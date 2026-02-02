@@ -1,0 +1,6 @@
+applicationType: function
+defaultPackage: cat.complai
+testFramework: junit
+sourceLanguage: java
+buildTool: gradle
+features: [ amazon-api-gateway-http, app-name, aws-lambda, aws-lambda-handler-apigateway-v2, cache-caffeine, gradle, http-client, jackson-databind, java, junit, logback, micronaut-build, properties, readme, shade, snapstart, x86 ]

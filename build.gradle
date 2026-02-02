@@ -1,0 +1,51 @@
+plugins {
+    id("io.micronaut.library") version "4.6.1"
+    id("com.gradleup.shadow") version "8.3.9"
+    id("application")
+}
+
+version = "0.1"
+group = "cat.complai"
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation("com.amazonaws:aws-lambda-java-events")
+    implementation("io.micronaut:micronaut-http-client")
+    implementation("io.micronaut:micronaut-jackson-databind")
+    implementation("io.micronaut.aws:micronaut-aws-apigateway")
+    implementation("io.micronaut.aws:micronaut-function-aws")
+    implementation("io.micronaut.cache:micronaut-cache-caffeine")
+    implementation("io.micronaut.crac:micronaut-crac")
+    // Thymeleaf support for Micronaut
+    implementation("io.micronaut.views:micronaut-views-thymeleaf")
+    // Netty server for local run
+    runtimeOnly("io.micronaut:micronaut-http-server-netty")
+    runtimeOnly("ch.qos.logback:logback-classic")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+
+java {
+    sourceCompatibility = JavaVersion.toVersion("21")
+    targetCompatibility = JavaVersion.toVersion("21")
+}
+
+
+micronaut {
+    runtime("lambda_java")
+    testRuntime("junit5")
+    nativeLambda {
+        lambdaRuntimeClassName = "io.micronaut.function.aws.runtime.APIGatewayV2HTTPEventMicronautLambdaRuntime"
+    }
+    processing {
+        incremental(true)
+        annotations("cat.complai.*")
+    }
+}
+
+application {
+    mainClass.set("cat.complai.App" )
+}
