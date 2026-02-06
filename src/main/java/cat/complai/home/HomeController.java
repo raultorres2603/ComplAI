@@ -6,12 +6,12 @@ import io.micronaut.http.annotation.Get;
 
 import java.util.logging.Logger;
 
-@Controller("/")
+@Controller()
 public class HomeController {
 
     private final Logger logger = Logger.getLogger(HomeController.class.getName());
 
-    @Get("/")
+    @Get()
     public HomeDto index() {
         logger.info("Accessed home page");
         return new HomeDto("Welcome to ComplAI!", System.currentTimeMillis());
