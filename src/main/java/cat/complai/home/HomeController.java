@@ -1,5 +1,6 @@
 package cat.complai.home;
 
+import cat.complai.home.dto.HomeDto;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Produces;
@@ -13,8 +14,8 @@ public class HomeController {
 
     @Get("/")
     @Produces("application/json")
-    public String index() {
+    public HomeDto index() {
         logger.info("Accessed home page");
-        return "Hello, welcome to ComplAI! This is the home page.";
+        return new HomeDto("Welcome to ComplAI!", System.currentTimeMillis());
     }
 }
