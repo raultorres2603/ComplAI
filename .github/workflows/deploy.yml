@@ -65,9 +65,11 @@ jobs:
       - name: Install AWS CDK CLI
         run: npm install -g aws-cdk
 
-      # Placeholder for CDK deployment
+      - name: Install CDK dependencies
+        run: cd cdk && npm install
+
       - name: Deploy with AWS CDK
-        run: echo "cdk deploy (infra code to be added)"
+        run: cd cdk && npx cdk deploy --require-approval never
 
 # Best practices:
 # - Use GitHub secrets for AWS credentials

@@ -2,9 +2,7 @@ package cat.complai.home;
 
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
-import io.micronaut.views.View;
 
-import java.util.Map;
 import java.util.logging.Logger;
 
 @Controller("/")

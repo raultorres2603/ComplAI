@@ -19,14 +19,10 @@ dependencies {
     implementation("io.micronaut.aws:micronaut-function-aws")
     implementation("io.micronaut.cache:micronaut-cache-caffeine")
     implementation("io.micronaut.crac:micronaut-crac")
-    // Thymeleaf support for Micronaut
-    implementation("io.micronaut.views:micronaut-views-thymeleaf")
     // Netty server for local run
     runtimeOnly("io.micronaut:micronaut-http-server-netty")
     runtimeOnly("ch.qos.logback:logback-classic")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-    // HTMX for dynamic HTML interactions
-    implementation("org.webjars.npm:htmx.org:1.9.10")
 }
 
 
