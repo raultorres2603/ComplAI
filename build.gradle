@@ -14,7 +14,6 @@ repositories {
 dependencies {
     implementation("com.amazonaws:aws-lambda-java-events")
     implementation("io.micronaut:micronaut-http-client")
-    implementation("io.micronaut:micronaut-jackson-databind")
     implementation("io.micronaut.aws:micronaut-aws-apigateway")
     implementation("io.micronaut.aws:micronaut-function-aws")
     implementation("io.micronaut.cache:micronaut-cache-caffeine")
