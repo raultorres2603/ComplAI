@@ -25,6 +25,8 @@ dependencies {
     runtimeOnly("io.micronaut:micronaut-http-server-netty")
     runtimeOnly("ch.qos.logback:logback-classic")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    // HTMX for dynamic HTML interactions
+    implementation("org.webjars.npm:htmx.org:1.9.10")
 }
 
 
