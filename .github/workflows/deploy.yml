@@ -43,7 +43,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     environment:
-      name: dev
+      name: production
     steps:
       - name: Download JAR artifact
         uses: actions/download-artifact@v7
