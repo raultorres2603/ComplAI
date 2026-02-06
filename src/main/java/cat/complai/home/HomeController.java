@@ -3,14 +3,18 @@ package cat.complai.home;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.views.View;
+
 import java.util.Map;
+import java.util.logging.Logger;
 
 @Controller("/")
 public class HomeController {
 
+    private final Logger logger = Logger.getLogger(HomeController.class.getName());
+
     @Get("/")
-    @View("home.html")
-    public Map<String, Object> index() {
-        return Map.of("message", "Hello, World!");
+    public String index() {
+        logger.info("Accessed home page");
+        return "Hello, welcome to ComplAI! This is the home page.";
     }
 }
