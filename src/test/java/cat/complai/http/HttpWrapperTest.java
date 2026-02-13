@@ -27,15 +27,12 @@ public class HttpWrapperTest {
         // Start a simple HTTP server that mimics OpenRouter's response
         HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
         String responseJson = "{\"choices\":[{\"message\":{\"content\":\"Hello from mock\"}}]}";
-        server.createContext("/api/v1/chat/completions", new HttpHandler() {
-            @Override
-            public void handle(HttpExchange exchange) throws IOException {
-                byte[] bytes = responseJson.getBytes();
-                exchange.getResponseHeaders().add("Content-Type", "application/json");
-                exchange.sendResponseHeaders(200, bytes.length);
-                try (OutputStream os = exchange.getResponseBody()) {
-                    os.write(bytes);
-                }
+        server.createContext("/api/v1/chat/completions", exchange -> {
+            byte[] bytes = responseJson.getBytes();
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, bytes.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(bytes);
             }
         });
         server.start();
@@ -68,15 +65,12 @@ public class HttpWrapperTest {
     public void postToOpenRouterAsync_shouldReturnErrorOnNon2xx() throws Exception {
         String body = "{\"error\":\"server failure\"}";
         HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
-        server.createContext("/api/v1/chat/completions", new HttpHandler() {
-            @Override
-            public void handle(HttpExchange exchange) throws IOException {
-                byte[] bytes = body.getBytes();
-                exchange.getResponseHeaders().add("Content-Type", "application/json");
-                exchange.sendResponseHeaders(500, bytes.length);
-                try (OutputStream os = exchange.getResponseBody()) {
-                    os.write(bytes);
-                }
+        server.createContext("/api/v1/chat/completions", exchange -> {
+            byte[] bytes = body.getBytes();
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(500, bytes.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(bytes);
             }
         });
         server.start();
@@ -108,15 +102,12 @@ public class HttpWrapperTest {
     public void postToOpenRouterAsync_shouldHandleMalformedJsonGracefully() throws Exception {
         String body = "not a json";
         HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
-        server.createContext("/api/v1/chat/completions", new HttpHandler() {
-            @Override
-            public void handle(HttpExchange exchange) throws IOException {
-                byte[] bytes = body.getBytes();
-                exchange.getResponseHeaders().add("Content-Type", "text/plain");
-                exchange.sendResponseHeaders(200, bytes.length);
-                try (OutputStream os = exchange.getResponseBody()) {
-                    os.write(bytes);
-                }
+        server.createContext("/api/v1/chat/completions", exchange -> {
+            byte[] bytes = body.getBytes();
+            exchange.getResponseHeaders().add("Content-Type", "text/plain");
+            exchange.sendResponseHeaders(200, bytes.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(bytes);
             }
         });
         server.start();
@@ -149,17 +140,14 @@ public class HttpWrapperTest {
         final String[] receivedAuth = new String[1];
         String resp = "{\"choices\":[{\"message\":{\"content\":\"ok\"}}]}";
         HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
-        server.createContext("/api/v1/chat/completions", new HttpHandler() {
-            @Override
-            public void handle(HttpExchange exchange) throws IOException {
-                Headers reqHeaders = exchange.getRequestHeaders();
-                receivedAuth[0] = reqHeaders.getFirst("Authorization");
-                byte[] bytes = resp.getBytes();
-                exchange.getResponseHeaders().add("Content-Type", "application/json");
-                exchange.sendResponseHeaders(200, bytes.length);
-                try (OutputStream os = exchange.getResponseBody()) {
-                    os.write(bytes);
-                }
+        server.createContext("/api/v1/chat/completions", exchange -> {
+            Headers reqHeaders = exchange.getRequestHeaders();
+            receivedAuth[0] = reqHeaders.getFirst("Authorization");
+            byte[] bytes = resp.getBytes();
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, bytes.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(bytes);
             }
         });
         server.start();
