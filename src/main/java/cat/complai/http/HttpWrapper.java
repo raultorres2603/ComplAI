@@ -57,19 +57,6 @@ public class HttpWrapper {
         this.headers = Map.copyOf(h);
     }
 
-    /**
-     * Test-friendly constructor. Use in unit tests to provide a local mock server, client and explicit headers.
-     */
-    HttpWrapper(String openRouterUrl, HttpClient httpClient, ObjectMapper mapper, Map<String, String> headers) {
-        this.openRouterUrl = openRouterUrl;
-        this.httpClient = httpClient == null ? HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build() : httpClient;
-        this.mapper = mapper == null ? new ObjectMapper() : mapper;
-        Map<String, String> h = new HashMap<>(headers == null ? Map.of() : headers);
-        h.putIfAbsent("HTTP-Referer", "https://complai.cat");
-        h.putIfAbsent("X-Title", "Complai");
-        this.headers = Map.copyOf(h);
-    }
-
     public CompletableFuture<HttpDto> postToOpenRouterAsync(String userPrompt) {
         try {
             String model = "minimax/minimax-m2.5";
