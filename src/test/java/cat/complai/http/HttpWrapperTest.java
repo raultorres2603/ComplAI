@@ -1,6 +1,7 @@
 package cat.complai.http;
 
 import cat.complai.http.dto.HttpDto;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -12,6 +13,8 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.http.HttpClient;
+import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -37,11 +40,16 @@ public class HttpWrapperTest {
         });
         server.start();
 
-        try (ApplicationContext ctx = ApplicationContext.run(Map.of(
+        Map<String, Object> props = Map.of(
                 "openrouter.url", "http://localhost:" + server.getAddress().getPort() + "/api/v1/chat/completions",
                 "OPENROUTER_API_KEY", "test-key",
                 "micronaut.application.name", "complai-test"
-        ), Environment.TEST)) {
+        );
+        try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST).build()) {
+            // register singletons before starting context so DI finds them
+            ctx.registerSingleton(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build());
+            ctx.registerSingleton(new ObjectMapper());
+            ctx.start();
             HttpWrapper httpWrapper = ctx.getBean(HttpWrapper.class);
             var future = httpWrapper.postToOpenRouterAsync("Test prompt");
             HttpDto dto = future.get(5, TimeUnit.SECONDS);
@@ -73,10 +81,14 @@ public class HttpWrapperTest {
         });
         server.start();
 
-        try (ApplicationContext ctx = ApplicationContext.run(Map.of(
+        Map<String, Object> props = Map.of(
                 "openrouter.url", "http://localhost:" + server.getAddress().getPort() + "/api/v1/chat/completions",
                 "OPENROUTER_API_KEY", "test-key"
-        ), Environment.TEST)) {
+        );
+        try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST).build()) {
+            ctx.registerSingleton(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build());
+            ctx.registerSingleton(new ObjectMapper());
+            ctx.start();
             HttpWrapper wrapper = ctx.getBean(HttpWrapper.class);
 
             var future = wrapper.postToOpenRouterAsync("prompt");
@@ -109,10 +121,14 @@ public class HttpWrapperTest {
         });
         server.start();
 
-        try (ApplicationContext ctx = ApplicationContext.run(Map.of(
+        Map<String, Object> props = Map.of(
                 "openrouter.url", "http://localhost:" + server.getAddress().getPort() + "/api/v1/chat/completions",
                 "OPENROUTER_API_KEY", "test-key"
-        ), Environment.TEST)) {
+        );
+        try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST).build()) {
+            ctx.registerSingleton(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build());
+            ctx.registerSingleton(new ObjectMapper());
+            ctx.start();
             HttpWrapper wrapper = ctx.getBean(HttpWrapper.class);
 
             var future = wrapper.postToOpenRouterAsync("prompt");
@@ -148,11 +164,15 @@ public class HttpWrapperTest {
         });
         server.start();
 
-        try (ApplicationContext ctx = ApplicationContext.run(Map.of(
+        Map<String, Object> props = Map.of(
                 "openrouter.url", "http://localhost:" + server.getAddress().getPort() + "/api/v1/chat/completions",
                 // Put a plain token so wrapper prefixes Bearer
                 "OPENROUTER_API_KEY", "plain-token"
-        ), Environment.TEST)) {
+        );
+        try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST).build()) {
+            ctx.registerSingleton(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build());
+            ctx.registerSingleton(new ObjectMapper());
+            ctx.start();
             HttpWrapper wrapper = ctx.getBean(HttpWrapper.class);
 
             var future = wrapper.postToOpenRouterAsync("prompt");
