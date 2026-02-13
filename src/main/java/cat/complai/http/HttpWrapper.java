@@ -1,11 +1,12 @@
 package cat.complai.http;
 
 import cat.complai.http.dto.HttpDto;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import io.micronaut.context.annotation.Value;
 
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.net.URI;
@@ -19,59 +20,51 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
- * This class is intended to serve as a wrapper for HTTP-related functionalities in the Complai application. It can be used to centralize and manage HTTP requests, responses, and any related logic that may be needed across different parts of the application. This could include handling common headers, managing authentication tokens, or providing utility methods for making HTTP calls to external services.
+ * HTTP wrapper for calling OpenRouter (or compatible) endpoints.
+ * Design notes:
+ * - Use a single constructor for DI so Micronaut creates the singleton cleanly.
+ * - Provide a package-visible/test-friendly constructor for unit tests to override URL/client/mapper/headers.
  */
 @Singleton
 public class HttpWrapper {
-    // Endpoint and configuration - default values provided but overridable for testing
+    // Endpoint and configuration - overridable for testing
     private final String openRouterUrl;
     private final Map<String, String> headers;
-    private final String model = "minimax/minimax-m2.5";
 
     // HttpClient and ObjectMapper are fields to allow injection and easier testing
     private final HttpClient httpClient;
     private final ObjectMapper mapper;
 
-    // Default constructor used by the application
-    public HttpWrapper() {
-        this.openRouterUrl = "https://openrouter.ai/api/v1/chat/completions";
-        this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(10))
-                .build();
-        this.mapper = new ObjectMapper();
-        // Safely initialize headers: only include Authorization if the env var is present
+    /**
+     * DI-friendly constructor used by Micronaut in production.
+     * Reads configuration via @Value for easy wiring and sensible defaults.
+     */
+    @Inject
+    public HttpWrapper(HttpClient httpClient,
+                       ObjectMapper mapper,
+                       @Value("${openrouter.url:https://openrouter.ai/api/v1/chat/completions}") String openRouterUrl,
+                       @Value("${OPENROUTER_API_KEY:}") String openRouterApiKey) {
+        this.openRouterUrl = openRouterUrl;
+        this.httpClient = httpClient == null ? HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build() : httpClient;
+        this.mapper = mapper == null ? new ObjectMapper() : mapper;
+
         Map<String, String> h = new HashMap<>();
-        String apiKeyEnv = System.getenv("OPENROUTER_API_KEY");
-        if (apiKeyEnv != null && !apiKeyEnv.isBlank()) {
-            h.put("Authorization", apiKeyEnv);
+        if (openRouterApiKey != null && !openRouterApiKey.isBlank()) {
+            h.put("Authorization", openRouterApiKey);
         }
         h.put("HTTP-Referer", "https://complai.cat");
         h.put("X-Title", "Complai");
         this.headers = Map.copyOf(h);
     }
 
-    // Test-friendly constructor to override URL/client/mapper
-    public HttpWrapper(String openRouterUrl, HttpClient httpClient, ObjectMapper mapper) {
+    /**
+     * Test-friendly constructor. Use in unit tests to provide a local mock server, client and explicit headers.
+     */
+    HttpWrapper(String openRouterUrl, HttpClient httpClient, ObjectMapper mapper, Map<String, String> headers) {
         this.openRouterUrl = openRouterUrl;
-        this.httpClient = httpClient;
-        this.mapper = mapper;
-        Map<String, String> h = new HashMap<>();
-        String apiKeyEnv = System.getenv("OPENROUTER_API_KEY");
-        if (apiKeyEnv != null && !apiKeyEnv.isBlank()) {
-            h.put("Authorization", apiKeyEnv);
-        }
-        h.put("HTTP-Referer", "https://complai.cat");
-        h.put("X-Title", "Complai");
-        this.headers = Map.copyOf(h);
-    }
-
-    // Additional constructor allowing test to provide headers explicitly (e.g., bypass env)
-    public HttpWrapper(String openRouterUrl, HttpClient httpClient, ObjectMapper mapper, Map<String, String> headers) {
-        this.openRouterUrl = openRouterUrl;
-        this.httpClient = httpClient;
-        this.mapper = mapper;
+        this.httpClient = httpClient == null ? HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build() : httpClient;
+        this.mapper = mapper == null ? new ObjectMapper() : mapper;
         Map<String, String> h = new HashMap<>(headers == null ? Map.of() : headers);
-        // ensure referer and title defaults exist if not provided
         h.putIfAbsent("HTTP-Referer", "https://complai.cat");
         h.putIfAbsent("X-Title", "Complai");
         this.headers = Map.copyOf(h);
@@ -79,6 +72,7 @@ public class HttpWrapper {
 
     public CompletableFuture<HttpDto> postToOpenRouterAsync(String userPrompt) {
         try {
+            String model = "minimax/minimax-m2.5";
             Map<String, Object> payload = Map.of(
                     "model", model,
                     "messages", List.of(Map.of("role", "user", "content", userPrompt))
@@ -139,7 +133,7 @@ public class HttpWrapper {
             }
             return null;
         } catch (Exception e) {
-            // If parsing fails, return raw body
+            // If parsing fails, return null (caller handles it)
             return null;
         }
     }

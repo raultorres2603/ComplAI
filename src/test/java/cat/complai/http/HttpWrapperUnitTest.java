@@ -3,12 +3,9 @@ package cat.complai.http;
 import cat.complai.http.dto.HttpDto;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.Headers;
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.http.HttpClient;
@@ -18,7 +15,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-public class HttpWrapperTest {
+public class HttpWrapperUnitTest {
 
     @Test
     public void postToOpenRouterAsync_shouldReturnParsedMessage() throws Exception {
