@@ -12,6 +12,8 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
+import java.util.concurrent.CompletableFuture;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -21,40 +23,74 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  */
 @Singleton
 public class HttpWrapper {
-    private final String openRouterUrl = "https://openrouter.ai/api/v1/chat/completions";
-    private final Map<String, String> headers = Map.of(
-        "Authorization", System.getenv("OPENROUTER_API_KEY"),
-            "HTTP-Referer", "https://complai.cat",
-            "X-Title", "Complai"
-                );
+    // Endpoint and configuration - default values provided but overridable for testing
+    private final String openRouterUrl;
+    private final Map<String, String> headers;
     private final String model = "minimax/minimax-m2.5";
 
-    public HttpWrapper() {
-        // Initialize headers, model, and messages as needed
-    }
+    // HttpClient and ObjectMapper are fields to allow injection and easier testing
+    private final HttpClient httpClient;
+    private final ObjectMapper mapper;
 
-    public HttpDto postToOpenRouter(String userPrompt) {
-        HttpClient client = HttpClient.newBuilder()
+    // Default constructor used by the application
+    public HttpWrapper() {
+        this.openRouterUrl = "https://openrouter.ai/api/v1/chat/completions";
+        this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
-        ObjectMapper mapper = new ObjectMapper();
+        this.mapper = new ObjectMapper();
+        // Safely initialize headers: only include Authorization if the env var is present
+        Map<String, String> h = new HashMap<>();
+        String apiKeyEnv = System.getenv("OPENROUTER_API_KEY");
+        if (apiKeyEnv != null && !apiKeyEnv.isBlank()) {
+            h.put("Authorization", apiKeyEnv);
+        }
+        h.put("HTTP-Referer", "https://complai.cat");
+        h.put("X-Title", "Complai");
+        this.headers = Map.copyOf(h);
+    }
 
-        // Build payload according to OpenRouter chat completions shape
-        Map<String, Object> payload = Map.of(
-                "model", model,
-                "messages", List.of(Map.of("role", "user", "content", userPrompt))
-        );
+    // Test-friendly constructor to override URL/client/mapper
+    public HttpWrapper(String openRouterUrl, HttpClient httpClient, ObjectMapper mapper) {
+        this.openRouterUrl = openRouterUrl;
+        this.httpClient = httpClient;
+        this.mapper = mapper;
+        Map<String, String> h = new HashMap<>();
+        String apiKeyEnv = System.getenv("OPENROUTER_API_KEY");
+        if (apiKeyEnv != null && !apiKeyEnv.isBlank()) {
+            h.put("Authorization", apiKeyEnv);
+        }
+        h.put("HTTP-Referer", "https://complai.cat");
+        h.put("X-Title", "Complai");
+        this.headers = Map.copyOf(h);
+    }
 
+    // Additional constructor allowing test to provide headers explicitly (e.g., bypass env)
+    public HttpWrapper(String openRouterUrl, HttpClient httpClient, ObjectMapper mapper, Map<String, String> headers) {
+        this.openRouterUrl = openRouterUrl;
+        this.httpClient = httpClient;
+        this.mapper = mapper;
+        Map<String, String> h = new HashMap<>(headers == null ? Map.of() : headers);
+        // ensure referer and title defaults exist if not provided
+        h.putIfAbsent("HTTP-Referer", "https://complai.cat");
+        h.putIfAbsent("X-Title", "Complai");
+        this.headers = Map.copyOf(h);
+    }
+
+    public CompletableFuture<HttpDto> postToOpenRouterAsync(String userPrompt) {
         try {
+            Map<String, Object> payload = Map.of(
+                    "model", model,
+                    "messages", List.of(Map.of("role", "user", "content", userPrompt))
+            );
             String requestBody = mapper.writeValueAsString(payload);
 
-            // Normalize authorization header (allow raw key in env or already a Bearer token)
             String authValue = headers.get("Authorization");
             if (authValue == null || authValue.isBlank()) {
                 authValue = System.getenv("OPENROUTER_API_KEY");
             }
             if (authValue == null) {
-                return new HttpDto(null, null, "POST", "Missing OPENROUTER_API_KEY");
+                return CompletableFuture.completedFuture(new HttpDto(null, null, "POST", "Missing OPENROUTER_API_KEY"));
             }
             if (!authValue.toLowerCase().startsWith("bearer ")) {
                 authValue = "Bearer " + authValue;
@@ -70,19 +106,21 @@ public class HttpWrapper {
                     .POST(BodyPublishers.ofString(requestBody))
                     .build();
 
-            HttpResponse<String> response = client.send(request, BodyHandlers.ofString());
-            int status = response.statusCode();
-            String responseBody = response.body();
+            return httpClient.sendAsync(request, BodyHandlers.ofString())
+                    .<HttpDto>thenApply(response -> {
+                        int status = response.statusCode();
+                        String body = response.body();
+                        if (status >= 200 && status < 300) {
+                            String extracted = extractTextFromOpenRouterResponse(body, mapper);
+                            return new HttpDto(extracted, status, "POST", null);
+                        } else {
+                            return new HttpDto(body, status, "POST", String.format("OpenRouter non-2xx response: %d", status));
+                        }
+                    })
+                    .exceptionally(ex -> new HttpDto(null, null, "POST", ex.getMessage()));
 
-            if (status >= 200 && status < 300) {
-                String extracted = extractTextFromOpenRouterResponse(responseBody, mapper);
-                return new HttpDto(extracted, status, "POST", null);
-            } else {
-                String err = String.format("OpenRouter non-2xx response: %d", status);
-                return new HttpDto(responseBody, status, "POST", err);
-            }
         } catch (Exception e) {
-            return new HttpDto(null, null, "POST", e.getMessage());
+            return CompletableFuture.completedFuture(new HttpDto(null, null, "POST", e.getMessage()));
         }
     }
 
@@ -95,22 +133,14 @@ public class HttpWrapper {
                 if (first.has("message") && first.get("message").has("content")) {
                     return first.get("message").get("content").asText();
                 }
+                if (first.has("text")) {
+                    return first.get("text").asText();
+                }
             }
             return null;
         } catch (Exception e) {
+            // If parsing fails, return raw body
             return null;
         }
-    }
-
-    public String getOpenRouterUrl() {
-        return openRouterUrl;
-    }
-
-    public Map<String, String> getHeaders() {
-        return headers;
-    }
-
-    public String getModel() {
-        return model;
     }
 }
