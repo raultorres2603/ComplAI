@@ -16,6 +16,7 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @MicronautTest
 public class OpenRouterControllerIntegrationTest {
@@ -30,7 +31,7 @@ public class OpenRouterControllerIntegrationTest {
         HttpRequest<AskRequest> httpReq = HttpRequest.POST("/openrouter/ask", req);
         HttpResponse<OpenRouterPublicDto> resp = client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
         assertEquals(200, resp.getStatus().getCode());
-        assertEquals(true, resp.getBody().get().isSuccess());
+        assertTrue(resp.getBody().get().isSuccess());
         assertEquals("OK from AI (integration)", resp.getBody().get().getMessage());
     }
 
@@ -40,7 +41,7 @@ public class OpenRouterControllerIntegrationTest {
         HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/openrouter/redact", req);
         HttpResponse<OpenRouterPublicDto> resp = client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
         assertEquals(200, resp.getStatus().getCode());
-        assertEquals(true, resp.getBody().get().isSuccess());
+        assertTrue(resp.getBody().get().isSuccess());
         assertEquals("Redacted (integration)", resp.getBody().get().getMessage());
     }
 

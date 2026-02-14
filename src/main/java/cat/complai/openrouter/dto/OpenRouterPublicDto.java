@@ -28,10 +28,6 @@ public class OpenRouterPublicDto {
         return error;
     }
 
-    public OpenRouterErrorCode getErrorCode() {
-        return errorCode;
-    }
-
     public static OpenRouterPublicDto from(OpenRouterResponseDto dto) {
         if (dto == null) return null;
         return new OpenRouterPublicDto(dto.isSuccess(), dto.getMessage(), dto.getError(), dto.getErrorCode());

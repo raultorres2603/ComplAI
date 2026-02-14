@@ -75,26 +75,26 @@ public class OpenRouterServices implements IOpenRouterService {
         try {
             CompletableFuture<HttpDto> future = httpWrapper.postToOpenRouterAsync(prompt);
             HttpDto dto = future.get(30, TimeUnit.SECONDS);
-            logger.fine(() -> "callOpenRouterAndExtract: received dto=" + (dto == null ? "null" : String.valueOf(dto.getStatusCode())));
+            logger.fine(() -> "callOpenRouterAndExtract: received dto=" + (dto == null ? "null" : String.valueOf(dto.statusCode())));
             if (dto == null) {
                 logger.warning("callOpenRouterAndExtract: No response from AI service");
                 return new OpenRouterResponseDto(false, null, "No response from AI service.", null, OpenRouterErrorCode.UPSTREAM);
             }
-            if (dto.getError() != null && !dto.getError().isBlank()) {
-                logger.log(Level.WARNING, "AI wrapper returned error: {0}", dto.getError());
-                return new OpenRouterResponseDto(false, dto.getMessage(), dto.getError(), dto.getStatusCode(), OpenRouterErrorCode.UPSTREAM);
+            if (dto.error() != null && !dto.error().isBlank()) {
+                logger.log(Level.WARNING, "AI wrapper returned error: {0}", dto.error());
+                return new OpenRouterResponseDto(false, dto.message(), dto.error(), dto.statusCode(), OpenRouterErrorCode.UPSTREAM);
             }
-            if (dto.getMessage() != null && !dto.getMessage().isBlank()) {
+            if (dto.message() != null && !dto.message().isBlank()) {
                 // If the AI refused because it's not about El Prat, map to a standardized error
-                if (aiRefusedAsNotAboutElPrat(dto.getMessage())) {
+                if (aiRefusedAsNotAboutElPrat(dto.message())) {
                     logger.info("AI refused - not about El Prat");
-                    return new OpenRouterResponseDto(false, null, "Request is not about El Prat de Llobregat.", dto.getStatusCode(), OpenRouterErrorCode.REFUSAL);
+                    return new OpenRouterResponseDto(false, null, "Request is not about El Prat de Llobregat.", dto.statusCode(), OpenRouterErrorCode.REFUSAL);
                 }
                 logger.fine("AI returned a message successfully");
-                return new OpenRouterResponseDto(true, dto.getMessage(), null, dto.getStatusCode(), OpenRouterErrorCode.NONE);
+                return new OpenRouterResponseDto(true, dto.message(), null, dto.statusCode(), OpenRouterErrorCode.NONE);
             }
             logger.warning("AI returned no message");
-            return new OpenRouterResponseDto(false, null, "AI returned no message.", dto.getStatusCode(), OpenRouterErrorCode.UPSTREAM);
+            return new OpenRouterResponseDto(false, null, "AI returned no message.", dto.statusCode(), OpenRouterErrorCode.UPSTREAM);
         } catch (TimeoutException te) {
             logger.log(Level.SEVERE, "AI service timed out", te);
             return new OpenRouterResponseDto(false, null, "AI service timed out.", null, OpenRouterErrorCode.TIMEOUT);

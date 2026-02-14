@@ -10,10 +10,6 @@ public class OpenRouterResponseDto {
     private final Integer statusCode; // HTTP status code from AI service when available
     private final OpenRouterErrorCode errorCode;
 
-    public OpenRouterResponseDto(boolean success, String message, String error, Integer statusCode) {
-        this(success, message, error, statusCode, OpenRouterErrorCode.NONE);
-    }
-
     public OpenRouterResponseDto(boolean success, String message, String error, Integer statusCode, OpenRouterErrorCode errorCode) {
         this.success = success;
         this.message = message;
@@ -32,10 +28,6 @@ public class OpenRouterResponseDto {
 
     public String getError() {
         return error;
-    }
-
-    public Integer getStatusCode() {
-        return statusCode;
     }
 
     public OpenRouterErrorCode getErrorCode() {

@@ -3,14 +3,11 @@ package cat.complai.http;
 import cat.complai.http.dto.HttpDto;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.Headers;
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.env.Environment;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.http.HttpClient;
@@ -52,10 +49,10 @@ public class HttpWrapperTest {
             HttpDto dto = future.get(5, TimeUnit.SECONDS);
 
             assertNotNull(dto);
-            assertEquals(200, dto.getStatusCode());
-            assertNull(dto.getError());
-            assertNotNull(dto.getMessage());
-            assertTrue(dto.getMessage().contains("Hello from mock"));
+            assertEquals(200, dto.statusCode());
+            assertNull(dto.error());
+            assertNotNull(dto.message());
+            assertTrue(dto.message().contains("Hello from mock"));
         } finally {
             server.stop(0);
         }
@@ -89,10 +86,10 @@ public class HttpWrapperTest {
             HttpDto dto = future.get(5, TimeUnit.SECONDS);
 
             assertNotNull(dto);
-            assertEquals(500, dto.getStatusCode());
-            assertNotNull(dto.getError());
-            assertTrue(dto.getError().contains("OpenRouter non-2xx response"));
-            assertEquals(body, dto.getMessage());
+            assertEquals(500, dto.statusCode());
+            assertNotNull(dto.error());
+            assertTrue(dto.error().contains("OpenRouter non-2xx response"));
+            assertEquals(body, dto.message());
         } finally {
             server.stop(0);
         }
@@ -126,10 +123,10 @@ public class HttpWrapperTest {
             HttpDto dto = future.get(5, TimeUnit.SECONDS);
 
             assertNotNull(dto);
-            assertEquals(200, dto.getStatusCode());
+            assertEquals(200, dto.statusCode());
             // current implementation returns null message when parsing fails
-            assertNull(dto.getMessage());
-            assertNull(dto.getError());
+            assertNull(dto.message());
+            assertNull(dto.error());
         } finally {
             server.stop(0);
         }
@@ -167,10 +164,10 @@ public class HttpWrapperTest {
             HttpDto dto = future.get(5, TimeUnit.SECONDS);
 
             assertNotNull(dto);
-            assertEquals(200, dto.getStatusCode());
-            assertNull(dto.getError());
-            assertNotNull(dto.getMessage());
-            assertEquals("ok", dto.getMessage());
+            assertEquals(200, dto.statusCode());
+            assertNull(dto.error());
+            assertNotNull(dto.message());
+            assertEquals("ok", dto.message());
             assertNotNull(receivedAuth[0]);
             assertTrue(receivedAuth[0].startsWith("Bearer "));
             assertTrue(receivedAuth[0].endsWith("plain-token"));

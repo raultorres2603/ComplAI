@@ -9,7 +9,7 @@ import cat.complai.openrouter.controllers.dto.RedactRequest;
 import io.micronaut.http.HttpResponse;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class OpenRouterControllerTest {
 
@@ -55,7 +55,7 @@ public class OpenRouterControllerTest {
         AskRequest req = new AskRequest("Is there a recycling center?");
         HttpResponse<OpenRouterPublicDto> resp = c.ask(req);
         assertEquals(200, resp.getStatus().getCode());
-        assertEquals(true, resp.getBody().get().isSuccess());
+        assertTrue(resp.getBody().get().isSuccess());
         assertEquals("OK from AI", resp.getBody().get().getMessage());
     }
 
@@ -65,7 +65,7 @@ public class OpenRouterControllerTest {
         AskRequest req = new AskRequest("What's the capital of France?");
         HttpResponse<OpenRouterPublicDto> resp = c.ask(req);
         assertEquals(422, resp.getStatus().getCode());
-        assertEquals(false, resp.getBody().get().isSuccess());
+        assertFalse(resp.getBody().get().isSuccess());
         assertEquals("Request is not about El Prat de Llobregat.", resp.getBody().get().getError());
     }
 
@@ -75,7 +75,7 @@ public class OpenRouterControllerTest {
         AskRequest req = new AskRequest("Is there a recycling center?");
         HttpResponse<OpenRouterPublicDto> resp = c.ask(req);
         assertEquals(502, resp.getStatus().getCode());
-        assertEquals(false, resp.getBody().get().isSuccess());
+        assertFalse(resp.getBody().get().isSuccess());
         assertEquals("Missing OPENROUTER_API_KEY", resp.getBody().get().getError());
     }
 
@@ -85,7 +85,7 @@ public class OpenRouterControllerTest {
         RedactRequest req = new RedactRequest("Noise from the airport");
         HttpResponse<OpenRouterPublicDto> resp = c.redact(req);
         assertEquals(200, resp.getStatus().getCode());
-        assertEquals(true, resp.getBody().get().isSuccess());
+        assertTrue(resp.getBody().get().isSuccess());
         assertEquals("Redacted letter", resp.getBody().get().getMessage());
     }
 
@@ -95,7 +95,7 @@ public class OpenRouterControllerTest {
         RedactRequest req = new RedactRequest("How to cook paella?");
         HttpResponse<OpenRouterPublicDto> resp = c.redact(req);
         assertEquals(422, resp.getStatus().getCode());
-        assertEquals(false, resp.getBody().get().isSuccess());
+        assertFalse(resp.getBody().get().isSuccess());
         assertEquals("Request is not about El Prat de Llobregat.", resp.getBody().get().getError());
     }
 
@@ -105,7 +105,7 @@ public class OpenRouterControllerTest {
         RedactRequest req = new RedactRequest("Noise from the airport");
         HttpResponse<OpenRouterPublicDto> resp = c.redact(req);
         assertEquals(502, resp.getStatus().getCode());
-        assertEquals(false, resp.getBody().get().isSuccess());
+        assertFalse(resp.getBody().get().isSuccess());
         assertEquals("OpenRouter non-2xx response: 500", resp.getBody().get().getError());
     }
 }

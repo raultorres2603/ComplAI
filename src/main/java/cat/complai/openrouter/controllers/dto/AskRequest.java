@@ -4,10 +4,7 @@ import io.micronaut.core.annotation.Introspected;
 
 @Introspected
 public class AskRequest {
-    private String text;
-
-    public AskRequest() {
-    }
+    private final String text;
 
     public AskRequest(String text) {
         this.text = text;
@@ -17,8 +14,5 @@ public class AskRequest {
         return text;
     }
 
-    public void setText(String text) {
-        this.text = text;
-    }
 }
 

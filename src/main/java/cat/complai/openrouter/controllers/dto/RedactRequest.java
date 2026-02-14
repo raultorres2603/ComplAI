@@ -6,9 +6,6 @@ import io.micronaut.core.annotation.Introspected;
 public class RedactRequest {
     private String text;
 
-    public RedactRequest() {
-    }
-
     public RedactRequest(String text) {
         this.text = text;
     }
@@ -17,8 +14,5 @@ public class RedactRequest {
         return text;
     }
 
-    public void setText(String text) {
-        this.text = text;
-    }
 }
 
