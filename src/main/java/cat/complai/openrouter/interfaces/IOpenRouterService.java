@@ -1,6 +1,8 @@
 package cat.complai.openrouter.interfaces;
 
+import cat.complai.openrouter.dto.OpenRouterResponseDto;
+
 public interface IOpenRouterService {
-        String ask(String question);
-        String redactComplaint(String complaint);
+    OpenRouterResponseDto ask(String question);
+    OpenRouterResponseDto redactComplaint(String complaint);
 }

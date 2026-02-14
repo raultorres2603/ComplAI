@@ -1,6 +1,7 @@
 package cat.complai.openrouter.interfaces.services;
 
 import cat.complai.openrouter.interfaces.IOpenRouterService;
+import cat.complai.openrouter.dto.OpenRouterResponseDto;
 import cat.complai.http.HttpWrapper;
 import cat.complai.http.dto.HttpDto;
 import jakarta.inject.Singleton;
@@ -22,18 +23,13 @@ public class OpenRouterServices implements IOpenRouterService {
     }
 
     @Override
-    public String ask(String question) {
+    public OpenRouterResponseDto ask(String question) {
         if (question == null || question.isBlank()) {
-            return "Question must not be empty.";
-        }
-
-        // If the question does not mention El Prat, refuse.
-        if (isNotAboutElPrat(question)) {
-            return "I can only assist with matters related to El Prat de Llobregat.";
+            return new OpenRouterResponseDto(false, null, "Question must not be empty.", null);
         }
 
         String prompt = String.format(
-                "User question about El Prat de Llobregat:\n%s\n\nPlease answer concisely and provide relevant local information or guidance.",
+                "User question (from a resident). Please answer only if the question is about El Prat de Llobregat. If it's not about El Prat de Llobregat, politely say you can't help with that request.\n\nQuestion:\n%s\n\nPlease answer concisely and provide relevant local information or guidance.",
                 question.trim()
         );
 
@@ -41,49 +37,51 @@ public class OpenRouterServices implements IOpenRouterService {
     }
 
     @Override
-    public String redactComplaint(String complaint) {
+    public OpenRouterResponseDto redactComplaint(String complaint) {
         if (complaint == null || complaint.isBlank()) {
-            return "Complaint must not be empty.";
-        }
-
-        // If the complaint does not mention El Prat, refuse.
-        if (isNotAboutElPrat(complaint)) {
-            return "I can only help draft complaints or letters that are about El Prat de Llobregat.";
+            return new OpenRouterResponseDto(false, null, "Complaint must not be empty.", null);
         }
 
         String prompt = String.format(
-                "Please redact a formal, civil, and concise letter addressed to the City Hall (Ajuntament) of El Prat de Llobregat based on the following complaint. Include a short summary, the specific request or remedy sought, and a polite closing. Complaint text:\n%s",
+                "Please redact a formal, civil, and concise letter addressed to the City Hall (Ajuntament) of El Prat de Llobregat based on the following complaint. If the complaint is not about El Prat de Llobregat, politely say you can't help with that request. Include a short summary, the specific request or remedy sought, and a polite closing. Complaint text:\n%s",
                 complaint.trim()
         );
 
         return callOpenRouterAndExtract(prompt);
     }
 
-    private boolean isNotAboutElPrat(String text) {
-        if (text == null) return true;
-        String lower = text.toLowerCase();
-        return !(lower.contains("el prat de llobregat") || lower.contains("el prat") || lower.contains("prat de llobregat"));
+    /**
+     * Detect whether the assistant explicitly refused because the request is not about El Prat.
+     * This uses a small set of phrase checks that mirror the system prompt instruction.
+     */
+    private boolean aiRefusedAsNotAboutElPrat(String aiMessage) {
+        if (aiMessage == null) return false;
+        String lower = aiMessage.toLowerCase();
+        return lower.contains("can't help") || lower.contains("cannot help") || lower.contains("can't help with that request") || lower.contains("no puc ajudar") || lower.contains("no puedo ayudar");
     }
 
-    private String callOpenRouterAndExtract(String prompt) {
+    private OpenRouterResponseDto callOpenRouterAndExtract(String prompt) {
         try {
             CompletableFuture<HttpDto> future = httpWrapper.postToOpenRouterAsync(prompt);
             HttpDto dto = future.get(30, TimeUnit.SECONDS);
             if (dto == null) {
-                return "No response from AI service.";
+                return new OpenRouterResponseDto(false, null, "No response from AI service.", null);
             }
-            // If the wrapper returned an error, surface it directly to the caller.
             if (dto.getError() != null && !dto.getError().isBlank()) {
-                return dto.getError();
+                return new OpenRouterResponseDto(false, dto.getMessage(), dto.getError(), dto.getStatusCode());
             }
             if (dto.getMessage() != null && !dto.getMessage().isBlank()) {
-                return dto.getMessage();
+                // If the AI refused because it's not about El Prat, map to a standardized error
+                if (aiRefusedAsNotAboutElPrat(dto.getMessage())) {
+                    return new OpenRouterResponseDto(false, null, "Request is not about El Prat de Llobregat.", dto.getStatusCode());
+                }
+                return new OpenRouterResponseDto(true, dto.getMessage(), null, dto.getStatusCode());
             }
-            return "AI returned no message.";
+            return new OpenRouterResponseDto(false, null, "AI returned no message.", dto.getStatusCode());
         } catch (TimeoutException te) {
-            return "AI service timed out.";
+            return new OpenRouterResponseDto(false, null, "AI service timed out.", null);
         } catch (Exception e) {
-            return e.getMessage();
+            return new OpenRouterResponseDto(false, null, e.getMessage(), null);
         }
     }
 }

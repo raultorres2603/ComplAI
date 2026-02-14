@@ -32,6 +32,17 @@ public class HttpWrapper {
     private final HttpClient httpClient;
     private final ObjectMapper mapper;
 
+    /**
+     * Protected no-arg constructor to allow tests to subclass HttpWrapper without needing DI.
+     * Initializes fields with safe defaults.
+     */
+    protected HttpWrapper() {
+        this.openRouterUrl = "";
+        this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+        this.mapper = new ObjectMapper();
+        this.headers = Map.of();
+    }
+
     @Inject
     public HttpWrapper(@Value("${openrouter.url:https://openrouter.ai/api/v1/chat/completions}") String openRouterUrl,
                        @Value("${OPENROUTER_API_KEY:}") String openRouterApiKey) {
@@ -52,8 +63,10 @@ public class HttpWrapper {
         try {
             String model = "minimax/minimax-m2.5";
 
-            // System message defining assistant persona and constraint to El Prat de Llobregat.
-            String systemMessage = "You are an assistant that helps users draft formal letters and complaints to the City Hall (Ajuntament) of El Prat de Llobregat, provides local information about El Prat de Llobregat, and supports or clarifies users' opinions only when they are explicitly about El Prat de Llobregat. If the user's request is not about El Prat de Llobregat, reply that you can't help with that request.";
+            // Friendlier, town-tone system message for civilian users from El Prat de Llobregat.
+            String systemMessage = "Ets un assistent amable i proper per als veïns d'El Prat de Llobregat. Ajudes a redactar cartes i queixes clares i civils adreçades a l'Ajuntament i ofereixes informació pràctica i local d'El Prat. Mantén les respostes curtes, respectuoses i fàcils de llegir, com un veí que vol ajudar. Si la consulta no és sobre El Prat de Llobregat, digues-ho educadament i explica que no pots ajudar amb aquesta petició; també pots suggerir que facin una pregunta sobre assumptes locals." +
+                    "\n\nEn español: Eres un asistente amable y cercano para los vecinos de El Prat de Llobregat. Ayuda a redactar cartes i queixes dirigides al Ayuntamiento i ofereix informació pràctica i local. Mantén las respuestas cortas y fáciles de entender. Si la consulta no trata sobre El Prat, dilo educadamente y sugiere que pregunten sobre asuntos locales." +
+                    "\n\nIn English (support): You are a friendly local assistant for residents of El Prat de Llobregat. Help draft clear, civil letters to the City Hall and provide practical local information. Keep answers short and easy to read. If the request is not about El Prat de Llobregat, politely say you can't help with that request.";
 
             Map<String, Object> userMessage = Map.of("role", "user", "content", userPrompt);
             Map<String, Object> systemMsg = Map.of("role", "system", "content", systemMessage);
