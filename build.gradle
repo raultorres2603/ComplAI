@@ -25,6 +25,11 @@ dependencies {
     runtimeOnly("ch.qos.logback:logback-classic")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     implementation 'io.swagger.core.v3:swagger-annotations:2.2.17'
+
+    // Micronaut OpenAPI - annotation processor and runtime
+    compileOnly("io.micronaut.openapi:micronaut-openapi:6.0.2")
+    annotationProcessor("io.micronaut.openapi:micronaut-openapi:6.0.2")
+    implementation("io.swagger.core.v3:swagger-annotations:2.2.17")
 }
 
 
