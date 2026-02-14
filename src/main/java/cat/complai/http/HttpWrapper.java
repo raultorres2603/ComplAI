@@ -21,9 +21,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * HTTP wrapper for calling OpenRouter (or compatible) endpoints.
- * Design notes:
- * - Use a single constructor for DI so Micronaut creates the singleton cleanly.
- * - Provide a package-visible/test-friendly constructor for unit tests to override URL/client/mapper/headers.
  */
 @Singleton
 public class HttpWrapper {
@@ -35,18 +32,12 @@ public class HttpWrapper {
     private final HttpClient httpClient;
     private final ObjectMapper mapper;
 
-    /**
-     * DI-friendly constructor used by Micronaut in production.
-     * Reads configuration via @Value for easy wiring and sensible defaults.
-     */
     @Inject
-    public HttpWrapper(HttpClient httpClient,
-                       ObjectMapper mapper,
-                       @Value("${openrouter.url:https://openrouter.ai/api/v1/chat/completions}") String openRouterUrl,
+    public HttpWrapper(@Value("${openrouter.url:https://openrouter.ai/api/v1/chat/completions}") String openRouterUrl,
                        @Value("${OPENROUTER_API_KEY:}") String openRouterApiKey) {
         this.openRouterUrl = openRouterUrl;
-        this.httpClient = httpClient == null ? HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build() : httpClient;
-        this.mapper = mapper == null ? new ObjectMapper() : mapper;
+        this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+        this.mapper = new ObjectMapper();
 
         Map<String, String> h = new HashMap<>();
         if (openRouterApiKey != null && !openRouterApiKey.isBlank()) {
@@ -60,9 +51,16 @@ public class HttpWrapper {
     public CompletableFuture<HttpDto> postToOpenRouterAsync(String userPrompt) {
         try {
             String model = "minimax/minimax-m2.5";
+
+            // System message defining assistant persona and constraint to El Prat de Llobregat.
+            String systemMessage = "You are an assistant that helps users draft formal letters and complaints to the City Hall (Ajuntament) of El Prat de Llobregat, provides local information about El Prat de Llobregat, and supports or clarifies users' opinions only when they are explicitly about El Prat de Llobregat. If the user's request is not about El Prat de Llobregat, reply that you can't help with that request.";
+
+            Map<String, Object> userMessage = Map.of("role", "user", "content", userPrompt);
+            Map<String, Object> systemMsg = Map.of("role", "system", "content", systemMessage);
+
             Map<String, Object> payload = Map.of(
                     "model", model,
-                    "messages", List.of(Map.of("role", "user", "content", userPrompt))
+                    "messages", List.of(systemMsg, userMessage)
             );
             String requestBody = mapper.writeValueAsString(payload);
 
@@ -88,7 +86,7 @@ public class HttpWrapper {
                     .build();
 
             return httpClient.sendAsync(request, BodyHandlers.ofString())
-                    .<HttpDto>thenApply(response -> {
+                    .thenApply(response -> {
                         int status = response.statusCode();
                         String body = response.body();
                         if (status >= 200 && status < 300) {
