@@ -52,6 +52,18 @@ jobs:
         with:
           name: lambda-jar
 
+      - name: Validate OPENROUTER_API_KEY
+        # Fail fast if the OpenRouter API key secret is missing from GitHub secrets.
+        # Read the secret into an env var and check it's not empty; this prevents us
+        # from calling CDK with an empty parameter and failing mid-deploy.
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          if [ -z "$OPENROUTER_API_KEY" ]; then
+            echo "ERROR: OPENROUTER_API_KEY is not set or is empty. Aborting deploy." >&2
+            exit 1
+          fi
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
         with:
@@ -70,7 +82,14 @@ jobs:
         run: cd cdk && npm install
 
       - name: Deploy with AWS CDK
-        run: cd cdk && npx cdk deploy --require-approval never
+        # Pass the OpenRouter API key as a CloudFormation parameter to CDK so it becomes
+        # available as an environment variable in the Lambda. The value is taken from
+        # a GitHub Secret named OPENROUTER_API_KEY. We avoid echoing the secret.
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          cd cdk
+          npx cdk deploy --require-approval never --parameters OpenRouterApiKey=$OPENROUTER_API_KEY
 
 # Best practices:
 # - Use GitHub secrets for AWS credentials
