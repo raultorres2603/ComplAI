@@ -70,6 +70,7 @@ jobs:
         run: |
           if [ -z "$OPENROUTER_API_KEY" ]; then
             echo "OPENROUTER_API_KEY is not set.";
+            exit 1
           else
             LEN=$(echo -n "$OPENROUTER_API_KEY" | wc -c | tr -d ' ')
             echo "OPENROUTER_API_KEY is set and will be used for deployment (length: $LEN, value: [REDACTED])."
