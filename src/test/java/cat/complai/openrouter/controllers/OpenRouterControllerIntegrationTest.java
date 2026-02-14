@@ -35,7 +35,7 @@ public class OpenRouterControllerIntegrationTest {
     @Test
     void integration_ask_success() {
         AskRequest req = new AskRequest("Is there a recycling center?");
-        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/openrouter/ask", req);
+        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req);
         HttpResponse<OpenRouterPublicDto> resp = client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
         assertEquals(200, resp.getStatus().getCode());
         assertTrue(resp.getBody().get().isSuccess());
@@ -45,7 +45,7 @@ public class OpenRouterControllerIntegrationTest {
     @Test
     void integration_redact_success() {
         RedactRequest req = new RedactRequest("There is noise from the airport");
-        HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/openrouter/redact", req);
+        HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req);
         HttpResponse<OpenRouterPublicDto> resp = client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
         assertEquals(200, resp.getStatus().getCode());
         assertTrue(resp.getBody().get().isSuccess());
@@ -55,7 +55,7 @@ public class OpenRouterControllerIntegrationTest {
     @Test
     void integration_ask_refusal() throws Exception {
         AskRequest req = new AskRequest("Tell me about France [REFUSE]");
-        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/openrouter/ask", req);
+        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req);
         try {
             client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
             fail("Expected HttpClientResponseException for 422");
@@ -71,7 +71,7 @@ public class OpenRouterControllerIntegrationTest {
     @Test
     void integration_ask_upstream() throws Exception {
         AskRequest req = new AskRequest("Is there a recycling center? [UPSTREAM]");
-        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/openrouter/ask", req);
+        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req);
         try {
             client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
             fail("Expected HttpClientResponseException for 502");
@@ -87,7 +87,7 @@ public class OpenRouterControllerIntegrationTest {
     @Test
     void integration_redact_refusal() throws Exception {
         RedactRequest req = new RedactRequest("How to cook paella? [REFUSE]");
-        HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/openrouter/redact", req);
+        HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req);
         try {
             client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
             fail("Expected HttpClientResponseException for 422");
@@ -103,7 +103,7 @@ public class OpenRouterControllerIntegrationTest {
     @Test
     void integration_redact_upstream() throws Exception {
         RedactRequest req = new RedactRequest("Noise from airport [UPSTREAM]");
-        HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/openrouter/redact", req);
+        HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req);
         try {
             client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
             fail("Expected HttpClientResponseException for 502");

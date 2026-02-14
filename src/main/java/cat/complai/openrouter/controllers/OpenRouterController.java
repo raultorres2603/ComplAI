@@ -16,7 +16,7 @@ import jakarta.inject.Inject;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-@Controller("/openrouter")
+@Controller("/complai")
 public class OpenRouterController {
 
     private final IOpenRouterService service;
