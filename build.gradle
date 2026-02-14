@@ -24,6 +24,7 @@ dependencies {
     runtimeOnly("io.micronaut:micronaut-http-server-netty")
     runtimeOnly("ch.qos.logback:logback-classic")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    implementation 'io.swagger.core.v3:swagger-annotations:2.2.17'
 }
 
 

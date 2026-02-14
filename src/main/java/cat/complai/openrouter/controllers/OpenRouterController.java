@@ -11,6 +11,10 @@ import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import jakarta.inject.Inject;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -26,6 +30,12 @@ public class OpenRouterController {
         this.service = service;
     }
 
+    @Operation(summary = "Ask a question related to El Prat de Llobregat")
+    @ApiResponse(responseCode = "200", description = "Success", content = @Content(mediaType = "application/json", schema = @Schema(implementation = OpenRouterPublicDto.class)))
+    @ApiResponse(responseCode = "400", description = "Validation error", content = @Content)
+    @ApiResponse(responseCode = "422", description = "Refusal: not about El Prat", content = @Content)
+    @ApiResponse(responseCode = "502", description = "Upstream AI error", content = @Content)
+    @ApiResponse(responseCode = "500", description = "Internal server error", content = @Content)
     @Post("/ask")
     public HttpResponse<OpenRouterPublicDto> ask(@Body AskRequest request) {
         logger.info("POST /openrouter/ask called");
@@ -55,11 +65,17 @@ public class OpenRouterController {
             return HttpResponse.serverError(publicDto);
         } catch (Exception e) {
             logger.log(Level.SEVERE, "ask: unexpected exception", e);
-            OpenRouterPublicDto err = new OpenRouterPublicDto(false, null, e.getMessage(), null);
+            OpenRouterPublicDto err = new OpenRouterPublicDto(false, null, e.getMessage(), 5);
             return HttpResponse.serverError(err);
         }
     }
 
+    @Operation(summary = "Redact a formal letter to the City Hall of El Prat")
+    @ApiResponse(responseCode = "200", description = "Success", content = @Content(mediaType = "application/json", schema = @Schema(implementation = OpenRouterPublicDto.class)))
+    @ApiResponse(responseCode = "400", description = "Validation error", content = @Content)
+    @ApiResponse(responseCode = "422", description = "Refusal: not about El Prat", content = @Content)
+    @ApiResponse(responseCode = "502", description = "Upstream AI error", content = @Content)
+    @ApiResponse(responseCode = "500", description = "Internal server error", content = @Content)
     @Post("/redact")
     public HttpResponse<OpenRouterPublicDto> redact(@Body RedactRequest request) {
         logger.info("POST /openrouter/redact called");
@@ -89,7 +105,7 @@ public class OpenRouterController {
             return HttpResponse.serverError(publicDto);
         } catch (Exception e) {
             logger.log(Level.SEVERE, "redact: unexpected exception", e);
-            OpenRouterPublicDto err = new OpenRouterPublicDto(false, null, e.getMessage(), null);
+            OpenRouterPublicDto err = new OpenRouterPublicDto(false, null, e.getMessage(), 5);
             return HttpResponse.serverError(err);
         }
     }
