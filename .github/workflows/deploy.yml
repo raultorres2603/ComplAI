@@ -27,8 +27,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
+      - name: Run CI tests
+        # This will execute the ciTest task we added to build.gradle. The step (and job)
+        # will fail early if any test fails, preventing later steps from running.
+        run: ./gradlew --no-daemon ciTest
+
       - name: Build JAR (shadowJar)
-        run: ./gradlew clean shadowJar
+        run: ./gradlew --no-daemon clean shadowJar
 
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v6
