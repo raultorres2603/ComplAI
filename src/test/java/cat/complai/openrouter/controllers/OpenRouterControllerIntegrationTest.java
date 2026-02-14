@@ -6,14 +6,13 @@ import cat.complai.openrouter.dto.OpenRouterResponseDto;
 import cat.complai.openrouter.interfaces.IOpenRouterService;
 import cat.complai.openrouter.controllers.dto.AskRequest;
 import cat.complai.openrouter.controllers.dto.RedactRequest;
-import io.micronaut.context.annotation.Replaces;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
+import io.micronaut.test.annotation.MockBean;
 import jakarta.inject.Inject;
-import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -45,19 +44,18 @@ public class OpenRouterControllerIntegrationTest {
         assertEquals("Redacted (integration)", resp.getBody().get().getMessage());
     }
 
-    // Provide a test bean that replaces the real IOpenRouterService for the test context
-    @Singleton
-    @Replaces(IOpenRouterService.class)
-    static class TestOpenRouterService implements IOpenRouterService {
+    @MockBean(IOpenRouterService.class)
+    IOpenRouterService openRouterService() {
+        return new IOpenRouterService() {
+            @Override
+            public OpenRouterResponseDto ask(String question) {
+                return new OpenRouterResponseDto(true, "OK from AI (integration)", null, 200, OpenRouterErrorCode.NONE);
+            }
 
-        @Override
-        public OpenRouterResponseDto ask(String question) {
-            return new OpenRouterResponseDto(true, "OK from AI (integration)", null, 200, OpenRouterErrorCode.NONE);
-        }
-
-        @Override
-        public OpenRouterResponseDto redactComplaint(String complaint) {
-            return new OpenRouterResponseDto(true, "Redacted (integration)", null, 200, OpenRouterErrorCode.NONE);
-        }
+            @Override
+            public OpenRouterResponseDto redactComplaint(String complaint) {
+                return new OpenRouterResponseDto(true, "Redacted (integration)", null, 200, OpenRouterErrorCode.NONE);
+            }
+        };
     }
 }

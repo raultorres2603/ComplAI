@@ -7,6 +7,7 @@ import cat.complai.openrouter.controllers.dto.AskRequest;
 import cat.complai.openrouter.controllers.dto.RedactRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import jakarta.inject.Inject;
@@ -26,7 +27,7 @@ public class OpenRouterController {
     }
 
     @Post("/ask")
-    public HttpResponse<OpenRouterPublicDto> ask(AskRequest request) {
+    public HttpResponse<OpenRouterPublicDto> ask(@Body AskRequest request) {
         logger.info("POST /openrouter/ask called");
         try {
             OpenRouterResponseDto dto = service.ask(request.getText());
@@ -60,7 +61,7 @@ public class OpenRouterController {
     }
 
     @Post("/redact")
-    public HttpResponse<OpenRouterPublicDto> redact(RedactRequest request) {
+    public HttpResponse<OpenRouterPublicDto> redact(@Body RedactRequest request) {
         logger.info("POST /openrouter/redact called");
         try {
             OpenRouterResponseDto dto = service.redactComplaint(request.getText());
