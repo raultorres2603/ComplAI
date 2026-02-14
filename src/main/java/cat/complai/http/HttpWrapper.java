@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.concurrent.CompletableFuture;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -31,6 +33,7 @@ public class HttpWrapper {
     // HttpClient and ObjectMapper are fields to allow injection and easier testing
     private final HttpClient httpClient;
     private final ObjectMapper mapper;
+    private final Logger logger = Logger.getLogger(HttpWrapper.class.getName());
 
     /**
      * Protected no-arg constructor to allow tests to subclass HttpWrapper without needing DI.
@@ -60,6 +63,7 @@ public class HttpWrapper {
     }
 
     public CompletableFuture<HttpDto> postToOpenRouterAsync(String userPrompt) {
+        logger.fine(() -> "postToOpenRouterAsync called; prompt length=" + (userPrompt == null ? 0 : userPrompt.length()));
         try {
             String model = "minimax/minimax-m2.5";
 
@@ -77,11 +81,16 @@ public class HttpWrapper {
             );
             String requestBody = mapper.writeValueAsString(payload);
 
+            logger.fine(() -> "postToOpenRouterAsync: request body prepared; payload size=" + requestBody.length());
+            logger.finer(() -> "postToOpenRouterAsync: request snippet=" + (userPrompt == null ? "" : (userPrompt.length() > 200 ? userPrompt.substring(0, 200) + "..." : userPrompt)));
+
             String authValue = headers.get("Authorization");
             if (authValue == null || authValue.isBlank()) {
+                logger.warning("Authorization header not present in headers map; falling back to environment variable OPENROUTER_API_KEY");
                 authValue = System.getenv("OPENROUTER_API_KEY");
             }
             if (authValue == null) {
+                logger.warning("Missing OPENROUTER_API_KEY");
                 return CompletableFuture.completedFuture(new HttpDto(null, null, "POST", "Missing OPENROUTER_API_KEY"));
             }
             if (!authValue.toLowerCase().startsWith("bearer ")) {
@@ -98,20 +107,29 @@ public class HttpWrapper {
                     .POST(BodyPublishers.ofString(requestBody))
                     .build();
 
+            logger.fine(() -> "Sending request to OpenRouter URL: " + openRouterUrl);
+
             return httpClient.sendAsync(request, BodyHandlers.ofString())
                     .thenApply(response -> {
                         int status = response.statusCode();
                         String body = response.body();
+                        logger.fine(() -> "Received response from OpenRouter: status=" + status + " bodyLength=" + (body == null ? 0 : body.length()));
                         if (status >= 200 && status < 300) {
                             String extracted = extractTextFromOpenRouterResponse(body, mapper);
+                            logger.fine(() -> "Extracted message length=" + (extracted == null ? 0 : extracted.length()));
                             return new HttpDto(extracted, status, "POST", null);
                         } else {
+                            logger.warning(() -> "OpenRouter returned non-2xx status: " + status);
                             return new HttpDto(body, status, "POST", String.format("OpenRouter non-2xx response: %d", status));
                         }
                     })
-                    .exceptionally(ex -> new HttpDto(null, null, "POST", ex.getMessage()));
+                    .exceptionally(ex -> {
+                        logger.log(Level.SEVERE, "Exception when calling OpenRouter", ex);
+                        return new HttpDto(null, null, "POST", ex.getMessage());
+                    });
 
         } catch (Exception e) {
+            logger.log(Level.SEVERE, "Failed preparing request to OpenRouter", e);
             return CompletableFuture.completedFuture(new HttpDto(null, null, "POST", e.getMessage()));
         }
     }
@@ -132,6 +150,7 @@ public class HttpWrapper {
             return null;
         } catch (Exception e) {
             // If parsing fails, return null (caller handles it)
+            logger.log(Level.FINE, "Failed to parse OpenRouter response JSON", e);
             return null;
         }
     }

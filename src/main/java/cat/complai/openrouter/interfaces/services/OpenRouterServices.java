@@ -2,6 +2,7 @@ package cat.complai.openrouter.interfaces.services;
 
 import cat.complai.openrouter.interfaces.IOpenRouterService;
 import cat.complai.openrouter.dto.OpenRouterResponseDto;
+import cat.complai.openrouter.dto.OpenRouterErrorCode;
 import cat.complai.http.HttpWrapper;
 import cat.complai.http.dto.HttpDto;
 import jakarta.inject.Singleton;
@@ -11,11 +12,14 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 @Singleton
 public class OpenRouterServices implements IOpenRouterService {
 
     private final HttpWrapper httpWrapper;
+    private final Logger logger = Logger.getLogger(OpenRouterServices.class.getName());
 
     @Inject
     public OpenRouterServices(HttpWrapper httpWrapper) {
@@ -24,8 +28,10 @@ public class OpenRouterServices implements IOpenRouterService {
 
     @Override
     public OpenRouterResponseDto ask(String question) {
+        logger.info("ask() called");
         if (question == null || question.isBlank()) {
-            return new OpenRouterResponseDto(false, null, "Question must not be empty.", null);
+            logger.fine("ask() rejected: empty question");
+            return new OpenRouterResponseDto(false, null, "Question must not be empty.", null, OpenRouterErrorCode.VALIDATION);
         }
 
         String prompt = String.format(
@@ -33,13 +39,16 @@ public class OpenRouterServices implements IOpenRouterService {
                 question.trim()
         );
 
+        logger.fine(() -> "ask() prompt prepared: " + (question.length() > 200 ? question.substring(0, 200) + "..." : question));
         return callOpenRouterAndExtract(prompt);
     }
 
     @Override
     public OpenRouterResponseDto redactComplaint(String complaint) {
+        logger.info("redactComplaint() called");
         if (complaint == null || complaint.isBlank()) {
-            return new OpenRouterResponseDto(false, null, "Complaint must not be empty.", null);
+            logger.fine("redactComplaint() rejected: empty complaint");
+            return new OpenRouterResponseDto(false, null, "Complaint must not be empty.", null, OpenRouterErrorCode.VALIDATION);
         }
 
         String prompt = String.format(
@@ -47,6 +56,7 @@ public class OpenRouterServices implements IOpenRouterService {
                 complaint.trim()
         );
 
+        logger.fine(() -> "redactComplaint() prompt prepared: " + (complaint.length() > 200 ? complaint.substring(0, 200) + "..." : complaint));
         return callOpenRouterAndExtract(prompt);
     }
 
@@ -61,27 +71,36 @@ public class OpenRouterServices implements IOpenRouterService {
     }
 
     private OpenRouterResponseDto callOpenRouterAndExtract(String prompt) {
+        logger.fine("callOpenRouterAndExtract: calling HttpWrapper");
         try {
             CompletableFuture<HttpDto> future = httpWrapper.postToOpenRouterAsync(prompt);
             HttpDto dto = future.get(30, TimeUnit.SECONDS);
+            logger.fine(() -> "callOpenRouterAndExtract: received dto=" + (dto == null ? "null" : String.valueOf(dto.getStatusCode())));
             if (dto == null) {
-                return new OpenRouterResponseDto(false, null, "No response from AI service.", null);
+                logger.warning("callOpenRouterAndExtract: No response from AI service");
+                return new OpenRouterResponseDto(false, null, "No response from AI service.", null, OpenRouterErrorCode.UPSTREAM);
             }
             if (dto.getError() != null && !dto.getError().isBlank()) {
-                return new OpenRouterResponseDto(false, dto.getMessage(), dto.getError(), dto.getStatusCode());
+                logger.log(Level.WARNING, "AI wrapper returned error: {0}", dto.getError());
+                return new OpenRouterResponseDto(false, dto.getMessage(), dto.getError(), dto.getStatusCode(), OpenRouterErrorCode.UPSTREAM);
             }
             if (dto.getMessage() != null && !dto.getMessage().isBlank()) {
                 // If the AI refused because it's not about El Prat, map to a standardized error
                 if (aiRefusedAsNotAboutElPrat(dto.getMessage())) {
-                    return new OpenRouterResponseDto(false, null, "Request is not about El Prat de Llobregat.", dto.getStatusCode());
+                    logger.info("AI refused - not about El Prat");
+                    return new OpenRouterResponseDto(false, null, "Request is not about El Prat de Llobregat.", dto.getStatusCode(), OpenRouterErrorCode.REFUSAL);
                 }
-                return new OpenRouterResponseDto(true, dto.getMessage(), null, dto.getStatusCode());
+                logger.fine("AI returned a message successfully");
+                return new OpenRouterResponseDto(true, dto.getMessage(), null, dto.getStatusCode(), OpenRouterErrorCode.NONE);
             }
-            return new OpenRouterResponseDto(false, null, "AI returned no message.", dto.getStatusCode());
+            logger.warning("AI returned no message");
+            return new OpenRouterResponseDto(false, null, "AI returned no message.", dto.getStatusCode(), OpenRouterErrorCode.UPSTREAM);
         } catch (TimeoutException te) {
-            return new OpenRouterResponseDto(false, null, "AI service timed out.", null);
+            logger.log(Level.SEVERE, "AI service timed out", te);
+            return new OpenRouterResponseDto(false, null, "AI service timed out.", null, OpenRouterErrorCode.TIMEOUT);
         } catch (Exception e) {
-            return new OpenRouterResponseDto(false, null, e.getMessage(), null);
+            logger.log(Level.SEVERE, "Error calling AI service", e);
+            return new OpenRouterResponseDto(false, null, e.getMessage(), null, OpenRouterErrorCode.INTERNAL);
         }
     }
 }
