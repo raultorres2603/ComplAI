@@ -18,6 +18,8 @@ import io.micronaut.test.annotation.MockBean;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
+import cat.complai.openrouter.dto.OutputFormat;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -131,7 +133,7 @@ public class OpenRouterControllerIntegrationTest {
             }
 
             @Override
-            public OpenRouterResponseDto redactComplaint(String complaint) {
+            public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format) {
                 if (complaint != null && complaint.contains("[REFUSE]")) {
                     return new OpenRouterResponseDto(false, null, "Request is not about El Prat de Llobregat.", 200, OpenRouterErrorCode.REFUSAL);
                 }

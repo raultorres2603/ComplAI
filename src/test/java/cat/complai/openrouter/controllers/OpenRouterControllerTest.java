@@ -6,6 +6,7 @@ import cat.complai.openrouter.dto.OpenRouterResponseDto;
 import cat.complai.openrouter.interfaces.IOpenRouterService;
 import cat.complai.openrouter.controllers.dto.AskRequest;
 import cat.complai.openrouter.controllers.dto.RedactRequest;
+import cat.complai.openrouter.dto.OutputFormat;
 import io.micronaut.http.HttpResponse;
 import org.junit.jupiter.api.Test;
 
@@ -20,7 +21,7 @@ public class OpenRouterControllerTest {
         }
 
         @Override
-        public OpenRouterResponseDto redactComplaint(String complaint) {
+        public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format) {
             return new OpenRouterResponseDto(true, "Redacted letter", null, 200, OpenRouterErrorCode.NONE);
         }
     }
@@ -32,7 +33,7 @@ public class OpenRouterControllerTest {
         }
 
         @Override
-        public OpenRouterResponseDto redactComplaint(String complaint) {
+        public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format) {
             return new OpenRouterResponseDto(false, null, "Request is not about El Prat de Llobregat.", 200, OpenRouterErrorCode.REFUSAL);
         }
     }
@@ -44,7 +45,7 @@ public class OpenRouterControllerTest {
         }
 
         @Override
-        public OpenRouterResponseDto redactComplaint(String complaint) {
+        public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format) {
             return new OpenRouterResponseDto(false, null, "OpenRouter non-2xx response: 500", 500, OpenRouterErrorCode.UPSTREAM);
         }
     }
@@ -83,30 +84,33 @@ public class OpenRouterControllerTest {
     void redact_success_returns200() {
         OpenRouterController c = new OpenRouterController(new FakeServiceSuccess());
         RedactRequest req = new RedactRequest("Noise from the airport");
-        HttpResponse<OpenRouterPublicDto> resp = c.redact(req);
-        assertEquals(200, resp.getStatus().getCode());
-        assertTrue(resp.getBody().get().isSuccess());
-        assertEquals("Redacted letter", resp.getBody().get().getMessage());
+        HttpResponse<?> raw = c.redact(req);
+        assertEquals(200, raw.getStatus().getCode());
+        OpenRouterPublicDto body = (OpenRouterPublicDto) raw.getBody().get();
+        assertTrue(body.isSuccess());
+        assertEquals("Redacted letter", body.getMessage());
     }
 
     @Test
     void redact_refuse_returns422() {
         OpenRouterController c = new OpenRouterController(new FakeServiceRefuse());
         RedactRequest req = new RedactRequest("How to cook paella?");
-        HttpResponse<OpenRouterPublicDto> resp = c.redact(req);
-        assertEquals(422, resp.getStatus().getCode());
-        assertFalse(resp.getBody().get().isSuccess());
-        assertEquals("Request is not about El Prat de Llobregat.", resp.getBody().get().getError());
+        HttpResponse<?> raw = c.redact(req);
+        assertEquals(422, raw.getStatus().getCode());
+        OpenRouterPublicDto body = (OpenRouterPublicDto) raw.getBody().get();
+        assertFalse(body.isSuccess());
+        assertEquals("Request is not about El Prat de Llobregat.", body.getError());
     }
 
     @Test
     void redact_upstream_returns502() {
         OpenRouterController c = new OpenRouterController(new FakeServiceUpstream());
         RedactRequest req = new RedactRequest("Noise from the airport");
-        HttpResponse<OpenRouterPublicDto> resp = c.redact(req);
-        assertEquals(502, resp.getStatus().getCode());
-        assertFalse(resp.getBody().get().isSuccess());
-        assertEquals("OpenRouter non-2xx response: 500", resp.getBody().get().getError());
+        HttpResponse<?> raw = c.redact(req);
+        assertEquals(502, raw.getStatus().getCode());
+        OpenRouterPublicDto body = (OpenRouterPublicDto) raw.getBody().get();
+        assertFalse(body.isSuccess());
+        assertEquals("OpenRouter non-2xx response: 500", body.getError());
     }
 }
 

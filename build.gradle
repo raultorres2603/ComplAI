@@ -24,6 +24,9 @@ dependencies {
     runtimeOnly("io.micronaut:micronaut-http-server-netty")
     runtimeOnly("ch.qos.logback:logback-classic")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
+    // PDF generation
+    implementation("org.apache.pdfbox:pdfbox:2.0.29")
 }
 
 

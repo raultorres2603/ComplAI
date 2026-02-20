@@ -6,10 +6,14 @@ import cat.complai.openrouter.dto.OpenRouterResponseDto;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.CompletableFuture;
+import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
+import cat.complai.openrouter.dto.OutputFormat;
 
 /**
  * Unit tests for OpenRouterServices. Uses a small fake HttpWrapper to avoid network calls.
@@ -96,8 +100,42 @@ public class OpenRouterServicesTest {
         FakeSuccessWrapper wrapper = new FakeSuccessWrapper("OK");
         OpenRouterServices svc = new OpenRouterServices(wrapper);
 
-        OpenRouterResponseDto out = svc.redactComplaint("   ");
+        OpenRouterResponseDto out = svc.redactComplaint("   ", OutputFormat.JSON);
         assertFalse(out.isSuccess());
         assertEquals("Complaint must not be empty.", out.getError());
+    }
+
+    @Test
+    void redact_pdfRequested_returnsPdfMagicBytes() {
+        String aiMessage = "Dear Ajuntament of El Prat,\n\nI am writing to complain about...\n\nSincerely,\nResident";
+        FakeSuccessWrapper wrapper = new FakeSuccessWrapper(aiMessage);
+        OpenRouterServices svc = new OpenRouterServices(wrapper);
+
+        OpenRouterResponseDto out = svc.redactComplaint("Some complaint text", OutputFormat.PDF);
+        assertTrue(out.isSuccess());
+        assertNotNull(out.getPdfData());
+        String head = new String(out.getPdfData(), 0, Math.min(4, out.getPdfData().length), StandardCharsets.US_ASCII);
+        assertTrue(head.startsWith("%PDF"), "PDF magic bytes expected at start of file");
+    }
+
+    @Test
+    void redact_auto_shouldProducePdf_whenAiReturnsFormalLetter() {
+        // AI returns a long, formal letter which should trigger the AUTO->PDF heuristic
+        StringBuilder sb = new StringBuilder();
+        sb.append("Dear Ajuntament of El Prat,\n\n");
+        for (int i = 0; i < 30; i++) {
+            sb.append("I am writing to express my concern about noise pollution near my residence. This has been ongoing and affects quality of life. ");
+        }
+        sb.append("\n\nSincerely,\nA concerned resident");
+        String aiMessage = sb.toString();
+
+        FakeSuccessWrapper wrapper = new FakeSuccessWrapper(aiMessage);
+        OpenRouterServices svc = new OpenRouterServices(wrapper);
+
+        OpenRouterResponseDto out = svc.redactComplaint("Some long complaint text", OutputFormat.AUTO);
+        assertTrue(out.isSuccess(), "Service should report success");
+        assertNotNull(out.getPdfData(), "PDF data should be produced for AUTO when AI message is a formal letter");
+        String head = new String(out.getPdfData(), 0, Math.min(4, out.getPdfData().length), StandardCharsets.US_ASCII);
+        assertTrue(head.startsWith("%PDF"), "PDF magic bytes expected at start of file");
     }
 }
