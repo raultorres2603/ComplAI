@@ -62,18 +62,16 @@ public class OpenRouterServices implements IOpenRouterService {
             return new OpenRouterResponseDto(false, null, "Complaint must not be empty.", null, OpenRouterErrorCode.VALIDATION);
         }
 
-        // Instruct the model it may optionally emit a single-line metadata header at the very start of its reply
-        // either as a small JSON object (e.g. {"format":"pdf" , "note":"..."}) or a plain header like: FORMAT: pdf
-        // If provided, the server will use that to decide whether to serve a PDF. If not provided, server may decide heuristically.
+        // Instruct the model: the model MUST emit a JSON metadata header on the first line. The header should be a small JSON
+        // object containing at least a "format" field ("pdf" | "json"). The server will parse that JSON header and use it
+        // to decide whether to generate a PDF. If the header is missing or malformed, the request will be rejected.
         String prompt = String.format(
                 "Please redact a formal, civil, and concise letter addressed to the City Hall (Ajuntament) of El Prat de Llobregat based on the following complaint. " +
                         "If the complaint is not about El Prat de Llobregat, politely say you can't help with that request. " +
                         "Include a short summary, the specific request or remedy sought, and a polite closing.\n\n" +
-                        "IMPORTANT (optional): If you believe this response is best provided as a PDF (for example because it is a formal letter), start your reply with a single metadata header indicating the format, either as JSON on the first line like:\n" +
-                        "  {\"format\": \"pdf\"}\n" +
-                        "or as a simple header like:\n" +
-                        "  FORMAT: pdf\n\n" +
-                        "After that header, leave an empty line and then provide the letter body. If you do not emit a header, the server will decide automatically.\n\nComplaint text:\n%s",
+                        "REQUIRED: Emit a single-line JSON header as the first line of your response with at least the 'format' field. Example:\n" +
+                        "  {\"format\": \"pdf\"}\n\n" +
+                        "After that JSON header, include an empty line and then provide the letter body. The server will reject responses that do not begin with a valid JSON header.\n\nComplaint text:\n%s",
                 complaint.trim()
         );
 
@@ -94,20 +92,13 @@ public class OpenRouterServices implements IOpenRouterService {
             effectiveFormat = parsed.format;
         }
 
-        boolean producePdf;
-        switch (effectiveFormat) {
-            case PDF:
-                producePdf = true;
-                break;
-            case JSON:
-                producePdf = false;
-                break;
-            case AUTO:
-            default:
-                // fallback to previous heuristic
-                producePdf = shouldAiProducePdf(parsed.message);
-                break;
+        // Enforce that the model must emit a JSON header. If we don't have a JSON header, return validation error.
+        if (parsed.format == null || parsed.format == OutputFormat.AUTO) {
+            logger.warning("AI response missing required JSON header");
+            return new OpenRouterResponseDto(false, null, "AI response missing required JSON header.", aiDto.getStatusCode(), OpenRouterErrorCode.VALIDATION);
         }
+
+        boolean producePdf = effectiveFormat == OutputFormat.PDF || (effectiveFormat == OutputFormat.AUTO && shouldAiProducePdf(parsed.message));
 
         if (!producePdf) {
             // return the cleaned AI message (without header)
@@ -138,48 +129,43 @@ public class OpenRouterServices implements IOpenRouterService {
      * If no header found, returns format AUTO and the original message.
      */
     private AiParsed parseAiFormatHeader(String aiMessage) {
+        // Strict: only accept a JSON header on the first line. If not present, treat as missing header.
         if (aiMessage == null) return new AiParsed(OutputFormat.AUTO, "");
         String trimmed = aiMessage.trim();
 
-        // Try JSON first-line
-        if (trimmed.startsWith("{")) {
-            try {
-                com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-                java.util.Map map = mapper.readValue(trimmed, java.util.Map.class);
-                // If the entire response was JSON and contains a 'format' and 'body'/'message' fields
-                Object fmt = map.get("format");
-                Object body = map.get("body") != null ? map.get("body") : map.get("message");
-                if (fmt != null) {
-                    OutputFormat f = OutputFormat.fromString(fmt.toString());
-                    String m = body != null ? body.toString() : "";
-                    return new AiParsed(f, m);
-                }
-            } catch (Exception ignored) {
-                // fall through to other parsing strategies
-            }
+        if (!trimmed.startsWith("{")) {
+            return new AiParsed(OutputFormat.AUTO, aiMessage);
         }
 
-        // Check for simple header on the first line
-        String[] lines = aiMessage.split("\\r?\\n", -1);
-        if (lines.length > 0) {
-            String first = lines[0].trim();
-            java.util.regex.Matcher m = java.util.regex.Pattern.compile("(?i)^format\\s*[:=]\\s*(pdf|json|auto)").matcher(first);
-            if (m.find()) {
-                OutputFormat f = OutputFormat.fromString(m.group(1));
-                // Skip the first line and any immediately following blank line
-                int start = 1;
-                if (lines.length > 1 && lines[1].trim().isEmpty()) start = 2;
-                StringBuilder body = new StringBuilder();
-                for (int i = start; i < lines.length; i++) {
-                    body.append(lines[i]);
-                    if (i < lines.length - 1) body.append('\n');
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            // Read first JSON object at the start: find the closing brace matching the first open
+            int depth = 0;
+            int idx = -1;
+            for (int i = 0; i < aiMessage.length(); i++) {
+                char c = aiMessage.charAt(i);
+                if (c == '{') depth++;
+                else if (c == '}') {
+                    depth--;
+                    if (depth == 0) { idx = i; break; }
                 }
-                return new AiParsed(f, body.toString().trim());
             }
-        }
+            if (idx < 0) return new AiParsed(OutputFormat.AUTO, aiMessage);
 
-        // No header found: return AUTO and original message
-        return new AiParsed(OutputFormat.AUTO, aiMessage);
+            String jsonHeader = aiMessage.substring(0, idx + 1).trim();
+            String rest = aiMessage.substring(idx + 1).trim();
+            java.util.Map map = mapper.readValue(jsonHeader, java.util.Map.class);
+            Object fmt = map.get("format");
+            Object body = map.get("body") != null ? map.get("body") : map.get("message");
+            OutputFormat f = fmt == null ? OutputFormat.AUTO : OutputFormat.fromString(fmt.toString());
+            String m = (body != null) ? body.toString() : rest;
+            // If body missing in JSON, use the remaining text after the JSON header
+            if ((m == null || m.isBlank()) && rest != null) m = rest;
+            return new AiParsed(f, m == null ? "" : m.trim());
+        } catch (Exception e) {
+            // parsing failed: treat as missing strict header
+            return new AiParsed(OutputFormat.AUTO, aiMessage);
+        }
     }
 
     /**
@@ -239,70 +225,117 @@ public class OpenRouterServices implements IOpenRouterService {
         }
     }
 
-    /**
-     * Generate a simple PDF document containing the provided text. This method is intentionally small
-     * and uses standard PDFBox fonts. It performs basic wrapping by character count to avoid
-     * depending on advanced layout code.
-     */
+    // ------------------ PDF generation refactor helpers ------------------
     private byte[] generatePdfFromText(String text) throws Exception {
-        if (text == null) text = "";
         try (PDDocument doc = new PDDocument()) {
-            PDPage page = new PDPage(PDRectangle.LETTER);
-            doc.addPage(page);
-
-            try (PDPageContentStream contents = new PDPageContentStream(doc, page)) {
-                contents.beginText();
-                contents.setFont(PDType1Font.HELVETICA_BOLD, 16);
-                contents.newLineAtOffset(50, 700);
-                contents.showText("Redacted complaint");
-                contents.endText();
-
-                contents.beginText();
-                contents.setFont(PDType1Font.HELVETICA, 12);
-                contents.newLineAtOffset(50, 680);
-
-                // naive wrapping: 90 characters per line
-                int maxPerLine = 90;
-                // Replace carriage returns and normalize paragraph breaks
-                String normalized = text.replace("\r", "");
-                String[] paragraphs = normalized.split("\n\\s*\n");
-
-                for (String s : paragraphs) {
-                    // Replace any leftover single newlines with spaces to avoid illegal characters for the font encoder
-                    String paragraph = s.replace("\n", " ").trim();
-                    if (paragraph.isEmpty()) {
-                        // add a blank line
-                        contents.newLineAtOffset(0, -14);
-                        continue;
-                    }
-                    // word-wrap the paragraph to avoid breaking words and to ensure no newlines inside showText
-                    String[] words = paragraph.split("\\s+");
-                    StringBuilder lineBuilder = new StringBuilder();
-                    for (String w : words) {
-                        if (lineBuilder.length() + w.length() + 1 > maxPerLine) {
-                            // flush current line
-                            contents.showText(lineBuilder.toString().trim());
-                            contents.newLineAtOffset(0, -14);
-                            lineBuilder.setLength(0);
-                        }
-                        if (!lineBuilder.isEmpty()) lineBuilder.append(' ');
-                        lineBuilder.append(w);
-                    }
-                    if (!lineBuilder.isEmpty()) {
-                        contents.showText(lineBuilder.toString().trim());
-                        contents.newLineAtOffset(0, -14);
-                    }
-                    // paragraph separation: add an extra line
-                    contents.newLineAtOffset(0, -6);
-                }
-
-                contents.endText();
-            }
-
+            writeBodyToDocument(doc, text);
             try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
                 doc.save(out);
                 return out.toByteArray();
             }
         }
+    }
+
+    private void writeBodyToDocument(PDDocument doc, String text) throws Exception {
+        final float margin = 50f;
+        final PDRectangle pageSize = PDRectangle.LETTER;
+        final float pageHeight = pageSize.getHeight();
+        final float titleGap = 20f;
+        final float leading = 14f;
+
+        float yStart = pageHeight - margin - titleGap;
+        float yPosition = yStart;
+
+        PDPage page = new PDPage(pageSize);
+        doc.addPage(page);
+        PDPageContentStream contents = new PDPageContentStream(doc, page);
+
+        // Title
+        contents.beginText();
+        contents.setFont(PDType1Font.HELVETICA_BOLD, 16);
+        contents.newLineAtOffset(margin, yStart + 10);
+        contents.showText("Redacted complaint");
+        contents.endText();
+
+        // Begin body
+        contents.beginText();
+        contents.setFont(PDType1Font.HELVETICA, 12);
+        contents.newLineAtOffset(margin, yPosition);
+
+        // Normalize and split paragraphs
+        String normalized = (text == null) ? "" : text.replace("\r", "");
+        String[] paragraphs = normalized.split("\n\\s*\n");
+        int maxPerLine = 90;
+
+        for (String s : paragraphs) {
+            String paragraph = s.replace("\n", " ").trim();
+            if (paragraph.isEmpty()) {
+                yPosition -= leading;
+                contents.newLineAtOffset(0, -leading);
+                if (yPosition < margin) {
+                    contents.endText();
+                    contents.close();
+                    page = addNewPage(doc);
+                    contents = new PDPageContentStream(doc, page);
+                    yPosition = yStart;
+                    contents.beginText();
+                    contents.setFont(PDType1Font.HELVETICA, 12);
+                    contents.newLineAtOffset(margin, yPosition);
+                }
+                continue;
+            }
+
+            String[] words = paragraph.split("\\s+");
+            StringBuilder lineBuilder = new StringBuilder();
+            for (String w : words) {
+                if (lineBuilder.length() + w.length() + 1 > maxPerLine) {
+                    contents.showText(lineBuilder.toString().trim());
+                    contents.newLineAtOffset(0, -leading);
+                    yPosition -= leading;
+                    lineBuilder.setLength(0);
+
+                    if (yPosition < margin) {
+                        contents.endText();
+                        contents.close();
+                        page = addNewPage(doc);
+                        contents = new PDPageContentStream(doc, page);
+                        yPosition = yStart;
+                        contents.beginText();
+                        contents.setFont(PDType1Font.HELVETICA, 12);
+                        contents.newLineAtOffset(margin, yPosition);
+                    }
+                }
+                if (lineBuilder.length() > 0) lineBuilder.append(' ');
+                lineBuilder.append(w);
+            }
+            if (lineBuilder.length() > 0) {
+                contents.showText(lineBuilder.toString().trim());
+                contents.newLineAtOffset(0, -leading);
+                yPosition -= leading;
+            }
+
+            // paragraph gap
+            yPosition -= (leading / 2f);
+            contents.newLineAtOffset(0, -(leading / 2f));
+            if (yPosition < margin) {
+                contents.endText();
+                contents.close();
+                page = addNewPage(doc);
+                contents = new PDPageContentStream(doc, page);
+                yPosition = yStart;
+                contents.beginText();
+                contents.setFont(PDType1Font.HELVETICA, 12);
+                contents.newLineAtOffset(margin, yPosition);
+            }
+        }
+
+        contents.endText();
+        contents.close();
+    }
+
+    private PDPage addNewPage(PDDocument doc) {
+        PDPage newPage = new PDPage(PDRectangle.LETTER);
+        doc.addPage(newPage);
+        return newPage;
     }
 }

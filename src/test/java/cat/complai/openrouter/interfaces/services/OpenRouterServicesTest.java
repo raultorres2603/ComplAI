@@ -107,7 +107,7 @@ public class OpenRouterServicesTest {
 
     @Test
     void redact_pdfRequested_returnsPdfMagicBytes() {
-        String aiMessage = "Dear Ajuntament of El Prat,\n\nI am writing to complain about...\n\nSincerely,\nResident";
+        String aiMessage = "{\"format\": \"pdf\"}\n\nDear Ajuntament of El Prat,\n\nI am writing to complain about...\n\nSincerely,\nResident";
         FakeSuccessWrapper wrapper = new FakeSuccessWrapper(aiMessage);
         OpenRouterServices svc = new OpenRouterServices(wrapper);
 
@@ -129,6 +129,8 @@ public class OpenRouterServicesTest {
         sb.append("\n\nSincerely,\nA concerned resident");
         String aiMessage = sb.toString();
 
+        // prepend required JSON header
+        aiMessage = "{\"format\": \"pdf\"}\n\n" + aiMessage;
         FakeSuccessWrapper wrapper = new FakeSuccessWrapper(aiMessage);
         OpenRouterServices svc = new OpenRouterServices(wrapper);
 

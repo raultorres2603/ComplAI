@@ -19,6 +19,12 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
 import cat.complai.openrouter.dto.OutputFormat;
+import io.micronaut.http.MediaType;
+
+import cat.complai.http.HttpWrapper;
+import cat.complai.http.dto.HttpDto;
+
+import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -31,6 +37,9 @@ public class OpenRouterControllerIntegrationTest {
     @Inject
     @Client("/")
     HttpClient client;
+
+    @Inject
+    HttpWrapper httpWrapper; // injected mock
 
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -118,29 +127,131 @@ public class OpenRouterControllerIntegrationTest {
         }
     }
 
-    @MockBean(IOpenRouterService.class)
-    IOpenRouterService openRouterService() {
-        return new IOpenRouterService() {
-            @Override
-            public OpenRouterResponseDto ask(String question) {
-                if (question != null && question.contains("[REFUSE]")) {
-                    return new OpenRouterResponseDto(false, null, "Request is not about El Prat de Llobregat.", 200, OpenRouterErrorCode.REFUSAL);
-                }
-                if (question != null && question.contains("[UPSTREAM]")) {
-                    return new OpenRouterResponseDto(false, null, "Missing OPENROUTER_API_KEY", 500, OpenRouterErrorCode.UPSTREAM);
-                }
-                return new OpenRouterResponseDto(true, "OK from AI (integration)", null, 200, OpenRouterErrorCode.NONE);
-            }
+    @Test
+    void integration_redact_aiHeader_producesPdf() {
+        // When AI responds with a JSON header indicating PDF, service should parse and controller stream application/pdf
+        RedactRequest req = new RedactRequest("Complaint about noise [HEADER]");
+        HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req);
+        HttpResponse<byte[]> resp = client.toBlocking().exchange(httpReq, byte[].class);
+        assertEquals(200, resp.getStatus().getCode());
+        String contentType = resp.getContentType().map(Object::toString).orElse(MediaType.TEXT_PLAIN);
+        assertEquals(MediaType.APPLICATION_PDF, contentType);
+        byte[] body = resp.getBody().get();
+        assertNotNull(body);
+        String head = new String(body, 0, Math.min(4, body.length));
+        assertTrue(head.startsWith("%PDF"));
+    }
 
+    @Test
+    void integration_redact_missingHeader_rejected() throws Exception {
+        // AI returns plain text without JSON header -> service rejects with 400
+        RedactRequest req = new RedactRequest("Complaint with no header [NOHEADER]");
+        HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req);
+        try {
+            client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
+            fail("Expected HttpClientResponseException for 400");
+        } catch (HttpClientResponseException e) {
+            assertEquals(400, e.getStatus().getCode());
+            String bodyJson = e.getResponse().getBody(String.class).orElse("{}");
+            JsonNode node = mapper.readTree(bodyJson);
+            assertNotNull(node);
+            // validation error code mapped
+            assertEquals(OpenRouterErrorCode.VALIDATION.getCode(), node.path("errorCode").asInt());
+        }
+    }
+
+    @Test
+    void integration_redact_headerWithInlineJsonBody_producesPdf() {
+        // AI returns a JSON header that includes an inline 'body' field; service should use that body to generate PDF
+        RedactRequest req = new RedactRequest("Complaint that requests inline body [HEADER]");
+        HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req);
+        HttpResponse<byte[]> resp = client.toBlocking().exchange(httpReq, byte[].class);
+        assertEquals(200, resp.getStatus().getCode());
+        String contentType = resp.getContentType().map(Object::toString).orElse(MediaType.TEXT_PLAIN);
+        assertEquals(MediaType.APPLICATION_PDF, contentType);
+        byte[] body = resp.getBody().get();
+        assertNotNull(body);
+        String head = new String(body, 0, Math.min(4, body.length));
+        assertTrue(head.startsWith("%PDF"));
+    }
+
+    @Test
+    void integration_redact_longProducesMultiplePages() throws Exception {
+        // AI returns a JSON header + very long body; the generated PDF should have multiple pages
+        RedactRequest req = new RedactRequest("Very long complaint [HEADER_LONG]");
+        HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req);
+        HttpResponse<byte[]> resp = client.toBlocking().exchange(httpReq, byte[].class);
+        assertEquals(200, resp.getStatus().getCode());
+        byte[] body = resp.getBody().get();
+        assertNotNull(body);
+        try (java.io.ByteArrayInputStream in = new java.io.ByteArrayInputStream(body);
+             org.apache.pdfbox.pdmodel.PDDocument doc = org.apache.pdfbox.pdmodel.PDDocument.load(in)) {
+            assertTrue(doc.getNumberOfPages() > 1, "Expected multi-page PDF");
+        }
+    }
+
+    @Test
+    void integration_redact_invalidHeader_rejected() throws Exception {
+        // AI returns a JSON header with invalid format -> service should reject
+        RedactRequest req = new RedactRequest("Complaint with invalid header [HEADER_INVALID]");
+        HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req);
+        try {
+            client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
+            fail("Expected HttpClientResponseException for 400 due to invalid header");
+        } catch (HttpClientResponseException e) {
+            assertEquals(400, e.getStatus().getCode());
+            String bodyJson = e.getResponse().getBody(String.class).orElse("{}");
+            JsonNode node = mapper.readTree(bodyJson);
+            assertNotNull(node);
+            assertEquals(OpenRouterErrorCode.VALIDATION.getCode(), node.path("errorCode").asInt());
+        }
+    }
+
+    @MockBean(HttpWrapper.class)
+    HttpWrapper openRouterHttpWrapper() {
+        return new HttpWrapper() {
             @Override
-            public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format) {
-                if (complaint != null && complaint.contains("[REFUSE]")) {
-                    return new OpenRouterResponseDto(false, null, "Request is not about El Prat de Llobregat.", 200, OpenRouterErrorCode.REFUSAL);
+            public CompletableFuture<HttpDto> postToOpenRouterAsync(String userPrompt) {
+                // Simulate AI responses based on embedded markers in the prompt
+                if (userPrompt != null && userPrompt.contains("[REFUSE]")) {
+                    return CompletableFuture.completedFuture(new HttpDto("I'm sorry, I can't help with that request because it's not about El Prat de Llobregat.", 200, "POST", null));
                 }
-                if (complaint != null && complaint.contains("[UPSTREAM]")) {
-                    return new OpenRouterResponseDto(false, null, "OpenRouter non-2xx response: 500", 500, OpenRouterErrorCode.UPSTREAM);
+                if (userPrompt != null && userPrompt.contains("[UPSTREAM]")) {
+                    return CompletableFuture.completedFuture(new HttpDto(null, 500, "POST", "Missing OPENROUTER_API_KEY"));
                 }
-                return new OpenRouterResponseDto(true, "Redacted (integration)", null, 200, OpenRouterErrorCode.NONE);
+                if (userPrompt != null && userPrompt.contains("[HEADER]")) {
+                    // Return a JSON header followed by the letter body so the real service parses and generates a PDF
+                    String body = "{\"format\": \"pdf\"}\n\nDear Ajuntament,\n\nI am writing to complain about noise...\n\nSincerely,\nResident";
+                    return CompletableFuture.completedFuture(new HttpDto(body, 200, "POST", null));
+                }
+                if (userPrompt != null && userPrompt.contains("[NOHEADER]")) {
+                    // Return plain text with no JSON header
+                    String body = "I will not emit a JSON header.";
+                    return CompletableFuture.completedFuture(new HttpDto(body, 200, "POST", null));
+                }
+                if (userPrompt != null && userPrompt.contains("[HEADER_LONG]")) {
+                    // Return a JSON header followed by a very long body to exercise pagination
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("{\"format\": \"pdf\"}\n\n");
+                    sb.append("Dear Ajuntament,\n\n");
+                    for (int i = 0; i < 800; i++) {
+                        sb.append("This is a long complaint sentence to generate many pages. ");
+                    }
+                    sb.append("\n\nSincerely,\nResident");
+                    return CompletableFuture.completedFuture(new HttpDto(sb.toString(), 200, "POST", null));
+                }
+                if (userPrompt != null && userPrompt.contains("[HEADER_INVALID]")) {
+                    // Return a JSON header with unsupported format
+                    String body = "{\"format\": \"xml\"}\n\nThis body should be rejected due to invalid format.";
+                    return CompletableFuture.completedFuture(new HttpDto(body, 200, "POST", null));
+                }
+                // For redact prompts without markers, the prompt includes the literal 'Complaint text:'; return a JSON header + cleaned body
+                if (userPrompt != null && userPrompt.contains("Complaint text:")) {
+                    String body = "{\"format\": \"json\"}\n\nRedacted (integration)";
+                    return CompletableFuture.completedFuture(new HttpDto(body, 200, "POST", null));
+                }
+                // Default successful text response
+                return CompletableFuture.completedFuture(new HttpDto("OK from AI (integration)", 200, "POST", null));
             }
         };
     }
