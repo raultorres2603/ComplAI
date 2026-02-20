@@ -2,8 +2,6 @@ package cat.complai.openrouter.controllers;
 
 import cat.complai.openrouter.dto.OpenRouterErrorCode;
 import cat.complai.openrouter.dto.OpenRouterPublicDto;
-import cat.complai.openrouter.dto.OpenRouterResponseDto;
-import cat.complai.openrouter.interfaces.IOpenRouterService;
 import cat.complai.openrouter.controllers.dto.AskRequest;
 import cat.complai.openrouter.controllers.dto.RedactRequest;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -18,12 +16,12 @@ import io.micronaut.test.annotation.MockBean;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
-import cat.complai.openrouter.dto.OutputFormat;
 import io.micronaut.http.MediaType;
 
 import cat.complai.http.HttpWrapper;
 import cat.complai.http.dto.HttpDto;
 
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -49,8 +47,11 @@ public class OpenRouterControllerIntegrationTest {
         HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req);
         HttpResponse<OpenRouterPublicDto> resp = client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
         assertEquals(200, resp.getStatus().getCode());
-        assertTrue(resp.getBody().get().isSuccess());
-        assertEquals("OK from AI (integration)", resp.getBody().get().getMessage());
+        Optional<OpenRouterPublicDto> bodyOpt = resp.getBody();
+        assertTrue(bodyOpt.isPresent());
+        OpenRouterPublicDto body = bodyOpt.get();
+        assertTrue(body.isSuccess());
+        assertEquals("OK from AI (integration)", body.getMessage());
     }
 
     @Test
@@ -59,8 +60,11 @@ public class OpenRouterControllerIntegrationTest {
         HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req);
         HttpResponse<OpenRouterPublicDto> resp = client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
         assertEquals(200, resp.getStatus().getCode());
-        assertTrue(resp.getBody().get().isSuccess());
-        assertEquals("Redacted (integration)", resp.getBody().get().getMessage());
+        Optional<OpenRouterPublicDto> bodyOpt = resp.getBody();
+        assertTrue(bodyOpt.isPresent());
+        OpenRouterPublicDto body = bodyOpt.get();
+        assertTrue(body.isSuccess());
+        assertEquals("Redacted (integration)", body.getMessage());
     }
 
     @Test
@@ -136,7 +140,9 @@ public class OpenRouterControllerIntegrationTest {
         assertEquals(200, resp.getStatus().getCode());
         String contentType = resp.getContentType().map(Object::toString).orElse(MediaType.TEXT_PLAIN);
         assertEquals(MediaType.APPLICATION_PDF, contentType);
-        byte[] body = resp.getBody().get();
+        Optional<byte[]> bodyOpt = resp.getBody();
+        assertTrue(bodyOpt.isPresent());
+        byte[] body = bodyOpt.get();
         assertNotNull(body);
         String head = new String(body, 0, Math.min(4, body.length));
         assertTrue(head.startsWith("%PDF"));
@@ -169,7 +175,9 @@ public class OpenRouterControllerIntegrationTest {
         assertEquals(200, resp.getStatus().getCode());
         String contentType = resp.getContentType().map(Object::toString).orElse(MediaType.TEXT_PLAIN);
         assertEquals(MediaType.APPLICATION_PDF, contentType);
-        byte[] body = resp.getBody().get();
+        Optional<byte[]> bodyOpt = resp.getBody();
+        assertTrue(bodyOpt.isPresent());
+        byte[] body = bodyOpt.get();
         assertNotNull(body);
         String head = new String(body, 0, Math.min(4, body.length));
         assertTrue(head.startsWith("%PDF"));
@@ -182,7 +190,9 @@ public class OpenRouterControllerIntegrationTest {
         HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req);
         HttpResponse<byte[]> resp = client.toBlocking().exchange(httpReq, byte[].class);
         assertEquals(200, resp.getStatus().getCode());
-        byte[] body = resp.getBody().get();
+        Optional<byte[]> bodyOpt = resp.getBody();
+        assertTrue(bodyOpt.isPresent());
+        byte[] body = bodyOpt.get();
         assertNotNull(body);
         try (java.io.ByteArrayInputStream in = new java.io.ByteArrayInputStream(body);
              org.apache.pdfbox.pdmodel.PDDocument doc = org.apache.pdfbox.pdmodel.PDDocument.load(in)) {
@@ -234,9 +244,7 @@ public class OpenRouterControllerIntegrationTest {
                     StringBuilder sb = new StringBuilder();
                     sb.append("{\"format\": \"pdf\"}\n\n");
                     sb.append("Dear Ajuntament,\n\n");
-                    for (int i = 0; i < 800; i++) {
-                        sb.append("This is a long complaint sentence to generate many pages. ");
-                    }
+                    sb.append("This is a long complaint sentence to generate many pages. ".repeat(800));
                     sb.append("\n\nSincerely,\nResident");
                     return CompletableFuture.completedFuture(new HttpDto(sb.toString(), 200, "POST", null));
                 }
