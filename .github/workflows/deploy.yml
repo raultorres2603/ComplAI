@@ -3,6 +3,8 @@ name: Build and Deploy Serverless JAR
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened]
+  push:
     branches:
       - master
 
@@ -42,6 +44,8 @@ jobs:
           path: build/libs/*.jar
 
   deploy:
+    # Only run deploy when this workflow was triggered by a push to the master branch.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     needs: build
     runs-on: ubuntu-latest
     environment:
