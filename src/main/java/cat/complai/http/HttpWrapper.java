@@ -27,6 +27,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @Singleton
 public class HttpWrapper {
     // Endpoint and configuration - overridable for testing
+    private static final String DEFAULT_OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
     private final String openRouterUrl;
     private final Map<String, String> headers;
 
@@ -49,7 +50,7 @@ public class HttpWrapper {
     @Inject
     public HttpWrapper(@Value("${openrouter.url:https://openrouter.ai/api/v1/chat/completions}") String openRouterUrl,
                        @Value("${OPENROUTER_API_KEY:}") String openRouterApiKey) {
-        this.openRouterUrl = openRouterUrl;
+        this.openRouterUrl = normalizeOpenRouterUrl(openRouterUrl);
         this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
         this.mapper = new ObjectMapper();
 
@@ -152,6 +153,26 @@ public class HttpWrapper {
             // If parsing fails, return null (caller handles it)
             logger.log(Level.FINE, "Failed to parse OpenRouter response JSON", e);
             return null;
+        }
+    }
+
+    private String normalizeOpenRouterUrl(String url) {
+        if (url == null || url.isBlank()) {
+            return DEFAULT_OPENROUTER_URL;
+        }
+        url = url.trim();
+        // If URL already has a scheme (http or https), leave it as-is; otherwise default to https
+        String lower = url.toLowerCase();
+        if (!(lower.startsWith("http://") || lower.startsWith("https://"))) {
+            url = "https://" + url;
+        }
+        // Validate by attempting to create a URI
+        try {
+            URI uri = URI.create(url);
+            return uri.toString();
+        } catch (IllegalArgumentException e) {
+            logger.log(Level.WARNING, "Configured OpenRouter URL is malformed, falling back to default URL", e);
+            return DEFAULT_OPENROUTER_URL;
         }
     }
 }
