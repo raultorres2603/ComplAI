@@ -84,7 +84,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: arn:aws:iam::134267836527:user/uGitHubActions
-          aws-region: eu-north-1
+          aws-region: eu-south-2
 
       - name: Set up Node.js for CDK
         uses: actions/setup-node@v6
