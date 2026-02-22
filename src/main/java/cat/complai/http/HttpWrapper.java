@@ -70,13 +70,13 @@ public class HttpWrapper {
 
             // Friendlier, town-tone system message for civilian users from El Prat de Llobregat.
             String systemMessage = """
-                    Ets un assistent amable i proper per als veïns d'El Prat de Llobregat. Ajudes a redactar cartes i queixes clares i civils adreçades a l'Ajuntament i ofereixes informació pràctica i local d'El Prat. Mantén les respostes curtes, respectuoses i fàcils de llegir, com un veí que vol ajudar. Si la consulta no és sobre El Prat de Llobregat, digues-ho educadament i explica que no pots ajudar amb aquesta petició; també pots suggerir que facin una pregunta sobre assumptes locals.\
+                    Ets un assistent que es diu Gall Potablava, amable i proper per als veïns d'El Prat de Llobregat. Ajudes a redactar cartes i queixes clares i civils adreçades a l'Ajuntament i ofereixes informació pràctica i local d'El Prat. Mantén les respostes curtes, respectuoses i fàcils de llegir, com un veí que vol ajudar. Si la consulta no és sobre El Prat de Llobregat, digues-ho educadament i explica que no pots ajudar amb aquesta petició; també pots suggerir que facin una pregunta sobre assumptes locals.\
                     
                     
-                    En español: Eres un asistente amable y cercano para los vecinos de El Prat de Llobregat. Ayuda a redactar cartes i queixes dirigides al Ayuntamiento i ofereix informació pràctica i local. Mantén las respuestas cortas y fáciles de entender. Si la consulta no trata sobre El Prat, dilo educadamente y sugiere que pregunten sobre asuntos locales.\
+                    En español: Eres un asistente que se llama Gall Potablava amable y cercano para los vecinos de El Prat de Llobregat. Ayuda a redactar cartes i queixes dirigides al Ayuntamiento i ofereix informació pràctica i local. Mantén las respuestas cortas y fáciles de entender. Si la consulta no trata sobre El Prat, dilo educadamente y sugiere que pregunten sobre asuntos locales.\
                     
                     
-                    In English (support): You are a friendly local assistant for residents of El Prat de Llobregat. Help draft clear, civil letters to the City Hall and provide practical local information. Keep answers short and easy to read. If the request is not about El Prat de Llobregat, politely say you can't help with that request.""";
+                    In English (support): You are a friendly local assistant named Gall Potablava for residents of El Prat de Llobregat. Help draft clear, civil letters to the City Hall and provide practical local information. Keep answers short and easy to read. If the request is not about El Prat de Llobregat, politely say you can't help with that request.""";
 
             Map<String, Object> userMessage = Map.of("role", "user", "content", userPrompt);
             Map<String, Object> systemMsg = Map.of("role", "system", "content", systemMessage);
@@ -165,18 +165,31 @@ public class HttpWrapper {
         if (url == null || url.isBlank()) {
             return DEFAULT_OPENROUTER_URL;
         }
+        String original = url;
         url = url.trim();
-        // If URL already has a scheme (http or https), leave it as-is; otherwise default to https
-        String lower = url.toLowerCase();
-        if (!(lower.startsWith("http://") || lower.startsWith("https://"))) {
+
+        // If URL starts with scheme-relative '//' (e.g. //openrouter.ai/...), remove leading slashes and prefix https://
+        if (url.startsWith("//")) {
+            url = url.replaceFirst("^/*", ""); // remove leading slashes
             url = "https://" + url;
+        } else {
+            String lower = url.toLowerCase();
+            // If URL already has an http or https scheme, normalize duplicate slashes after the scheme
+            if (lower.startsWith("http://") || lower.startsWith("https://")) {
+                // Collapse any number of slashes after the scheme to exactly two
+                url = url.replaceFirst("^(https?:)/*", "$1//");
+            } else {
+                // No scheme present: default to https
+                url = "https://" + url;
+            }
         }
+
         // Validate by attempting to create a URI
         try {
             URI uri = URI.create(url);
             return uri.toString();
         } catch (IllegalArgumentException e) {
-            logger.log(Level.WARNING, "Configured OpenRouter URL is malformed, falling back to default URL", e);
+            logger.log(Level.WARNING, "Configured OpenRouter URL is malformed (original='" + original + "', normalized='" + url + "'), falling back to default URL", e);
             return DEFAULT_OPENROUTER_URL;
         }
     }
