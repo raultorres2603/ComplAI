@@ -1,7 +1,6 @@
 plugins {
-    id("io.micronaut.library") version "4.6.1"
+    id("io.micronaut.minimal.application") version "4.6.1"
     id("com.gradleup.shadow") version "8.3.9"
-    id("application")
 }
 
 version = "0.1"
@@ -23,9 +22,6 @@ dependencies {
     implementation("io.micronaut.aws:micronaut-function-aws")
     implementation("io.micronaut.cache:micronaut-cache-caffeine")
     implementation("io.micronaut.crac:micronaut-crac")
-    // Netty is only needed for local development runs; exclude it from the shadow JAR.
-    // Including it in Lambda causes classpath conflicts and inflates the package size.
-    runtimeOnly("io.micronaut:micronaut-http-server-netty")
     runtimeOnly("ch.qos.logback:logback-classic")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
@@ -47,11 +43,10 @@ java {
 
 
 micronaut {
-    runtime("lambda_java")
+    // "lambda_provided" is the correct runtime for API Gateway proxy handlers (APIGatewayV2HTTPEventFunction).
+    // "lambda_provided" means the Lambda runtime is provided by AWS — no embedded HTTP server is started.
+    runtime("lambda_provided")
     testRuntime("junit5")
-    nativeLambda {
-        lambdaRuntimeClassName = "io.micronaut.function.aws.runtime.APIGatewayV2HTTPEventMicronautLambdaRuntime"
-    }
     processing {
         incremental(true)
         annotations("cat.complai.*")
@@ -62,13 +57,6 @@ application {
     mainClass.set("cat.complai.App" )
 }
 
-// Exclude Netty from the shadow (fat) JAR.
-// Netty is pulled in as runtimeOnly for local development only.
-// Bundling it into the Lambda package wastes space and can cause classpath conflicts
-// with the Lambda runtime's own HTTP layer.
-tasks.named('shadowJar') {
-    exclude 'io/netty/**'
-}
 
 // CI test task: explicit task for the CI pipeline. It runs tests with JUnit Platform
 // and is configured to fail the build if any test fails (Gradle default behaviour).
