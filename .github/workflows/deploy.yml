@@ -1,6 +1,11 @@
 # Workflow for building Micronaut JAR and preparing for AWS CDK deployment
 name: Build & Deploy to AWS CDK
 
+# Grant the workflow permission to request OIDC id-tokens and read repository contents.
+permissions:
+  id-token: write
+  contents: read
+
 on:
   pull_request:
     types: [opened, synchronize, reopened]
@@ -86,6 +91,8 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::134267836527:role/github-cdk-deploy-role
           aws-region: eu-south-2
+          audience: sts.amazonaws.com
+          output-env-credentials: true
 
       - name: Set up Node.js for CDK
         uses: actions/setup-node@v6
