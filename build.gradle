@@ -16,11 +16,15 @@ dependencies {
     implementation("io.micronaut:micronaut-http-client")
     // Micronaut JSON support via Jackson - provides JsonMapper bean
     implementation("io.micronaut:micronaut-jackson-databind")
-    implementation("io.micronaut.aws:micronaut-aws-apigateway")
+    // micronaut-function-aws-api-proxy contains APIGatewayV2HTTPEventFunction,
+    // which is the correct handler class for an HTTP API (API Gateway v2) + Lambda setup.
+    // micronaut-aws-apigateway was the old REST/payload-1 module and does not contain this class.
+    implementation("io.micronaut.aws:micronaut-function-aws-api-proxy")
     implementation("io.micronaut.aws:micronaut-function-aws")
     implementation("io.micronaut.cache:micronaut-cache-caffeine")
     implementation("io.micronaut.crac:micronaut-crac")
-    // Netty server for local run
+    // Netty is only needed for local development runs; exclude it from the shadow JAR.
+    // Including it in Lambda causes classpath conflicts and inflates the package size.
     runtimeOnly("io.micronaut:micronaut-http-server-netty")
     runtimeOnly("ch.qos.logback:logback-classic")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
@@ -56,6 +60,14 @@ micronaut {
 
 application {
     mainClass.set("cat.complai.App" )
+}
+
+// Exclude Netty from the shadow (fat) JAR.
+// Netty is pulled in as runtimeOnly for local development only.
+// Bundling it into the Lambda package wastes space and can cause classpath conflicts
+// with the Lambda runtime's own HTTP layer.
+tasks.named('shadowJar') {
+    exclude 'io/netty/**'
 }
 
 // CI test task: explicit task for the CI pipeline. It runs tests with JUnit Platform
