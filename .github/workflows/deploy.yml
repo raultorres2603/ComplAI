@@ -56,6 +56,12 @@ jobs:
     environment:
       name: production
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          # Ensure we checkout the same commit that produced the artifact in the build job
+          ref: ${{ github.sha }}
+
       - name: Download JAR artifact
         uses: actions/download-artifact@v7
         with:
@@ -99,11 +105,30 @@ jobs:
         with:
           node-version: '18'
 
+      - name: Cache npm for cdk
+        uses: actions/cache@v5
+        with:
+          # Cache the npm cache for faster installs. Key tied to cdk/package-lock.json.
+          path: |
+            ~/.npm
+            ~/.cache/npm
+          key: ${{ runner.os }}-node-${{ hashFiles('cdk/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
       - name: Install AWS CDK CLI
         run: npm install -g aws-cdk
 
       - name: Install CDK dependencies
         run: cd cdk && npm install
+
+      - name: Validate CDK installation
+        # Quick validation to ensure Node, npm and CDK CLI are present and cdk deps installed
+        run: |
+          node -v
+          npm -v
+          echo "CDK (global) version:" && npx cdk --version || true
+          echo "Listing top-level cdk/node_modules (if present):" && ls -1 cdk/node_modules | head -n 50 || true
 
       - name: Deploy with AWS CDK
         # Compute JAR_PATH automatically (prefer *-all.jar) and pass it to CDK.
