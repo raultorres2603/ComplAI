@@ -1,5 +1,5 @@
 # Workflow for building Micronaut JAR and preparing for AWS CDK deployment
-name: Build and Deploy Serverless JAR
+name: Build & Deploy to AWS CDK
 
 on:
   pull_request:
