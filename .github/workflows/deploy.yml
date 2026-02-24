@@ -55,6 +55,7 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           name: lambda-jar
+          path: build/libs
 
       - name: Check JAR artifact exists
         # Ensure the build produced at least one JAR before attempting deployment.
