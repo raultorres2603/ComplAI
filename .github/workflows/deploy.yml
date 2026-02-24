@@ -103,7 +103,7 @@ jobs:
       - name: Set up Node.js for CDK
         uses: actions/setup-node@v6
         with:
-          node-version: '18'
+          node-version: '20'
 
       - name: Cache npm for cdk
         uses: actions/cache@v5
