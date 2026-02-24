@@ -1,10 +1,12 @@
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
-import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as apigateway from 'aws-cdk-lib/aws-apigateway';
+import * as apigwv2 from 'aws-cdk-lib/aws-apigatewayv2';
+import * as integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 
 export class LambdaStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -65,12 +67,12 @@ export class LambdaStack extends cdk.Stack {
 
     const lambdaFn = new lambda.Function(this, 'ComplAILambda', {
       runtime: lambda.Runtime.JAVA_17,
-      // The previous handler referenced a class from an older package that is not
-      // present in the assembled shadow JAR. Use the Micronaut request handler
-      // class that is present in the jar: io.micronaut.function.aws.MicronautRequestHandler
-      // (method name handleRequest). This maps correctly to Micronaut's AWS support
-      // included via the project dependencies.
-      handler: 'io.micronaut.function.aws.MicronautRequestHandler::handleRequest',
+      // The project uses the Micronaut APIGateway V2 runtime; use the Micronaut
+      // APIGateway v2 HTTP event function handler which the Micronaut build
+      // packages in the shadow JAR.
+      // This handler expects the APIGateway V2 payload (HTTP API) which matches
+      // our CDK HttpApi integration.
+      handler: 'io.micronaut.function.aws.proxy.payload2.APIGatewayV2HTTPEventFunction::handleRequest',
       code: lambda.Code.fromAsset(jarPath),
       memorySize: 1024,
       timeout: cdk.Duration.seconds(30),
@@ -83,12 +85,17 @@ export class LambdaStack extends cdk.Stack {
       role: lambdaRole,
     });
 
-    // Create API Gateway pointing to the Lambda. Not assigned because it's not used later.
-    new apigateway.LambdaRestApi(this, 'ComplAIEndpoint', {
-      handler: lambdaFn,
-      proxy: true,
-      restApiName: 'ComplAI API',
-      description: 'API Gateway proxy for the ComplAI Lambda (hosts all controllers)',
+    // Create an HTTP API (API Gateway v2) and connect it to the Lambda via a proxy integration.
+    // HTTP APIs are cheaper and recommended for most Lambda-backed HTTP workloads.
+    const lambdaIntegration = new integrations.LambdaProxyIntegration({ handler: lambdaFn });
+    const httpApi = new apigwv2.HttpApi(this, 'ComplAIHttpApi', {
+      defaultIntegration: lambdaIntegration,
+    });
+
+    // Expose the HTTP API endpoint as a CloudFormation output so deploys and CI can discover it easily.
+    new cdk.CfnOutput(this, 'ComplAIHttpApiEndpoint', {
+      value: httpApi.apiEndpoint,
+      description: 'URL of the deployed ComplAI HTTP API (API Gateway v2)',
     });
 
     // Expose the Lambda name and ARN as CloudFormation outputs so deploys (and CI)
