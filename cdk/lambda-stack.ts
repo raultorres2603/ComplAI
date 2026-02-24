@@ -8,9 +8,21 @@ import * as fs from 'fs';
 import * as apigwv2 from 'aws-cdk-lib/aws-apigatewayv2';
 import * as integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 
+export type DeploymentEnvironment = 'development' | 'production';
+
+export interface LambdaStackProps extends cdk.StackProps {
+  // Identifies which environment this stack owns. Every AWS resource is suffixed
+  // with this value so the two stacks can coexist in the same AWS account without
+  // name collisions, and so it is immediately obvious in the console which
+  // resource belongs to which environment.
+  readonly environment: DeploymentEnvironment;
+}
+
 export class LambdaStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: Construct, id: string, props: LambdaStackProps) {
     super(scope, id, props);
+
+    const { environment } = props;
 
     // Create a CloudFormation parameter for the OpenRouter API key.
     // We set noEcho: true so CloudFormation does not display the value in the console output.
@@ -27,10 +39,11 @@ export class LambdaStack extends cdk.Stack {
       constraintDescription: 'OpenRouterApiKey must be provided and not be empty.',
     });
 
-    // Create a custom IAM role for Lambda with least privilege
-    const lambdaRole = new iam.Role(this, 'ComplAILambdaRole', {
+    // Create a custom IAM role for Lambda with least privilege.
+    // The logical ID includes the environment so both stacks can live in the same account.
+    const lambdaRole = new iam.Role(this, `ComplAILambdaRole-${environment}`, {
       assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
-      description: 'IAM role for ComplAI Lambda with least privilege',
+      description: `IAM role for ComplAI Lambda (${environment}) with least privilege`,
     });
 
     // Attach AWS managed policy for basic Lambda logging
@@ -63,9 +76,7 @@ export class LambdaStack extends cdk.Stack {
     }
     if (!jarPath || !fs.existsSync(jarPath)) throw new Error(`Unable to determine JAR path. Computed: ${jarPath}`);
 
-    // Use jarPath as the lambda asset
-
-    const lambdaFn = new lambda.Function(this, 'ComplAILambda', {
+    const lambdaFn = new lambda.Function(this, `ComplAILambda-${environment}`, {
       runtime: lambda.Runtime.JAVA_17,
       // The project uses the Micronaut APIGateway V2 runtime; use the Micronaut
       // APIGateway v2 HTTP event function handler which the Micronaut build
@@ -88,15 +99,17 @@ export class LambdaStack extends cdk.Stack {
     // Create an HTTP API (API Gateway v2) and connect it to the Lambda via a proxy integration.
     // HTTP APIs are cheaper and recommended for most Lambda-backed HTTP workloads.
     // HttpLambdaIntegration requires an id as the first argument in aws-cdk-lib v2.
-    const lambdaIntegration = new integrations.HttpLambdaIntegration('ComplAILambdaIntegration', lambdaFn);
-    const httpApi = new apigwv2.HttpApi(this, 'ComplAIHttpApi', {
+    const lambdaIntegration = new integrations.HttpLambdaIntegration(`ComplAILambdaIntegration-${environment}`, lambdaFn);
+    const httpApi = new apigwv2.HttpApi(this, `ComplAIHttpApi-${environment}`, {
       defaultIntegration: lambdaIntegration,
     });
 
     // CloudWatch log group for HTTP API access logs.
     // 1 week retention keeps costs minimal while giving enough history to debug issues.
-    const accessLogGroup = new logs.LogGroup(this, 'ComplAIHttpApiAccessLogs', {
-      logGroupName: `/aws/apigateway/complai/${this.stackName}`,
+    // The log group path is namespaced by environment so the two stacks write to
+    // separate log groups and do not share retention/deletion lifecycle.
+    const accessLogGroup = new logs.LogGroup(this, `ComplAIHttpApiAccessLogs-${environment}`, {
+      logGroupName: `/aws/apigateway/complai/${environment}/${this.stackName}`,
       retention: logs.RetentionDays.ONE_WEEK,
       // Delete the log group when the stack is destroyed to avoid orphaned resources.
       removalPolicy: cdk.RemovalPolicy.DESTROY,
@@ -136,7 +149,7 @@ export class LambdaStack extends cdk.Stack {
     // Expose the HTTP API endpoint as a CloudFormation output so deploys and CI can discover it easily.
     new cdk.CfnOutput(this, 'ComplAIHttpApiEndpoint', {
       value: httpApi.apiEndpoint,
-      description: 'URL of the deployed ComplAI HTTP API (API Gateway v2)',
+      description: `URL of the deployed ComplAI HTTP API (${environment})`,
     });
 
     // Expose the Lambda name and ARN as CloudFormation outputs so deploys (and CI)
@@ -145,12 +158,13 @@ export class LambdaStack extends cdk.Stack {
     // generated suffix, so using the output avoids guessing the hash.
     new cdk.CfnOutput(this, 'ComplAILambdaFunctionName', {
       value: lambdaFn.functionName,
-      description: 'Name of the deployed ComplAI Lambda function',
+      description: `Name of the deployed ComplAI Lambda function (${environment})`,
     });
 
     new cdk.CfnOutput(this, 'ComplAILambdaArn', {
       value: lambdaFn.functionArn,
-      description: 'ARN of the deployed ComplAI Lambda function',
+      description: `ARN of the deployed ComplAI Lambda function (${environment})`,
     });
   }
 }
+

@@ -1,4 +1,18 @@
-# Workflow for building Micronaut JAR and preparing for AWS CDK deployment
+# Workflow for building the Micronaut JAR and deploying via AWS CDK.
+#
+# Triggers:
+#   - Manual (workflow_dispatch): choose environment (development | production) and branch.
+#     Deploying to production is only allowed from the master branch; the guard job
+#     enforces this before anything else runs.
+#   - Automatic (pull_request): any PR opened/updated/reopened deploys to development only.
+#     Production is never touched automatically.
+#
+# Environments:
+#   - development: no approval required, uses secrets.OPENROUTER_API_KEY from the
+#                  "development" GitHub Environment.
+#   - production:  requires manual approval (configure a required reviewer in
+#                  Settings → Environments → production), uses secrets.OPENROUTER_API_KEY
+#                  from the "production" GitHub Environment.
 name: Build & Deploy to AWS CDK
 
 # Grant the workflow permission to request OIDC id-tokens and read repository contents.
@@ -7,18 +21,63 @@ permissions:
   contents: read
 
 on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - development
+          - production
+      branch:
+        description: 'Branch to deploy (production only accepts master)'
+        required: true
+        default: 'master'
   pull_request:
     types: [opened, synchronize, reopened]
-  push:
-    branches:
-      - master
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Guard: fail fast when a manual dispatch tries to deploy production from a
+  # branch other than master. This is the only place this rule is enforced, so
+  # it is explicit and visible in the job list.
+  # ---------------------------------------------------------------------------
+  guard:
+    name: Validate deployment inputs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Block production deploy from non-master branch
+        if: >
+          github.event_name == 'workflow_dispatch' &&
+          inputs.environment == 'production' &&
+          inputs.branch != 'master'
+        run: |
+          echo "ERROR: Production can only be deployed from master. Got branch: '${{ inputs.branch }}'." >&2
+          exit 1
+
+      - name: Confirm deployment target
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "Automatic PR trigger → deploying to: development"
+          else
+            echo "Manual trigger → deploying to: ${{ inputs.environment }} from branch: ${{ inputs.branch }}"
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Build: compile and test the JAR, then upload it as an artifact.
+  # ---------------------------------------------------------------------------
   build:
+    name: Build JAR
+    needs: guard
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+        with:
+          # For manual dispatches, check out the requested branch.
+          # For PRs, the default checkout (merge commit) is correct.
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.branch || github.sha }}
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
@@ -35,8 +94,7 @@ jobs:
             ${{ runner.os }}-gradle-
 
       - name: Run CI tests
-        # This will execute the ciTest task we added to build.gradle. The step (and job)
-        # will fail early if any test fails, preventing later steps from running.
+        # Fail early if any test fails, before building the deployable artifact.
         run: ./gradlew --no-daemon ciTest
 
       - name: Build JAR (shadowJar)
@@ -48,19 +106,37 @@ jobs:
           name: lambda-jar
           path: build/libs/*.jar
 
+  # ---------------------------------------------------------------------------
+  # Deploy: download the JAR and deploy the correct CDK stack for the target
+  # environment. The GitHub Environment binding is what gates production behind
+  # a required manual approval (configured in Settings → Environments).
+  # ---------------------------------------------------------------------------
   deploy:
-    # Only run deploy when this workflow was triggered by a push to the master branch.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    name: Deploy to ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'development' }}
     needs: build
     runs-on: ubuntu-latest
     environment:
-      name: production
+      # Bind to the matching GitHub Environment so that:
+      #   - development: deploys immediately (no approval required).
+      #   - production:  waits for a required reviewer to approve
+      #                  (configure in Settings → Environments → production).
+      # Each environment holds its own OPENROUTER_API_KEY secret.
+      name: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'development' }}
     steps:
+      - name: Resolve deployment target
+        id: target
+        # Produce a single output used throughout this job to avoid repeating the ternary.
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "environment=${{ inputs.environment }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "environment=development" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout code
         uses: actions/checkout@v6
         with:
-          # Ensure we checkout the same commit that produced the artifact in the build job
-          ref: ${{ github.sha }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.branch || github.sha }}
 
       - name: Download JAR artifact
         uses: actions/download-artifact@v7
@@ -68,29 +144,27 @@ jobs:
           name: lambda-jar
           path: build/libs
 
-      - name: Check JAR artifact exists
-        # Ensure the build produced at least one JAR before attempting deployment.
+      - name: Verify JAR artifact exists
         run: |
           echo "Checking for build/libs/*.jar artifacts..."
-          if ! ls build/libs/*.jar 1> /dev/null 2>&1; then
-            echo "ERROR: build/libs/*.jar not found. Ensure the build produced the JAR artifact." >&2
+          if ! ls build/libs/*.jar 1>/dev/null 2>&1; then
+            echo "ERROR: No JAR found in build/libs. Ensure the build job produced an artifact." >&2
             exit 1
           fi
           echo "Found artifacts:"
           ls -1 build/libs/*.jar
 
-      - name: Masked secret info (CI log friendly)
-        # Print a non-sensitive message about which secret will be used. Do NOT print the secret value.
+      - name: Verify OPENROUTER_API_KEY is set
+        # Do NOT print the key value. Only log that it is present and its length.
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
           if [ -z "$OPENROUTER_API_KEY" ]; then
-            echo "OPENROUTER_API_KEY is not set.";
+            echo "ERROR: OPENROUTER_API_KEY secret is not set for the '${{ steps.target.outputs.environment }}' environment." >&2
             exit 1
-          else
-            LEN=$(echo -n "$OPENROUTER_API_KEY" | wc -c | tr -d ' ')
-            echo "OPENROUTER_API_KEY is set and will be used for deployment (length: $LEN, value: [REDACTED])."
           fi
+          LEN=$(echo -n "$OPENROUTER_API_KEY" | wc -c | tr -d ' ')
+          echo "OPENROUTER_API_KEY is set (length: $LEN, value: [REDACTED])."
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
@@ -105,10 +179,9 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Cache npm for cdk
+      - name: Cache npm for CDK
         uses: actions/cache@v5
         with:
-          # Cache the npm cache for faster installs. Key tied to cdk/package-lock.json.
           path: |
             ~/.npm
             ~/.cache/npm
@@ -126,53 +199,45 @@ jobs:
         run: cd cdk && npm run build
 
       - name: Validate CDK installation
-        # Quick validation to ensure Node, npm and CDK CLI are present and cdk deps installed
         run: |
           node -v
           npm -v
           echo "CDK (global) version:" && npx cdk --version || true
-          echo "Listing top-level cdk/node_modules (if present):" && ls -1 cdk/node_modules | head -n 50 || true
 
       - name: Deploy with AWS CDK
-        # Compute JAR_PATH automatically (prefer *-all.jar) and pass it to CDK.
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          TARGET_ENV: ${{ steps.target.outputs.environment }}
         run: |
-          # Ensure a deterministic JAR path is available for CDK. Prefer shadowJar '*-all.jar'.
-          if [ -f "build/libs/complai-latest.jar" ]; then
-            JAR="build/libs/complai-latest.jar"
-          else
-            # pick first *-all.jar if present
-            CANDIDATE=$(ls build/libs/*-all.jar 2>/dev/null | head -n1)
-            if [ -n "$CANDIDATE" ]; then
-              JAR="$CANDIDATE"
-            else
-              # fallback to the largest jar
-              JAR=$(ls -S build/libs/*.jar 2>/dev/null | head -n1)
-            fi
+          # Resolve the shadow JAR. Prefer *-all.jar (shadowJar output).
+          CANDIDATE=$(ls build/libs/*-all.jar 2>/dev/null | head -n1)
+          if [ -z "$CANDIDATE" ]; then
+            CANDIDATE=$(ls -S build/libs/*.jar 2>/dev/null | head -n1)
           fi
 
-          if [ -z "$JAR" ] || [ ! -f "$JAR" ]; then
-            echo "ERROR: No JAR found for deployment. Expected a shadow JAR in build/libs or set JAR_PATH." >&2
+          if [ -z "$CANDIDATE" ] || [ ! -f "$CANDIDATE" ]; then
+            echo "ERROR: No usable JAR found in build/libs." >&2
             ls -la build/libs || true
             exit 1
           fi
 
-          echo "Using JAR for deployment: $JAR"
-          # Provide both env and CDK context to the CDK app
-          export JAR_PATH="$JAR"
+          echo "Using JAR: $CANDIDATE"
+          echo "Target CDK stack: ComplAILambdaStack-${TARGET_ENV}"
+
+          export JAR_PATH="$CANDIDATE"
           cd cdk
-          # Write CloudFormation outputs to a file so the CI can upload them as an artifact.
-          npx cdk deploy --require-approval never -c jarPath=$JAR_PATH --parameters OpenRouterApiKey=$OPENROUTER_API_KEY --outputs-file ../cdk-outputs.json
+          # Deploy only the stack for the target environment. The CDK app defines one
+          # stack per environment; deploying by explicit name ensures the other stack
+          # is never touched.
+          npx cdk deploy "ComplAILambdaStack-${TARGET_ENV}" \
+            --require-approval never \
+            -c jarPath="$JAR_PATH" \
+            -c environment="$TARGET_ENV" \
+            --parameters OpenRouterApiKey="$OPENROUTER_API_KEY" \
+            --outputs-file "../cdk-outputs-${TARGET_ENV}.json"
 
       - name: Upload CDK outputs
         uses: actions/upload-artifact@v6
         with:
-          name: cdk-outputs
-          path: cdk-outputs.json
-
-# Best practices:
-# - Use GitHub secrets for AWS credentials
-# - Restrict IAM permissions to least privilege
-# - Version artifacts for traceability
-# - Modularize CDK code for future integration
+          name: cdk-outputs-${{ steps.target.outputs.environment }}
+          path: cdk-outputs-${{ steps.target.outputs.environment }}.json
