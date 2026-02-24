@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "name": "E2E ComplAI",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}
