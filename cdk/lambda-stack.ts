@@ -2,6 +2,7 @@ import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as logs from 'aws-cdk-lib/aws-logs';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as apigwv2 from 'aws-cdk-lib/aws-apigatewayv2';
@@ -91,6 +92,46 @@ export class LambdaStack extends cdk.Stack {
     const httpApi = new apigwv2.HttpApi(this, 'ComplAIHttpApi', {
       defaultIntegration: lambdaIntegration,
     });
+
+    // CloudWatch log group for HTTP API access logs.
+    // 1 week retention keeps costs minimal while giving enough history to debug issues.
+    const accessLogGroup = new logs.LogGroup(this, 'ComplAIHttpApiAccessLogs', {
+      logGroupName: `/aws/apigateway/complai/${this.stackName}`,
+      retention: logs.RetentionDays.ONE_WEEK,
+      // Delete the log group when the stack is destroyed to avoid orphaned resources.
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    // API Gateway (delivery.logs.amazonaws.com) must be allowed to create log streams
+    // and write log events to the log group. Without this the stage will fail to deliver
+    // access logs and the setting silently has no effect.
+    accessLogGroup.addToResourcePolicy(new iam.PolicyStatement({
+      principals: [new iam.ServicePrincipal('delivery.logs.amazonaws.com')],
+      actions: ['logs:CreateLogStream', 'logs:PutLogEvents'],
+      resources: [`${accessLogGroup.logGroupArn}:*`],
+    }));
+
+    // The L2 HttpApi does not expose accessLogSettings on the default stage directly.
+    // Use the CfnStage escape hatch to enable access logging on the $default stage.
+    // Format: structured JSON per request — easy to query in CloudWatch Logs Insights.
+    if (!httpApi.defaultStage) {
+      throw new Error('HttpApi.defaultStage is undefined — cannot configure access logging.');
+    }
+    const cfnDefaultStage = httpApi.defaultStage.node.defaultChild as apigwv2.CfnStage;
+    cfnDefaultStage.accessLogSettings = {
+      destinationArn: accessLogGroup.logGroupArn,
+      format: JSON.stringify({
+        requestId:          '$context.requestId',
+        ip:                 '$context.identity.sourceIp',
+        httpMethod:         '$context.httpMethod',
+        routeKey:           '$context.routeKey',
+        status:             '$context.status',
+        integrationError:   '$context.integrationErrorMessage',
+        errorMessage:       '$context.error.message',
+        responseLatency:    '$context.responseLatency',
+        integrationLatency: '$context.integrationLatency',
+      }),
+    };
 
     // Expose the HTTP API endpoint as a CloudFormation output so deploys and CI can discover it easily.
     new cdk.CfnOutput(this, 'ComplAIHttpApiEndpoint', {
