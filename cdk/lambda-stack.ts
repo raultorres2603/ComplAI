@@ -65,7 +65,12 @@ export class LambdaStack extends cdk.Stack {
 
     const lambdaFn = new lambda.Function(this, 'ComplAILambda', {
       runtime: lambda.Runtime.JAVA_17,
-      handler: 'io.micronaut.function.aws.proxy.MicronautLambdaHandler::handleRequest',
+      // The previous handler referenced a class from an older package that is not
+      // present in the assembled shadow JAR. Use the Micronaut request handler
+      // class that is present in the jar: io.micronaut.function.aws.MicronautRequestHandler
+      // (method name handleRequest). This maps correctly to Micronaut's AWS support
+      // included via the project dependencies.
+      handler: 'io.micronaut.function.aws.MicronautRequestHandler::handleRequest',
       code: lambda.Code.fromAsset(jarPath),
       memorySize: 1024,
       timeout: cdk.Duration.seconds(30),
