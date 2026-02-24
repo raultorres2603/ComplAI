@@ -4,6 +4,7 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as path from 'path';
+import * as fs from 'fs';
 
 export class LambdaStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -39,10 +40,28 @@ export class LambdaStack extends cdk.Stack {
     //   resources: ['arn:aws:s3:::your-bucket/*'],
     // }));
 
-    // Resolve the path to the built fat JAR produced by Gradle's shadowJar. Using an
-    // explicit path to the jar keeps the asset upload deterministic and small. Update
-    // the jar filename if your build produces a different name.
-    const jarPath = path.resolve(__dirname, '..', '..', 'build', 'libs', 'complai-0.1-all.jar');
+    // Minimal JAR selection:
+    // 1) If CI sets JAR_PATH (or CDK context 'jarPath'), use it.
+    // 2) Otherwise require a '*-all.jar' (shadowJar) in build/libs and use the first one found.
+    // This keeps behavior explicit and avoids brittle heuristics.
+    const explicit = process.env.JAR_PATH || this.node.tryGetContext?.('jarPath');
+    let jarPath: string | undefined;
+    if (explicit) {
+      const candidate = path.isAbsolute(explicit) ? explicit : path.resolve(__dirname, '..', '..', explicit);
+      if (!fs.existsSync(candidate)) throw new Error(`Configured JAR_PATH does not exist: ${candidate}`);
+      jarPath = candidate;
+    } else {
+      const libsDir = path.resolve(__dirname, '..', '..', 'build', 'libs');
+      if (!fs.existsSync(libsDir)) throw new Error(`Expected build/libs not found at ${libsDir}. Run './gradlew clean shadowJar'.`);
+      const jars = fs.readdirSync(libsDir).filter((f: string) => f.endsWith('.jar'));
+      if (jars.length === 0) throw new Error(`No JARs found in ${libsDir}. Run './gradlew clean shadowJar'.`);
+      const allJar = jars.find((f: string) => f.includes('-all.jar') || f.endsWith('-all.jar'));
+      if (!allJar) throw new Error(`No '*-all.jar' found in ${libsDir}. Set JAR_PATH env to the produced jar or produce a shadow JAR.`);
+      jarPath = path.join(libsDir, allJar);
+    }
+    if (!jarPath || !fs.existsSync(jarPath)) throw new Error(`Unable to determine JAR path. Computed: ${jarPath}`);
+
+    // Use jarPath as the lambda asset
 
     const lambdaFn = new lambda.Function(this, 'ComplAILambda', {
       runtime: lambda.Runtime.JAVA_17,

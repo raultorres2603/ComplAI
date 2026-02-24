@@ -98,14 +98,35 @@ jobs:
         run: cd cdk && npm install
 
       - name: Deploy with AWS CDK
-        # Pass the OpenRouter API key as a CloudFormation parameter to CDK so it becomes
-        # available as an environment variable in the Lambda. The value is taken from
-        # a GitHub Secret named OPENROUTER_API_KEY. We avoid echoing the secret.
+        # Compute JAR_PATH automatically (prefer *-all.jar) and pass it to CDK.
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
+          # Ensure a deterministic JAR path is available for CDK. Prefer shadowJar '*-all.jar'.
+          if [ -f "build/libs/complai-latest.jar" ]; then
+            JAR="build/libs/complai-latest.jar"
+          else
+            # pick first *-all.jar if present
+            CANDIDATE=$(ls build/libs/*-all.jar 2>/dev/null | head -n1)
+            if [ -n "$CANDIDATE" ]; then
+              JAR="$CANDIDATE"
+            else
+              # fallback to the largest jar
+              JAR=$(ls -S build/libs/*.jar 2>/dev/null | head -n1)
+            fi
+          fi
+
+          if [ -z "$JAR" ] || [ ! -f "$JAR" ]; then
+            echo "ERROR: No JAR found for deployment. Expected a shadow JAR in build/libs or set JAR_PATH." >&2
+            ls -la build/libs || true
+            exit 1
+          fi
+
+          echo "Using JAR for deployment: $JAR"
+          # Provide both env and CDK context to the CDK app
+          export JAR_PATH="$JAR"
           cd cdk
-          npx cdk deploy --require-approval never --parameters OpenRouterApiKey=$OPENROUTER_API_KEY
+          npx cdk deploy --require-approval never -c jarPath=$JAR_PATH --parameters OpenRouterApiKey=$OPENROUTER_API_KEY
 
 # Best practices:
 # - Use GitHub secrets for AWS credentials
