@@ -122,6 +122,9 @@ jobs:
       - name: Install CDK dependencies
         run: cd cdk && npm install
 
+      - name: Build CDK TypeScript
+        run: cd cdk && npm run build
+
       - name: Validate CDK installation
         # Quick validation to ensure Node, npm and CDK CLI are present and cdk deps installed
         run: |
