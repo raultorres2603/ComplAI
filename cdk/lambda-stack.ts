@@ -4,7 +4,6 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as path from 'path';
 import * as fs from 'fs';
-import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as apigwv2 from 'aws-cdk-lib/aws-apigatewayv2';
 import * as integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 
@@ -87,7 +86,8 @@ export class LambdaStack extends cdk.Stack {
 
     // Create an HTTP API (API Gateway v2) and connect it to the Lambda via a proxy integration.
     // HTTP APIs are cheaper and recommended for most Lambda-backed HTTP workloads.
-    const lambdaIntegration = new integrations.LambdaProxyIntegration({ handler: lambdaFn });
+    // HttpLambdaIntegration requires an id as the first argument in aws-cdk-lib v2.
+    const lambdaIntegration = new integrations.HttpLambdaIntegration('ComplAILambdaIntegration', lambdaFn);
     const httpApi = new apigwv2.HttpApi(this, 'ComplAIHttpApi', {
       defaultIntegration: lambdaIntegration,
     });
