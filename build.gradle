@@ -24,12 +24,21 @@ dependencies {
     runtimeOnly("io.micronaut:micronaut-http-server-netty")
     runtimeOnly("ch.qos.logback:logback-classic")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
+    // PDF generation
+    implementation("org.apache.pdfbox:pdfbox:2.0.29")
 }
 
 
 java {
-    sourceCompatibility = JavaVersion.toVersion("21")
-    targetCompatibility = JavaVersion.toVersion("21")
+    // Ensure Gradle compiles with Java 17 for both toolchain and source/target compatibility.
+    // This makes the build deterministic and matches the Lambda runtime (JAVA_17).
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 
@@ -47,4 +56,33 @@ micronaut {
 
 application {
     mainClass.set("cat.complai.App" )
+}
+
+// CI test task: explicit task for the CI pipeline. It runs tests with JUnit Platform
+// and is configured to fail the build if any test fails (Gradle default behaviour).
+// Having this task makes the CI script intention-revealing and allows running
+// tests independently of assembling the shadow JAR.
+
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+import org.gradle.api.tasks.testing.logging.TestLogEvent
+
+tasks.register('ciTest', Test) {
+    description = 'Run unit tests for CI pipeline. Fails build on test failures.'
+    group = 'verification'
+
+    // Ensure we run the project's test classes with the test classpath
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+
+    useJUnitPlatform()
+
+    testLogging {
+        events TestLogEvent.FAILED, TestLogEvent.SKIPPED, TestLogEvent.PASSED
+        exceptionFormat = TestExceptionFormat.SHORT
+        showExceptions = true
+        showCauses = true
+        showStackTraces = true
+    }
+
+    // Keep standard test task behaviour: don't continue build if tests fail.
 }

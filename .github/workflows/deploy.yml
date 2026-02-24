@@ -1,8 +1,10 @@
 # Workflow for building Micronaut JAR and preparing for AWS CDK deployment
-name: Build and Deploy Serverless JAR
+name: Build & Deploy to AWS CDK
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened]
+  push:
     branches:
       - master
 
@@ -16,7 +18,7 @@ jobs:
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
-          java-version: '21'
+          java-version: '17'
           distribution: 'temurin'
 
       - name: Cache Gradle
@@ -27,8 +29,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
+      - name: Run CI tests
+        # This will execute the ciTest task we added to build.gradle. The step (and job)
+        # will fail early if any test fails, preventing later steps from running.
+        run: ./gradlew --no-daemon ciTest
+
       - name: Build JAR (shadowJar)
-        run: ./gradlew clean shadowJar
+        run: ./gradlew --no-daemon clean shadowJar
 
       - name: Upload JAR artifact
         uses: actions/upload-artifact@v6
@@ -37,6 +44,8 @@ jobs:
           path: build/libs/*.jar
 
   deploy:
+    # Only run deploy when this workflow was triggered by a push to the master branch.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     needs: build
     runs-on: ubuntu-latest
     environment:
@@ -47,11 +56,35 @@ jobs:
         with:
           name: lambda-jar
 
+      - name: Check JAR artifact exists
+        # Ensure the build produced at least one JAR before attempting deployment.
+        run: |
+          echo "Checking for build/libs/*.jar artifacts..."
+          if ! ls build/libs/*.jar 1> /dev/null 2>&1; then
+            echo "ERROR: build/libs/*.jar not found. Ensure the build produced the JAR artifact." >&2
+            exit 1
+          fi
+          echo "Found artifacts:"
+          ls -1 build/libs/*.jar
+
+      - name: Masked secret info (CI log friendly)
+        # Print a non-sensitive message about which secret will be used. Do NOT print the secret value.
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          if [ -z "$OPENROUTER_API_KEY" ]; then
+            echo "OPENROUTER_API_KEY is not set.";
+            exit 1
+          else
+            LEN=$(echo -n "$OPENROUTER_API_KEY" | wc -c | tr -d ' ')
+            echo "OPENROUTER_API_KEY is set and will be used for deployment (length: $LEN, value: [REDACTED])."
+          fi
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
         with:
-          role-to-assume: arn:aws:iam::134267836527:user/uGitHubActions
-          aws-region: eu-north-1
+          role-to-assume: arn:aws:iam::134267836527:role/github-cdk-deploy-role
+          aws-region: eu-south-2
 
       - name: Set up Node.js for CDK
         uses: actions/setup-node@v6
@@ -65,7 +98,35 @@ jobs:
         run: cd cdk && npm install
 
       - name: Deploy with AWS CDK
-        run: cd cdk && npx cdk deploy --require-approval never
+        # Compute JAR_PATH automatically (prefer *-all.jar) and pass it to CDK.
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          # Ensure a deterministic JAR path is available for CDK. Prefer shadowJar '*-all.jar'.
+          if [ -f "build/libs/complai-latest.jar" ]; then
+            JAR="build/libs/complai-latest.jar"
+          else
+            # pick first *-all.jar if present
+            CANDIDATE=$(ls build/libs/*-all.jar 2>/dev/null | head -n1)
+            if [ -n "$CANDIDATE" ]; then
+              JAR="$CANDIDATE"
+            else
+              # fallback to the largest jar
+              JAR=$(ls -S build/libs/*.jar 2>/dev/null | head -n1)
+            fi
+          fi
+
+          if [ -z "$JAR" ] || [ ! -f "$JAR" ]; then
+            echo "ERROR: No JAR found for deployment. Expected a shadow JAR in build/libs or set JAR_PATH." >&2
+            ls -la build/libs || true
+            exit 1
+          fi
+
+          echo "Using JAR for deployment: $JAR"
+          # Provide both env and CDK context to the CDK app
+          export JAR_PATH="$JAR"
+          cd cdk
+          npx cdk deploy --require-approval never -c jarPath=$JAR_PATH --parameters OpenRouterApiKey=$OPENROUTER_API_KEY
 
 # Best practices:
 # - Use GitHub secrets for AWS credentials
