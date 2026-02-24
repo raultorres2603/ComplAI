@@ -13,6 +13,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
+import io.micronaut.http.annotation.Produces;
 import jakarta.inject.Inject;
 
 import java.util.logging.Level;
@@ -69,15 +70,22 @@ public class OpenRouterController {
     }
 
     @Post("/redact")
+    @Produces({MediaType.APPLICATION_JSON, MediaType.APPLICATION_PDF})
     public HttpResponse<?> redact(@Body RedactRequest request) {
         logger.info("POST /openrouter/redact called");
         try {
             OutputFormat format = request == null ? OutputFormat.AUTO : request.getFormat();
             OpenRouterResponseDto dto = service.redactComplaint(request.getText(), format);
 
-            // If PDF data present and success, return it directly as application/pdf
+            // If PDF data present and success, return it directly as application/pdf.
+            // Content-Length must be set explicitly: without it Netty cannot determine the body
+            // boundary, falls back to Connection: close, and the client fires channelInactive
+            // before reading the body — causing ResponseClosedException in tests and in production.
             if (dto != null && dto.isSuccess() && dto.getPdfData() != null) {
-                return HttpResponse.ok(dto.getPdfData()).contentType(MediaType.APPLICATION_PDF);
+                byte[] pdf = dto.getPdfData();
+                return HttpResponse.ok(pdf)
+                        .contentType(MediaType.APPLICATION_PDF)
+                        .header(io.micronaut.http.HttpHeaders.CONTENT_LENGTH, String.valueOf(pdf.length));
             }
 
             OpenRouterPublicDto publicDto = OpenRouterPublicDto.from(dto);
