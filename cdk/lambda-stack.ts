@@ -3,6 +3,7 @@ import { Construct } from 'constructs';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as path from 'path';
 
 export class LambdaStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -38,10 +39,15 @@ export class LambdaStack extends cdk.Stack {
     //   resources: ['arn:aws:s3:::your-bucket/*'],
     // }));
 
+    // Resolve the path to the built fat JAR produced by Gradle's shadowJar. Using an
+    // explicit path to the jar keeps the asset upload deterministic and small. Update
+    // the jar filename if your build produces a different name.
+    const jarPath = path.resolve(__dirname, '..', '..', 'build', 'libs', 'complai-0.1-all.jar');
+
     const lambdaFn = new lambda.Function(this, 'ComplAILambda', {
       runtime: lambda.Runtime.JAVA_17,
       handler: 'io.micronaut.function.aws.proxy.MicronautLambdaHandler::handleRequest',
-      code: lambda.Code.fromAsset('../../build/libs'),
+      code: lambda.Code.fromAsset(jarPath),
       memorySize: 1024,
       timeout: cdk.Duration.seconds(30),
       // Wire the OpenRouter API key (from CFN parameter) into the Lambda environment.
