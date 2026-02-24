@@ -87,8 +87,8 @@ export class LambdaStack extends cdk.Stack {
     new apigateway.LambdaRestApi(this, 'ComplAIEndpoint', {
       handler: lambdaFn,
       proxy: true,
-      restApiName: 'ComplAI Home API',
-      description: 'API Gateway for ComplAI HomeController',
+      restApiName: 'ComplAI API',
+      description: 'API Gateway proxy for the ComplAI Lambda (hosts all controllers)',
     });
 
     // Expose the Lambda name and ARN as CloudFormation outputs so deploys (and CI)
