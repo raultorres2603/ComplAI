@@ -85,5 +85,19 @@ export class LambdaStack extends cdk.Stack {
       restApiName: 'ComplAI Home API',
       description: 'API Gateway for ComplAI HomeController',
     });
+
+    // Expose the Lambda name and ARN as CloudFormation outputs so deploys (and CI)
+    // can easily discover the physical identifiers. These are safe to emit and
+    // helpful for debugging and automation. The function name includes the CDK
+    // generated suffix, so using the output avoids guessing the hash.
+    new cdk.CfnOutput(this, 'ComplAILambdaFunctionName', {
+      value: lambdaFn.functionName,
+      description: 'Name of the deployed ComplAI Lambda function',
+    });
+
+    new cdk.CfnOutput(this, 'ComplAILambdaArn', {
+      value: lambdaFn.functionArn,
+      description: 'ARN of the deployed ComplAI Lambda function',
+    });
   }
 }

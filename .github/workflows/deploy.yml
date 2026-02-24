@@ -159,7 +159,14 @@ jobs:
           # Provide both env and CDK context to the CDK app
           export JAR_PATH="$JAR"
           cd cdk
-          npx cdk deploy --require-approval never -c jarPath=$JAR_PATH --parameters OpenRouterApiKey=$OPENROUTER_API_KEY
+          # Write CloudFormation outputs to a file so the CI can upload them as an artifact.
+          npx cdk deploy --require-approval never -c jarPath=$JAR_PATH --parameters OpenRouterApiKey=$OPENROUTER_API_KEY --outputs-file ../cdk-outputs.json
+
+      - name: Upload CDK outputs
+        uses: actions/upload-artifact@v6
+        with:
+          name: cdk-outputs
+          path: cdk-outputs.json
 
 # Best practices:
 # - Use GitHub secrets for AWS credentials
