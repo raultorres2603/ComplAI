@@ -66,12 +66,18 @@ public class OpenRouterServices implements IOpenRouterService {
         // object containing at least a "format" field ("pdf" | "json"). The server will parse that JSON header and use it
         // to decide whether to generate a PDF. If the header is missing or malformed, the request will be rejected.
         String prompt = String.format(
-                "Please redact a formal, civil, and concise letter addressed to the City Hall (Ajuntament) of El Prat de Llobregat based on the following complaint. " +
-                        "If the complaint is not about El Prat de Llobregat, politely say you can't help with that request. " +
-                        "Include a short summary, the specific request or remedy sought, and a polite closing.\n\n" +
-                        "REQUIRED: Emit a single-line JSON header as the first line of your response with at least the 'format' field. Example:\n" +
-                        "  {\"format\": \"pdf\"}\n\n" +
-                        "After that JSON header, include an empty line and then provide the letter body. The server will reject responses that do not begin with a valid JSON header.\n\nComplaint text:\n%s",
+                """
+                        Please redact a formal, civil, and concise letter addressed to the City Hall (Ajuntament) of El Prat de Llobregat based on the following complaint. \
+                        If the complaint is not about El Prat de Llobregat, politely say you can't help with that request. \
+                        Include a short summary, the specific request or remedy sought, and a polite closing.
+                        
+                        REQUIRED: Emit a single-line JSON header as the first line of your response with at least the 'format' field. Example:
+                          {"format": "pdf"}
+                        
+                        After that JSON header, include an empty line and then provide the letter body. The server will reject responses that do not begin with a valid JSON header.
+                        
+                        Complaint text:
+                        %s""",
                 complaint.trim()
         );
 
@@ -98,7 +104,7 @@ public class OpenRouterServices implements IOpenRouterService {
             return new OpenRouterResponseDto(false, null, "AI response missing required JSON header.", aiDto.getStatusCode(), OpenRouterErrorCode.VALIDATION);
         }
 
-        boolean producePdf = effectiveFormat == OutputFormat.PDF || (effectiveFormat == OutputFormat.AUTO && shouldAiProducePdf(parsed.message));
+        boolean producePdf = effectiveFormat == OutputFormat.PDF;
 
         if (!producePdf) {
             // return the cleaned AI message (without header)
@@ -154,31 +160,20 @@ public class OpenRouterServices implements IOpenRouterService {
 
             String jsonHeader = aiMessage.substring(0, idx + 1).trim();
             String rest = aiMessage.substring(idx + 1).trim();
-            java.util.Map map = mapper.readValue(jsonHeader, java.util.Map.class);
+            java.util.Map<String, Object> map = mapper.readValue(jsonHeader, new com.fasterxml.jackson.core.type.TypeReference<>() {
+            });
             Object fmt = map.get("format");
             Object body = map.get("body") != null ? map.get("body") : map.get("message");
             OutputFormat f = fmt == null ? OutputFormat.AUTO : OutputFormat.fromString(fmt.toString());
             String m = (body != null) ? body.toString() : rest;
-            // If body missing in JSON, use the remaining text after the JSON header
-            if ((m == null || m.isBlank()) && rest != null) m = rest;
-            return new AiParsed(f, m == null ? "" : m.trim());
+            // If body missing in JSON, use the remaining text after the JSON header (if non-blank)
+            if ((m == null || m.isBlank()) && !rest.isBlank()) m = rest;
+            if (m == null) m = "";
+            return new AiParsed(f, m.trim());
         } catch (Exception e) {
             // parsing failed: treat as missing strict header
             return new AiParsed(OutputFormat.AUTO, aiMessage);
         }
-    }
-
-    /**
-     * Heuristic to decide whether AI message should be returned as a PDF when client asked AUTO.
-     * Conservative rules: if message is long, contains salutations/closings or multiple paragraphs.
-     */
-    private boolean shouldAiProducePdf(String message) {
-        if (message == null) return false;
-        String lower = message.toLowerCase();
-        if (message.length() > 300) return true;
-        if (lower.contains("dear ") || lower.contains("sincerely") || lower.contains("regards") || lower.contains("yours faithfully")) return true;
-        // multiple paragraphs
-        return message.contains("\n\n") || message.split("\\n").length > 4;
     }
 
     /**
@@ -187,8 +182,47 @@ public class OpenRouterServices implements IOpenRouterService {
      */
     private boolean aiRefusedAsNotAboutElPrat(String aiMessage) {
         if (aiMessage == null) return false;
-        String lower = aiMessage.toLowerCase();
-        return lower.contains("can't help") || lower.contains("cannot help") || lower.contains("can't help with that request") || lower.contains("no puc ajudar") || lower.contains("no puedo ayudar");
+        // Normalize common quotes/apostrophes for more reliable matching
+        String normalized = aiMessage.replace('’', '\'').replace('‘', '\'').replace('“', '"').replace('”', '"');
+        String lower = normalized.toLowerCase().trim();
+
+        // Common refusal patterns in English, Spanish and Catalan
+        String[] refusalPhrases = new String[] {
+                "can't help with",
+                "cannot help with",
+                "can't help",
+                "cannot help",
+                "can't assist",
+                "cannot assist",
+                "i'm sorry, i can't",
+                "i'm sorry i can't",
+                "i'm sorry, i cannot",
+                "i'm sorry i cannot",
+                "i cannot",
+                "i can't",
+                "i am unable to",
+                "i'm unable to",
+                "i cannot help",
+                "i can't help",
+                "cannot provide",
+                "can't provide",
+                "no puc ajudar",
+                "no puc ajudar amb",
+                "no puedo ayudar",
+                "no puedo ayudar con",
+                "lo siento, no puedo ayudar",
+                "lo siento, no puedo",
+                "no puedo",
+                "no puc",
+                "no puc ajudar"
+        };
+
+        for (String p : refusalPhrases) {
+            if (lower.contains(p)) return true;
+        }
+
+        // Also check for explicit mention that the model can only answer about El Prat
+        return lower.contains("el prat") && (lower.contains("only") || lower.contains("solament") || lower.contains("solo") || lower.contains("only about"));
     }
 
     private OpenRouterResponseDto callOpenRouterAndExtract(String prompt) {
@@ -209,7 +243,8 @@ public class OpenRouterServices implements IOpenRouterService {
                 // If the AI refused because it's not about El Prat, map to a standardized error
                 if (aiRefusedAsNotAboutElPrat(dto.message())) {
                     logger.info("AI refused - not about El Prat");
-                    return new OpenRouterResponseDto(false, null, "Request is not about El Prat de Llobregat.", dto.statusCode(), OpenRouterErrorCode.REFUSAL);
+                    // Return success=false but PRESERVE the AI message so callers can log/display the assistant's text
+                    return new OpenRouterResponseDto(false, dto.message(), "Request is not about El Prat de Llobregat.", dto.statusCode(), OpenRouterErrorCode.REFUSAL);
                 }
                 logger.fine("AI returned a message successfully");
                 return new OpenRouterResponseDto(true, dto.message(), null, dto.statusCode(), OpenRouterErrorCode.NONE);
@@ -305,10 +340,10 @@ public class OpenRouterServices implements IOpenRouterService {
                         contents.newLineAtOffset(margin, yPosition);
                     }
                 }
-                if (lineBuilder.length() > 0) lineBuilder.append(' ');
+                if (!lineBuilder.isEmpty()) lineBuilder.append(' ');
                 lineBuilder.append(w);
             }
-            if (lineBuilder.length() > 0) {
+            if (!lineBuilder.isEmpty()) {
                 contents.showText(lineBuilder.toString().trim());
                 contents.newLineAtOffset(0, -leading);
                 yPosition -= leading;
