@@ -79,6 +79,17 @@ jobs:
           # For PRs, the default checkout (merge commit) is correct.
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.branch || github.sha }}
 
+      - name: Verify branch exists
+        # Only relevant for manual dispatches. Provides a clear error message if the
+        # branch input is mistyped, instead of letting a later step fail cryptically.
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if ! git show-ref --verify --quiet "refs/remotes/origin/${{ inputs.branch }}"; then
+            echo "ERROR: Branch '${{ inputs.branch }}' does not exist in the repository." >&2
+            exit 1
+          fi
+          echo "Branch '${{ inputs.branch }}' verified."
+
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
