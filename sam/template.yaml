@@ -43,7 +43,7 @@ Resources:
       # runs `clean shadowJar` first, so the directory will contain exactly one JAR
       # (the shadow/fat JAR) regardless of the project version. This avoids hardcoding
       # the version number here, which would break every time build.gradle is bumped.
-      CodeUri: ../build/libs/
+      CodeUri: ../build/libs/complai-0.1-all.jar
       Handler: io.micronaut.function.aws.proxy.payload2.APIGatewayV2HTTPEventFunction::handleRequest
       Runtime: java21
       MemorySize: 768
