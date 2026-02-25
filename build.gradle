@@ -31,14 +31,14 @@ dependencies {
 
 
 java {
-    // Ensure Gradle compiles with Java 17 for both toolchain and source/target compatibility.
-    // This makes the build deterministic and matches the Lambda runtime (JAVA_17).
+    // Ensure Gradle compiles with Java 21 for both toolchain and source/target compatibility.
+    // This makes the build deterministic and matches the Lambda runtime (JAVA_21).
     toolchain {
-        languageVersion = JavaLanguageVersion.of(17)
+        languageVersion = JavaLanguageVersion.of(21)
     }
 
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
 }
 
 

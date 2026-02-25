@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
 # start-local.sh
 #
-# Convenience script to build the shadow JAR, start LocalStack, and launch
-# SAM CLI local API — all from the sam/ directory.
+# Convenience script for Linux / macOS / WSL only.
+# On Windows PowerShell use start-local.ps1 instead:
+#   cd sam\
+#   .\start-local.ps1
 #
 # Prerequisites (must already be installed and on PATH):
 #   - Docker (with the Compose plugin or standalone docker-compose)
 #   - AWS SAM CLI  (https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html)
 #   - Java 17 + Gradle wrapper in the project root
 #
-# Usage:
+# Usage (Linux / macOS / WSL):
 #   cd sam/
 #   ./start-local.sh
 #
@@ -17,6 +19,15 @@
 # Press Ctrl-C to stop SAM; then run `docker compose down` to stop LocalStack.
 
 set -euo pipefail
+
+# Fail fast with a clear message if sam is not on PATH.
+# On Windows, sam is installed as a .exe and will not be found here unless
+# you are in WSL with the Windows PATH forwarded. Use start-local.ps1 instead.
+if ! command -v sam &>/dev/null; then
+  echo "[start-local] ERROR: 'sam' not found on PATH." >&2
+  echo "[start-local] On Windows, run: .\\start-local.ps1  (in PowerShell)" >&2
+  exit 1
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"

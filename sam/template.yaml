@@ -3,7 +3,7 @@ Transform: AWS::Serverless-2016-10-31
 
 # SAM template for local development with SAM CLI.
 # This mirrors the production Lambda configuration defined in cdk/lambda-stack.ts:
-#   - Same Java 17 runtime
+#   - Same Java 21 runtime
 #   - Same handler class (Micronaut APIGatewayV2 HTTP event function)
 #   - Same memory and timeout values
 #   - Same environment variable names
@@ -13,7 +13,9 @@ Transform: AWS::Serverless-2016-10-31
 #   2. Start LocalStack:            docker compose up -d
 #   3. Start SAM local API:         sam local start-api --env-vars env.json
 #
-# Or use the provided helper script:  ./start-local.sh
+# Or use the provided helper script:
+#   Linux / macOS / WSL:  ./start-local.sh
+#   Windows PowerShell:   .\start-local.ps1
 
 Description: ComplAI Lambda – local SAM development template
 
@@ -40,7 +42,7 @@ Resources:
       # `./gradlew clean shadowJar` from the project root and lands in build/libs/.
       CodeUri: ../build/libs/
       Handler: io.micronaut.function.aws.proxy.payload2.APIGatewayV2HTTPEventFunction::handleRequest
-      Runtime: java17
+      Runtime: java21
       MemorySize: 1024
       Timeout: 30
       Environment:
