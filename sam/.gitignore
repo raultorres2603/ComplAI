@@ -1,0 +1,7 @@
+# LocalStack persisted state — generated at runtime, never commit.
+.localstack-data/
+
+# env.json contains secrets (OPENROUTER_API_KEY). Each developer maintains
+# their own copy. env.json.example is the committed template.
+env.json
+

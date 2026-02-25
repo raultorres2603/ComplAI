@@ -77,7 +77,7 @@ export class LambdaStack extends cdk.Stack {
     if (!jarPath || !fs.existsSync(jarPath)) throw new Error(`Unable to determine JAR path. Computed: ${jarPath}`);
 
     const lambdaFn = new lambda.Function(this, `ComplAILambda-${environment}`, {
-      runtime: lambda.Runtime.JAVA_17,
+      runtime: lambda.Runtime.JAVA_21,
       // The project uses the Micronaut APIGateway V2 runtime; use the Micronaut
       // APIGateway v2 HTTP event function handler which the Micronaut build
       // packages in the shadow JAR.
@@ -85,7 +85,7 @@ export class LambdaStack extends cdk.Stack {
       // our CDK HttpApi integration.
       handler: 'io.micronaut.function.aws.proxy.payload2.APIGatewayV2HTTPEventFunction::handleRequest',
       code: lambda.Code.fromAsset(jarPath),
-      memorySize: 1024,
+      memorySize: 768,
       timeout: cdk.Duration.seconds(30),
       // Wire the OpenRouter API key (from CFN parameter) into the Lambda environment.
       // Be aware that environment variables are visible in the Lambda console; using

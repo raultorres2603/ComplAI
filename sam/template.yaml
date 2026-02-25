@@ -1,0 +1,64 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+# SAM template for local development with SAM CLI.
+# This mirrors the production Lambda configuration defined in cdk/lambda-stack.ts:
+#   - Same Java 17 runtime
+#   - Same handler class (Micronaut APIGatewayV2 HTTP event function)
+#   - Same memory and timeout values
+#   - Same environment variable names
+#
+# Usage:
+#   1. Build the shadow JAR:        ../gradlew clean shadowJar   (from the sam/ dir)
+#   2. Start LocalStack:            docker compose up -d
+#   3. Start SAM local API:         sam local start-api --env-vars env.json
+#
+# Or use the provided helper script:  ./start-local.sh
+
+Description: ComplAI Lambda – local SAM development template
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 768
+    Runtime: java21
+    # SnapStart is not supported by SAM CLI locally; it is a no-op here but
+    # documents intent if this template is ever adapted for a direct SAM deploy.
+    Environment:
+      Variables:
+        # Override this via env.json (--env-vars flag) or export it in your shell.
+        # Never commit a real API key here.
+        OPENROUTER_API_KEY: "REPLACE_ME"
+        # Point the AWS SDK at LocalStack so any S3 (or other AWS) calls are local.
+        AWS_ENDPOINT_URL: "http://localhost:4566"
+
+Resources:
+  ComplAIFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      # Path is relative to the sam/ directory. The shadow JAR is produced by
+      # `./gradlew clean shadowJar` from the project root and lands in build/libs/.
+      CodeUri: ../build/libs/
+      Handler: io.micronaut.function.aws.proxy.payload2.APIGatewayV2HTTPEventFunction::handleRequest
+      Runtime: java17
+      MemorySize: 1024
+      Timeout: 30
+      Environment:
+        Variables:
+          OPENROUTER_API_KEY: "REPLACE_ME"
+          AWS_ENDPOINT_URL: "http://host.docker.internal:4566"
+      Events:
+        # Catch-all proxy: every HTTP method on every path is forwarded to the
+        # Micronaut handler, which routes internally — same as the CDK HttpApi
+        # defaultIntegration setup.
+        ProxyRoot:
+          Type: HttpApi
+          Properties:
+            Path: /
+            Method: ANY
+        ProxyGreedy:
+          Type: HttpApi
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+

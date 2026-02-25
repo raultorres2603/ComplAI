@@ -1,0 +1,41 @@
+# docker-compose.yml — LocalStack for local development.
+#
+# Starts LocalStack and, on first boot, runs the init script
+# (localstack-init/init.sh) which creates the S3 bucket used by ComplAI.
+#
+# Usage:
+#   docker compose up -d          # start in the background
+#   docker compose logs -f        # tail logs
+#   docker compose down           # stop and remove containers
+#
+# Ports:
+#   4566 — LocalStack unified gateway (S3, SSM, STS, …)
+
+services:
+  localstack:
+    image: localstack/localstack:3
+    container_name: complai-localstack
+    ports:
+      - "4566:4566"
+    environment:
+      # Services to activate. Add more (e.g. sqs,ssm) only when needed to keep
+      # startup fast and resource usage minimal.
+      - SERVICES=s3
+      # Keep LocalStack data across restarts so you do not have to re-seed on
+      # every `docker compose up`. Delete .localstack-data/ to reset state.
+      - PERSISTENCE=1
+      - DATA_DIR=/var/lib/localstack/data
+    volumes:
+      # Init scripts — executed once by LocalStack on first startup.
+      - ./localstack-init:/etc/localstack/init/ready.d
+      # Persist LocalStack state between restarts.
+      - ./.localstack-data:/var/lib/localstack/data
+      # Required for LocalStack to access the Docker socket (used internally).
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
