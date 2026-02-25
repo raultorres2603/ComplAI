@@ -30,7 +30,7 @@ Globals:
       Variables:
         # Override this via env.json (--env-vars flag) or export it in your shell.
         # Never commit a real API key here.
-        OPENROUTER_API_KEY: "REPLACE_ME"
+        OPENROUTER_API_KEY: "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"
         # Point the AWS SDK at LocalStack so any S3 (or other AWS) calls are local.
         AWS_ENDPOINT_URL: "http://localhost:4566"
 
