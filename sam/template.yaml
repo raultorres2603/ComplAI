@@ -30,7 +30,7 @@ Globals:
       Variables:
         # Override this via env.json (--env-vars flag) or export it in your shell.
         # Never commit a real API key here.
-        OPENROUTER_API_KEY: "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"
+        OPENROUTER_API_KEY: "REPLACE_ME"
         # Point the AWS SDK at LocalStack so any S3 (or other AWS) calls are local.
         AWS_ENDPOINT_URL: "http://localhost:4566"
 
@@ -40,10 +40,15 @@ Resources:
     Properties:
       # Path is relative to the sam/ directory. The shadow JAR is produced by
       # `./gradlew clean shadowJar` from the project root and lands in build/libs/.
-      CodeUri: ../build/libs/
+      # Must point directly to the shadow JAR (-all.jar), NOT the build/libs/ directory.
+      # SAM CLI does not know which JAR to execute if given a directory containing
+      # multiple JARs (Gradle produces both a plain JAR and the shadow/fat JAR).
+      # The shadow JAR is produced by `./gradlew clean shadowJar` and named
+      # <artifactId>-<version>-all.jar by the Shadow plugin.
+      CodeUri: ../build/libs/complai-0.1-all.jar
       Handler: io.micronaut.function.aws.proxy.payload2.APIGatewayV2HTTPEventFunction::handleRequest
       Runtime: java21
-      MemorySize: 1024
+      MemorySize: 768
       Timeout: 30
       Environment:
         Variables:
