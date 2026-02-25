@@ -40,6 +40,27 @@ echo "[start-local] Building shadow JAR..."
 echo "[start-local] Shadow JAR built."
 
 # ---------------------------------------------------------------------------
+# 1b. Verify exactly one shadow JAR exists in build/libs/.
+#     `clean` removes stale JARs; `shadowJar` produces only the fat JAR.
+#     If somehow multiple JARs are present (e.g. someone ran `jar` separately),
+#     fail fast here rather than letting SAM silently package the wrong one.
+# ---------------------------------------------------------------------------
+LIBS_DIR="${PROJECT_ROOT}/build/libs"
+mapfile -t SHADOW_JARS < <(find "${LIBS_DIR}" -maxdepth 1 -name '*-all.jar' 2>/dev/null)
+
+if [ "${#SHADOW_JARS[@]}" -eq 0 ]; then
+  echo "[start-local] ERROR: No shadow JAR (*-all.jar) found in ${LIBS_DIR} after build." >&2
+  exit 1
+fi
+if [ "${#SHADOW_JARS[@]}" -gt 1 ]; then
+  echo "[start-local] ERROR: Multiple shadow JARs found in ${LIBS_DIR} — cannot determine which to use:" >&2
+  printf '  %s\n' "${SHADOW_JARS[@]}" >&2
+  echo "[start-local] Run clean and try again." >&2
+  exit 1
+fi
+echo "[start-local] Shadow JAR confirmed: $(basename "${SHADOW_JARS[0]}")"
+
+# ---------------------------------------------------------------------------
 # 2. Start LocalStack (detached) and wait for it to be healthy.
 # ---------------------------------------------------------------------------
 echo "[start-local] Starting LocalStack..."

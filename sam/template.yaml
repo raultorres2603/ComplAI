@@ -38,14 +38,12 @@ Resources:
   ComplAIFunction:
     Type: AWS::Serverless::Function
     Properties:
-      # Path is relative to the sam/ directory. The shadow JAR is produced by
-      # `./gradlew clean shadowJar` from the project root and lands in build/libs/.
-      # Must point directly to the shadow JAR (-all.jar), NOT the build/libs/ directory.
-      # SAM CLI does not know which JAR to execute if given a directory containing
-      # multiple JARs (Gradle produces both a plain JAR and the shadow/fat JAR).
-      # The shadow JAR is produced by `./gradlew clean shadowJar` and named
-      # <artifactId>-<version>-all.jar by the Shadow plugin.
-      CodeUri: ../build/libs/complai-0.1-all.jar
+      # CodeUri points at the build/libs/ directory rather than a specific JAR name.
+      # SAM packages whatever JAR it finds there. The start-local.ps1 script always
+      # runs `clean shadowJar` first, so the directory will contain exactly one JAR
+      # (the shadow/fat JAR) regardless of the project version. This avoids hardcoding
+      # the version number here, which would break every time build.gradle is bumped.
+      CodeUri: ../build/libs/
       Handler: io.micronaut.function.aws.proxy.payload2.APIGatewayV2HTTPEventFunction::handleRequest
       Runtime: java21
       MemorySize: 768

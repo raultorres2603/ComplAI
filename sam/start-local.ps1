@@ -33,6 +33,25 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host '[start-local] Shadow JAR built.' -ForegroundColor Green
 
 # ---------------------------------------------------------------------------
+# 1b. Verify exactly one shadow JAR exists in build/libs/.
+#     `clean` removes stale JARs; `shadowJar` produces only the fat JAR.
+#     If somehow multiple JARs are present (e.g. someone ran `jar` separately),
+#     fail fast here rather than letting SAM silently package the wrong one.
+# ---------------------------------------------------------------------------
+$LibsDir = Join-Path $ProjectRoot 'build\libs'
+$ShadowJars = @(Get-ChildItem -Path $LibsDir -Filter '*-all.jar' -ErrorAction SilentlyContinue)
+
+if ($ShadowJars.Count -eq 0) {
+    Write-Error "[start-local] No shadow JAR (*-all.jar) found in $LibsDir after build. Aborting."
+    exit 1
+}
+if ($ShadowJars.Count -gt 1) {
+    Write-Error "[start-local] Multiple shadow JARs found in $LibsDir — cannot determine which to use: $($ShadowJars.Name -join ', '). Run clean and try again."
+    exit 1
+}
+Write-Host "[start-local] Shadow JAR confirmed: $($ShadowJars[0].Name)" -ForegroundColor Green
+
+# ---------------------------------------------------------------------------
 # 2. Start LocalStack (detached) and wait for it to be healthy.
 # ---------------------------------------------------------------------------
 Write-Host '[start-local] Starting LocalStack...' -ForegroundColor Cyan
