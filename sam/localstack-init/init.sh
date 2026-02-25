@@ -12,6 +12,11 @@
 
 set -euo pipefail
 
+if ! command -v awslocal &>/dev/null; then
+  echo "[init] ERROR: 'awslocal' not found on PATH. Install with: pip install awscli-local" >&2
+  exit 1
+fi
+
 BUCKET_NAME="complai-local"
 
 echo "[init] Creating S3 bucket: ${BUCKET_NAME}"
@@ -24,4 +29,3 @@ else
   awslocal s3 mb "s3://${BUCKET_NAME}"
   echo "[init] Bucket '${BUCKET_NAME}' created."
 fi
-
