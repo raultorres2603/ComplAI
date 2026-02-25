@@ -86,3 +86,7 @@ tasks.register('ciTest', Test) {
 
     // Keep standard test task behaviour: don't continue build if tests fail.
 }
+
+tasks.named('shadowJar') {
+    archiveFileName.set('complai-all.jar')
+}
