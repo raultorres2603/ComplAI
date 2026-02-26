@@ -35,33 +35,7 @@ public class OpenRouterController {
         logger.info("POST /openrouter/ask called");
         try {
             OpenRouterResponseDto dto = service.ask(request.getText());
-            OpenRouterPublicDto publicDto = OpenRouterPublicDto.from(dto);
-            if (dto.isSuccess()) {
-                return HttpResponse.ok(publicDto);
-            }
-            // Map known validation strings to 400
-            if (dto.getErrorCode() == OpenRouterErrorCode.VALIDATION || (dto.getError() != null && (dto.getError().contains("must not be empty") || dto.getError().contains("empty")))) {
-                logger.fine("ask: bad request - " + dto.getError());
-                return HttpResponse.badRequest(publicDto);
-            }
-            // Map AI refusal to 422
-            if (dto.getErrorCode() == OpenRouterErrorCode.REFUSAL || (dto.getError() != null && dto.getError().equals("Request is not about El Prat de Llobregat."))) {
-                logger.info("ask: request out of scope for El Prat");
-                return HttpResponse.status(HttpStatus.UNPROCESSABLE_ENTITY).body(publicDto);
-            }
-            // Map TIMEOUT to 504
-            if (dto.getErrorCode() == OpenRouterErrorCode.TIMEOUT) {
-                logger.warning("ask: AI service timed out");
-                return HttpResponse.status(HttpStatus.GATEWAY_TIMEOUT).body(publicDto);
-            }
-            // Map upstream AI errors to 502
-            if (dto.getErrorCode() == OpenRouterErrorCode.UPSTREAM || (dto.getError() != null && (dto.getError().contains("OPENROUTER") || dto.getError().toLowerCase().contains("openrouter") || dto.getError().toLowerCase().contains("non-2xx")))) {
-                logger.log(Level.WARNING, "ask: upstream AI error: {0}", dto.getError());
-                return HttpResponse.status(HttpStatus.BAD_GATEWAY).body(publicDto);
-            }
-            // Generic error -> 500
-            logger.log(Level.WARNING, "ask: unexpected error: {0}", dto.getError());
-            return HttpResponse.serverError(publicDto);
+            return errorToHttpResponse(dto, "ask");
         } catch (Exception e) {
             logger.log(Level.SEVERE, "ask: unexpected exception", e);
             OpenRouterPublicDto err = new OpenRouterPublicDto(false, null, e.getMessage(), OpenRouterErrorCode.INTERNAL.getCode());
@@ -74,8 +48,9 @@ public class OpenRouterController {
     public HttpResponse<?> redact(@Body RedactRequest request) {
         logger.info("POST /openrouter/redact called");
         try {
+            String text = request != null ? request.getText() : null;
             OutputFormat format = request == null ? OutputFormat.AUTO : request.getFormat();
-            OpenRouterResponseDto dto = service.redactComplaint(request.getText(), format);
+            OpenRouterResponseDto dto = service.redactComplaint(text, format);
 
             // If PDF data present and success, return it directly as application/pdf.
             // Content-Length must be set explicitly: without it Netty cannot determine the body
@@ -88,37 +63,49 @@ public class OpenRouterController {
                         .header(io.micronaut.http.HttpHeaders.CONTENT_LENGTH, String.valueOf(pdf.length));
             }
 
-            OpenRouterPublicDto publicDto = OpenRouterPublicDto.from(dto);
-            if (dto != null && dto.isSuccess()) {
-                return HttpResponse.ok(publicDto);
-            }
-            // Map known validation strings to 400
-            if (dto != null && (dto.getErrorCode() == OpenRouterErrorCode.VALIDATION || (dto.getError() != null && (dto.getError().contains("must not be empty") || dto.getError().contains("empty"))))) {
-                logger.fine("redact: bad request - " + dto.getError());
-                return HttpResponse.badRequest(publicDto);
-            }
-            // Map AI refusal to 422
-            if (dto != null && (dto.getErrorCode() == OpenRouterErrorCode.REFUSAL || (dto.getError() != null && dto.getError().equals("Request is not about El Prat de Llobregat.")))) {
-                logger.info("redact: request out of scope for El Prat");
-                return HttpResponse.status(HttpStatus.UNPROCESSABLE_ENTITY).body(publicDto);
-            }
-            // Map TIMEOUT to 504
-            if (dto != null && dto.getErrorCode() == OpenRouterErrorCode.TIMEOUT) {
-                logger.warning("redact: AI service timed out");
-                return HttpResponse.status(HttpStatus.GATEWAY_TIMEOUT).body(publicDto);
-            }
-            // Map upstream AI errors to 502
-            if (dto != null && (dto.getErrorCode() == OpenRouterErrorCode.UPSTREAM || (dto.getError() != null && (dto.getError().contains("OPENROUTER") || dto.getError().toLowerCase().contains("openrouter") || dto.getError().toLowerCase().contains("non-2xx"))))) {
-                logger.log(Level.WARNING, "redact: upstream AI error: {0}", dto.getError());
-                return HttpResponse.status(HttpStatus.BAD_GATEWAY).body(publicDto);
-            }
-            // Generic error -> 500
-            logger.log(Level.WARNING, "redact: unexpected error: {0}", dto == null ? "null" : dto.getError());
-            return HttpResponse.serverError(publicDto);
+            return errorToHttpResponse(dto, "redact");
         } catch (Exception e) {
             logger.log(Level.SEVERE, "redact: unexpected exception", e);
             OpenRouterPublicDto err = new OpenRouterPublicDto(false, null, e.getMessage(), OpenRouterErrorCode.INTERNAL.getCode());
             return HttpResponse.serverError(err);
         }
+    }
+
+    /**
+     * Maps a service response to the appropriate HTTP status. The errorCode on the DTO is the
+     * authoritative signal; the error message is only consulted as a fallback for legacy responses
+     * that predate the errorCode field.
+     */
+    private HttpResponse<OpenRouterPublicDto> errorToHttpResponse(OpenRouterResponseDto dto, String operation) {
+        OpenRouterPublicDto publicDto = OpenRouterPublicDto.from(dto);
+
+        if (dto != null && dto.isSuccess()) {
+            return HttpResponse.ok(publicDto);
+        }
+
+        OpenRouterErrorCode errorCode = dto != null ? dto.getErrorCode() : OpenRouterErrorCode.INTERNAL;
+
+        return switch (errorCode) {
+            case VALIDATION -> {
+                logger.fine(operation + ": bad request - " + dto.getError());
+                yield HttpResponse.badRequest(publicDto);
+            }
+            case REFUSAL -> {
+                logger.info(operation + ": request out of scope for El Prat");
+                yield HttpResponse.status(HttpStatus.UNPROCESSABLE_ENTITY).body(publicDto);
+            }
+            case TIMEOUT -> {
+                logger.warning(operation + ": AI service timed out");
+                yield HttpResponse.status(HttpStatus.GATEWAY_TIMEOUT).body(publicDto);
+            }
+            case UPSTREAM -> {
+                logger.log(Level.WARNING, "{0}: upstream AI error: {1}", new Object[]{operation, dto.getError()});
+                yield HttpResponse.status(HttpStatus.BAD_GATEWAY).body(publicDto);
+            }
+            default -> {
+                logger.log(Level.WARNING, "{0}: unexpected error: {1}", new Object[]{operation, dto != null ? dto.getError() : "null dto"});
+                yield HttpResponse.serverError(publicDto);
+            }
+        };
     }
 }

@@ -25,6 +25,7 @@ import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import java.io.ByteArrayOutputStream;
 
 import cat.complai.openrouter.dto.OutputFormat;
+import cat.complai.openrouter.helpers.AiParsed;
 
 @Singleton
 public class OpenRouterServices implements IOpenRouterService {
@@ -90,16 +91,16 @@ public class OpenRouterServices implements IOpenRouterService {
         }
 
         // Parse optional AI-supplied header: either JSON first-line or simple 'FORMAT: pdf' header.
-        AiParsed parsed = parseAiFormatHeader(aiDto.getMessage());
+        AiParsed parsed = AiParsed.parseAiFormatHeader(aiDto.getMessage());
 
         // If client explicitly requested PDF/JSON, honor that. If client requested AUTO and AI supplied a header, use AI's format.
         OutputFormat effectiveFormat = format == null ? OutputFormat.AUTO : format;
-        if (effectiveFormat == OutputFormat.AUTO && parsed.format != null && parsed.format != OutputFormat.AUTO) {
-            effectiveFormat = parsed.format;
+        if (effectiveFormat == OutputFormat.AUTO && parsed.format() != null && parsed.format() != OutputFormat.AUTO) {
+            effectiveFormat = parsed.format();
         }
 
         // Enforce that the model must emit a JSON header. If we don't have a JSON header, return validation error.
-        if (parsed.format == null || parsed.format == OutputFormat.AUTO) {
+        if (parsed.format() == null || parsed.format() == OutputFormat.AUTO) {
             logger.warning("AI response missing required JSON header");
             return new OpenRouterResponseDto(false, null, "AI response missing required JSON header.", aiDto.getStatusCode(), OpenRouterErrorCode.VALIDATION);
         }
@@ -108,11 +109,11 @@ public class OpenRouterServices implements IOpenRouterService {
 
         if (!producePdf) {
             // return the cleaned AI message (without header)
-            return new OpenRouterResponseDto(true, parsed.message, null, aiDto.getStatusCode(), OpenRouterErrorCode.NONE);
+            return new OpenRouterResponseDto(true, parsed.message(), null, aiDto.getStatusCode(), OpenRouterErrorCode.NONE);
         }
 
         try {
-            byte[] pdf = generatePdfFromText(parsed.message);
+            byte[] pdf = generatePdfFromText(parsed.message());
             return new OpenRouterResponseDto(true, null, null, null, OpenRouterErrorCode.NONE, pdf);
         } catch (Exception e) {
             logger.log(Level.SEVERE, "PDF generation failed", e);
@@ -120,61 +121,6 @@ public class OpenRouterServices implements IOpenRouterService {
         }
     }
 
-    // Small holder for parsed AI reply
-    private static class AiParsed {
-        OutputFormat format;
-        String message;
-
-        AiParsed(OutputFormat f, String m) { this.format = f; this.message = m; }
-    }
-
-    /**
-     * Parse a model reply for an optional metadata header. Supports:
-     * - First-line JSON like: {"format":"pdf"}\n\n<message>
-     * - First-line simple header like: FORMAT: pdf\n\n<message>
-     * If no header found, returns format AUTO and the original message.
-     */
-    private AiParsed parseAiFormatHeader(String aiMessage) {
-        // Strict: only accept a JSON header on the first line. If not present, treat as missing header.
-        if (aiMessage == null) return new AiParsed(OutputFormat.AUTO, "");
-        String trimmed = aiMessage.trim();
-
-        if (!trimmed.startsWith("{")) {
-            return new AiParsed(OutputFormat.AUTO, aiMessage);
-        }
-
-        try {
-            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-            // Read first JSON object at the start: find the closing brace matching the first open
-            int depth = 0;
-            int idx = -1;
-            for (int i = 0; i < aiMessage.length(); i++) {
-                char c = aiMessage.charAt(i);
-                if (c == '{') depth++;
-                else if (c == '}') {
-                    depth--;
-                    if (depth == 0) { idx = i; break; }
-                }
-            }
-            if (idx < 0) return new AiParsed(OutputFormat.AUTO, aiMessage);
-
-            String jsonHeader = aiMessage.substring(0, idx + 1).trim();
-            String rest = aiMessage.substring(idx + 1).trim();
-            java.util.Map<String, Object> map = mapper.readValue(jsonHeader, new com.fasterxml.jackson.core.type.TypeReference<>() {
-            });
-            Object fmt = map.get("format");
-            Object body = map.get("body") != null ? map.get("body") : map.get("message");
-            OutputFormat f = fmt == null ? OutputFormat.AUTO : OutputFormat.fromString(fmt.toString());
-            String m = (body != null) ? body.toString() : rest;
-            // If body missing in JSON, use the remaining text after the JSON header (if non-blank)
-            if ((m == null || m.isBlank()) && !rest.isBlank()) m = rest;
-            if (m == null) m = "";
-            return new AiParsed(f, m.trim());
-        } catch (Exception e) {
-            // parsing failed: treat as missing strict header
-            return new AiParsed(OutputFormat.AUTO, aiMessage);
-        }
-    }
 
     /**
      * Detect whether the assistant explicitly refused because the request is not about El Prat.
