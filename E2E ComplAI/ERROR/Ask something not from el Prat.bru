@@ -1,0 +1,40 @@
+meta {
+  name: Ask something not from el Prat
+  type: http
+  seq: 3
+  tags: [
+    ask
+  ]
+}
+
+post {
+  url: {{complaiPath}}/ask
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "text": "Hola, com funciona el tema de residus a Viladecans?"
+  }
+}
+
+tests {
+  test("HTTP status == 200", () => {
+    expect(res.getStatus()).to.equal(422);
+  });
+  test("Success prop == false", () => {
+    expect(res.getBody().success).to.equal(false);
+  });
+  test("Message != empty", () => {
+    expect(res.getBody().message).to.not.be.empty;
+  });
+  test("Error code == 0", () => {
+    expect(res.getBody().errorCode).to.equal(2);
+  });
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
