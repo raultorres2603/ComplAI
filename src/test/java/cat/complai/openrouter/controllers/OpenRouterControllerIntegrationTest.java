@@ -151,21 +151,18 @@ public class OpenRouterControllerIntegrationTest {
     }
 
     @Test
-    void integration_redact_missingHeader_rejected() throws Exception {
-        // AI returns plain text without JSON header -> service rejects with 400
+    void integration_redact_missingHeader_fallsBackToJsonSuccess() throws Exception {
+        // AI returns plain text without JSON header. The service must NOT reject with 400.
+        // Because the client did not explicitly request PDF (format=AUTO), the service degrades
+        // gracefully and returns the raw AI message as a 200 JSON response.
         RedactRequest req = new RedactRequest("Complaint with no header [NOHEADER]");
         HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req);
-        try {
-            client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
-            fail("Expected HttpClientResponseException for 400");
-        } catch (HttpClientResponseException e) {
-            assertEquals(400, e.getStatus().getCode());
-            String bodyJson = e.getResponse().getBody(String.class).orElse("{}");
-            JsonNode node = mapper.readTree(bodyJson);
-            assertNotNull(node);
-            // validation error code mapped
-            assertEquals(OpenRouterErrorCode.VALIDATION.getCode(), node.path("errorCode").asInt());
-        }
+        HttpResponse<OpenRouterPublicDto> resp = client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
+        assertEquals(200, resp.getStatus().getCode());
+        Optional<OpenRouterPublicDto> bodyOpt = resp.getBody();
+        assertTrue(bodyOpt.isPresent());
+        assertTrue(bodyOpt.get().isSuccess());
+        assertNotNull(bodyOpt.get().getMessage());
     }
 
     @Test
@@ -190,20 +187,17 @@ public class OpenRouterControllerIntegrationTest {
     }
 
     @Test
-    void integration_redact_invalidHeader_rejected() throws Exception {
-        // AI returns a JSON header with invalid format -> service should reject
+    void integration_redact_invalidHeaderFormat_fallsBackToJsonSuccess() throws Exception {
+        // AI returns a JSON header with an unrecognised format ("xml"). OutputFormat.fromString
+        // treats unknown values as AUTO, which triggers the graceful fallback: the service returns
+        // 200 with the raw AI message instead of failing with a 400.
         RedactRequest req = new RedactRequest("Complaint with invalid header [HEADER_INVALID]");
         HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req);
-        try {
-            client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
-            fail("Expected HttpClientResponseException for 400 due to invalid header");
-        } catch (HttpClientResponseException e) {
-            assertEquals(400, e.getStatus().getCode());
-            String bodyJson = e.getResponse().getBody(String.class).orElse("{}");
-            JsonNode node = mapper.readTree(bodyJson);
-            assertNotNull(node);
-            assertEquals(OpenRouterErrorCode.VALIDATION.getCode(), node.path("errorCode").asInt());
-        }
+        HttpResponse<OpenRouterPublicDto> resp = client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
+        assertEquals(200, resp.getStatus().getCode());
+        Optional<OpenRouterPublicDto> bodyOpt = resp.getBody();
+        assertTrue(bodyOpt.isPresent());
+        assertTrue(bodyOpt.get().isSuccess());
     }
 
     @MockBean(HttpWrapper.class)

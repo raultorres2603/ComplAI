@@ -50,6 +50,19 @@ public class OpenRouterController {
         try {
             String text = request != null ? request.getText() : null;
             OutputFormat format = request == null ? OutputFormat.AUTO : request.getFormat();
+
+            // Reject unsupported format values at the HTTP boundary before touching the service.
+            // Only PDF, JSON, and AUTO are valid. Any other value (e.g. "xml", "docx") means the
+            // client sent something we will never support: only PDF is produced as a document.
+            if (!OutputFormat.isSupportedClientFormat(format)) {
+                OpenRouterPublicDto err = new OpenRouterPublicDto(
+                        false, null,
+                        "Unsupported format. Only 'pdf', 'json', or 'auto' are accepted. Documents are always produced as PDF.",
+                        OpenRouterErrorCode.VALIDATION.getCode()
+                );
+                return HttpResponse.badRequest(err);
+            }
+
             OpenRouterResponseDto dto = service.redactComplaint(text, format);
 
             // If PDF data present and success, return it directly as application/pdf.

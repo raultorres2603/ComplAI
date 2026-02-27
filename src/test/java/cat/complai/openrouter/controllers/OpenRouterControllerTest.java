@@ -112,5 +112,19 @@ public class OpenRouterControllerTest {
         assertFalse(body.isSuccess());
         assertEquals("OpenRouter non-2xx response: 500", body.getError());
     }
-}
 
+    @Test
+    void redact_unsupportedFormat_returns400WithClearMessage() {
+        // null format means the client sent an unrecognised value (e.g. "xml") — OutputFormat.fromString
+        // returns null for those. The controller must reject it before reaching the service.
+        OpenRouterController c = new OpenRouterController(new FakeServiceSuccess());
+        RedactRequest req = new RedactRequest("Noise from the airport", null);
+        HttpResponse<?> raw = c.redact(req);
+        assertEquals(400, raw.getStatus().getCode());
+        OpenRouterPublicDto body = (OpenRouterPublicDto) raw.getBody().get();
+        assertFalse(body.isSuccess());
+        assertEquals(OpenRouterErrorCode.VALIDATION.getCode(), body.getErrorCode());
+        assertNotNull(body.getError());
+        assertTrue(body.getError().contains("PDF"), "Error message must mention PDF as the only supported document format");
+    }
+}

@@ -63,19 +63,27 @@ public class OpenRouterServices implements IOpenRouterService {
             return new OpenRouterResponseDto(false, null, "Complaint must not be empty.", null, OpenRouterErrorCode.VALIDATION);
         }
 
-        // Instruct the model: the model MUST emit a JSON metadata header on the first line. The header should be a small JSON
-        // object containing at least a "format" field ("pdf" | "json"). The server will parse that JSON header and use it
-        // to decide whether to generate a PDF. If the header is missing or malformed, the request will be rejected.
+        // Instruct the model to emit a JSON metadata header on the very first line so the server
+        // can determine the output format without ambiguity. The prompt is explicit and places the
+        // instruction at both the top and bottom of the message to maximise model compliance.
+        // The server degrades gracefully if the header is absent (see below), but we still ask for
+        // it to enable PDF generation when the client requests OutputFormat.AUTO.
         String prompt = String.format(
                 """
-                        Please redact a formal, civil, and concise letter addressed to the City Hall (Ajuntament) of El Prat de Llobregat based on the following complaint. \
-                        If the complaint is not about El Prat de Llobregat, politely say you can't help with that request. \
+                        IMPORTANT: Your response MUST start with a single-line JSON header on line 1. \
+                        No text, no markdown, no explanation before it. \
+                        The header must contain the 'format' field set to "pdf" or "json". \
+                        Example of a valid first line: {"format": "pdf"}
+                        
+                        After that JSON header, leave one blank line, then write the letter body.
+                        
+                        Task: Redact a formal, civil, and concise letter addressed to the City Hall \
+                        (Ajuntament) of El Prat de Llobregat based on the complaint below. \
+                        If the complaint is not about El Prat de Llobregat, politely say you can't \
+                        help with that request. \
                         Include a short summary, the specific request or remedy sought, and a polite closing.
                         
-                        REQUIRED: Emit a single-line JSON header as the first line of your response with at least the 'format' field. Example:
-                          {"format": "pdf"}
-                        
-                        After that JSON header, include an empty line and then provide the letter body. The server will reject responses that do not begin with a valid JSON header.
+                        Reminder: first line of your response MUST be the JSON header {"format": "pdf"} or {"format": "json"}.
                         
                         Complaint text:
                         %s""",
@@ -99,10 +107,21 @@ public class OpenRouterServices implements IOpenRouterService {
             effectiveFormat = parsed.format();
         }
 
-        // Enforce that the model must emit a JSON header. If we don't have a JSON header, return validation error.
+        // The AI did not emit the required JSON header. Log the raw response prefix to aid diagnosis.
+        // Graceful fallback: if the client explicitly requested PDF we cannot produce one without a
+        // clean letter body, so we return an error. In all other cases (AUTO or JSON) we treat the
+        // full AI message as the letter body and return it as a JSON response — the user still gets
+        // their letter rather than an opaque 400.
         if (parsed.format() == null || parsed.format() == OutputFormat.AUTO) {
-            logger.warning("AI response missing required JSON header");
-            return new OpenRouterResponseDto(false, null, "AI response missing required JSON header.", aiDto.getStatusCode(), OpenRouterErrorCode.VALIDATION);
+            String rawPreview = aiDto.getMessage() == null ? "<null>"
+                    : (aiDto.getMessage().length() > 200 ? aiDto.getMessage().substring(0, 200) + "..." : aiDto.getMessage());
+            logger.warning("AI response missing required JSON header; raw response prefix: " + rawPreview);
+
+            if (effectiveFormat == OutputFormat.PDF) {
+                return new OpenRouterResponseDto(false, null, "AI response missing required JSON header; cannot produce PDF.", aiDto.getStatusCode(), OpenRouterErrorCode.UPSTREAM);
+            }
+            // Fall back: return the raw AI message as a JSON response so the user gets their letter.
+            return new OpenRouterResponseDto(true, aiDto.getMessage(), null, aiDto.getStatusCode(), OpenRouterErrorCode.NONE);
         }
 
         boolean producePdf = effectiveFormat == OutputFormat.PDF;

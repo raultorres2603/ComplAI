@@ -13,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import cat.complai.openrouter.dto.OpenRouterErrorCode;
 import cat.complai.openrouter.dto.OutputFormat;
 
 /**
@@ -116,6 +117,47 @@ public class OpenRouterServicesTest {
         assertNotNull(out.getPdfData());
         String head = new String(out.getPdfData(), 0, Math.min(4, out.getPdfData().length), StandardCharsets.US_ASCII);
         assertTrue(head.startsWith("%PDF"), "PDF magic bytes expected at start of file");
+    }
+
+    @Test
+    void redact_missingJsonHeader_withAutoFormat_fallsBackToJsonSuccess() {
+        // AI returns a plain letter with no JSON header — should NOT fail with a 400.
+        // The service must degrade gracefully and return the raw message as a JSON response.
+        String aiMessage = "Dear Ajuntament,\n\nI am writing to complain about...\n\nSincerely,\nResident";
+        FakeSuccessWrapper wrapper = new FakeSuccessWrapper(aiMessage);
+        OpenRouterServices svc = new OpenRouterServices(wrapper);
+
+        OpenRouterResponseDto out = svc.redactComplaint("Some complaint text", OutputFormat.AUTO);
+
+        assertTrue(out.isSuccess(), "Missing header with AUTO must not fail the request");
+        assertEquals(aiMessage, out.getMessage(), "Raw AI message must be returned as-is");
+        assertNotNull(out.getMessage());
+    }
+
+    @Test
+    void redact_missingJsonHeader_withJsonFormat_fallsBackToJsonSuccess() {
+        String aiMessage = "Dear Ajuntament,\n\nI am writing to complain about...\n\nSincerely,\nResident";
+        FakeSuccessWrapper wrapper = new FakeSuccessWrapper(aiMessage);
+        OpenRouterServices svc = new OpenRouterServices(wrapper);
+
+        OpenRouterResponseDto out = svc.redactComplaint("Some complaint text", OutputFormat.JSON);
+
+        assertTrue(out.isSuccess(), "Missing header with JSON must not fail the request");
+        assertEquals(aiMessage, out.getMessage());
+    }
+
+    @Test
+    void redact_missingJsonHeader_withPdfFormat_returnsError() {
+        // When the client explicitly asked for PDF but the AI omits the header we cannot extract
+        // a clean letter body, so the service must return an error rather than produce a broken PDF.
+        String aiMessage = "Dear Ajuntament,\n\nI am writing to complain about...\n\nSincerely,\nResident";
+        FakeSuccessWrapper wrapper = new FakeSuccessWrapper(aiMessage);
+        OpenRouterServices svc = new OpenRouterServices(wrapper);
+
+        OpenRouterResponseDto out = svc.redactComplaint("Some complaint text", OutputFormat.PDF);
+
+        assertFalse(out.isSuccess(), "Missing header with explicit PDF must report failure");
+        assertEquals(OpenRouterErrorCode.UPSTREAM, out.getErrorCode());
     }
 
     @Test
