@@ -1,0 +1,41 @@
+meta {
+  name: More specific question
+  type: http
+  seq: 7
+  tags: [
+    ask
+  ]
+}
+
+post {
+  url: {{complaiPath}}/ask
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "text": "Que es va parlar a l'últim ple del prat?",
+    "conversationId": "{{conversationId}}"
+  }
+}
+
+tests {
+  test("HTTP status == 200", () => {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Success prop == true", () => {
+    expect(res.getBody().success).to.equal(true);
+  });
+  test("Message != empty", () => {
+    expect(res.getBody().message).to.not.be.empty;
+  });
+  test("Error code == 0", () => {
+    expect(res.getBody().errorCode).to.equal(0);
+  });
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
