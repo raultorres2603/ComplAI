@@ -7,6 +7,8 @@ import cat.complai.http.HttpWrapper;
 import cat.complai.http.dto.HttpDto;
 import jakarta.inject.Singleton;
 import jakarta.inject.Inject;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -14,6 +16,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.*;
 
 // PDFBox imports
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -30,72 +33,96 @@ import cat.complai.openrouter.helpers.AiParsed;
 @Singleton
 public class OpenRouterServices implements IOpenRouterService {
 
+    private static final int MAX_HISTORY_TURNS = 10;
     private final HttpWrapper httpWrapper;
     private final Logger logger = Logger.getLogger(OpenRouterServices.class.getName());
+    private final Cache<String, List<MessageEntry>> conversationCache;
+
+    public record MessageEntry(String role, String content) {}
 
     @Inject
     public OpenRouterServices(HttpWrapper httpWrapper) {
         this.httpWrapper = Objects.requireNonNull(httpWrapper, "httpWrapper");
+        this.conversationCache = Caffeine.newBuilder()
+                .expireAfterWrite(30, TimeUnit.MINUTES)
+                .maximumSize(10000)
+                .build();
     }
 
     @Override
-    public OpenRouterResponseDto ask(String question) {
+    public OpenRouterResponseDto ask(String question, String conversationId) {
         logger.info("ask() called");
         if (question == null || question.isBlank()) {
             logger.fine("ask() rejected: empty question");
             return new OpenRouterResponseDto(false, null, "Question must not be empty.", null, OpenRouterErrorCode.VALIDATION);
         }
 
-        String prompt = String.format(
-                "User question (from a resident). Please answer only if the question is about El Prat de Llobregat. If it's not about El Prat de Llobregat, politely say you can't help with that request.\n\nQuestion:\n%s\n\nPlease answer concisely and provide relevant local information or guidance.",
-                question.trim()
-        );
+        List<Map<String, Object>> messages = new ArrayList<>();
+        // System message
+        messages.add(Map.of("role", "system", "content", getSystemMessage()));
+        // Conversation history
+        if (conversationId != null && !conversationId.isBlank()) {
+            List<MessageEntry> history = conversationCache.getIfPresent(conversationId);
+            if (history != null) {
+                for (MessageEntry entry : history) {
+                    messages.add(Map.of("role", entry.role(), "content", entry.content()));
+                }
+            }
+        }
+        // Current user message
+        messages.add(Map.of("role", "user", "content", question.trim()));
 
-        logger.fine(() -> "ask() prompt prepared: " + (question.length() > 200 ? question.substring(0, 200) + "..." : question));
-        return callOpenRouterAndExtract(prompt);
+        logger.fine(() -> "ask() messages prepared: " + messages.size() + " total");
+        OpenRouterResponseDto response = callOpenRouterAndExtract(messages);
+
+        // On success, update conversation history
+        if (conversationId != null && !conversationId.isBlank() && response != null && response.getMessage() != null) {
+            List<MessageEntry> history = conversationCache.getIfPresent(conversationId);
+            if (history == null) history = new ArrayList<>();
+            history.add(new MessageEntry("user", question.trim()));
+            history.add(new MessageEntry("assistant", response.getMessage()));
+            // Cap history
+            if (history.size() > MAX_HISTORY_TURNS * 2) {
+                history = history.subList(history.size() - MAX_HISTORY_TURNS * 2, history.size());
+            }
+            conversationCache.put(conversationId, history);
+        }
+        return response;
     }
 
     @Override
-    public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format) {
+    public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format, String conversationId) {
         logger.info("redactComplaint() called");
         if (complaint == null || complaint.isBlank()) {
             logger.fine("redactComplaint() rejected: empty complaint");
             return new OpenRouterResponseDto(false, null, "Complaint must not be empty.", null, OpenRouterErrorCode.VALIDATION);
         }
 
-        // Instruct the model to emit a JSON metadata header on the very first line so the server
-        // can determine the output format without ambiguity. The prompt is explicit and places the
-        // instruction at both the top and bottom of the message to maximise model compliance.
-        // The server degrades gracefully if the header is absent (see below), but we still ask for
-        // it to enable PDF generation when the client requests OutputFormat.AUTO.
-        String prompt = String.format(
-                """
-                        IMPORTANT: Your response MUST start with a single-line JSON header on line 1. \
-                        No text, no markdown, no explanation before it. \
-                        The header must contain the 'format' field set to "pdf" or "json". \
-                        Example of a valid first line: {"format": "pdf"}
-                        
-                        After that JSON header, leave one blank line, then write the letter body.
-                        
-                        Task: Redact a formal, civil, and concise letter addressed to the City Hall \
-                        (Ajuntament) of El Prat de Llobregat based on the complaint below. \
-                        If the complaint is not about El Prat de Llobregat, politely say you can't \
-                        help with that request. \
-                        Include a short summary, the specific request or remedy sought, and a polite closing.
-                        
-                        Reminder: first line of your response MUST be the JSON header {"format": "pdf"} or {"format": "json"}.
-                        
-                        Complaint text:
-                        %s""",
-                complaint.trim()
-        );
+        List<Map<String, Object>> messages = new ArrayList<>();
+        messages.add(Map.of("role", "system", "content", getSystemMessage()));
+        if (conversationId != null && !conversationId.isBlank()) {
+            List<MessageEntry> history = conversationCache.getIfPresent(conversationId);
+            if (history != null) {
+                for (MessageEntry entry : history) {
+                    messages.add(Map.of("role", entry.role(), "content", entry.content()));
+                }
+            }
+        }
+        messages.add(Map.of("role", "user", "content", buildRedactPrompt(complaint)));
 
-        logger.fine(() -> "redactComplaint() prompt prepared: " + (complaint.length() > 200 ? complaint.substring(0, 200) + "..." : complaint));
-        OpenRouterResponseDto aiDto = callOpenRouterAndExtract(prompt);
+        logger.fine(() -> "redactComplaint() messages prepared: " + messages.size() + " total");
+        OpenRouterResponseDto aiDto = callOpenRouterAndExtract(messages);
 
-        if (!aiDto.isSuccess()) {
-            // propagate error as-is
-            return aiDto;
+        // On success, update conversation history
+        if (conversationId != null && !conversationId.isBlank() && aiDto != null && aiDto.getMessage() != null) {
+            List<MessageEntry> history = conversationCache.getIfPresent(conversationId);
+            if (history == null) history = new ArrayList<>();
+            history.add(new MessageEntry("user", buildRedactPrompt(complaint)));
+            history.add(new MessageEntry("assistant", aiDto.getMessage()));
+            if (history.size() > MAX_HISTORY_TURNS * 2) {
+                history = history.subList(history.size() - MAX_HISTORY_TURNS * 2, history.size());
+            }
+            conversationCache.put(conversationId, history);
         }
 
         // Parse optional AI-supplied header: either JSON first-line or simple 'FORMAT: pdf' header.
@@ -190,10 +217,10 @@ public class OpenRouterServices implements IOpenRouterService {
         return lower.contains("el prat") && (lower.contains("only") || lower.contains("solament") || lower.contains("solo") || lower.contains("only about"));
     }
 
-    private OpenRouterResponseDto callOpenRouterAndExtract(String prompt) {
+    private OpenRouterResponseDto callOpenRouterAndExtract(List<Map<String, Object>> messages) {
         logger.fine("callOpenRouterAndExtract: calling HttpWrapper");
         try {
-            CompletableFuture<HttpDto> future = httpWrapper.postToOpenRouterAsync(prompt);
+            CompletableFuture<HttpDto> future = httpWrapper.postToOpenRouterAsync(messages);
             HttpDto dto = future.get(30, TimeUnit.SECONDS);
             logger.fine(() -> "callOpenRouterAndExtract: received dto=" + (dto == null ? "null" : String.valueOf(dto.statusCode())));
             if (dto == null) {
@@ -337,5 +364,40 @@ public class OpenRouterServices implements IOpenRouterService {
         PDPage newPage = new PDPage(PDRectangle.LETTER);
         doc.addPage(newPage);
         return newPage;
+    }
+
+    private String getSystemMessage() {
+        return """
+                Ets un assistent que es diu Gall Potablava, amable i proper per als veïns d'El Prat de Llobregat. Ajudes a redactar cartes i queixes clares i civils adreçades a l'Ajuntament i ofereixes informació pràctica i local d'El Prat. Mantén les respostes curtes, respectuoses i fàcils de llegir, com un veí que vol ajudar. Si la consulta no és sobre El Prat de Llobregat, digues-ho educadament i explica que no pots ajudar amb aquesta petició; també pots suggerir que facin una pregunta sobre assumptes locals.\
+                
+                
+                En español: Eres un asistente que se llama Gall Potablava amable y cercano para los vecinos de El Prat de Llobregat. Ayuda a redactar cartes i queixes dirigides al Ayuntamiento i ofereix informació pràctica i local. Mantén las respuestas cortas y fáciles de entender. Si la consulta no trata sobre El Prat, dilo educadamente y sugiere que pregunten sobre asuntos locales.\
+                
+                
+                In English (support): You are a friendly local assistant named Gall Potablava for residents of El Prat de Llobregat. Help draft clear, civil letters to the City Hall and provide practical local information. Keep answers short and easy to read. If the request is not about El Prat de Llobregat, politely say you can't help with that request.""";
+    }
+
+    private String buildRedactPrompt(String complaint) {
+        return String.format(
+                """
+                        IMPORTANT: Your response MUST start with a single-line JSON header on line 1. 
+                        No text, no markdown, no explanation before it. 
+                        The header must contain the 'format' field set to "pdf" or "json". 
+                        Example of a valid first line: {"format": "pdf"}
+                        
+                        After that JSON header, leave one blank line, then write the letter body.
+                        
+                        Task: Redact a formal, civil, and concise letter addressed to the City Hall 
+                        (Ajuntament) of El Prat de Llobregat based on the complaint below. 
+                        If the complaint is not about El Prat de Llobregat, politely say you can't 
+                        help with that request. 
+                        Include a short summary, the specific request or remedy sought, and a polite closing.
+                        
+                        Reminder: first line of your response MUST be the JSON header {"format": "pdf"} or {"format": "json"}.
+                        
+                        Complaint text:
+                        %s""",
+                complaint.trim()
+        );
     }
 }

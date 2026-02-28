@@ -140,6 +140,65 @@ public class HttpWrapper {
         }
     }
 
+    public CompletableFuture<HttpDto> postToOpenRouterAsync(List<Map<String, Object>> messages) {
+        logger.fine(() -> "postToOpenRouterAsync (multi-turn) called; messages count=" + (messages == null ? 0 : messages.size()));
+        try {
+            String model = "minimax/minimax-m2.5";
+            Map<String, Object> payload = Map.of(
+                    "model", model,
+                    "messages", messages
+            );
+            String requestBody = mapper.writeValueAsString(payload);
+
+            String authValue = headers.get("Authorization");
+            if (authValue == null || authValue.isBlank()) {
+                logger.warning("Authorization header not present in headers map; falling back to environment variable OPENROUTER_API_KEY");
+                authValue = System.getenv("OPENROUTER_API_KEY");
+            }
+            if (authValue == null) {
+                logger.warning("Missing OPENROUTER_API_KEY");
+                return CompletableFuture.completedFuture(new HttpDto(null, null, "POST", "Missing OPENROUTER_API_KEY"));
+            }
+            if (!authValue.toLowerCase().startsWith("bearer ")) {
+                authValue = "Bearer " + authValue;
+            }
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(openRouterUrl))
+                    .timeout(Duration.ofSeconds(20))
+                    .header("Content-Type", "application/json")
+                    .header("Authorization", authValue)
+                    .header("Referer", headers.getOrDefault("HTTP-Referer", "https://complai.cat"))
+                    .header("X-Title", headers.getOrDefault("X-Title", "complai"))
+                    .POST(BodyPublishers.ofString(requestBody))
+                    .build();
+
+            logger.fine(() -> "Sending request to OpenRouter URL: " + openRouterUrl);
+
+            return httpClient.sendAsync(request, BodyHandlers.ofString())
+                    .thenApply(response -> {
+                        int status = response.statusCode();
+                        String body = response.body();
+                        logger.fine(() -> "Received response from OpenRouter: status=" + status + " bodyLength=" + (body == null ? 0 : body.length()));
+                        if (status >= 200 && status < 300) {
+                            String extracted = extractTextFromOpenRouterResponse(body, mapper);
+                            logger.fine(() -> "Extracted message length=" + (extracted == null ? 0 : extracted.length()));
+                            return new HttpDto(extracted, status, "POST", null);
+                        } else {
+                            logger.warning(() -> "OpenRouter returned non-2xx status: " + status);
+                            return new HttpDto(body, status, "POST", String.format("OpenRouter non-2xx response: %d", status));
+                        }
+                    })
+                    .exceptionally(ex -> {
+                        logger.log(Level.SEVERE, "Exception when calling OpenRouter", ex);
+                        return new HttpDto(null, null, "POST", ex.getMessage());
+                    });
+        } catch (Exception e) {
+            logger.log(Level.SEVERE, "Failed preparing request to OpenRouter (multi-turn)", e);
+            return CompletableFuture.completedFuture(new HttpDto(null, null, "POST", e.getMessage()));
+        }
+    }
+
     private String extractTextFromOpenRouterResponse(String responseBody, ObjectMapper mapper) {
         try {
             JsonNode root = mapper.readTree(responseBody);

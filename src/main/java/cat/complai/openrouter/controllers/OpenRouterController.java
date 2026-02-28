@@ -34,7 +34,7 @@ public class OpenRouterController {
     public HttpResponse<OpenRouterPublicDto> ask(@Body AskRequest request) {
         logger.info("POST /openrouter/ask called");
         try {
-            OpenRouterResponseDto dto = service.ask(request.getText());
+            OpenRouterResponseDto dto = service.ask(request.getText(), request.getConversationId());
             return errorToHttpResponse(dto, "ask");
         } catch (Exception e) {
             logger.log(Level.SEVERE, "ask: unexpected exception", e);
@@ -50,6 +50,7 @@ public class OpenRouterController {
         try {
             String text = request != null ? request.getText() : null;
             OutputFormat format = request == null ? OutputFormat.AUTO : request.getFormat();
+            String conversationId = request == null ? null : request.getConversationId();
 
             // Reject unsupported format values at the HTTP boundary before touching the service.
             // Only PDF, JSON, and AUTO are valid. Any other value (e.g. "xml", "docx") means the
@@ -63,7 +64,7 @@ public class OpenRouterController {
                 return HttpResponse.badRequest(err);
             }
 
-            OpenRouterResponseDto dto = service.redactComplaint(text, format);
+            OpenRouterResponseDto dto = service.redactComplaint(text, format, conversationId);
 
             // If PDF data present and success, return it directly as application/pdf.
             // Content-Length must be set explicitly: without it Netty cannot determine the body

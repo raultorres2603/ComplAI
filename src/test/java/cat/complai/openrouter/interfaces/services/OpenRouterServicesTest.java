@@ -8,13 +8,10 @@ import org.junit.jupiter.api.Test;
 import java.util.concurrent.CompletableFuture;
 import java.nio.charset.StandardCharsets;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-
 import cat.complai.openrouter.dto.OpenRouterErrorCode;
 import cat.complai.openrouter.dto.OutputFormat;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for OpenRouterServices. Uses a small fake HttpWrapper to avoid network calls.
@@ -71,7 +68,7 @@ public class OpenRouterServicesTest {
         OpenRouterResponseDto out = svc.ask(input);
         assertTrue(out.isSuccess());
         assertEquals("Hello from El Prat AI", out.getMessage());
-        assertEquals(null, out.getError());
+        assertNull(out.getError());
     }
 
     @Test
