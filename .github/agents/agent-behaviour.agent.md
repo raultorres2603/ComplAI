@@ -248,7 +248,7 @@ npx cdk deploy ComplAILambdaStack-production  --parameters OpenRouterApiKey=<key
 
 - After every successful deployment to the development environment, the GitHub Actions pipeline automatically runs the full Bruno E2E ComplAI collection using the `Development.bru` environment.
 - The E2E job will fail the workflow if any test fails, ensuring that regressions are caught before further work or merges.
-- E2E results are uploaded as an artifact for review and debugging.
+- E2E results are uploaded as an artifact for review and debugging. A JUnit XML report (`results.xml`) is also generated and uploaded for integration with test dashboards or CI tools.
 - The E2E suite covers multi-turn conversation, error handling, PDF generation, and edge cases (see above).
 - If you add new endpoints or change API contracts, update the Bruno collection and ensure E2E tests pass.
 
@@ -264,7 +264,7 @@ npx cdk deploy ComplAILambdaStack-production  --parameters OpenRouterApiKey=<key
   ```
 - Run all E2E tests with the development environment:
   ```sh
-  bru run . --env Development
+  bru run . -r --env Development --reporter-json report/results.json
   ```
 - For other environments, use the corresponding `.bru` file in the `environments/` folder.
 
