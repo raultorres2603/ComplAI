@@ -276,7 +276,7 @@ jobs:
       - name: Run Bruno E2E tests (development)
         working-directory: ./E2E-ComplAI
         run: >
-          bru run . --env-file environments/Development.bru
+          bru run . -r --env Development
 
       - name: Upload Bruno E2E results (optional)
         if: always()

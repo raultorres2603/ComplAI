@@ -179,7 +179,7 @@ PDFBox generates PDFs in-memory. The `OpenRouterController` returns `application
 ./gradlew test          # Standard test suite
 ./gradlew ciTest        # CI-specific task with verbose logging
 # E2E API tests (Bruno):
-#   bruno run "E2E ComplAI/"
+#   bru run . --env Development
 ```
 
 ### Local Development (SAM + LocalStack)
@@ -252,6 +252,23 @@ npx cdk deploy ComplAILambdaStack-production  --parameters OpenRouterApiKey=<key
 - The E2E suite covers multi-turn conversation, error handling, PDF generation, and edge cases (see above).
 - If you add new endpoints or change API contracts, update the Bruno collection and ensure E2E tests pass.
 
+### Running Bruno E2E Locally
+
+- Install Bruno CLI globally if not already installed:
+  ```sh
+  npm install -g @usebruno/cli
+  ```
+- Change directory to the root of the collection:
+  ```sh
+  cd "E2E-ComplAI"
+  ```
+- Run all E2E tests with the development environment:
+  ```sh
+  bru run . --env Development
+  ```
+- For other environments, use the corresponding `.bru` file in the `environments/` folder.
+
 ### Troubleshooting E2E Failures
-- If the E2E job fails due to `bruno: command not found`, ensure Bruno CLI is installed in the workflow or locally with `npm install -g @usebruno/cli`.
+- If the E2E job fails due to `bruno: command not found` or `bru: command not found`, ensure Bruno CLI is installed in the workflow or locally with `npm install -g @usebruno/cli`.
+- If you see errors like `not a function` in post-response scripts, check your Bruno test scripts for invalid function calls.
 - If tests fail due to environment or deployment issues, check the deployment logs and the uploaded E2E results artifact for details.
