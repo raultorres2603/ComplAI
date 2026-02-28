@@ -274,10 +274,9 @@ jobs:
         run: npm install -g @usebruno/cli
 
       - name: Run Bruno E2E tests (development)
+        working-directory: ./E2E ComplAI
         run: >
-          bruno run "E2E ComplAI/" \
-            --env "E2E ComplAI/environments/Development.bru" \
-            --reporter=cli
+          bru run . --env-file environments/Development.bru
 
       - name: Upload Bruno E2E results (optional)
         if: always()
