@@ -13,7 +13,7 @@ get {
 script:post-response {
   let conversationId = crypto.randomUUID();
   console.log("Created conversationId: " + conversationId);
-  bru.setGlobalEnvVar("conversationId", conversationId.toString());
+  bru.setEnvVar("conversationId", conversationId.toString());
 }
 
 settings {
