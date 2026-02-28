@@ -276,12 +276,12 @@ jobs:
       - name: Run Bruno E2E tests (development)
         working-directory: ./E2E-ComplAI
         run: >
-          bru run . -r --env Development --reporter-json results.json
+          bru run . -r --env Development --reporter-json report/results.json
 
       - name: Upload Bruno E2E JSON report
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: bruno-e2e-json-report
-          path: ./E2E-ComplAI/results.json
+          path: ./E2E-ComplAI/report/results.json
 
