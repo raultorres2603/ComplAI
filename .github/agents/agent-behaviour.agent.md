@@ -244,3 +244,14 @@ npx cdk deploy ComplAILambdaStack-production  --parameters OpenRouterApiKey=<key
 - The Lambda IAM role follows least-privilege (only `AWSLambdaBasicExecutionRole`).
 - Input is validated at service boundaries; the AI model is scoped to El Prat topics only.
 
+## E2E Pipeline in CI/CD
+
+- After every successful deployment to the development environment, the GitHub Actions pipeline automatically runs the full Bruno E2E ComplAI collection using the `Development.bru` environment.
+- The E2E job will fail the workflow if any test fails, ensuring that regressions are caught before further work or merges.
+- E2E results are uploaded as an artifact for review and debugging.
+- The E2E suite covers multi-turn conversation, error handling, PDF generation, and edge cases (see above).
+- If you add new endpoints or change API contracts, update the Bruno collection and ensure E2E tests pass.
+
+### Troubleshooting E2E Failures
+- If the E2E job fails due to `bruno: command not found`, ensure Bruno CLI is installed in the workflow or locally with `npm install -g @usebruno/cli`.
+- If tests fail due to environment or deployment issues, check the deployment logs and the uploaded E2E results artifact for details.

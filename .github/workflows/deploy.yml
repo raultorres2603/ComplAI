@@ -252,3 +252,37 @@ jobs:
         with:
           name: cdk-outputs-${{ steps.target.outputs.environment }}
           path: cdk-outputs-${{ steps.target.outputs.environment }}.json
+
+  # ---------------------------------------------------------------------------
+  # E2E: Run Bruno E2E tests after successful deploy to development
+  # ---------------------------------------------------------------------------
+  e2e:
+    name: E2E API Tests (Bruno)
+    needs: deploy
+    if: needs.deploy.result == 'success' && needs.deploy.outputs.environment == 'development'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Install Bruno CLI
+        run: npm install -g @usebruno/cli
+
+      - name: Run Bruno E2E tests (development)
+        run: >
+          bruno run "E2E ComplAI/" \
+            --env "E2E ComplAI/environments/Development.bru" \
+            --reporter=cli
+
+      - name: Upload Bruno E2E results (optional)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: bruno-e2e-results
+          path: .bruno/reports
+
