@@ -1,0 +1,31 @@
+meta {
+  name: Create conversationId
+  type: http
+  seq: 1
+}
+
+get {
+  url: https://echo.usebruno.com
+  body: none
+  auth: inherit
+}
+
+script:post-response {
+  function uuidv4() {
+    // https://stackoverflow.com/a/2117523/2715716
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+  
+  let conversationId = uuidv4();
+  console.log("Created conversationId: " + conversationId);
+  bru.setEnvVar("conversationId", conversationId);
+  
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
