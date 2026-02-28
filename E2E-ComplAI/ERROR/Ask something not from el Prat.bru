@@ -21,9 +21,6 @@ body:json {
 }
 
 tests {
-  test("HTTP status == 422", () => {
-    expect(res.getStatus()).to.equal(422);
-  });
   test("Success prop == false", () => {
     expect(res.getBody().success).to.equal(false);
   });

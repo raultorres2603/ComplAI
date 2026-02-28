@@ -14,7 +14,7 @@ The application exposes a REST API deployed as an **AWS Lambda** behind **API Ga
 |------------------|--------------------------------------------------------------------|
 | Language         | Java 21                                                            |
 | Framework        | Micronaut 4.10.7 (function runtime, DI, HTTP layer)               |
-| Build            | Gradle (Groovy DSL) with Shadow JAR plugin                         |
+| Build            | Gradle (Groovy DSL), Micronaut Gradle Plugin 4.6.1, Shadow JAR plugin (com.gradleup.shadow 8.3.9) |
 | AI Backend       | OpenRouter API (`minimax/minimax-m2.5` model)                      |
 | PDF Generation   | Apache PDFBox 2.0.29                                               |
 | Caching          | Micronaut Caffeine Cache                                           |
@@ -24,7 +24,7 @@ The application exposes a REST API deployed as an **AWS Lambda** behind **API Ga
 | Local Dev        | AWS SAM CLI + LocalStack (Docker Compose)                          |
 | Testing          | JUnit 5, Micronaut Test (`@MicronautTest`, `@MockBean`), Bruno (E2E) |
 | Logging          | JUL (`java.util.logging`) bridged to Logback via SLF4J            |
-| API Testing      | Bruno (E2E collection in `E2E ComplAI/`)                           |
+| API Testing      | Bruno (E2E collection in `E2E-ComplAI/`)                           |
 
 ---
 
@@ -56,7 +56,7 @@ src/main/java/cat/complai/
         ├── IOpenRouterService.java   # Service interface: ask() + redactComplaint() (now with conversationId)
         └── services/
             └── OpenRouterServices.java # Singleton: orchestrates prompt → AI call → response/PDF, manages conversation history
-E2E ComplAI/                           # Bruno E2E API test collection (see below)
+E2E-ComplAI/                           # Bruno E2E API test collection (see below)
 ```
 
 ### Infrastructure
@@ -71,7 +71,8 @@ sam/                    # Local development with SAM CLI + LocalStack
 ├── template.yaml       # SAM template mirroring CDK production config
 ├── docker-compose.yml  # LocalStack container
 ├── env.json            # Local environment overrides
-└── start-local.sh      # Helper script to build & start locally
+├── start-local.sh      # Helper script to build & start locally (Linux/macOS/WSL)
+└── start-local.ps1     # Helper script to build & start locally (Windows PowerShell)
 ```
 
 ### Tests
@@ -86,7 +87,7 @@ src/test/java/cat/complai/
     │   └── OpenRouterControllerIntegrationTest.java   # Integration: @MicronautTest + @MockBean
     └── interfaces/services/
         └── OpenRouterServicesTest.java                # Unit: service logic, refusal detection, PDF
-E2E ComplAI/                                          # Bruno E2E API test collection (multi-turn, error, and PDF cases)
+E2E-ComplAI/                                          # Bruno E2E API test collection (multi-turn, error, and PDF cases)
 ```
 
 ---
@@ -98,7 +99,7 @@ E2E ComplAI/                                          # Bruno E2E API test colle
 1. **Controller** (`OpenRouterController`) — HTTP boundary. Validates the `format` field at the boundary (rejects unsupported values like `"xml"` with a `400` before the service is called) and maps service-level `OpenRouterErrorCode` to HTTP status codes via an exhaustive `switch` expression.
 2. **Service Interface** (`IOpenRouterService`) — contract. Two operations: `ask(String, String)` and `redactComplaint(String, OutputFormat, String)` (both support conversationId).
 3. **Service Implementation** (`OpenRouterServices`) — business logic. Builds prompts, manages conversation history, calls the AI, detects refusals, parses AI metadata headers, generates PDFs.
-4. **HTTP Wrapper** (`HttpWrapper`) — infrastructure. Sends async HTTP requests to OpenRouter, extracts the assistant message from the OpenAI-compatible JSON response.
+4. **HTTP Wrapper** (`HttpWrapper`) — infrastructure. Sends async HTTP requests to OpenRouter, extracts the assistant message from the OpenAI-compatible JSON response. Provides two overloads: `postToOpenRouterAsync(String)` for simple single-prompt calls (builds messages array internally), and `postToOpenRouterAsync(List<Map<String, Object>>)` for pre-assembled multi-turn message lists (used by the service layer for conversation history).
 
 ### Conversation History (Multi-turn Context)
 
@@ -119,6 +120,7 @@ Micronaut compile-time DI. All beans are `@Singleton`. Constructor injection wit
 - `OpenRouterErrorCode` is the authoritative error signal (not the message string).
 - The controller maps error codes to HTTP statuses: `VALIDATION → 400`, `REFUSAL → 422`, `TIMEOUT → 504`, `UPSTREAM → 502`, `INTERNAL → 500`.
 - Unexpected exceptions in the controller are caught and returned as `500` with an `INTERNAL` error code.
+- In `redactComplaint()`, any non-success result from the AI call (`callOpenRouterAndExtract`) is returned immediately — before header parsing or PDF generation. This prevents refusals or upstream errors from being silently swallowed by the graceful-fallback logic.
 
 ### AI Response Protocol (Redact Endpoint)
 
@@ -230,9 +232,9 @@ npx cdk deploy ComplAILambdaStack-production  --parameters OpenRouterApiKey=<key
 ## Testing Approach
 
 - **Unit tests** use fake implementations of service interfaces and lightweight HTTP servers (`com.sun.net.httpserver.HttpServer`) to mock external APIs.
-- **Integration tests** use `@MicronautTest` with `@MockBean` to replace `HttpWrapper` and verify the full controller→service→response pipeline.
+- **Integration tests** use `@MicronautTest` with `@MockBean` to replace `HttpWrapper` and verify the full controller→service→response pipeline. A `@Factory` inner class (`TestBeans`) provides a `@Replaces`-annotated `OpenRouterServices` bean wired with the mock `HttpWrapper`. The mock overrides `postToOpenRouterAsync(List<Map<String, Object>>)` — the multi-turn overload that the service actually calls — and routes scenarios based on the last user message content.
 - **PDF tests** verify generation at the service level (not via HTTP) because Micronaut's embedded Netty server closes connections on binary responses.
-- **E2E API tests** are maintained in the `E2E ComplAI/` folder using Bruno. These cover multi-turn conversation, error handling, and PDF generation scenarios against the deployed or local API.
+- **E2E API tests** are maintained in the `E2E-ComplAI/` folder using Bruno. These cover multi-turn conversation, error handling, and PDF generation scenarios against the deployed or local API.
 - **Edge cases** covered: empty input, AI refusal detection, missing API keys, non-2xx upstream responses, timeout handling, malformed URLs, missing AI JSON header graceful fallback (AUTO/JSON succeed, PDF returns UPSTREAM error), unsupported client format values rejected at controller boundary.
 
 ---
@@ -246,9 +248,12 @@ npx cdk deploy ComplAILambdaStack-production  --parameters OpenRouterApiKey=<key
 
 ## E2E Pipeline in CI/CD
 
-- After every successful deployment to the development environment, the GitHub Actions pipeline automatically runs the full Bruno E2E ComplAI collection using the `Development.bru` environment.
+- The GitHub Actions workflow (`deploy.yml`) triggers on `workflow_dispatch` (manual, choose environment and branch) and `pull_request` (automatic, always deploys to development).
+- Production deploys are gated: only allowed from the `master` branch, enforced by a `guard` job. Production environments require manual approval via GitHub Environment reviewers.
+- After every successful deployment to the development environment, the workflow automatically runs the full Bruno E2E-ComplAI collection using the `Development.bru` environment.
+- The E2E job uses the deploy job's `outputs.environment` to determine whether to run (only runs when `environment == 'development'`).
 - The E2E job will fail the workflow if any test fails, ensuring that regressions are caught before further work or merges.
-- E2E results are uploaded as an artifact for review and debugging. A JUnit XML report (`results.xml`) is also generated and uploaded for integration with test dashboards or CI tools.
+- E2E results are uploaded as a JSON artifact (`results.json`) for review and debugging.
 - The E2E suite covers multi-turn conversation, error handling, PDF generation, and edge cases (see above).
 - If you add new endpoints or change API contracts, update the Bruno collection and ensure E2E tests pass.
 
