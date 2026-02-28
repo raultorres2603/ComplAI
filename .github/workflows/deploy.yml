@@ -133,6 +133,8 @@ jobs:
       #                  (configure in Settings → Environments → production).
       # Each environment holds its own OPENROUTER_API_KEY secret.
       name: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'development' }}
+    outputs:
+      environment: ${{ steps.target.outputs.environment }}
     steps:
       - name: Resolve deployment target
         id: target
