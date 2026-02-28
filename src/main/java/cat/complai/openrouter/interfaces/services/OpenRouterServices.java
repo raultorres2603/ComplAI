@@ -113,8 +113,15 @@ public class OpenRouterServices implements IOpenRouterService {
         logger.fine(() -> "redactComplaint() messages prepared: " + messages.size() + " total");
         OpenRouterResponseDto aiDto = callOpenRouterAndExtract(messages);
 
+        // Propagate any non-success result (refusal, upstream error, timeout, internal error) immediately.
+        // Continuing to the header-parsing logic with a failed AI response would produce incorrect
+        // fallback behaviour — e.g. a refusal would silently become a 200 JSON response.
+        if (aiDto.getErrorCode() != OpenRouterErrorCode.NONE) {
+            return aiDto;
+        }
+
         // On success, update conversation history
-        if (conversationId != null && !conversationId.isBlank() && aiDto != null && aiDto.getMessage() != null) {
+        if (conversationId != null && !conversationId.isBlank() && aiDto.getMessage() != null) {
             List<MessageEntry> history = conversationCache.getIfPresent(conversationId);
             if (history == null) history = new ArrayList<>();
             history.add(new MessageEntry("user", buildRedactPrompt(complaint)));
