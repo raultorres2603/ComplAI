@@ -22,7 +22,7 @@ The application exposes a REST API deployed as an **AWS Lambda** behind **API Ga
 | Runtime          | AWS Lambda (Java 21, SnapStart-ready, CRaC support)               |
 | Infrastructure   | AWS CDK (TypeScript) — two stacks: `development` and `production`  |
 | Local Dev        | AWS SAM CLI + LocalStack (Docker Compose)                          |
-| Testing          | JUnit 5, Micronaut Test (`@MicronautTest`, `@MockBean`)           |
+| Testing          | JUnit 5, Micronaut Test (`@MicronautTest`, `@MockBean`), Bruno (E2E) |
 | Logging          | JUL (`java.util.logging`) bridged to Logback via SLF4J            |
 | API Testing      | Bruno (E2E collection in `E2E ComplAI/`)                           |
 
@@ -43,8 +43,8 @@ src/main/java/cat/complai/
     ├── controllers/
     │   ├── OpenRouterController.java # POST /complai/ask, POST /complai/redact
     │   └── dto/
-    │       ├── AskRequest.java       # Inbound DTO for /ask
-    │       └── RedactRequest.java    # Inbound DTO for /redact (text + format)
+    │       ├── AskRequest.java       # Inbound DTO for /ask (now includes conversationId)
+    │       └── RedactRequest.java    # Inbound DTO for /redact (text + format + conversationId)
     ├── dto/
     │   ├── OpenRouterErrorCode.java  # Enum: NONE, VALIDATION, REFUSAL, UPSTREAM, TIMEOUT, INTERNAL
     │   ├── OpenRouterPublicDto.java  # Outbound DTO: what clients receive
@@ -53,9 +53,10 @@ src/main/java/cat/complai/
     ├── helpers/
     │   └── AiParsed.java             # Record: parses AI JSON header from model response
     └── interfaces/
-        ├── IOpenRouterService.java   # Service interface: ask() + redactComplaint()
+        ├── IOpenRouterService.java   # Service interface: ask() + redactComplaint() (now with conversationId)
         └── services/
-            └── OpenRouterServices.java # Singleton: orchestrates prompt → AI call → response/PDF
+            └── OpenRouterServices.java # Singleton: orchestrates prompt → AI call → response/PDF, manages conversation history
+E2E ComplAI/                           # Bruno E2E API test collection (see below)
 ```
 
 ### Infrastructure
@@ -85,6 +86,7 @@ src/test/java/cat/complai/
     │   └── OpenRouterControllerIntegrationTest.java   # Integration: @MicronautTest + @MockBean
     └── interfaces/services/
         └── OpenRouterServicesTest.java                # Unit: service logic, refusal detection, PDF
+E2E ComplAI/                                          # Bruno E2E API test collection (multi-turn, error, and PDF cases)
 ```
 
 ---
@@ -94,9 +96,18 @@ src/test/java/cat/complai/
 ### Layered Architecture
 
 1. **Controller** (`OpenRouterController`) — HTTP boundary. Validates the `format` field at the boundary (rejects unsupported values like `"xml"` with a `400` before the service is called) and maps service-level `OpenRouterErrorCode` to HTTP status codes via an exhaustive `switch` expression.
-2. **Service Interface** (`IOpenRouterService`) — contract. Two operations: `ask(String)` and `redactComplaint(String, OutputFormat)`.
-3. **Service Implementation** (`OpenRouterServices`) — business logic. Builds prompts, calls the AI, detects refusals, parses AI metadata headers, generates PDFs.
+2. **Service Interface** (`IOpenRouterService`) — contract. Two operations: `ask(String, String)` and `redactComplaint(String, OutputFormat, String)` (both support conversationId).
+3. **Service Implementation** (`OpenRouterServices`) — business logic. Builds prompts, manages conversation history, calls the AI, detects refusals, parses AI metadata headers, generates PDFs.
 4. **HTTP Wrapper** (`HttpWrapper`) — infrastructure. Sends async HTTP requests to OpenRouter, extracts the assistant message from the OpenAI-compatible JSON response.
+
+### Conversation History (Multi-turn Context)
+
+- Both `/complai/ask` and `/complai/redact` endpoints accept an optional `conversationId` (UUID as String) in the request body.
+- The service layer maintains a short-lived, bounded conversation history in a Caffeine cache. Key: `conversationId`, Value: list of `{role, content}` message pairs (capped at 10 turns).
+- When a `conversationId` is present, the cached history is prepended to the OpenRouter `messages` array, enabling multi-turn context.
+- After a successful response, the new user/assistant messages are appended to the cache, with history capped to avoid unbounded growth.
+- If the conversation is expired or unknown, the system starts fresh (no error).
+- Stateless operation is preserved if `conversationId` is omitted.
 
 ### Dependency Injection
 
@@ -167,6 +178,8 @@ PDFBox generates PDFs in-memory. The `OpenRouterController` returns `application
 ```bash
 ./gradlew test          # Standard test suite
 ./gradlew ciTest        # CI-specific task with verbose logging
+# E2E API tests (Bruno):
+#   bruno run "E2E ComplAI/"
 ```
 
 ### Local Development (SAM + LocalStack)
@@ -219,6 +232,7 @@ npx cdk deploy ComplAILambdaStack-production  --parameters OpenRouterApiKey=<key
 - **Unit tests** use fake implementations of service interfaces and lightweight HTTP servers (`com.sun.net.httpserver.HttpServer`) to mock external APIs.
 - **Integration tests** use `@MicronautTest` with `@MockBean` to replace `HttpWrapper` and verify the full controller→service→response pipeline.
 - **PDF tests** verify generation at the service level (not via HTTP) because Micronaut's embedded Netty server closes connections on binary responses.
+- **E2E API tests** are maintained in the `E2E ComplAI/` folder using Bruno. These cover multi-turn conversation, error handling, and PDF generation scenarios against the deployed or local API.
 - **Edge cases** covered: empty input, AI refusal detection, missing API keys, non-2xx upstream responses, timeout handling, malformed URLs, missing AI JSON header graceful fallback (AUTO/JSON succeed, PDF returns UPSTREAM error), unsupported client format values rejected at controller boundary.
 
 ---
