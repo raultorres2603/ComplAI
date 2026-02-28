@@ -15,12 +15,13 @@ post {
 
 body:json {
   {
-    "text": "Hola, com funciona el tema de residus a Viladecans?"
+    "text": "Hola, com funciona el tema de residus a Viladecans?",
+    "conversationId": "{{conversationId}}"
   }
 }
 
 tests {
-  test("HTTP status == 200", () => {
+  test("HTTP status == 422", () => {
     expect(res.getStatus()).to.equal(422);
   });
   test("Success prop == false", () => {
