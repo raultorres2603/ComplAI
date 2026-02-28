@@ -1,0 +1,41 @@
+meta {
+  name: Jo em dic Raúl
+  type: http
+  seq: 3
+  tags: [
+    ask
+  ]
+}
+
+post {
+  url: {{complaiPath}}/ask
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "text": "Jo em dic Raúl",
+    "conversationId": "{{conversationId}}"
+  }
+}
+
+tests {
+  test("HTTP status == 200", () => {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Success prop == true", () => {
+    expect(res.getBody().success).to.equal(true);
+  });
+  test("Message != empty", () => {
+    expect(res.getBody().message).to.not.be.empty;
+  });
+  test("Error code == 0", () => {
+    expect(res.getBody().errorCode).to.equal(0);
+  });
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
