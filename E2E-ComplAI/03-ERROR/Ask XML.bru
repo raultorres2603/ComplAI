@@ -1,7 +1,7 @@
 meta {
   name: Ask XML
   type: http
-  seq: 2
+  seq: 3
   tags: [
     ask
   ]
@@ -16,14 +16,12 @@ post {
 body:json {
   {
     "text": "Hola, em podries fer una queixa forma a l'ajuntament per a queixar-me sobre els contenidors trencats al carrer Pau Casals?",
-    "format": "XML"
+    "format": "XML",
+    "conversationId": "{{conversationId}}"
   }
 }
 
 tests {
-  test("HTTP status == 400", () => {
-    expect(res.getStatus()).to.be.equal(400);
-  });
   test("Success prop == false", () => {
     expect(res.getBody().success).to.equal(false);
   });

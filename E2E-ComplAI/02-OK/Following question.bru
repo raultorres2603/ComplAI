@@ -1,0 +1,41 @@
+meta {
+  name: Following question
+  type: http
+  seq: 6
+  tags: [
+    ask
+  ]
+}
+
+post {
+  url: {{complaiPath}}/ask
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "text": "Vale, digue'm els passos que haig de seguir per obtenir-lo i, a poder ser, siusplau, com ho empleno",
+    "conversationId": "{{conversationId}}"
+  }
+}
+
+tests {
+  test("HTTP status == 200", () => {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Success prop == true", () => {
+    expect(res.getBody().success).to.equal(true);
+  });
+  test("Message != empty", () => {
+    expect(res.getBody().message).to.not.be.empty;
+  });
+  test("Error code == 0", () => {
+    expect(res.getBody().errorCode).to.equal(0);
+  });
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

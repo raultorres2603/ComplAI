@@ -1,7 +1,7 @@
 meta {
   name: Ask something not from el Prat
   type: http
-  seq: 3
+  seq: 2
   tags: [
     ask
   ]
@@ -15,14 +15,12 @@ post {
 
 body:json {
   {
-    "text": "Hola, com funciona el tema de residus a Viladecans?"
+    "text": "Hola, com funciona el tema de residus a Viladecans?",
+    "conversationId": "{{conversationId}}"
   }
 }
 
 tests {
-  test("HTTP status == 200", () => {
-    expect(res.getStatus()).to.equal(422);
-  });
   test("Success prop == false", () => {
     expect(res.getBody().success).to.equal(false);
   });

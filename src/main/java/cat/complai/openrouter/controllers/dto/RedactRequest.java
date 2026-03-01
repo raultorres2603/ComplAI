@@ -7,17 +7,20 @@ import cat.complai.openrouter.dto.OutputFormat;
 public class RedactRequest {
     private final String text;
     private OutputFormat format = OutputFormat.AUTO;
+    private final String conversationId;
 
     public RedactRequest(String text) {
-        this.text = text;
+        this(text, OutputFormat.AUTO, null);
     }
 
     public RedactRequest(String text, OutputFormat format) {
+        this(text, format, null);
+    }
+
+    public RedactRequest(String text, OutputFormat format, String conversationId) {
         this.text = text;
-        // Preserve null: a null format here means the client sent an unrecognised value.
-        // The controller checks OutputFormat.isSupportedClientFormat() and rejects it before
-        // the service is ever called.
         this.format = format;
+        this.conversationId = conversationId;
     }
 
     public String getText() {
@@ -28,4 +31,7 @@ public class RedactRequest {
         return format;
     }
 
+    public String getConversationId() {
+        return conversationId;
+    }
 }

@@ -1,7 +1,7 @@
 meta {
-  name: Ask it's name
+  name: More specific question
   type: http
-  seq: 1
+  seq: 7
   tags: [
     ask
   ]
@@ -15,7 +15,8 @@ post {
 
 body:json {
   {
-    "text": "Hola, com et dius?"
+    "text": "Que es va parlar a l'últim ple del prat?",
+    "conversationId": "{{conversationId}}"
   }
 }
 
