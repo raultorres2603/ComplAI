@@ -77,15 +77,7 @@ public class OpenRouterServices implements IOpenRouterService {
 
         // On success, update conversation history
         if (conversationId != null && !conversationId.isBlank() && response != null && response.getMessage() != null) {
-            List<MessageEntry> history = conversationCache.getIfPresent(conversationId);
-            if (history == null) history = new ArrayList<>();
-            history.add(new MessageEntry("user", question.trim()));
-            history.add(new MessageEntry("assistant", response.getMessage()));
-            // Cap history
-            if (history.size() > MAX_HISTORY_TURNS * 2) {
-                history = history.subList(history.size() - MAX_HISTORY_TURNS * 2, history.size());
-            }
-            conversationCache.put(conversationId, history);
+            updateConversationHistory(conversationId, question, response.getMessage());
         }
         return response;
     }
@@ -122,14 +114,7 @@ public class OpenRouterServices implements IOpenRouterService {
 
         // On success, update conversation history
         if (conversationId != null && !conversationId.isBlank() && aiDto.getMessage() != null) {
-            List<MessageEntry> history = conversationCache.getIfPresent(conversationId);
-            if (history == null) history = new ArrayList<>();
-            history.add(new MessageEntry("user", buildRedactPrompt(complaint)));
-            history.add(new MessageEntry("assistant", aiDto.getMessage()));
-            if (history.size() > MAX_HISTORY_TURNS * 2) {
-                history = history.subList(history.size() - MAX_HISTORY_TURNS * 2, history.size());
-            }
-            conversationCache.put(conversationId, history);
+            updateConversationHistory(conversationId, buildRedactPrompt(complaint), aiDto.getMessage());
         }
 
         // Parse optional AI-supplied header: either JSON first-line or simple 'FORMAT: pdf' header.
@@ -406,5 +391,20 @@ public class OpenRouterServices implements IOpenRouterService {
                         %s""",
                 complaint.trim()
         );
+    }
+
+    private void updateConversationHistory(String conversationId, String userMessage, String assistantMessage) {
+        if (conversationId == null || conversationId.isBlank() || assistantMessage == null) return;
+        List<MessageEntry> history = conversationCache.getIfPresent(conversationId);
+        if (history == null) history = new ArrayList<>();
+        if (userMessage != null && !userMessage.isBlank()) {
+            history.add(new MessageEntry("user", userMessage.trim()));
+        }
+        history.add(new MessageEntry("assistant", assistantMessage));
+        // Cap history
+        if (history.size() > MAX_HISTORY_TURNS * 2) {
+            history = history.subList(history.size() - MAX_HISTORY_TURNS * 2, history.size());
+        }
+        conversationCache.put(conversationId, history);
     }
 }
