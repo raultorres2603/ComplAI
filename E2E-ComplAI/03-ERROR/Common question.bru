@@ -1,7 +1,7 @@
 meta {
-  name: More specific question
+  name: Common question
   type: http
-  seq: 7
+  seq: 5
   tags: [
     ask
   ]
@@ -15,23 +15,23 @@ post {
 
 body:json {
   {
-    "text": "Que es va parlar a l'últim ple del prat?",
+    "text": "Hola, m'han demanat que dongui el certificat del padro, mel pots donar?",
     "conversationId": "{{conversationId}}"
   }
 }
 
 tests {
-  test("HTTP status == 200", () => {
-    expect(res.getStatus()).to.equal(200);
+  test("HTTP status == 422", () => {
+    expect(res.getStatus()).to.equal(422);
   });
   test("Success prop == true", () => {
-    expect(res.getBody().success).to.equal(true);
+    expect(res.getBody().success).to.equal(false);
   });
   test("Message != empty", () => {
     expect(res.getBody().message).to.not.be.empty;
   });
   test("Error code == 0", () => {
-    expect(res.getBody().errorCode).to.equal(0);
+    expect(res.getBody().errorCode).to.equal(2);
   });
 }
 
