@@ -277,3 +277,16 @@ npx cdk deploy ComplAILambdaStack-production  --parameters OpenRouterApiKey=<key
 - If the E2E job fails due to `bruno: command not found` or `bru: command not found`, ensure Bruno CLI is installed in the workflow or locally with `npm install -g @usebruno/cli`.
 - If you see errors like `not a function` in post-response scripts, check your Bruno test scripts for invalid function calls.
 - If tests fail due to environment or deployment issues, check the deployment logs and the uploaded E2E results artifact for details.
+
+## Release Process (GitHub Actions)
+
+- **Automated Release Creation:**  
+  A GitHub Release is created automatically via a workflow in `.github/workflows/release.yml`.
+- **Trigger Conditions:**  
+  - The workflow only runs when a tag is pushed to the `master` branch.
+  - The tag must match the version specified in `build.gradle` (e.g., tag `v1.2.3` and `version = '1.2.3'`).
+  - If a release for this version already exists, no new release is created.
+- **No Tag, No Release:**  
+  If a commit is pushed to `master` without a tag, or the tag does not match the version, the workflow does nothing.
+- **Purpose:**  
+  This ensures that only intentional, versioned releases are published, and prevents accidental or duplicate releases.
