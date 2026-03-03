@@ -1000,9 +1000,10 @@ the Lambda.
 **How it works at runtime:**
 
 1. **Cold start:** the Lambda downloads `procedures.json` from S3 (one `GetObject` call, ~200 KB).
-2. **Index build:** the `ProcedureIndexBuilder` creates a Lucene `RAMDirectory` (in-memory index),
-   adds one `Document` per procedure with fields: `title`, `description`, `requirements`, `steps`,
-   `fees`, `office`, `deadlines`, `url`. All fields are indexed as `TextField` for full-text search.
+2. **Index build:** the `ProcedureIndexBuilder` creates a Lucene `RAMDirectory` (in-memory)
+   index from the loaded procedures. Adds one `Document` per procedure with fields: `title`,
+   `description`, `requirements`, `steps`, `fees`, `office`, `deadlines`, `url`. All fields are
+   indexed as `TextField` for full-text search.
 3. **Cache:** the built index is cached as a singleton for the lifetime of the warm Lambda instance.
    Subsequent requests skip steps 1–2 entirely.
 4. **Search:** on each user query, a `ProcedureSearcher` runs a Lucene query combining:
@@ -1144,26 +1145,20 @@ common procedures. Phase 2 follows naturally once the concept is validated.
 
 ### Priority Recommendation
 
-| Priority | Feature | Effort | Impact |
-|----------|---------|--------|--------|
-| **P0** | #8 Input Length Limits | 🟢 Small | 🔴 Security/Cost |
-| **P0** | #7 Configurable Timeout | 🟢 Small | 🟡 Operability |
-| **P1** | #11 Prat Espais Procedure Integration (Poor Man's RAG) — Phase 1 (manual corpus + Lucene) | 🟡 Medium | 🔴 Core Value Proposition |
-| **P1** | #9 PDF Extraction + Unicode Fix | 🟡 Medium | 🔴 Correctness (Catalan chars) |
-| **P1** | #2 Rate Limiting (CDK) | 🟢 Small | 🔴 Security/Cost |
-| **P1** | #3 Health Check | 🟢 Small | 🟡 Operability |
-| **P2** | #11 Prat Espais Procedure Integration (Poor Man's RAG) — Phase 2–3 (S3 + Jsoup scraper) | 🟡 Medium | 🔴 Core Value Proposition |
-| **P2** | #4 Language Selection | 🟢 Small | 🟡 UX |
-| **P2** | #6 Audit Logging | 🟡 Medium | 🟡 Operability |
-| **P2** | #10 Retry with Backoff | 🟡 Medium | 🟡 Reliability |
-| **P3** | #5 Complaint Categories | 🟡 Medium | 🟡 UX |
-| **P3** | #1 Conversation History | 🟡 Medium | 🟡 UX |
+| Priority | Feature | Effort | Impact | Status |
+|----------|---------|--------|--------|--------|
+| **P0** | #8 Input Length Limits | 🟢 Small | 🔴 Security/Cost | Pending |
+| **P0** | #7 Configurable Timeout | 🟢 Small | 🟡 Operability | Pending |
+| **P1** | #11 Prat Espais Procedure Integration (Poor Man's RAG) — Phase 1 (manual corpus + Lucene) | 🟡 Medium | 🔴 Core Value Proposition | Pending |
+| **P1** | #9 PDF Extraction + Unicode Fix | 🟡 Medium | 🔴 Correctness (Catalan chars) | Pending |
+| **P1** | #2 Rate Limiting (CDK) | 🟢 Small | 🔴 Security/Cost | Pending |
+| **P1** | #3 Health Check | 🟢 Small | 🟡 Operability | Pending |
+| **P2** | #11 Prat Espais Procedure Integration (Poor Man's RAG) — Phase 2–3 (S3 + Jsoup scraper) | 🟡 Medium | 🔴 Core Value Proposition | Pending |
+| **P2** | #4 Language Selection | 🟢 Small | 🟡 UX | Pending |
+| **P2** | #6 Audit Logging | 🟡 Medium | 🟡 Operability | Pending |
+| **P2** | #10 Retry with Backoff | 🟡 Medium | 🟡 Reliability | Pending |
+| **P3** | #5 Complaint Categories | 🟡 Medium | 🟡 UX | Pending |
+| **P3** | #1 Conversation History | 🟡 Medium | 🟡 UX | DONE |
 
-**Start with P0** — they're small, non-controversial, and fix real gaps. Then tackle **#11 Phase 1**
-(manual corpus + Lucene search) — this is the feature that transforms ComplAI from a generic chatbot
-into a real civic tool. Phase 1 requires no infrastructure, no external APIs, and costs €0. It can
-be shipped in 1–2 days. Continue with P1 for the PDF Unicode fix and rate limiting.
 
----
-
-*Each proposal is designed to be implemented independently, with no cross-dependencies, following the existing architecture and patterns.*
+````
