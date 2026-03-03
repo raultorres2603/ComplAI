@@ -238,11 +238,10 @@ public class OpenRouterControllerIntegrationTest {
                 }
                 if (userPrompt != null && userPrompt.contains("[HEADER_LONG]")) {
                     // Simulate long PDF
-                    StringBuilder sb = new StringBuilder();
-                    sb.append("{\"format\": \"pdf\"}\n\nDear Ajuntament,\n\n");
-                    sb.append("This is a long complaint sentence to generate many pages. ".repeat(800));
-                    sb.append("\n\nSincerely,\nResident");
-                    return CompletableFuture.completedFuture(new HttpDto(sb.toString(), 200, "POST", null));
+                    String sb = "{\"format\": \"pdf\"}\n\nDear Ajuntament,\n\n" +
+                            "This is a long complaint sentence to generate many pages. ".repeat(800) +
+                            "\n\nSincerely,\nResident";
+                    return CompletableFuture.completedFuture(new HttpDto(sb, 200, "POST", null));
                 }
                 if (userPrompt != null && userPrompt.contains("[HEADER_INVALID]")) {
                     // Simulate invalid header
@@ -264,7 +263,7 @@ public class OpenRouterControllerIntegrationTest {
         @Singleton
         @Replaces(OpenRouterServices.class)
         IOpenRouterService openRouterService(HttpWrapper httpWrapper) {
-            return new OpenRouterServices(httpWrapper);
+            return new OpenRouterServices(httpWrapper, 5000);
         }
     }
 }

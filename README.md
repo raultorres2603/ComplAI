@@ -1,5 +1,7 @@
 # ComplAI — Gall Potablava · Project Overview
 
+© 2026 Raúl Torres Alarcón. All rights reserved.
+
 > **Gall Potablava** is an AI assistant for the residents of El Prat de Llobregat (Catalonia, Spain).
 > It helps citizens ask questions about local services, understand municipal procedures, and draft
 > formal complaints addressed to the City Hall (Ajuntament d'El Prat de Llobregat).
@@ -23,6 +25,16 @@
 13. [Testing Strategy](#13-testing-strategy)
 14. [CI/CD Pipeline](#14-cicd-pipeline)
 15. [Feature Proposals and Roadmap](#15-feature-proposals-and-roadmap)
+
+---
+
+## License
+
+This project is proprietary and confidential.  
+No license is granted to use, copy, modify, or distribute any part of this code or its contents.  
+All rights reserved.
+
+Unauthorized use, reproduction, or distribution of this code or any portion of it may result in civil and criminal penalties.
 
 ---
 
@@ -1147,7 +1159,7 @@ common procedures. Phase 2 follows naturally once the concept is validated.
 
 | Priority | Feature | Effort | Impact | Status |
 |----------|---------|--------|--------|--------|
-| **P0** | #8 Input Length Limits | 🟢 Small | 🔴 Security/Cost | Pending |
+| **P0** | #8 Input Length Limits | 🟢 Small | 🔴 Security/Cost | DONE |
 | **P0** | #7 Configurable Timeout | 🟢 Small | 🟡 Operability | Pending |
 | **P1** | #11 Prat Espais Procedure Integration (Poor Man's RAG) — Phase 1 (manual corpus + Lucene) | 🟡 Medium | 🔴 Core Value Proposition | Pending |
 | **P1** | #9 PDF Extraction + Unicode Fix | 🟡 Medium | 🔴 Correctness (Catalan chars) | Pending |
@@ -1160,5 +1172,3 @@ common procedures. Phase 2 follows naturally once the concept is validated.
 | **P3** | #5 Complaint Categories | 🟡 Medium | 🟡 UX | Pending |
 | **P3** | #1 Conversation History | 🟡 Medium | 🟡 UX | DONE |
 
-
-````

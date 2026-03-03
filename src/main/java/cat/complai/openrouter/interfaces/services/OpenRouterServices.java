@@ -9,6 +9,7 @@ import jakarta.inject.Singleton;
 import jakarta.inject.Inject;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import io.micronaut.context.annotation.Value;
 
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -37,16 +38,18 @@ public class OpenRouterServices implements IOpenRouterService {
     private final HttpWrapper httpWrapper;
     private final Logger logger = Logger.getLogger(OpenRouterServices.class.getName());
     private final Cache<String, List<MessageEntry>> conversationCache;
+    private final int maxInputLength;
 
     public record MessageEntry(String role, String content) {}
 
     @Inject
-    public OpenRouterServices(HttpWrapper httpWrapper) {
+    public OpenRouterServices(HttpWrapper httpWrapper, @Value("${complai.input.max-length-chars:5000}") int maxInputLength) {
         this.httpWrapper = Objects.requireNonNull(httpWrapper, "httpWrapper");
         this.conversationCache = Caffeine.newBuilder()
                 .expireAfterWrite(30, TimeUnit.MINUTES)
                 .maximumSize(10000)
                 .build();
+        this.maxInputLength = maxInputLength;
     }
 
     @Override
@@ -55,6 +58,10 @@ public class OpenRouterServices implements IOpenRouterService {
         if (question == null || question.isBlank()) {
             logger.fine("ask() rejected: empty question");
             return new OpenRouterResponseDto(false, null, "Question must not be empty.", null, OpenRouterErrorCode.VALIDATION);
+        }
+        if (question.length() > maxInputLength) {
+            logger.fine("ask() rejected: question too long");
+            return new OpenRouterResponseDto(false, null, "Question exceeds maximum allowed length (" + maxInputLength + " characters).", null, OpenRouterErrorCode.VALIDATION);
         }
 
         List<Map<String, Object>> messages = new ArrayList<>();
@@ -76,7 +83,7 @@ public class OpenRouterServices implements IOpenRouterService {
         OpenRouterResponseDto response = callOpenRouterAndExtract(messages);
 
         // On success, update conversation history
-        if (conversationId != null && !conversationId.isBlank() && response != null && response.getMessage() != null) {
+        if (conversationId != null && !conversationId.isBlank() && response.getMessage() != null) {
             updateConversationHistory(conversationId, question, response.getMessage());
         }
         return response;
@@ -88,6 +95,10 @@ public class OpenRouterServices implements IOpenRouterService {
         if (complaint == null || complaint.isBlank()) {
             logger.fine("redactComplaint() rejected: empty complaint");
             return new OpenRouterResponseDto(false, null, "Complaint must not be empty.", null, OpenRouterErrorCode.VALIDATION);
+        }
+        if (complaint.length() > maxInputLength) {
+            logger.fine("redactComplaint() rejected: complaint too long");
+            return new OpenRouterResponseDto(false, null, "Complaint exceeds maximum allowed length (" + maxInputLength + " characters).", null, OpenRouterErrorCode.VALIDATION);
         }
 
         List<Map<String, Object>> messages = new ArrayList<>();
@@ -168,7 +179,9 @@ public class OpenRouterServices implements IOpenRouterService {
         if (aiMessage == null) return false;
         // Normalize common quotes/apostrophes for more reliable matching
         String normalized = aiMessage.replace('’', '\'').replace('‘', '\'').replace('“', '"').replace('”', '"');
-        String lower = normalized.toLowerCase().trim();
+        String lower = normalized.toLowerCase(Locale.ROOT).trim();
+        // Remove punctuation for more robust matching (fix regex)
+        String lowerNoPunct = lower.replaceAll("[.,;:!?()\\[\\]{}-]", " ").replaceAll("\\s+", " ").trim();
 
         // Common refusal patterns in English, Spanish and Catalan
         String[] refusalPhrases = new String[] {
@@ -198,15 +211,31 @@ public class OpenRouterServices implements IOpenRouterService {
                 "lo siento, no puedo",
                 "no puedo",
                 "no puc",
-                "no puc ajudar"
+                "no puc ajudar",
+                // Add more variants
+                "not about el prat",
+                "only answer about el prat",
+                "only questions about el prat",
+                "solo puedo responder sobre el prat",
+                "només puc respondre sobre el prat",
+                "solamente puedo responder sobre el prat",
+                "solament puc respondre sobre el prat"
         };
 
         for (String p : refusalPhrases) {
-            if (lower.contains(p)) return true;
+            String pNoPunct = p.replaceAll("[.,;:!?()\\[\\]{}-]", " ").trim();
+            if (lower.contains(p) || lowerNoPunct.contains(pNoPunct)) {
+                logger.fine("Refusal detected by phrase: '" + p + "' in: " + lower);
+                return true;
+            }
         }
 
         // Also check for explicit mention that the model can only answer about El Prat
-        return lower.contains("el prat") && (lower.contains("only") || lower.contains("solament") || lower.contains("solo") || lower.contains("only about"));
+        if (lower.contains("el prat") && (lower.contains("only") || lower.contains("solament") || lower.contains("solo") || lower.contains("only about"))) {
+            logger.fine("Refusal detected by El Prat + only/solament/solo/only about");
+            return true;
+        }
+        return false;
     }
 
     private OpenRouterResponseDto callOpenRouterAndExtract(List<Map<String, Object>> messages) {
@@ -372,21 +401,21 @@ public class OpenRouterServices implements IOpenRouterService {
     private String buildRedactPrompt(String complaint) {
         return String.format(
                 """
-                        IMPORTANT: Your response MUST start with a single-line JSON header on line 1. 
-                        No text, no markdown, no explanation before it. 
-                        The header must contain the 'format' field set to "pdf" or "json". 
+                        IMPORTANT: Your response MUST start with a single-line JSON header on line 1.\s
+                        No text, no markdown, no explanation before it.\s
+                        The header must contain the 'format' field set to "pdf" or "json".\s
                         Example of a valid first line: {"format": "pdf"}
-                        
+                       \s
                         After that JSON header, leave one blank line, then write the letter body.
-                        
-                        Task: Redact a formal, civil, and concise letter addressed to the City Hall 
-                        (Ajuntament) of El Prat de Llobregat based on the complaint below. 
-                        If the complaint is not about El Prat de Llobregat, politely say you can't 
-                        help with that request. 
+                       \s
+                        Task: Redact a formal, civil, and concise letter addressed to the City Hall\s
+                        (Ajuntament) of El Prat de Llobregat based on the complaint below.\s
+                        If the complaint is not about El Prat de Llobregat, politely say you can't\s
+                        help with that request.\s
                         Include a short summary, the specific request or remedy sought, and a polite closing.
-                        
+                       \s
                         Reminder: first line of your response MUST be the JSON header {"format": "pdf"} or {"format": "json"}.
-                        
+                       \s
                         Complaint text:
                         %s""",
                 complaint.trim()
