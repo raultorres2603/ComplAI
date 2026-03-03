@@ -1,5 +1,7 @@
 # ComplAI — Gall Potablava · Project Overview
 
+© 2026 Raúl Torres Alarcón. All rights reserved.
+
 > **Gall Potablava** is an AI assistant for the residents of El Prat de Llobregat (Catalonia, Spain).
 > It helps citizens ask questions about local services, understand municipal procedures, and draft
 > formal complaints addressed to the City Hall (Ajuntament d'El Prat de Llobregat).
@@ -23,6 +25,16 @@
 13. [Testing Strategy](#13-testing-strategy)
 14. [CI/CD Pipeline](#14-cicd-pipeline)
 15. [Feature Proposals and Roadmap](#15-feature-proposals-and-roadmap)
+
+---
+
+## License
+
+This project is proprietary and confidential.  
+No license is granted to use, copy, modify, or distribute any part of this code or its contents.  
+All rights reserved.
+
+Unauthorized use, reproduction, or distribution of this code or any portion of it may result in civil and criminal penalties.
 
 ---
 
