@@ -164,9 +164,7 @@ public class OpenRouterServicesTest {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
         OpenRouterServices svc = new OpenRouterServices(wrapper, 5000);
 
-        String sb = "Dear Ajuntament of El Prat,\n\n" +
-                "I am writing to express my concern about noise pollution near my residence. This has been ongoing and affects quality of life. ".repeat(30) +
-                "\n\nSincerely,\nA concerned resident";
+        "I am writing to express my concern about noise pollution near my residence. This has been ongoing and affects quality of life. ".repeat(30);
 
         // The fake will return a valid PDF header for [HEADER_LONG]
         OpenRouterResponseDto out = svc.redactComplaint("Some long complaint text [HEADER_LONG]", OutputFormat.AUTO, null);
@@ -190,9 +188,7 @@ public class OpenRouterServicesTest {
     void redactComplaint_tooLong_rejects() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
         OpenRouterServices svc = new OpenRouterServices(wrapper, 5000);
-        StringBuilder sb = new StringBuilder();
-        sb.append("b".repeat(5001));
-        OpenRouterResponseDto out = svc.redactComplaint(sb.toString(), OutputFormat.JSON, null);
+        OpenRouterResponseDto out = svc.redactComplaint("b".repeat(5001), OutputFormat.JSON, null);
         assertFalse(out.isSuccess());
         assertEquals(OpenRouterErrorCode.VALIDATION, out.getErrorCode());
         assertTrue(out.getError().contains("maximum allowed length"));
