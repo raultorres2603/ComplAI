@@ -815,7 +815,7 @@ After a thorough analysis of the codebase, architecture, and project purpose, he
 
 ---
 
-### 11. 🏛️ Prat Espais Procedure Integration (RAG)
+### 11. 🏛️ Prat Espais Procedure Integration ("Poor Man's RAG")
 
 **Problem:** Today, Gall Potablava answers questions based only on the general knowledge of the
 underlying AI model. It has no access to the real, up-to-date catalogue of municipal procedures
@@ -829,17 +829,22 @@ assistant is a general chatbot, not a civic tool.
 
 ---
 
-### Proposed Architecture: Retrieval-Augmented Generation (RAG)
+### Proposed Architecture: "Poor Man's RAG" — Zero-Cost Retrieval-Augmented Generation
 
-The proven pattern for grounding an LLM in domain-specific, frequently-changing data is **RAG**
-(Retrieval-Augmented Generation). Instead of fine-tuning the model or stuffing all procedures into
-the system prompt, we:
+The goal is to ground the AI in real procedure data without introducing paid infrastructure. The
+classical RAG approach (embedding API + vector database) is overkill for a corpus of 50–200
+municipal procedures and adds ongoing costs. Instead, we use a **zero-cost alternative**:
 
-1. **Ingest** — periodically scrape or export the procedure catalogue from Prat Espais.
-2. **Index** — chunk the text, compute embeddings, and store them in a vector database.
-3. **Retrieve** — at query time, search the vector index for the most relevant procedure chunks.
-4. **Augment** — inject those chunks into the AI prompt as context, so the model answers based on
-   real data.
+1. **Scrape** — a Java CLI tool uses **Jsoup** to scrape the Prat Espais procedure catalogue and
+   produce a `procedures.json` file.
+2. **Store** — the JSON file is uploaded to **Amazon S3 Free Tier** (5 GB storage, 20,000 GET
+   requests/month — more than enough).
+3. **Search** — at query time, the Lambda loads the JSON into memory and uses **Apache Lucene**
+   (in-process, no server) for full-text search with fuzzy matching. No embedding API calls, no
+   vector database, no external services.
+4. **Augment** — the top matching procedure chunks are injected into the AI prompt as context.
+
+**Total incremental cost: €0.**
 
 ```
                                                 ┌─────────────────────────┐
@@ -848,34 +853,60 @@ the system prompt, we:
                                                 └────────────┬────────────┘
                                                              │
                                           ┌──────────────────▼──────────────────┐
-                                          │  1. INGESTION (offline, scheduled)  │
-                                          │     Scraper / API export            │
-                                          │     → clean & chunk text            │
-                                          │     → compute embeddings            │
-                                          │     → store in vector DB            │
+                                          │  1. SCRAPE (offline, scheduled)     │
+                                          │     Jsoup scraper (Java CLI)        │
+                                          │     → extract procedure text        │
+                                          │     → produce procedures.json       │
+                                          │     → upload to S3                  │
                                           └──────────────────┬──────────────────┘
                                                              │
                                                              ▼
-┌───────────────┐    ┌───────────────────┐    ┌──────────────────────────────┐
-│  Citizen      │    │  ComplAI Lambda    │    │  Vector Database             │
-│  "Com puc     │───▶│                   │───▶│  (e.g. OpenSearch Serverless │
-│  empadronar-  │    │  2. RETRIEVE      │    │   or Pinecone or pgvector)   │
-│  me?"         │    │     embed query   │◀───│                              │
-│               │    │     search index  │    │  Returns top-K chunks:       │
-│               │    │                   │    │  "Empadronament: cal portar  │
-│               │    │  3. AUGMENT       │    │   DNI, contracte de lloguer, │
-│               │    │     inject chunks │    │   certificat de convivència" │
-│               │    │     into prompt   │    └──────────────────────────────┘
-│               │    │                   │
-│               │    │  4. GENERATE      │
-│               │◀───│     call OpenRouter│───▶ OpenRouter API
-│               │    │     with context  │
-└───────────────┘    └───────────────────┘
+                                                ┌────────────────────────┐
+                                                │  Amazon S3 (Free Tier) │
+                                                │  procedures.json       │
+                                                └────────────┬───────────┘
+                                                             │ downloaded on cold start
+                                                             │ cached in Lambda memory
+                                                             ▼
+┌───────────────┐    ┌──────────────────────────────────────────────────┐
+│  Citizen      │    │  ComplAI Lambda                                  │
+│  "Com puc     │───▶│                                                  │
+│  empadronar-  │    │  2. SEARCH (in-process, Apache Lucene)          │
+│  me?"         │    │     Build in-memory Lucene index from JSON      │
+│               │    │     Fuzzy full-text search on user query        │
+│               │    │     → top-K matching procedures                  │
+│               │    │                                                  │
+│               │    │  3. AUGMENT                                      │
+│               │    │     Inject matched procedures into AI prompt     │
+│               │    │                                                  │
+│               │    │  4. GENERATE                                     │
+│               │◀───│     Call OpenRouter with augmented context       │
+└───────────────┘    └─────────────────────┬────────────────────────────┘
+                                           │ HTTPS POST
+                                           ▼
+                                  ┌──────────────────┐
+                                  │  OpenRouter API   │
+                                  └──────────────────┘
 ```
+
+**Why this approach instead of classical RAG with embeddings:**
+
+| Concern | Classical RAG | Poor Man's RAG |
+|---------|---------------|----------------|
+| Embedding API | Required (per-query cost) | Not needed |
+| Vector database | Required (Pinecone, pgvector, OpenSearch…) | Not needed |
+| Search quality at this scale | Excellent | Excellent — Lucene's BM25 + fuzzy matching is more than sufficient for 50–200 procedures |
+| Monthly cost | €5–350/month depending on vector DB | €0 (S3 Free Tier + Lucene in Lambda) |
+| Complexity | Embedding client + vector DB client + index management | One JSON file + Lucene in-process |
+| Cold start impact | Negligible (API call) | ~50–100 ms to build in-memory index from ~200 KB JSON |
+
+At the scale of a municipal procedure catalogue (50–200 documents, ~200 KB of text), Lucene's
+full-text search with fuzzy matching finds the right procedures just as reliably as vector
+similarity — and it runs entirely inside the Lambda with zero external calls.
 
 ---
 
-### Step 1: Ingestion — Getting the Procedure Data
+### Step 1: Scraping — Getting the Procedure Data with Jsoup
 
 The procedure catalogue at `tramits.pratespais.com/Ciutadania/` contains structured pages with:
 - Procedure name / title
@@ -887,112 +918,113 @@ The procedure catalogue at `tramits.pratespais.com/Ciutadania/` contains structu
 - Deadlines / processing times
 - Related regulations
 
-**Three viable approaches, from simplest to most robust:**
+**Scraper implementation:**
 
-#### Option A: Static scraping + scheduled refresh (simplest, recommended to start)
+A standalone Java CLI tool (can be a Gradle `run` task or a separate `main` class) that:
 
-- A standalone script (Python or Java CLI) scrapes the procedure pages, extracts the text content,
-  and produces a set of JSON/Markdown documents — one per procedure.
-- Run on a schedule (e.g. weekly via GitHub Actions cron, or an AWS EventBridge rule triggering
-  a lightweight Lambda).
-- Output is stored in S3 as the canonical procedure corpus.
-- A second step reads the corpus, chunks each procedure into ~500-token passages, computes
-  embeddings (using OpenRouter's embedding endpoint or a dedicated embedding model), and upserts
-  them into the vector database.
+1. Fetches the catalogue index page with **Jsoup** (`org.jsoup:jsoup`).
+2. Extracts all procedure links.
+3. For each procedure page, extracts structured fields (title, description, requirements, etc.)
+   using CSS selectors.
+4. Writes the result as a single `procedures.json` file.
+5. Uploads the file to an S3 bucket.
 
-**Why start here:**
-- No dependency on Prat Espais exposing an API.
+**Why Jsoup (not Python/BeautifulSoup):**
+- Stays in the Java ecosystem — same language, same build tool, same CI pipeline.
+- Jsoup is mature, well-documented, and handles malformed HTML gracefully.
+- No Python runtime dependency in the project.
+
+**Three approaches for keeping the data fresh, from simplest to most robust:**
+
+#### Option A: Jsoup scraper + scheduled refresh (recommended to start)
+
+- The Jsoup CLI scraper runs on a schedule (weekly via GitHub Actions cron or an AWS EventBridge
+  rule triggering a lightweight Lambda).
+- Output (`procedures.json`) is uploaded to S3 as the canonical procedure corpus.
 - Procedures change infrequently (weeks/months) — weekly refresh is more than enough.
-- A simple Python `BeautifulSoup` scraper is ~100 lines. Nothing clever, easy to debug.
 
 #### Option B: Prat Espais provides a structured API or data export
 
 - If the Prat Espais team can export the catalogue as structured data (JSON, CSV, or an API
   endpoint), ingestion becomes trivial — no scraping, no HTML parsing, no fragility.
 - **This is the preferred long-term solution.** Scraping is always brittle; a stable API is not.
-- The rest of the pipeline (chunking → embedding → vector DB) remains identical.
 
 #### Option C: Manual curation with version control
 
-- The procedure data is maintained as Markdown files in the repository (e.g. `procedures/`).
-- Each file follows a strict template: title, description, requirements, steps, fees, links.
-- Embeddings are recomputed on every CI build (or on file change).
-- **Trade-off:** requires manual updates, but gives total control over content quality and
-  correctness. Good as a bootstrap while negotiating API access.
+- The procedure data is maintained as JSON/Markdown files in the repository (e.g. `procedures/`).
+- The `procedures.json` is rebuilt on every CI build (or on file change) and uploaded to S3.
+- **Trade-off:** requires manual updates, but gives total control over content quality. Good as
+  a bootstrap while negotiating API access.
 
 ---
 
-### Step 2: Chunking and Embedding
+### Step 2: The `procedures.json` File Format
 
-Each procedure document is split into semantically coherent chunks (~300–500 tokens each):
+Each procedure is stored as a single document (no chunking needed at this scale — Lucene indexes
+the full text of each procedure and retrieves the most relevant ones):
 
-```
-Procedure: "Empadronament"
-  → Chunk 1: Title + description + purpose
-  → Chunk 2: Requirements (documents needed)
-  → Chunk 3: Steps to follow + where to go
-  → Chunk 4: Fees + deadlines + links
-```
-
-Each chunk is embedded using a text embedding model. Options:
-
-| Embedding model | Notes |
-|-----------------|-------|
-| OpenRouter embedding endpoint | Same provider as the chat model; simplest integration |
-| `text-embedding-3-small` (OpenAI) | High quality, low cost, widely used |
-| Local model (e.g. `all-MiniLM-L6-v2`) | Free, runs in the ingestion script; no API call needed |
-
-Metadata stored alongside each embedding:
-- `procedureId` (slug or ID from the source)
-- `procedureTitle`
-- `chunkIndex`
-- `sourceUrl` (link back to the Prat Espais page)
-- `lastUpdated` (timestamp of last scrape)
-
----
-
-### Step 3: Vector Database — Where to Store Embeddings
-
-| Option | Pros | Cons | Cost |
-|--------|------|------|------|
-| **Amazon OpenSearch Serverless** | AWS-native, serverless, scales to zero collection units | Minimum cost ~$350/month for a serverless collection | High for this use case |
-| **Pinecone (free tier)** | Managed, generous free tier (100K vectors), simple API | External dependency, vendor lock-in | Free for small scale |
-| **PostgreSQL + pgvector (RDS/Aurora)** | Standard SQL, mature, self-hosted or RDS | Requires a running DB instance | ~$15/month (db.t4g.micro) |
-| **SQLite + sqlite-vss (embedded)** | Zero infrastructure, file on S3, loaded into Lambda | Limited scale, cold-start penalty loading the file | $0 (S3 storage only) |
-| **JSON file on S3 + brute-force cosine similarity** | Zero infrastructure, trivially simple | Only viable for <1,000 chunks; O(n) search | $0 |
-
-**Recommendation for ComplAI's scale:**
-
-The Prat Espais procedure catalogue likely has **50–200 procedures**. At ~4 chunks per procedure,
-that is **200–800 vectors**. This is tiny.
-
-For this scale, the **simplest viable option** is:
-
-> **A pre-computed JSON file on S3** containing all chunks with their embeddings. The Lambda
-> downloads the file on cold start (cached in memory for warm invocations), computes the cosine
-> similarity of the user's query embedding against all stored embeddings, and returns the top-K
-> most relevant chunks.
-
-This eliminates an entire infrastructure component (no vector DB), keeps the architecture
-serverless and boring, and can be upgraded to a real vector DB later if the corpus grows past
-~5,000 chunks.
-
-**Pre-computed index file structure:**
 ```json
 {
-  "model": "text-embedding-3-small",
   "generatedAt": "2026-03-01T10:00:00Z",
-  "chunks": [
+  "sourceUrl": "https://tramits.pratespais.com/Ciutadania/",
+  "procedures": [
     {
       "procedureId": "empadronament",
-      "procedureTitle": "Empadronament",
-      "chunkIndex": 0,
-      "text": "L'empadronament és la inscripció al padró municipal...",
-      "sourceUrl": "https://tramits.pratespais.com/Ciutadania/Empadronament",
-      "embedding": [0.0123, -0.0456, 0.0789]
+      "title": "Empadronament",
+      "description": "L'empadronament és la inscripció al padró municipal d'habitants...",
+      "requirements": "DNI, NIE o passaport original. Contracte de lloguer o escriptura de propietat. Certificat de convivència (si escau).",
+      "steps": "1. Recopilar la documentació. 2. Anar a l'Oficina d'Atenció Ciutadana o fer-ho en línia...",
+      "fees": "Gratuït.",
+      "office": "Oficina d'Atenció Ciutadana, Pl. de la Vila, 1",
+      "deadlines": "Resolució immediata.",
+      "url": "https://tramits.pratespais.com/Ciutadania/Empadronament"
     }
   ]
 }
+```
+
+**Key properties:**
+- **Flat structure** — no nesting beyond the procedure object. Easy to index, easy to debug.
+- **All text fields** — Lucene indexes plain text. No embeddings, no floats, no binary data.
+- **Small file** — 200 procedures × ~500 chars each ≈ ~100–200 KB. Trivial for S3 and Lambda.
+- **Human-readable** — a developer can open the file, read it, and verify correctness.
+
+---
+
+### Step 3: In-Memory Search with Apache Lucene
+
+**Apache Lucene** is the gold standard for full-text search in Java. It powers Elasticsearch,
+Solr, and OpenSearch. Used directly as a library (no server), it runs entirely in-process inside
+the Lambda.
+
+**How it works at runtime:**
+
+1. **Cold start:** the Lambda downloads `procedures.json` from S3 (one `GetObject` call, ~200 KB).
+2. **Index build:** the `ProcedureIndexBuilder` creates a Lucene `RAMDirectory` (in-memory index),
+   adds one `Document` per procedure with fields: `title`, `description`, `requirements`, `steps`,
+   `fees`, `office`, `deadlines`, `url`. All fields are indexed as `TextField` for full-text search.
+3. **Cache:** the built index is cached as a singleton for the lifetime of the warm Lambda instance.
+   Subsequent requests skip steps 1–2 entirely.
+4. **Search:** on each user query, a `ProcedureSearcher` runs a Lucene query combining:
+   - **BM25 scoring** (Lucene's default — term frequency, inverse document frequency).
+   - **Fuzzy matching** (`FuzzyQuery` with edit distance 1–2) to handle typos and Catalan
+     morphological variations (e.g., "empadronar" matches "empadronament").
+   - **Multi-field search** across title, description, requirements, and steps.
+5. **Result:** the top 3–5 matching procedures (with their full text and source URL) are returned.
+
+**Why Lucene is ideal here:**
+- **Zero cost** — it is a Java library, runs in Lambda memory.
+- **Zero latency overhead** — in-memory index, no network call.
+- **Excellent fuzzy matching** — handles typos, partial words, and morphological variants.
+- **Battle-tested** — same engine that powers billion-document search clusters, here used for
+  200 documents. It will not break.
+- **Tiny footprint** — Lucene core JAR is ~3 MB. In-memory index for 200 procedures is <1 MB.
+
+**Lucene dependency:**
+```groovy
+// build.gradle
+implementation 'org.apache.lucene:lucene-core:9.12.1'
+implementation 'org.apache.lucene:lucene-queryparser:9.12.1'
 ```
 
 ---
@@ -1001,17 +1033,18 @@ serverless and boring, and can be upgraded to a real vector DB later if the corp
 
 When a citizen asks a question, the service:
 
-1. **Embeds the query** — calls the embedding model to convert the user's question into a vector.
-2. **Searches the index** — computes cosine similarity against all stored chunks, selects the
-   top 3–5 most relevant ones.
-3. **Augments the prompt** — injects the retrieved chunks into the system message or as a
-   dedicated `context` block before the user message.
+1. **Searches the index** — runs the user's query through the Lucene in-memory index. No
+   embedding computation, no external API call.
+2. **Filters by relevance** — only procedures above a minimum Lucene score threshold are included.
+   If nothing matches well enough, no context is injected — the AI answers from general knowledge.
+3. **Augments the prompt** — injects the matched procedures into the system message as a
+   structured context block before the user message.
 
 **Modified message array:**
 ```json
 [
   { "role": "system", "content": "<existing system prompt>" },
-  { "role": "system", "content": "CONTEXT FROM PRAT ESPAIS PROCEDURES:\n\n---\nProcedure: Empadronament\nSource: https://tramits.pratespais.com/...\n\nL'empadronament és la inscripció al padró municipal. Cal portar DNI, contracte de lloguer...\n---\n\nUse this context to answer the user's question. If the context is relevant, cite the procedure name and provide the source link. If the context does not help, answer based on your general knowledge about El Prat." },
+  { "role": "system", "content": "CONTEXT FROM PRAT ESPAIS PROCEDURES:\n\n---\nProcedure: Empadronament\nSource: https://tramits.pratespais.com/Ciutadania/Empadronament\n\nL'empadronament és la inscripció al padró municipal. Cal portar DNI, contracte de lloguer, certificat de convivència...\n\nPastos: Gratuït.\nOficina: Oficina d'Atenció Ciutadana, Pl. de la Vila, 1\n---\n\nUse this context to answer the user's question. If the context is relevant, cite the procedure name and provide the source link. If the context does not help, answer based on your general knowledge about El Prat." },
   { "role": "user", "content": "Com puc empadronar-me?" }
 ]
 ```
@@ -1030,14 +1063,15 @@ When a citizen asks a question, the service:
 
 | Component | Change |
 |-----------|--------|
-| **New: `ProcedureIndexLoader`** | Singleton. On first call (or cold start), downloads the pre-computed index JSON from S3. Caches in memory. |
-| **New: `ProcedureRetriever`** | Singleton. Given a query string, embeds it, runs cosine similarity against the index, returns top-K chunks. |
-| **New: `EmbeddingClient`** | Singleton. Calls the embedding API (OpenRouter or OpenAI) to embed a query string. |
-| **`OpenRouterServices`** | `ask()` and `redactComplaint()` call `ProcedureRetriever` before building the messages array. Inject retrieved chunks as a context system message. |
+| **New: `ProcedureIndexLoader`** | Singleton. On first call (cold start), downloads `procedures.json` from S3 via the AWS SDK. Caches the parsed JSON in memory. |
+| **New: `ProcedureIndexBuilder`** | Singleton. Builds a Lucene `ByteBuffersDirectory` (in-memory) index from the loaded procedures. Cached for the warm Lambda lifetime. |
+| **New: `ProcedureSearcher`** | Singleton. Given a query string, runs a fuzzy multi-field Lucene search against the in-memory index. Returns the top-K matching procedures with their full text and source URL. |
+| **`OpenRouterServices`** | `ask()` and `redactComplaint()` call `ProcedureSearcher` before building the messages array. Inject matched procedures as a context system message. |
 | **`IOpenRouterService`** | No interface change — retrieval is an internal concern of the service, not exposed to the controller. |
 | **`OpenRouterController`** | No change. |
-| **Infrastructure (CDK)** | Lambda needs `s3:GetObject` permission for the index bucket. New S3 bucket for the index file. |
-| **New: ingestion script** | Standalone CLI (Python or Java) that scrapes, chunks, embeds, and writes the index JSON to S3. |
+| **Infrastructure (CDK)** | Lambda needs `s3:GetObject` permission for the procedures bucket. New S3 bucket for `procedures.json`. |
+| **`build.gradle`** | Add `lucene-core` and `lucene-queryparser` dependencies. Add `jsoup` dependency (for the scraper tool). |
+| **New: scraper tool** | Standalone Java CLI (`PratEspaisScraper.java`) that uses Jsoup to scrape the procedure catalogue and produce `procedures.json`. Can be run as a Gradle task or GitHub Actions step. |
 
 ---
 
@@ -1050,7 +1084,7 @@ AI:      "Generalment necessites el DNI i un justificant de domicili..."
          (generic, possibly inaccurate, no source)
 ```
 
-**After (with RAG):**
+**After (with Poor Man's RAG):**
 ```
 Citizen: "Quins documents necessito per empadronar-me?"
 AI:      "Per empadronar-te a El Prat de Llobregat necessites:
@@ -1068,16 +1102,30 @@ AI:      "Per empadronar-te a El Prat de Llobregat necessites:
 
 ### Implementation Phases
 
-| Phase | What | Effort | Dependency |
-|-------|------|--------|------------|
-| **Phase 1: Manual corpus** | Curate 10–20 key procedures as Markdown files in the repo. Embed them locally. Load as a JSON file bundled in the JAR (no S3 yet). Wire into `ask()`. | 🟢 Small (1–2 days) | None |
-| **Phase 2: S3 index + scraper** | Build the scraper for `tramits.pratespais.com`. Automate embedding. Store index JSON on S3. Lambda loads from S3 on cold start. | 🟡 Medium (3–5 days) | S3 bucket, embedding API key |
-| **Phase 3: Scheduled refresh** | GitHub Actions cron or EventBridge rule triggers the scraper weekly. Index is regenerated and uploaded to S3 automatically. | 🟢 Small (1 day) | Phase 2 |
-| **Phase 4: API-based ingestion** | If/when Prat Espais provides a structured API, replace the scraper with an API client. Everything else stays the same. | 🟢 Small (swap) | Prat Espais API |
+| Phase | What | Effort | Dependency | Cost |
+|-------|------|--------|------------|------|
+| **Phase 1: Manual corpus + Lucene** | Curate 10–20 key procedures as JSON in the repo. Build the Lucene in-memory index at startup. Wire into `ask()`. No S3 yet — JSON bundled in the JAR. | 🟢 Small (1–2 days) | None | €0 |
+| **Phase 2: S3 + Jsoup scraper** | Build the Jsoup scraper for `tramits.pratespais.com`. Store `procedures.json` on S3 Free Tier. Lambda loads from S3 on cold start. | 🟡 Medium (3–5 days) | S3 bucket (Free Tier) | €0 |
+| **Phase 3: Scheduled refresh** | GitHub Actions cron job runs the scraper weekly. `procedures.json` is regenerated and uploaded to S3 automatically. | 🟢 Small (1 day) | Phase 2 | €0 |
+| **Phase 4: API-based ingestion** | If/when Prat Espais provides a structured API, replace the Jsoup scraper with an API client. Everything else stays the same. | 🟢 Small (swap) | Prat Espais API | €0 |
 
-**Recommendation:** Start with **Phase 1**. It proves the entire RAG pipeline end-to-end with
-zero infrastructure, and citizens immediately get better answers for the most common procedures.
-Phase 2 follows naturally once the concept is validated.
+**Recommendation:** Start with **Phase 1**. It proves the entire retrieval pipeline end-to-end
+with zero infrastructure and zero cost, and citizens immediately get better answers for the most
+common procedures. Phase 2 follows naturally once the concept is validated.
+
+---
+
+### Cost Analysis
+
+| Component | Monthly cost |
+|-----------|-------------|
+| Apache Lucene (Java library) | €0 — bundled in the Lambda JAR |
+| Amazon S3 (`procedures.json`, ~200 KB) | €0 — well within Free Tier (5 GB storage, 20,000 GET/month) |
+| Jsoup scraper (runs in GitHub Actions) | €0 — GitHub Actions free minutes |
+| Lambda memory increase (if needed) | €0 — current 512 MB is sufficient; Lucene index <1 MB |
+| Embedding API | €0 — **not needed** (Lucene uses term-based search, not vector similarity) |
+| Vector database | €0 — **not needed** |
+| **Total incremental cost** | **€0** |
 
 ---
 
@@ -1085,12 +1133,12 @@ Phase 2 follows naturally once the concept is validated.
 
 | Risk | Mitigation |
 |------|------------|
-| Scraping breaks when Prat Espais redesigns their site | Phase 4 (API) eliminates this. Until then, the scraper is monitored and the weekly job alerts on failure. |
+| Scraping breaks when Prat Espais redesigns their site | Phase 4 (API) eliminates this. Until then, the scraper is monitored and the weekly CI job alerts on failure. Manual corpus (Phase 1) serves as fallback. |
 | Stale data (procedure changes between scrapes) | Weekly refresh is sufficient for municipal procedures. Critical changes can trigger a manual re-scrape. |
-| Embedding API costs | At 200–800 chunks, embedding cost is negligible (<$0.01/run with `text-embedding-3-small`). Query-time embedding is one call per user question (~$0.00001). |
-| Irrelevant context injected into prompt | Cosine similarity threshold (e.g. >0.75) filters out low-relevance chunks. If nothing passes the threshold, no context is injected — the AI answers from general knowledge. |
-| Index file too large for Lambda memory | At 800 chunks × ~1,536 floats × 4 bytes ≈ ~5 MB. Well within Lambda's 512 MB. |
-| Privacy: user queries sent to embedding API | The query is just the citizen's question text — same text already sent to OpenRouter. No additional privacy exposure. |
+| Lucene search misses relevant procedures | Fuzzy matching + multi-field search makes this unlikely at 200 procedures. Tune the fuzzy edit distance and boost factors. Add synonym mappings if needed (e.g., "padró" → "empadronament"). |
+| Cold start penalty from building Lucene index | ~50–100 ms for 200 documents. Negligible compared to the OpenRouter API call (~2–5 s). SnapStart further reduces this. |
+| `procedures.json` too large for Lambda memory | At 200 procedures × ~500 chars ≈ ~200 KB raw, ~1 MB with Lucene index. Well within Lambda's 512 MB. |
+| Search quality inferior to vector similarity | At this corpus size, BM25 + fuzzy matching is on par with vector similarity. If the corpus grows past ~5,000 documents, consider adding embeddings — but that is unlikely for a single municipality. |
 
 ---
 
@@ -1100,11 +1148,11 @@ Phase 2 follows naturally once the concept is validated.
 |----------|---------|--------|--------|
 | **P0** | #8 Input Length Limits | 🟢 Small | 🔴 Security/Cost |
 | **P0** | #7 Configurable Timeout | 🟢 Small | 🟡 Operability |
-| **P1** | #11 Prat Espais Procedure Integration (RAG) — Phase 1 | 🟡 Medium | 🔴 Core Value Proposition |
+| **P1** | #11 Prat Espais Procedure Integration (Poor Man's RAG) — Phase 1 (manual corpus + Lucene) | 🟡 Medium | 🔴 Core Value Proposition |
 | **P1** | #9 PDF Extraction + Unicode Fix | 🟡 Medium | 🔴 Correctness (Catalan chars) |
 | **P1** | #2 Rate Limiting (CDK) | 🟢 Small | 🔴 Security/Cost |
 | **P1** | #3 Health Check | 🟢 Small | 🟡 Operability |
-| **P2** | #11 Prat Espais Procedure Integration (RAG) — Phase 2–3 | 🟡 Medium | 🔴 Core Value Proposition |
+| **P2** | #11 Prat Espais Procedure Integration (Poor Man's RAG) — Phase 2–3 (S3 + Jsoup scraper) | 🟡 Medium | 🔴 Core Value Proposition |
 | **P2** | #4 Language Selection | 🟢 Small | 🟡 UX |
 | **P2** | #6 Audit Logging | 🟡 Medium | 🟡 Operability |
 | **P2** | #10 Retry with Backoff | 🟡 Medium | 🟡 Reliability |
@@ -1112,9 +1160,9 @@ Phase 2 follows naturally once the concept is validated.
 | **P3** | #1 Conversation History | 🟡 Medium | 🟡 UX |
 
 **Start with P0** — they're small, non-controversial, and fix real gaps. Then tackle **#11 Phase 1**
-(manual corpus RAG) — this is the feature that transforms ComplAI from a generic chatbot into a
-real civic tool. Phase 1 requires no infrastructure and can be shipped in 1–2 days. Continue with
-P1 for the PDF Unicode fix and rate limiting.
+(manual corpus + Lucene search) — this is the feature that transforms ComplAI from a generic chatbot
+into a real civic tool. Phase 1 requires no infrastructure, no external APIs, and costs €0. It can
+be shipped in 1–2 days. Continue with P1 for the PDF Unicode fix and rate limiting.
 
 ---
 
