@@ -179,7 +179,9 @@ public class OpenRouterServices implements IOpenRouterService {
         if (aiMessage == null) return false;
         // Normalize common quotes/apostrophes for more reliable matching
         String normalized = aiMessage.replace('’', '\'').replace('‘', '\'').replace('“', '"').replace('”', '"');
-        String lower = normalized.toLowerCase().trim();
+        String lower = normalized.toLowerCase(Locale.ROOT).trim();
+        // Remove punctuation for more robust matching (fix regex)
+        String lowerNoPunct = lower.replaceAll("[.,;:!?()\\[\\]{}-]", " ").replaceAll("\\s+", " ").trim();
 
         // Common refusal patterns in English, Spanish and Catalan
         String[] refusalPhrases = new String[] {
@@ -209,15 +211,31 @@ public class OpenRouterServices implements IOpenRouterService {
                 "lo siento, no puedo",
                 "no puedo",
                 "no puc",
-                "no puc ajudar"
+                "no puc ajudar",
+                // Add more variants
+                "not about el prat",
+                "only answer about el prat",
+                "only questions about el prat",
+                "solo puedo responder sobre el prat",
+                "només puc respondre sobre el prat",
+                "solamente puedo responder sobre el prat",
+                "solament puc respondre sobre el prat"
         };
 
         for (String p : refusalPhrases) {
-            if (lower.contains(p)) return true;
+            String pNoPunct = p.replaceAll("[.,;:!?()\\[\\]{}-]", " ").trim();
+            if (lower.contains(p) || lowerNoPunct.contains(pNoPunct)) {
+                logger.fine("Refusal detected by phrase: '" + p + "' in: " + lower);
+                return true;
+            }
         }
 
         // Also check for explicit mention that the model can only answer about El Prat
-        return lower.contains("el prat") && (lower.contains("only") || lower.contains("solament") || lower.contains("solo") || lower.contains("only about"));
+        if (lower.contains("el prat") && (lower.contains("only") || lower.contains("solament") || lower.contains("solo") || lower.contains("only about"))) {
+            logger.fine("Refusal detected by El Prat + only/solament/solo/only about");
+            return true;
+        }
+        return false;
     }
 
     private OpenRouterResponseDto callOpenRouterAndExtract(List<Map<String, Object>> messages) {
