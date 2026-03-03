@@ -17,10 +17,11 @@ on:
 jobs:
   release:
     name: Create Release if New Version
+    if: github.ref_type == 'tag'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0  # Needed to access tags
 
@@ -57,4 +58,3 @@ jobs:
             exit 1
           fi
           gh release create "$TAG_NAME" --title "Release $VERSION" --notes "Automated release for version $VERSION."
-
