@@ -59,26 +59,23 @@ public class PratEspaisScraper {
                 // Inspect the DetallTramit.aspx page in your browser to find the real IDs or classes.
                 // For ASPX pages, they usually look like "#ctl00_MainContent_lblDescripcio"
 
-                Element title = doc.selectFirst("h1, .title, .titol");
+                Element title = doc.selectFirst(".iconesTramit, .senseCertificat");
                 proc.put("title", title != null ? title.text() : "");
 
-                Element desc = doc.selectFirst(".description, .descripcio");
+                Element desc = doc.selectFirst(".introduccio");
                 proc.put("description", desc != null ? desc.text() : "");
 
-                Element req = doc.selectFirst(".requirements, .requisits");
-                proc.put("requirements", req != null ? req.text() : "");
+                // Requirements: all <ul> inside .introduccio
+                Elements reqLists = doc.select(".introduccio ul");
+                StringBuilder reqText = new StringBuilder();
+                for (Element ul : reqLists) {
+                    reqText.append(ul.text()).append("\n");
+                }
+                proc.put("requirements", reqText.toString().trim());
 
-                Element steps = doc.selectFirst(".steps, .passos");
+                Element steps = doc.selectFirst(".block, .blockFirst");
                 proc.put("steps", steps != null ? steps.text() : "");
 
-                Element fees = doc.selectFirst(".fees, .taxes");
-                proc.put("fees", fees != null ? fees.text() : "");
-
-                Element office = doc.selectFirst(".office, .oficina");
-                proc.put("office", office != null ? office.text() : "");
-
-                Element deadlines = doc.selectFirst(".deadlines, .terminis");
-                proc.put("deadlines", deadlines != null ? deadlines.text() : "");
 
                 procedures.add(proc);
                 System.out.println("Successfully scraped: " + href);
