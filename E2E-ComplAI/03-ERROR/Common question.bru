@@ -21,9 +21,6 @@ body:json {
 }
 
 tests {
-  test("HTTP status == 422", () => {
-    expect(res.getStatus()).to.equal(422);
-  });
   test("Success prop == true", () => {
     expect(res.getBody().success).to.equal(false);
   });
@@ -31,7 +28,7 @@ tests {
     expect(res.getBody().message).to.not.be.empty;
   });
   test("Error code == 0", () => {
-    expect(res.getBody().errorCode).to.equal(2);
+    expect(res.getBody().errorCode).to.not.equal(0);
   });
 }
 

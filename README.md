@@ -180,8 +180,8 @@ ComplAI follows a strict **layered architecture** with clear boundaries at every
                                 │ HTTPS POST
                                 │ Bearer token auth
 ┌───────────────────────────────▼──────────────────────────────────┐
-│                    OpenRouter API                                 │
-│               model: minimax/minimax-m2.5                        │
+│                    OpenRouter API                                │
+│               model: arcee-ai/trinity-large-preview:free         │
 └──────────────────────────────────────────────────────────────────┘
 ```
 

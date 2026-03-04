@@ -15,7 +15,7 @@ The application exposes a REST API deployed as an **AWS Lambda** behind **API Ga
 | Language         | Java 21                                                            |
 | Framework        | Micronaut 4.10.7 (function runtime, DI, HTTP layer)               |
 | Build            | Gradle (Groovy DSL), Micronaut Gradle Plugin 4.6.1, Shadow JAR plugin (com.gradleup.shadow 8.3.9) |
-| AI Backend       | OpenRouter API (`minimax/minimax-m2.5` model)                      |
+| AI Backend       | OpenRouter API (`arcee-ai/trinity-large-preview:free` model)                      |
 | PDF Generation   | Apache PDFBox 2.0.29                                               |
 | Caching          | Micronaut Caffeine Cache                                           |
 | Serialization    | Jackson (micronaut-jackson-databind)                               |

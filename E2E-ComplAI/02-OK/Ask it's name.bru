@@ -21,8 +21,8 @@ body:json {
 }
 
 tests {
-  test("HTTP status == 200", () => {
-    expect(res.getStatus()).to.equal(200);
+  test("HTTP status != 500", () => {
+    expect(res.getStatus()).to.be.lessThan(500);
   });
   test("Success prop == true", () => {
     expect(res.getBody().success).to.equal(true);

@@ -52,6 +52,8 @@ Resources:
         Variables:
           OPENROUTER_API_KEY: "REPLACE_ME"
           AWS_ENDPOINT_URL: "http://host.docker.internal:4566"
+          OPENROUTER_REQUEST_TIMEOUT_SECONDS: "20"
+          OPENROUTER_OVERALL_TIMEOUT_SECONDS: "30"
       Events:
         # Catch-all proxy: every HTTP method on every path is forwarded to the
         # Micronaut handler, which routes internally — same as the CDK HttpApi
@@ -66,4 +68,3 @@ Resources:
           Properties:
             Path: /{proxy+}
             Method: ANY
-

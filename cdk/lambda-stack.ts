@@ -92,6 +92,8 @@ export class LambdaStack extends cdk.Stack {
       // Secrets Manager or SSM Parameter Store with encryption is more secure if available.
       environment: {
         OPENROUTER_API_KEY: openRouterApiKey.valueAsString,
+        OPENROUTER_REQUEST_TIMEOUT_SECONDS: process.env.OPENROUTER_REQUEST_TIMEOUT_SECONDS || '20',
+        OPENROUTER_OVERALL_TIMEOUT_SECONDS: process.env.OPENROUTER_OVERALL_TIMEOUT_SECONDS || '30',
       },
       role: lambdaRole,
     });
@@ -167,4 +169,3 @@ export class LambdaStack extends cdk.Stack {
     });
   }
 }
-
