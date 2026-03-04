@@ -27,9 +27,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'development' }}
     env:
-      PROCEDURES_BUCKET: ${{ github.event_name == 'workflow_dispatch' && (inputs.environment == 'development' && 'complai-procedures-development' || 'complai-procedures-production') || 'complai-procedures-development' }}
-      PROCEDURES_KEY: procedures.json
-      PROCEDURES_REGION: eu-south-2
+      PROCEDURES_BUCKET: ${{ vars.PROCEDURES_BUCKET }}
+      PROCEDURES_KEY: ${{ vars.PROCEDURES_KEY }}
+      PROCEDURES_REGION: ${{ vars.PROCEDURES_REGION }}
       AWS_REGION: eu-south-2
     steps:
       - name: Checkout repository
