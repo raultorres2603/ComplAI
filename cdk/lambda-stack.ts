@@ -7,6 +7,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as apigwv2 from 'aws-cdk-lib/aws-apigatewayv2';
 import * as integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
+import * as s3 from 'aws-cdk-lib/aws-s3';
 
 export type DeploymentEnvironment = 'development' | 'production';
 
@@ -76,6 +77,21 @@ export class LambdaStack extends cdk.Stack {
     }
     if (!jarPath || !fs.existsSync(jarPath)) throw new Error(`Unable to determine JAR path. Computed: ${jarPath}`);
 
+// S3 bucket for procedures corpus (Free Tier, no public access)
+    const proceduresBucket = new s3.Bucket(this, `ComplAIProceduresBucket-${environment}`, {
+      bucketName: `complai-procedures-${environment.toLowerCase()}`,
+      removalPolicy: cdk.RemovalPolicy.RETAIN, // Retain data by default
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      versioned: false,
+      lifecycleRules: [{
+        expiration: cdk.Duration.days(365), // Clean up old files after 1 year
+      }],
+    });
+
+    // Grant Lambda read-only access to the procedures bucket
+    proceduresBucket.grantRead(lambdaRole);
+
     const lambdaFn = new lambda.Function(this, `ComplAILambda-${environment}`, {
       runtime: lambda.Runtime.JAVA_21,
       // The project uses the Micronaut APIGateway V2 runtime; use the Micronaut
@@ -94,6 +110,9 @@ export class LambdaStack extends cdk.Stack {
         OPENROUTER_API_KEY: openRouterApiKey.valueAsString,
         OPENROUTER_REQUEST_TIMEOUT_SECONDS: process.env.OPENROUTER_REQUEST_TIMEOUT_SECONDS || '20',
         OPENROUTER_OVERALL_TIMEOUT_SECONDS: process.env.OPENROUTER_OVERALL_TIMEOUT_SECONDS || '30',
+        PROCEDURES_BUCKET: proceduresBucket.bucketName,
+        PROCEDURES_KEY: 'procedures.json',
+        PROCEDURES_REGION: this.region,
       },
       role: lambdaRole,
     });

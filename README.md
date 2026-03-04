@@ -1180,10 +1180,38 @@ common procedures. Phase 2 follows naturally once the concept is validated.
 | **P1** | #9 PDF Extraction + Unicode Fix | 🟡 Medium | 🔴 Correctness (Catalan chars) | DONE     |
 | **P1** | #2 Rate Limiting (CDK) | 🟢 Small | 🔴 Security/Cost | DONE     |
 | **P1** | #3 Health Check | 🟢 Small | 🟡 Operability | DONE     |
-| **P2** | #11 Prat Espais Procedure Integration (Poor Man's RAG) — Phase 2–3 (S3 + Jsoup scraper) | 🟡 Medium | 🔴 Core Value Proposition | Pending  |
+| **P2** | #11 Prat Espais Procedure Integration (Poor Man's RAG) — Phase 2–3 (S3 + Jsoup scraper) | 🟡 Medium | 🔴 Core Value Proposition | IN PROGRESS  |
 | **P2** | #4 Language Selection | 🟢 Small | 🟡 UX | Pending  |
 | **P2** | #6 Audit Logging | 🟡 Medium | 🟡 Operability | Pending  |
 | **P2** | #10 Retry with Backoff | 🟡 Medium | 🟡 Reliability | Pending  |
 | **P3** | #5 Complaint Categories | 🟡 Medium | 🟡 UX | Pending  |
 | **P3** | #1 Conversation History | 🟡 Medium | 🟡 UX | DONE     |
 
+---
+
+## Prat Espais Procedures Integration: S3 Environment Variables
+
+To enable Lambda to load the Prat Espais procedures corpus from S3, set the following environment variables:
+
+| Variable             | Example Value                        | Description                                 |
+|----------------------|--------------------------------------|---------------------------------------------|
+| PROCEDURES_BUCKET    | complai-procedures-development       | S3 bucket name for procedures corpus        |
+| PROCEDURES_KEY       | procedures.json                      | S3 object key (file name)                   |
+| PROCEDURES_REGION    | eu-west-1                            | AWS region where the bucket is located      |
+
+- These must be set in your Lambda environment (CDK, SAM, or AWS Console).
+- For local development, add them to your `env.json` or export in your shell.
+- If not set, the system will fall back to the bundled `procedures.json` (if present).
+
+### Running the Scraper and Uploading to S3
+
+1. Build the project: `./gradlew clean shadowJar`
+2. Run the scraper:
+   ```sh
+   export PROCEDURES_BUCKET=complai-procedures-development
+   export PROCEDURES_REGION=eu-west-1
+   java -cp build/libs/complai-all.jar cat.complai.pratespais.PratEspaisScraper
+   ```
+3. Confirm `procedures.json` is present in your S3 bucket.
+
+---
