@@ -17,8 +17,10 @@ import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class PratEspaisScraper {
     public static void main(String[] args) throws IOException {
@@ -33,19 +35,30 @@ public class PratEspaisScraper {
 
         // 1. Scrape index page
         Document index = Jsoup.connect(baseUrl).get();
-        Elements links = index.select("a[href^='/Ciutadania/']");
+
+        // FIX 1: Look specifically for links that go to the detail pages
+        Elements links = index.select("a[href*='DetallTramit.aspx']");
+
         List<Map<String, String>> procedures = new ArrayList<>();
+
+        // FIX 2: Keep track of visited URLs to avoid scraping the same procedure multiple times
+        Set<String> visitedUrls = new HashSet<>();
 
         for (Element link : links) {
             String href = link.absUrl("href");
-            if (!href.contains("/Ciutadania/")) continue;
+
+            // Skip if we already scraped this exact procedure URL
+            if (!visitedUrls.add(href)) continue;
 
             try {
                 Document doc = Jsoup.connect(href).get();
                 Map<String, String> proc = new HashMap<>();
                 proc.put("url", href);
 
-                // Added null-safety: prevent NullPointerException if an element doesn't exist on a specific page
+                // FIX 3: YOU NEED TO UPDATE THESE SELECTORS!
+                // Inspect the DetallTramit.aspx page in your browser to find the real IDs or classes.
+                // For ASPX pages, they usually look like "#ctl00_MainContent_lblDescripcio"
+
                 Element title = doc.selectFirst("h1, .title, .titol");
                 proc.put("title", title != null ? title.text() : "");
 
@@ -68,6 +81,7 @@ public class PratEspaisScraper {
                 proc.put("deadlines", deadlines != null ? deadlines.text() : "");
 
                 procedures.add(proc);
+                System.out.println("Successfully scraped: " + href);
             } catch (Exception e) {
                 // Prevent a single bad page from crashing the whole scraping job
                 System.err.println("Failed to scrape procedure page: " + href + " - " + e.getMessage());
@@ -88,7 +102,7 @@ public class PratEspaisScraper {
 
         // 3. Upload to S3
         try (S3Client s3 = S3Client.builder()
-                .region(Region.EU_WEST_1)
+                .region(Region.EU_SOUTH_2)
                 .credentialsProvider(DefaultCredentialsProvider.create())
                 .build()) {
 
