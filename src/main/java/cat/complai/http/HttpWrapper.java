@@ -70,7 +70,7 @@ public class HttpWrapper {
     public CompletableFuture<HttpDto> postToOpenRouterAsync(String userPrompt) {
         logger.fine(() -> "postToOpenRouterAsync called; prompt length=" + (userPrompt == null ? 0 : userPrompt.length()));
         try {
-            String model = "minimax/minimax-m2.5";
+            String model = "arcee-ai/trinity-large-preview:free";
 
             // Friendlier, town-tone system message for civilian users from El Prat de Llobregat.
             String systemMessage = """
@@ -147,7 +147,7 @@ public class HttpWrapper {
     public CompletableFuture<HttpDto> postToOpenRouterAsync(List<Map<String, Object>> messages) {
         logger.fine(() -> "postToOpenRouterAsync (multi-turn) called; messages count=" + (messages == null ? 0 : messages.size()));
         try {
-            String model = "minimax/minimax-m2.5";
+            String model = "arcee-ai/trinity-large-preview:free";
             Map<String, Object> payload = Map.of(
                     "model", model,
                     "messages", messages
