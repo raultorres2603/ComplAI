@@ -1,0 +1,70 @@
+name: Scrape and Upload Prat Espais Procedures
+
+description: >
+  Scheduled and manual workflow to scrape Prat Espais procedures using the Java CLI,
+  generate procedures.json, and upload it to the S3 bucket for Lambda RAG integration.
+
+on:
+  schedule:
+    - cron: '0 3 * * 1'   # Every Monday at 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write   # Required for OIDC authentication to AWS
+
+jobs:
+  scrape-upload:
+    name: Scrape and Upload Procedures
+    runs-on: ubuntu-latest
+    environment: development
+    env:
+      PROCEDURES_BUCKET: complai-procedures-development
+      PROCEDURES_KEY: procedures.json
+      PROCEDURES_REGION: eu-west-1
+      AWS_REGION: eu-west-1
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Build shadow JAR
+        run: ./gradlew clean shadowJar
+
+      - name: Run Prat Espais Scraper
+        run: |
+          java -cp build/libs/complai-all.jar cat.complai.pratespais.PratEspaisScraper
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_SCRAPER_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Upload procedures.json to S3
+        run: |
+          aws s3 cp procedures.json s3://$PROCEDURES_BUCKET/$PROCEDURES_KEY --region $PROCEDURES_REGION
+
+      - name: Post-upload verification
+        run: |
+          aws s3 ls s3://$PROCEDURES_BUCKET/$PROCEDURES_KEY --region $PROCEDURES_REGION
+
+    # Restrict permissions for this job
+    permissions:
+      id-token: write   # For OIDC to AWS
+      contents: read
+      actions: read
+      # No write to repo, no secrets access
+
+# Notes:
+# - Requires AWS_SCRAPER_ROLE_ARN secret in repo (IAM role with s3:PutObject to the procedures bucket, OIDC trust for GitHub Actions)
+# - No AWS static credentials are stored in GitHub; OIDC is used for secure, auditable access
+# - Only the minimum permissions are granted to the workflow and job
+# - Manual trigger is available via workflow_dispatch
+# - Logs and errors are visible in the Actions UI
+
