@@ -31,6 +31,7 @@ import java.io.ByteArrayOutputStream;
 import cat.complai.openrouter.dto.OutputFormat;
 import cat.complai.openrouter.helpers.AiParsed;
 import cat.complai.openrouter.helpers.ProcedureRagHelper;
+import cat.complai.openrouter.helpers.PdfGenerator;
 
 @Singleton
 public class OpenRouterServices implements IOpenRouterService {
@@ -244,7 +245,7 @@ public class OpenRouterServices implements IOpenRouterService {
         }
 
         try {
-            byte[] pdf = generatePdfFromText(parsed.message());
+            byte[] pdf = PdfGenerator.generatePdf(parsed.message());
             return new OpenRouterResponseDto(true, null, null, null, OpenRouterErrorCode.NONE, pdf);
         } catch (Exception e) {
             logger.log(Level.SEVERE, "PDF generation failed", e);
