@@ -38,10 +38,31 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Get previous tag
+        id: prev_tag
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          PREV_TAG=$(git tag --sort=-creatordate | grep -v "^$TAG_NAME$" | head -n1 || true)
+          echo "prev_tag=$PREV_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Generate commit log
+        id: changelog
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          PREV_TAG="${{ steps.prev_tag.outputs.prev_tag }}"
+          if [ -n "$PREV_TAG" ]; then
+            echo "## Changes since $PREV_TAG:" > changes.txt
+            git log --oneline "$PREV_TAG..$TAG_NAME" >> changes.txt
+          else
+            echo "## Changes in $TAG_NAME (initial release or no previous tag):" > changes.txt
+            git log --oneline >> changes.txt
+          fi
+
       - name: Create GitHub Release
         if: steps.check_release.outputs.exists == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG_NAME=${GITHUB_REF#refs/tags/}
-          gh release create "$TAG_NAME" --title "Release $TAG_NAME" --notes "Automated release for $TAG_NAME."
+          NOTES="Automated release for $TAG_NAME.\n\n$(cat changes.txt)"
+          gh release create "$TAG_NAME" --title "Release $TAG_NAME" --notes "$NOTES"
