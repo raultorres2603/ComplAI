@@ -205,6 +205,18 @@ public class OpenRouterControllerIntegrationTest {
         assertTrue(bodyOpt.get().isSuccess());
     }
 
+    @Test
+    void integration_redact_pdfUnicodeCatalanCharacters() {
+        // Simulate a PDF response with Catalan special characters
+        OpenRouterResponseDto dto = openRouterService.redactComplaint(
+            "Prova unicode català [HEADER]", OutputFormat.PDF, null);
+        assertTrue(dto.isSuccess(), "Expected success");
+        assertNotNull(dto.getPdfData(), "Expected PDF data");
+        assertTrue(dto.getPdfData().length > 0);
+        assertTrue(new String(dto.getPdfData(), 0, 4).startsWith("%PDF"), "Expected PDF magic bytes");
+        // Optionally: parse PDF and check text extraction (requires PDFBox in test scope)
+    }
+
     @MockBean(HttpWrapper.class)
     @Replaces(HttpWrapper.class)
     HttpWrapper openRouterHttpWrapper() {

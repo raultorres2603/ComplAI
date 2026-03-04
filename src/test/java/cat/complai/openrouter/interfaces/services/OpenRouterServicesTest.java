@@ -24,8 +24,19 @@ public class OpenRouterServicesTest {
     // The service always calls postToOpenRouterAsync(List) with the assembled message history,
     // so that is the overload we must override to intercept calls correctly.
     static class ScenarioFakeWrapper extends HttpWrapper {
+        // Add a field to allow test to override the next response
+        private String nextResponse = null;
+        public void overrideNextResponse(String response) {
+            this.nextResponse = response;
+        }
         @Override
         public CompletableFuture<HttpDto> postToOpenRouterAsync(List<Map<String, Object>> messages) {
+            if (nextResponse != null) {
+                String resp = nextResponse;
+                nextResponse = null;
+                return CompletableFuture.completedFuture(new HttpDto(resp, 200, "POST", null));
+            }
+
             // Extract the content of the last user message to determine which scenario to run.
             String userPrompt = messages == null ? null : messages.stream()
                     .filter(m -> "user".equals(m.get("role")))
@@ -192,5 +203,21 @@ public class OpenRouterServicesTest {
         assertFalse(out.isSuccess());
         assertEquals(OpenRouterErrorCode.VALIDATION, out.getErrorCode());
         assertTrue(out.getError().contains("maximum allowed length"));
+    }
+
+    @Test
+    void redact_pdfRequested_unicodeCatalanCharacters() {
+        ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30);
+        // Simulate a PDF response with Catalan special characters
+        String catalanText = "Això és una prova amb ç, à, ü, ·l, ñ, and œ.";
+        String aiResponse = "{\"format\": \"pdf\"}\n\n" + catalanText;
+        wrapper.overrideNextResponse(aiResponse);
+        OpenRouterResponseDto out = svc.redactComplaint("Prova unicode català [HEADER]", OutputFormat.PDF, null);
+        assertTrue(out.isSuccess());
+        assertNotNull(out.getPdfData());
+        String head = new String(out.getPdfData(), 0, Math.min(4, out.getPdfData().length), StandardCharsets.US_ASCII);
+        assertTrue(head.startsWith("%PDF"), "PDF magic bytes expected at start of file");
+        // Optionally: parse PDF and check text extraction (requires PDFBox in test scope)
     }
 }

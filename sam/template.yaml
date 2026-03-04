@@ -50,7 +50,10 @@ Resources:
       Timeout: 30
       Environment:
         Variables:
-          OPENROUTER_API_KEY: "REPLACE_ME"
+          OPENROUTER_API_KEY: !Ref OpenRouterApiKey
+          PROCEDURES_BUCKET: !Ref ProceduresBucket
+          PROCEDURES_KEY: procedures.json
+          PROCEDURES_REGION: eu-west-1
           AWS_ENDPOINT_URL: "http://host.docker.internal:4566"
           OPENROUTER_REQUEST_TIMEOUT_SECONDS: "20"
           OPENROUTER_OVERALL_TIMEOUT_SECONDS: "30"
@@ -68,3 +71,10 @@ Resources:
           Properties:
             Path: /{proxy+}
             Method: ANY
+  ProceduresBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: complai-procedures-development
+  OpenRouterApiKey:
+    Type: String
+    Description: OpenRouter API key (passed from CI or manually)
