@@ -24,6 +24,7 @@
 12. [Local Development](#12-local-development)
 13. [Testing Strategy](#13-testing-strategy)
 14. [CI/CD Pipeline](#14-cicd-pipeline)
+14.1. [Release Process](#141-release-process)
 15. [Feature Proposals and Roadmap](#15-feature-proposals-and-roadmap)
 
 ---
@@ -613,6 +614,17 @@ The GitHub Actions workflow (`deploy.yml`) follows a **build once, deploy many**
 - Production can only be deployed from the `master` branch (enforced by the `guard` job).
 - Pull requests always deploy to `development` only — never to production.
 - The E2E suite must pass before the workflow is considered successful.
+
+## 14.1 Release Process
+
+- On every push to `master`, a GitHub Actions workflow (`release.yml`) checks the version in `build.gradle` or `gradle.properties`.
+- If the version is greater than the latest `vX.Y.Z` tag, it:
+  - Creates a new tag (`vX.Y.Z`)
+  - Generates a changelog from the previous tag
+  - Publishes a GitHub Release with the changelog
+- No manual tagging is required. Just bump the version and push to `master`.
+- The changelog is included in the GitHub Release notes.
+- Tag format: `vX.Y.Z` (semantic versioning).
 
 ---
 
