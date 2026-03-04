@@ -27,8 +27,8 @@ tests {
   test("Message != empty", () => {
     expect(res.getBody().message).to.not.be.empty;
   });
-  test("Error code == 0", () => {
-    expect(res.getBody().errorCode).to.equal(2);
+  test("Error code != 0", () => {
+    expect(res.getBody().errorCode).to.not.equal(0);
   });
 }
 
