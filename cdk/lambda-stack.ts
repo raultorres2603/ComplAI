@@ -148,6 +148,12 @@ export class LambdaStack extends cdk.Stack {
       }),
     };
 
+    // Add rate limiting (throttle settings) to the $default stage
+    cfnDefaultStage.defaultRouteSettings = {
+      throttlingBurstLimit: 20, // Allow short bursts
+      throttlingRateLimit: 10,  // Steady-state rate (req/sec)
+    };
+
     // Expose the HTTP API endpoint as a CloudFormation output so deploys and CI can discover it easily.
     new cdk.CfnOutput(this, 'ComplAIHttpApiEndpoint', {
       value: httpApi.apiEndpoint,
