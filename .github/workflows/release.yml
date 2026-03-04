@@ -6,7 +6,6 @@
 # - If not, creates a release with the tag and version.
 
 name: Release version
-
 on:
   push:
     branches:
@@ -18,6 +17,8 @@ jobs:
   release:
     name: Create Release if New Version
     if: github.ref_type == 'tag'
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
