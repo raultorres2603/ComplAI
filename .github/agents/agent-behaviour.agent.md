@@ -121,6 +121,7 @@ Micronaut compile-time DI. All beans are `@Singleton`. Constructor injection wit
 - The controller maps error codes to HTTP statuses: `VALIDATION → 400`, `REFUSAL → 422`, `TIMEOUT → 504`, `UPSTREAM → 502`, `INTERNAL → 500`.
 - Unexpected exceptions in the controller are caught and returned as `500` with an `INTERNAL` error code.
 - In `redactComplaint()`, any non-success result from the AI call (`callOpenRouterAndExtract`) is returned immediately — before header parsing or PDF generation. This prevents refusals or upstream errors from being silently swallowed by the graceful-fallback logic.
+- **Input-based refusal:** The service layer immediately refuses requests for official documents (e.g., "certificat del padró", "empadronament") before calling the AI, ensuring consistent and predictable error handling for out-of-scope queries.
 
 ### AI Response Protocol (Redact Endpoint)
 
@@ -254,6 +255,7 @@ npx cdk deploy ComplAILambdaStack-production  --parameters OpenRouterApiKey=<key
 - The E2E job uses the deploy job's `outputs.environment` to determine whether to run (only runs when `environment == 'development'`).
 - The E2E job will fail the workflow if any test fails, ensuring that regressions are caught before further work or merges.
 - E2E results are uploaded as a JSON artifact (`results.json`) for review and debugging.
+- **Note:** When running Bruno E2E tests locally, the `results.json` file may not always be generated in the expected location. If missing, check Bruno CLI output and configuration.
 - The E2E suite covers multi-turn conversation, error handling, PDF generation, and edge cases (see above).
 - If you add new endpoints or change API contracts, update the Bruno collection and ensure E2E tests pass.
 
@@ -286,6 +288,8 @@ npx cdk deploy ComplAILambdaStack-production  --parameters OpenRouterApiKey=<key
   - The workflow only runs when a tag is pushed to the `master` branch.
   - The tag must match the version specified in `build.gradle` (e.g., tag `v1.2.3` and `version = '1.2.3'`).
   - If a release for this version already exists, no new release is created.
+- **Release Notes Content:**  
+  Each GitHub Release now automatically includes a summary of all commits between the previous tag and the new tag, making it easy to see what changed in each release.
 - **No Tag, No Release:**  
   If a commit is pushed to `master` without a tag, or the tag does not match the version, the workflow does nothing.
 - **Purpose:**  
