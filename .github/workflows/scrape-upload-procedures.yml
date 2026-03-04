@@ -14,8 +14,8 @@ on:
         required: true
         type: choice
         options:
-          - production
           - development
+          - production
 
 permissions:
   contents: read
