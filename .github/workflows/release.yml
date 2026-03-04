@@ -1,22 +1,19 @@
-# Workflow to create a GitHub Release when a tagged commit is merged into master and the version is new.
+# Workflow to create a GitHub Release when a new version is detected in build.gradle or gradle.properties and is greater than the latest tag.
 #
-# - Triggers only on push to master with a tag.
-# - Extracts version from build.gradle.
-# - Checks if a release for this version exists.
-# - If not, creates a release with the tag and version.
+# - Triggers on every push to master.
+# - Extracts version from build.gradle (supports single/double quotes) or gradle.properties.
+# - Compares to latest tag (vX.Y.Z).
+# - If version is new and greater, creates a tag and release with changelog.
 
 name: Release version
 on:
   push:
     branches:
       - master
-    tags:
-      - '*'
 
 jobs:
   release:
     name: Create Release if New Version
-    if: github.ref_type == 'tag'
     permissions:
       contents: write
     runs-on: ubuntu-latest
@@ -26,43 +23,88 @@ jobs:
         with:
           fetch-depth: 0  # Needed to access tags
 
-      - name: Check if release already exists
-        id: check_release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract version from build.gradle or gradle.properties
+        id: version
         run: |
-          TAG_NAME=${GITHUB_REF#refs/tags/}
-          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
+          # Try build.gradle (single or double quotes)
+          VERSION=$(grep -E "^version[[:space:]]*=[[:space:]]*['\"]" build.gradle | head -n1 | sed -E "s/version[[:space:]]*=[[:space:]]*['\"]([^'\"]+)['\"]/\1/")
+          # Fallback to gradle.properties if not found
+          if [ -z "$VERSION" ] && [ -f gradle.properties ]; then
+            VERSION=$(grep -E "^version[[:space:]]*=[[:space:]]*" gradle.properties | head -n1 | sed -E "s/version[[:space:]]*=[[:space:]]*//")
+          fi
+          if [ -z "$VERSION" ]; then
+            echo "::error::No version found in build.gradle or gradle.properties. Exiting."
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Get latest version tag
+        id: latest_tag
+        run: |
+          # Find latest tag matching v*.*.*
+          LATEST_TAG=$(git tag --list 'v*.*.*' --sort=-v:refname | head -n1 || true)
+          echo "latest_tag=$LATEST_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Compare version and decide if release is needed
+        id: should_release
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          LATEST_TAG="${{ steps.latest_tag.outputs.latest_tag }}"
+          if [ -z "$LATEST_TAG" ]; then
+            echo "No previous tag found. Will create release."
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Remove leading 'v' from tag for comparison
+          LATEST_VER=${LATEST_TAG#v}
+          # Compare versions using sort -V
+          if [ "$VERSION" = "$LATEST_VER" ]; then
+            echo "Version $VERSION already tagged. No release needed."
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # If VERSION > LATEST_VER, release
+          if [ "$(printf '%s\n%s' "$LATEST_VER" "$VERSION" | sort -V | tail -n1)" = "$VERSION" ]; then
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
           else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Get previous tag
+      - name: Create tag for new version
+        if: steps.should_release.outputs.should_release == 'true'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag "v$VERSION"
+          git push origin "v$VERSION"
+
+      - name: Get previous tag (for changelog)
         id: prev_tag
         run: |
-          TAG_NAME=${GITHUB_REF#refs/tags/}
-          PREV_TAG=$(git tag --sort=-creatordate | grep -v "^$TAG_NAME$" | head -n1 || true)
+          VERSION="${{ steps.version.outputs.version }}"
+          # After tagging, get previous tag (excluding the new one)
+          PREV_TAG=$(git tag --list 'v*.*.*' --sort=-v:refname | grep -v "^v$VERSION$" | head -n1 || true)
           echo "prev_tag=$PREV_TAG" >> "$GITHUB_OUTPUT"
 
       - name: Generate commit log
         id: changelog
         run: |
-          TAG_NAME=${GITHUB_REF#refs/tags/}
+          VERSION="${{ steps.version.outputs.version }}"
           PREV_TAG="${{ steps.prev_tag.outputs.prev_tag }}"
           if [ -n "$PREV_TAG" ]; then
             echo "## Changes since $PREV_TAG:" > changes.txt
-            git log --oneline "$PREV_TAG..$TAG_NAME" >> changes.txt
+            git log --pretty=format:"- %s (%h)" "$PREV_TAG..v$VERSION" >> changes.txt
           else
-            echo "## Changes in $TAG_NAME (initial release or no previous tag):" > changes.txt
-            git log --oneline >> changes.txt
+            echo "## Changes in v$VERSION (initial release or no previous tag):" > changes.txt
+            git log --pretty=format:"- %s (%h)" >> changes.txt
           fi
 
       - name: Create GitHub Release
-        if: steps.check_release.outputs.exists == 'false'
+        if: steps.should_release.outputs.should_release == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG_NAME=${GITHUB_REF#refs/tags/}
-          NOTES="Automated release for $TAG_NAME.\n\n$(cat changes.txt)"
-          gh release create "$TAG_NAME" --title "Release $TAG_NAME" --notes "$NOTES"
+          VERSION="${{ steps.version.outputs.version }}"
+          NOTES=$(printf "Automated release for v%s.\n\n" "$VERSION"; cat changes.txt)
+          gh release create "v$VERSION" --title "Release v$VERSION" --notes "$NOTES"
