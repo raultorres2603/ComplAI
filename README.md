@@ -1173,7 +1173,7 @@ common procedures. Phase 2 follows naturally once the concept is validated.
 |----------|---------|--------|--------|---------|
 | **P0** | #8 Input Length Limits | 🟢 Small | 🔴 Security/Cost | DONE    |
 | **P0** | #7 Configurable Timeout | 🟢 Small | 🟡 Operability | DONE     |
-| **P1** | #11 Prat Espais Procedure Integration (Poor Man's RAG) — Phase 1 (manual corpus + Lucene) | 🟡 Medium | 🔴 Core Value Proposition | Pending |
+| **P1** | #11 Prat Espais Procedure Integration (Poor Man's RAG) — Phase 1 (manual corpus + Lucene) | 🟡 Medium | 🔴 Core Value Proposition | DONE |
 | **P1** | #9 PDF Extraction + Unicode Fix | 🟡 Medium | 🔴 Correctness (Catalan chars) | Pending |
 | **P1** | #2 Rate Limiting (CDK) | 🟢 Small | 🔴 Security/Cost | Pending |
 | **P1** | #3 Health Check | 🟢 Small | 🟡 Operability | Pending |

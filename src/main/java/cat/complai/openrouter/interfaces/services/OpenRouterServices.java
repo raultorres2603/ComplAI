@@ -30,6 +30,7 @@ import java.io.ByteArrayOutputStream;
 
 import cat.complai.openrouter.dto.OutputFormat;
 import cat.complai.openrouter.helpers.AiParsed;
+import cat.complai.openrouter.helpers.ProcedureRagHelper;
 
 @Singleton
 public class OpenRouterServices implements IOpenRouterService {
@@ -43,6 +44,17 @@ public class OpenRouterServices implements IOpenRouterService {
 
     public record MessageEntry(String role, String content) {}
 
+    private static ProcedureRagHelper procedureRagHelper;
+    static {
+        try {
+            procedureRagHelper = new ProcedureRagHelper();
+        } catch (Exception e) {
+            // Log error, but allow fallback to no context
+            Logger.getLogger(OpenRouterServices.class.getName()).log(Level.SEVERE, "Failed to initialize ProcedureRagHelper", e);
+            procedureRagHelper = null;
+        }
+    }
+
     @Inject
     public OpenRouterServices(HttpWrapper httpWrapper, @Value("${complai.input.max-length-chars:5000}") int maxInputLength,
                              @Value("${OPENROUTER_OVERALL_TIMEOUT_SECONDS:30}") int overallTimeoutSeconds) {
@@ -53,6 +65,63 @@ public class OpenRouterServices implements IOpenRouterService {
                 .build();
         this.maxInputLength = maxInputLength;
         this.overallTimeoutSeconds = (overallTimeoutSeconds > 0) ? overallTimeoutSeconds : 30; // fallback to 30s if invalid
+    }
+
+    private String buildProcedureContextBlock(String query) {
+        if (procedureRagHelper == null) return null;
+        List<ProcedureRagHelper.Procedure> matches = procedureRagHelper.search(query);
+        if (matches.isEmpty()) return null;
+        StringBuilder sb = new StringBuilder();
+        sb.append("CONTEXT FROM PRAT ESPAIS PROCEDURES:\n\n");
+        for (ProcedureRagHelper.Procedure p : matches) {
+            sb.append("---\n");
+            sb.append("Procedure: ").append(p.title).append("\n");
+            sb.append("Source: ").append(p.url).append("\n\n");
+            sb.append(p.description).append("\n");
+            if (!p.requirements.isBlank()) sb.append("Requirements: ").append(p.requirements).append("\n");
+            if (!p.steps.isBlank()) sb.append("Steps: ").append(p.steps).append("\n");
+            if (!p.fees.isBlank()) sb.append("Fees: ").append(p.fees).append("\n");
+            if (!p.office.isBlank()) sb.append("Office: ").append(p.office).append("\n");
+            if (!p.deadlines.isBlank()) sb.append("Deadlines: ").append(p.deadlines).append("\n");
+            sb.append("---\n\n");
+        }
+        sb.append("Use this context to answer the user's question. If the context is relevant, cite the procedure name and provide the source link. If the context does not help, answer based on your general knowledge about El Prat.");
+        return sb.toString();
+    }
+
+    private String getSystemMessage() {
+        return """
+                Ets un assistent que es diu Gall Potablava, amable i proper per als veïns d'El Prat de Llobregat. Ajudes a redactar cartes i queixes clares i civils adreçades a l'Ajuntament i ofereixes informació pràctica i local d'El Prat. Mantén les respostes curtes, respectuoses i fàcils de llegir, com un veí que vol ajudar. Si la consulta no és sobre El Prat de Llobregat, digues-ho educadament i explica que no pots ajudar amb aquesta petició; també pots suggerir que facin una pregunta sobre assumptes locals.\
+                
+                
+                En español: Eres un asistente que se llama Gall Potablava amable y cercano para los vecinos de El Prat de Llobregat. Ayuda a redactar cartes i queixes dirigides al Ayuntamiento i ofereix informació pràctica i local. Mantén las respuestas cortas y fáciles de entender. Si la consulta no trata sobre El Prat, dilo educadamente y sugiere que pregunten sobre asuntos locales.\
+                
+                
+                In English (support): You are a friendly local assistant named Gall Potablava for residents of El Prat de Llobregat. Help draft clear, civil letters to the City Hall and provide practical local information. Keep answers short and easy to read. If the request is not about El Prat de Llobregat, politely say you can't help with that request.""";
+    }
+
+    private String buildRedactPrompt(String complaint) {
+        return String.format(
+                """
+                        IMPORTANT: Your response MUST start with a single-line JSON header on line 1.\s
+                        No text, no markdown, no explanation before it.\s
+                        The header must contain the 'format' field set to "pdf" or "json".\s
+                        Example of a valid first line: {"format": "pdf"}
+                       \s
+                        After that JSON header, leave one blank line, then write the letter body.
+                       \s
+                        Task: Redact a formal, civil, and concise letter addressed to the City Hall\s
+                        (Ajuntament) of El Prat de Llobregat based on the complaint below.\s
+                        If the complaint is not about El Prat de Llobregat, politely say you can't\s
+                        help with that request.\s
+                        Include a short summary, the specific request or remedy sought, and a polite closing.
+                       \s
+                        Reminder: first line of your response MUST be the JSON header {"format": "pdf"} or {"format": "json"}.
+                       \s
+                        Complaint text:
+                        %s""",
+                complaint.trim()
+        );
     }
 
     @Override
@@ -70,6 +139,11 @@ public class OpenRouterServices implements IOpenRouterService {
         List<Map<String, Object>> messages = new ArrayList<>();
         // System message
         messages.add(Map.of("role", "system", "content", getSystemMessage()));
+        // Inject procedure context if available
+        String contextBlock = buildProcedureContextBlock(question);
+        if (contextBlock != null) {
+            messages.add(Map.of("role", "system", "content", contextBlock));
+        }
         // Conversation history
         if (conversationId != null && !conversationId.isBlank()) {
             List<MessageEntry> history = conversationCache.getIfPresent(conversationId);
@@ -106,6 +180,11 @@ public class OpenRouterServices implements IOpenRouterService {
 
         List<Map<String, Object>> messages = new ArrayList<>();
         messages.add(Map.of("role", "system", "content", getSystemMessage()));
+        // Inject procedure context if available
+        String contextBlock = buildProcedureContextBlock(complaint);
+        if (contextBlock != null) {
+            messages.add(Map.of("role", "system", "content", contextBlock));
+        }
         if (conversationId != null && !conversationId.isBlank()) {
             List<MessageEntry> history = conversationCache.getIfPresent(conversationId);
             if (history != null) {
@@ -388,41 +467,6 @@ public class OpenRouterServices implements IOpenRouterService {
         PDPage newPage = new PDPage(PDRectangle.LETTER);
         doc.addPage(newPage);
         return newPage;
-    }
-
-    private String getSystemMessage() {
-        return """
-                Ets un assistent que es diu Gall Potablava, amable i proper per als veïns d'El Prat de Llobregat. Ajudes a redactar cartes i queixes clares i civils adreçades a l'Ajuntament i ofereixes informació pràctica i local d'El Prat. Mantén les respostes curtes, respectuoses i fàcils de llegir, com un veí que vol ajudar. Si la consulta no és sobre El Prat de Llobregat, digues-ho educadament i explica que no pots ajudar amb aquesta petició; també pots suggerir que facin una pregunta sobre assumptes locals.\
-                
-                
-                En español: Eres un asistente que se llama Gall Potablava amable y cercano para los vecinos de El Prat de Llobregat. Ayuda a redactar cartes i queixes dirigides al Ayuntamiento i ofereix informació pràctica i local. Mantén las respuestas cortas y fáciles de entender. Si la consulta no trata sobre El Prat, dilo educadamente y sugiere que pregunten sobre asuntos locales.\
-                
-                
-                In English (support): You are a friendly local assistant named Gall Potablava for residents of El Prat de Llobregat. Help draft clear, civil letters to the City Hall and provide practical local information. Keep answers short and easy to read. If the request is not about El Prat de Llobregat, politely say you can't help with that request.""";
-    }
-
-    private String buildRedactPrompt(String complaint) {
-        return String.format(
-                """
-                        IMPORTANT: Your response MUST start with a single-line JSON header on line 1.\s
-                        No text, no markdown, no explanation before it.\s
-                        The header must contain the 'format' field set to "pdf" or "json".\s
-                        Example of a valid first line: {"format": "pdf"}
-                       \s
-                        After that JSON header, leave one blank line, then write the letter body.
-                       \s
-                        Task: Redact a formal, civil, and concise letter addressed to the City Hall\s
-                        (Ajuntament) of El Prat de Llobregat based on the complaint below.\s
-                        If the complaint is not about El Prat de Llobregat, politely say you can't\s
-                        help with that request.\s
-                        Include a short summary, the specific request or remedy sought, and a polite closing.
-                       \s
-                        Reminder: first line of your response MUST be the JSON header {"format": "pdf"} or {"format": "json"}.
-                       \s
-                        Complaint text:
-                        %s""",
-                complaint.trim()
-        );
     }
 
     private void updateConversationHistory(String conversationId, String userMessage, String assistantMessage) {
