@@ -39,17 +39,20 @@ public class OpenRouterServices implements IOpenRouterService {
     private final Logger logger = Logger.getLogger(OpenRouterServices.class.getName());
     private final Cache<String, List<MessageEntry>> conversationCache;
     private final int maxInputLength;
+    private final int overallTimeoutSeconds;
 
     public record MessageEntry(String role, String content) {}
 
     @Inject
-    public OpenRouterServices(HttpWrapper httpWrapper, @Value("${complai.input.max-length-chars:5000}") int maxInputLength) {
+    public OpenRouterServices(HttpWrapper httpWrapper, @Value("${complai.input.max-length-chars:5000}") int maxInputLength,
+                             @Value("${OPENROUTER_OVERALL_TIMEOUT_SECONDS:30}") int overallTimeoutSeconds) {
         this.httpWrapper = Objects.requireNonNull(httpWrapper, "httpWrapper");
         this.conversationCache = Caffeine.newBuilder()
                 .expireAfterWrite(30, TimeUnit.MINUTES)
                 .maximumSize(10000)
                 .build();
         this.maxInputLength = maxInputLength;
+        this.overallTimeoutSeconds = (overallTimeoutSeconds > 0) ? overallTimeoutSeconds : 30; // fallback to 30s if invalid
     }
 
     @Override
@@ -242,7 +245,7 @@ public class OpenRouterServices implements IOpenRouterService {
         logger.fine("callOpenRouterAndExtract: calling HttpWrapper");
         try {
             CompletableFuture<HttpDto> future = httpWrapper.postToOpenRouterAsync(messages);
-            HttpDto dto = future.get(30, TimeUnit.SECONDS);
+            HttpDto dto = future.get(overallTimeoutSeconds, TimeUnit.SECONDS);
             logger.fine(() -> "callOpenRouterAndExtract: received dto=" + (dto == null ? "null" : String.valueOf(dto.statusCode())));
             if (dto == null) {
                 logger.warning("callOpenRouterAndExtract: No response from AI service");
@@ -437,3 +440,5 @@ public class OpenRouterServices implements IOpenRouterService {
         conversationCache.put(conversationId, history);
     }
 }
+
+// Timeout is now configurable via the OPENROUTER_OVERALL_TIMEOUT_SECONDS environment variable (default 30s).

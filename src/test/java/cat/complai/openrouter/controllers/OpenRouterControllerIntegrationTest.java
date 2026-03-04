@@ -263,7 +263,7 @@ public class OpenRouterControllerIntegrationTest {
         @Singleton
         @Replaces(OpenRouterServices.class)
         IOpenRouterService openRouterService(HttpWrapper httpWrapper) {
-            return new OpenRouterServices(httpWrapper, 5000);
+            return new OpenRouterServices(httpWrapper, 5000, 30);
         }
     }
 }

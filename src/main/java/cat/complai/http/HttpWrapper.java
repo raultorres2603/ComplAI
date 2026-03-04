@@ -36,6 +36,8 @@ public class HttpWrapper {
     private final ObjectMapper mapper;
     private final Logger logger = Logger.getLogger(HttpWrapper.class.getName());
 
+    private final int requestTimeoutSeconds;
+
     /**
      * Protected no-arg constructor to allow tests to subclass HttpWrapper without needing DI.
      * Initializes fields with safe defaults.
@@ -45,15 +47,17 @@ public class HttpWrapper {
         this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
         this.mapper = new ObjectMapper();
         this.headers = Map.of();
+        this.requestTimeoutSeconds = 20; // default fallback
     }
 
     @Inject
     public HttpWrapper(@Value("${openrouter.url:https://openrouter.ai/api/v1/chat/completions}") String openRouterUrl,
-                       @Value("${OPENROUTER_API_KEY:}") String openRouterApiKey) {
+                       @Value("${OPENROUTER_API_KEY:}") String openRouterApiKey,
+                       @Value("${OPENROUTER_REQUEST_TIMEOUT_SECONDS:20}") int requestTimeoutSeconds) {
         this.openRouterUrl = normalizeOpenRouterUrl(openRouterUrl);
         this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
         this.mapper = new ObjectMapper();
-
+        this.requestTimeoutSeconds = (requestTimeoutSeconds > 0) ? requestTimeoutSeconds : 20; // fallback to 20s if invalid
         Map<String, String> h = new HashMap<>();
         if (openRouterApiKey != null && !openRouterApiKey.isBlank()) {
             h.put("Authorization", openRouterApiKey);
@@ -105,7 +109,7 @@ public class HttpWrapper {
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(openRouterUrl))
-                    .timeout(Duration.ofSeconds(20))
+                    .timeout(Duration.ofSeconds(requestTimeoutSeconds)) // Configurable per-request timeout
                     .header("Content-Type", "application/json")
                     .header("Authorization", authValue)
                     .header("Referer", headers.getOrDefault("HTTP-Referer", "https://complai.cat"))
@@ -165,7 +169,7 @@ public class HttpWrapper {
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(openRouterUrl))
-                    .timeout(Duration.ofSeconds(20))
+                    .timeout(Duration.ofSeconds(requestTimeoutSeconds)) // Configurable per-request timeout
                     .header("Content-Type", "application/json")
                     .header("Authorization", authValue)
                     .header("Referer", headers.getOrDefault("HTTP-Referer", "https://complai.cat"))
@@ -253,3 +257,4 @@ public class HttpWrapper {
         }
     }
 }
+// Timeout is now configurable via the OPENROUTER_REQUEST_TIMEOUT_SECONDS environment variable (default 20s).

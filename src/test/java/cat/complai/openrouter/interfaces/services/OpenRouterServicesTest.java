@@ -68,7 +68,7 @@ public class OpenRouterServicesTest {
     @Test
     void ask_happyPath_returnsAiMessage() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
-        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000);
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30);
 
         String input = "Is there a recycling center in El Prat de Llobregat?";
         OpenRouterResponseDto out = svc.ask(input, null);
@@ -80,7 +80,7 @@ public class OpenRouterServicesTest {
     @Test
     void ask_wrapperError_surfacesError() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
-        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000);
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30);
 
         String input = "How to contact the Ajuntament of El Prat? [UPSTREAM]";
         OpenRouterResponseDto out = svc.ask(input, null);
@@ -91,7 +91,7 @@ public class OpenRouterServicesTest {
     @Test
     void ask_aiRefuses_whenNotAboutElPrat() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
-        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000);
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30);
 
         String input = "What is the capital of France? [REFUSE]";
         OpenRouterResponseDto out = svc.ask(input, null);
@@ -102,7 +102,7 @@ public class OpenRouterServicesTest {
     @Test
     void redact_emptyComplaint_rejects() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
-        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000);
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30);
 
         OpenRouterResponseDto out = svc.redactComplaint("   ", OutputFormat.JSON, null);
         assertFalse(out.isSuccess());
@@ -112,7 +112,7 @@ public class OpenRouterServicesTest {
     @Test
     void redact_pdfRequested_returnsPdfMagicBytes() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
-        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000);
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30);
 
         OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [HEADER]", OutputFormat.PDF, null);
         assertTrue(out.isSuccess());
@@ -124,7 +124,7 @@ public class OpenRouterServicesTest {
     @Test
     void redact_missingJsonHeader_withAutoFormat_fallsBackToJsonSuccess() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
-        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000);
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30);
 
         String aiMessage = "Dear Ajuntament,\n\nI am writing to complain about...\n\nSincerely,\nResident";
         OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [NOHEADER]", OutputFormat.AUTO, null);
@@ -137,7 +137,7 @@ public class OpenRouterServicesTest {
     @Test
     void redact_missingJsonHeader_withJsonFormat_fallsBackToJsonSuccess() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
-        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000);
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30);
 
         String aiMessage = "Dear Ajuntament,\n\nI am writing to complain about...\n\nSincerely,\nResident";
         OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [NOHEADER]", OutputFormat.JSON, null);
@@ -151,7 +151,7 @@ public class OpenRouterServicesTest {
         // When the client explicitly asked for PDF but the AI omits the header we cannot extract
         // a clean letter body, so the service must return an error rather than produce a broken PDF.
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
-        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000);
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30);
 
         OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [NOHEADER]", OutputFormat.PDF, null);
 
@@ -162,7 +162,7 @@ public class OpenRouterServicesTest {
     @Test
     void redact_auto_shouldProducePdf_whenAiReturnsFormalLetter() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
-        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000);
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30);
 
         "I am writing to express my concern about noise pollution near my residence. This has been ongoing and affects quality of life. ".repeat(30);
 
@@ -177,7 +177,7 @@ public class OpenRouterServicesTest {
     @Test
     void ask_tooLong_rejects() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
-        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000);
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30);
         OpenRouterResponseDto out = svc.ask("a".repeat(5001), null);
         assertFalse(out.isSuccess());
         assertEquals(OpenRouterErrorCode.VALIDATION, out.getErrorCode());
@@ -187,7 +187,7 @@ public class OpenRouterServicesTest {
     @Test
     void redactComplaint_tooLong_rejects() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
-        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000);
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30);
         OpenRouterResponseDto out = svc.redactComplaint("b".repeat(5001), OutputFormat.JSON, null);
         assertFalse(out.isSuccess());
         assertEquals(OpenRouterErrorCode.VALIDATION, out.getErrorCode());
