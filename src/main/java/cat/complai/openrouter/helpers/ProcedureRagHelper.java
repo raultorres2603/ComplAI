@@ -58,11 +58,10 @@ public class ProcedureRagHelper {
         String region = System.getenv(ENV_PROCEDURES_REGION);
         if (bucket != null && key != null && region != null) {
             // Try to load from S3
-            try {
-                software.amazon.awssdk.services.s3.S3Client s3 = software.amazon.awssdk.services.s3.S3Client.builder()
-                        .region(software.amazon.awssdk.regions.Region.of(region))
-                        .credentialsProvider(software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider.create())
-                        .build();
+            try (software.amazon.awssdk.services.s3.S3Client s3 = software.amazon.awssdk.services.s3.S3Client.builder()
+                    .region(software.amazon.awssdk.regions.Region.of(region))
+                    .credentialsProvider(software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider.create())
+                    .build()) {
                 software.amazon.awssdk.services.s3.model.GetObjectRequest req = software.amazon.awssdk.services.s3.model.GetObjectRequest.builder()
                         .bucket(bucket)
                         .key(key)
