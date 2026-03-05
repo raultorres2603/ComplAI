@@ -37,6 +37,7 @@ public class HttpWrapper {
     private final Logger logger = Logger.getLogger(HttpWrapper.class.getName());
 
     private final int requestTimeoutSeconds;
+    private final String openRouterModel;
 
     /**
      * Protected no-arg constructor to allow tests to subclass HttpWrapper without needing DI.
@@ -48,16 +49,19 @@ public class HttpWrapper {
         this.mapper = new ObjectMapper();
         this.headers = Map.of();
         this.requestTimeoutSeconds = 20; // default fallback
+        this.openRouterModel = "arcee-ai/trinity-large-preview:free";
     }
 
     @Inject
     public HttpWrapper(@Value("${openrouter.url:https://openrouter.ai/api/v1/chat/completions}") String openRouterUrl,
                        @Value("${OPENROUTER_API_KEY:}") String openRouterApiKey,
-                       @Value("${OPENROUTER_REQUEST_TIMEOUT_SECONDS:20}") int requestTimeoutSeconds) {
+                       @Value("${OPENROUTER_REQUEST_TIMEOUT_SECONDS:20}") int requestTimeoutSeconds,
+                       @Value("${OPENROUTER_MODEL:arcee-ai/trinity-large-preview:free}") String openRouterModel) {
         this.openRouterUrl = normalizeOpenRouterUrl(openRouterUrl);
         this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
         this.mapper = new ObjectMapper();
         this.requestTimeoutSeconds = (requestTimeoutSeconds > 0) ? requestTimeoutSeconds : 20; // fallback to 20s if invalid
+        this.openRouterModel = openRouterModel;
         Map<String, String> h = new HashMap<>();
         if (openRouterApiKey != null && !openRouterApiKey.isBlank()) {
             h.put("Authorization", openRouterApiKey);
@@ -70,7 +74,6 @@ public class HttpWrapper {
     public CompletableFuture<HttpDto> postToOpenRouterAsync(String userPrompt) {
         logger.fine(() -> "postToOpenRouterAsync called; prompt length=" + (userPrompt == null ? 0 : userPrompt.length()));
         try {
-            String model = "arcee-ai/trinity-large-preview:free";
 
             // Friendlier, town-tone system message for civilian users from El Prat de Llobregat.
             String systemMessage = """
@@ -86,7 +89,7 @@ public class HttpWrapper {
             Map<String, Object> systemMsg = Map.of("role", "system", "content", systemMessage);
 
             Map<String, Object> payload = Map.of(
-                    "model", model,
+                    "model", openRouterModel,
                     "messages", List.of(systemMsg, userMessage)
             );
             String requestBody = mapper.writeValueAsString(payload);
@@ -147,9 +150,8 @@ public class HttpWrapper {
     public CompletableFuture<HttpDto> postToOpenRouterAsync(List<Map<String, Object>> messages) {
         logger.fine(() -> "postToOpenRouterAsync (multi-turn) called; messages count=" + (messages == null ? 0 : messages.size()));
         try {
-            String model = "arcee-ai/trinity-large-preview:free";
             Map<String, Object> payload = Map.of(
-                    "model", model,
+                    "model", openRouterModel,
                     "messages", messages
             );
             String requestBody = mapper.writeValueAsString(payload);
