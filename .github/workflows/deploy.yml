@@ -179,6 +179,16 @@ jobs:
           LEN=$(echo -n "$OPENROUTER_API_KEY" | wc -c | tr -d ' ')
           echo "OPENROUTER_API_KEY is set (length: $LEN, value: [REDACTED])."
 
+      - name: Verify OPENROUTER_MODEL is set
+        env:
+          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
+        run: |
+          if [ -z "$OPENROUTER_MODEL" ]; then
+            echo "ERROR: OPENROUTER_MODEL variable is not set for the '${{ steps.target.outputs.environment }}' environment." >&2
+            exit 1
+          fi
+          echo "OPENROUTER_MODEL is set (value: [REDACTED])."
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
         with:
@@ -220,6 +230,7 @@ jobs:
       - name: Deploy with AWS CDK
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
           TARGET_ENV: ${{ steps.target.outputs.environment }}
         run: |
           # Resolve the shadow JAR. Prefer *-all.jar (shadowJar output).

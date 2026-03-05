@@ -113,6 +113,7 @@ export class LambdaStack extends cdk.Stack {
         PROCEDURES_BUCKET: proceduresBucket.bucketName,
         PROCEDURES_KEY: 'procedures.json',
         PROCEDURES_REGION: this.region,
+        OPENROUTER_MODEL: process.env.OPENROUTER_MODEL || 'arcee-ai/trinity-large-preview:free',
       },
       role: lambdaRole,
     });
