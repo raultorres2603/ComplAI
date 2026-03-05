@@ -76,14 +76,23 @@ public class OpenRouterServices implements IOpenRouterService {
         sb.append("CONTEXT FROM PRAT ESPAIS PROCEDURES:\n\n");
         for (ProcedureRagHelper.Procedure p : matches) {
             sb.append("---\n");
-            sb.append("Procedure: ").append(p.title).append("\n");
-            sb.append("Source: ").append(p.url).append("\n\n");
-            sb.append(p.description).append("\n");
-            if (!p.requirements.isBlank()) sb.append("Requirements: ").append(p.requirements).append("\n");
-            if (!p.steps.isBlank()) sb.append("Steps: ").append(p.steps).append("\n");
-            if (!p.fees.isBlank()) sb.append("Fees: ").append(p.fees).append("\n");
-            if (!p.office.isBlank()) sb.append("Office: ").append(p.office).append("\n");
-            if (!p.deadlines.isBlank()) sb.append("Deadlines: ").append(p.deadlines).append("\n");
+            sb.append("**").append(p.title).append("**\n");
+            sb.append("[Més informació] (").append(p.url).append(")\n\n");
+            if (!p.description.isBlank()) sb.append(p.description).append("\n\n");
+            if (!p.requirements.isBlank()) {
+                sb.append("**Requisits:**\n");
+                for (String req : p.requirements.split("\\n")) {
+                    if (!req.isBlank()) sb.append("- ").append(req.trim()).append("\n");
+                }
+                sb.append("\n");
+            }
+            if (!p.steps.isBlank()) {
+                sb.append("**Passos:**\n");
+                for (String step : p.steps.split("\\n")) {
+                    if (!step.isBlank()) sb.append("- ").append(step.trim()).append("\n");
+                }
+                sb.append("\n");
+            }
             sb.append("---\n\n");
         }
         sb.append("Use this context to answer the user's question. If the context is relevant, cite the procedure name and provide the source link. If the context does not help, answer based on your general knowledge about El Prat.");
