@@ -88,7 +88,7 @@ public class PratEspaisScraper {
                 proc.put("procedureId", procId);
                 proc.put("url", href);
 
-                Element title = doc.selectFirst(".iconesTramit span");
+                Element title = doc.selectFirst("span .iconesTramit");
                 proc.put("title", title != null ? title.text().trim() : "");
 
                 Element desc = doc.selectFirst(".introduccio");
