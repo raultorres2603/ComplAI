@@ -16,8 +16,11 @@ import java.io.IOException;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.*;
+import java.util.logging.Logger;
 
 public class PratEspaisScraper {
+
+    private static final Logger logger = Logger.getLogger(PratEspaisScraper.class.getName());
     public static void main(String[] args) throws IOException {
         String baseUrl = "https://tramits.pratespais.com/Ciutadania/TramitsTemes.aspx";
         String bucket = System.getenv("PROCEDURES_BUCKET");
@@ -35,7 +38,7 @@ public class PratEspaisScraper {
         // We start on the main page
         categoryUrlsToVisit.add(baseUrl);
 
-        System.out.println("Crawling categories to find all procedures...");
+        logger.info("Crawling categories to find all procedures...");
 
         // 1. Search for all category URLs starting from the main page, and collect detail URLs
         while (!categoryUrlsToVisit.isEmpty()) {
@@ -67,11 +70,11 @@ public class PratEspaisScraper {
                     }
                 }
             } catch (Exception e) {
-                System.err.println("Failed to fetch category page: " + currentUrl + " - " + e.getMessage());
+                logger.severe("Failed to fetch category page: " + currentUrl + " - " + e.getMessage());
             }
         }
 
-        System.out.println("Found " + detailUrls.size() + " unique procedures. Starting scrape...");
+        logger.info("Found " + detailUrls.size() + " unique procedures. Starting scrape...");
 
         // 2. Export every procedure detail page into a Map and add it to the list of procedures
         List<Map<String, String>> procedures = new ArrayList<>();
@@ -85,7 +88,7 @@ public class PratEspaisScraper {
                 proc.put("procedureId", procId);
                 proc.put("url", href);
 
-                Element title = doc.selectFirst(".iconesTramit, .senseCertificat, h1, .titolTramit");
+                Element title = doc.selectFirst(".iconesTramit span");
                 proc.put("title", title != null ? title.text().trim() : "");
 
                 Element desc = doc.selectFirst(".introduccio");
@@ -102,14 +105,14 @@ public class PratEspaisScraper {
                 proc.put("steps", steps != null ? steps.text().trim() : "");
 
                 // get only the text content of the page, excluding headers, footers, and navigation
-                if (!proc.get("title").isEmpty()) {
+                if (!proc.get("title").isEmpty() && !proc.get("title").equalsIgnoreCase("Portal de Tràmits")) {
                     procedures.add(proc);
-                    System.out.println("Successfully scraped: " + href);
+                    logger.info("Successfully scraped: " + href);
                 } else {
-                    System.out.println("Skipped (no valid content found): " + href);
+                    logger.info("Skipped (no valid content found): " + href);
                 }
             } catch (Exception e) {
-                System.err.println("Failed to scrape procedure page: " + href + " - " + e.getMessage());
+                logger.severe("Failed to scrape procedure page: " + href + " - " + e.getMessage());
             }
         }
 
@@ -136,7 +139,7 @@ public class PratEspaisScraper {
                             .build(),
                     Paths.get("procedures.json"));
 
-            System.out.println("Uploaded procedures.json to S3 bucket: " + bucket);
+            logger.info("Uploaded procedures.json to S3 bucket: " + bucket);
         }
     }
 }
