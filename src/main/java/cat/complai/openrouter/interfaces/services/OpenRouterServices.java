@@ -20,9 +20,6 @@ import java.util.logging.Logger;
 import java.util.*;
 
 // PDFBox imports
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.pdmodel.PDPage;
-import org.apache.pdfbox.pdmodel.common.PDRectangle;
 
 import cat.complai.openrouter.dto.OutputFormat;
 import cat.complai.openrouter.helpers.AiParsed;
@@ -73,17 +70,17 @@ public class OpenRouterServices implements IOpenRouterService {
         for (ProcedureRagHelper.Procedure p : matches) {
             sb.append("---\n");
             sb.append("**").append(p.title).append("**\n");
-            sb.append("[Més informació] (").append(p.url).append(")\n\n");
+            sb.append("[More information] (").append(p.url).append(")\n\n");
             if (!p.description.isBlank()) sb.append(p.description).append("\n\n");
             if (!p.requirements.isBlank()) {
-                sb.append("**Requisits:**\n");
+                sb.append("**Requirements:**\n");
                 for (String req : p.requirements.split("\\n")) {
                     if (!req.isBlank()) sb.append("- ").append(req.trim()).append("\n");
                 }
                 sb.append("\n");
             }
             if (!p.steps.isBlank()) {
-                sb.append("**Passos:**\n");
+                sb.append("**Steps:**\n");
                 for (String step : p.steps.split("\\n")) {
                     if (!step.isBlank()) sb.append("- ").append(step.trim()).append("\n");
                 }
@@ -359,12 +356,6 @@ public class OpenRouterServices implements IOpenRouterService {
             logger.log(Level.SEVERE, "Error calling AI service", e);
             return new OpenRouterResponseDto(false, null, e.getMessage(), null, OpenRouterErrorCode.INTERNAL);
         }
-    }
-
-    private PDPage addNewPage(PDDocument doc) {
-        PDPage newPage = new PDPage(PDRectangle.LETTER);
-        doc.addPage(newPage);
-        return newPage;
     }
 
     private void updateConversationHistory(String conversationId, String userMessage, String assistantMessage) {
