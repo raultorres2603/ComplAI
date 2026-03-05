@@ -19,7 +19,6 @@ import java.util.*;
 
 public class PratEspaisScraper {
     public static void main(String[] args) throws IOException {
-        // Updated Base URL to the categorization page
         String baseUrl = "https://tramits.pratespais.com/Ciutadania/TramitsTemes.aspx";
         String bucket = System.getenv("PROCEDURES_BUCKET");
         String key = "procedures.json";
@@ -29,37 +28,41 @@ public class PratEspaisScraper {
             System.exit(1);
         }
 
-        // 1. Discover all categories and procedure links via crawling
         Set<String> categoryUrlsToVisit = new HashSet<>();
         Set<String> visitedCategoryUrls = new HashSet<>();
         Set<String> detailUrls = new HashSet<>();
 
+        // We start on the main page
         categoryUrlsToVisit.add(baseUrl);
 
         System.out.println("Crawling categories to find all procedures...");
 
+        // 1. Search for all category URLs starting from the main page, and collect detail URLs
         while (!categoryUrlsToVisit.isEmpty()) {
             String currentUrl = categoryUrlsToVisit.iterator().next();
             categoryUrlsToVisit.remove(currentUrl);
 
-            // Skip if we've already parsed this category page
+            // If we've already visited this category URL, skip it
             if (!visitedCategoryUrls.add(currentUrl)) continue;
 
             try {
                 Document doc = Jsoup.connect(currentUrl).get();
-                Elements links = doc.select("a[href]");
 
-                for (Element link : links) {
+                // Take all category links from the current page
+                Elements categoryLinks = doc.select("div.LlistaTemes.LlistatMenu ul.llistat a[href]");
+                for (Element link : categoryLinks) {
                     String href = link.absUrl("href");
-
-                    // If it's a category page (menu links), add it to the crawl queue
-                    if (href.contains("TramitsTemes.aspx")) {
-                        if (!visitedCategoryUrls.contains(href)) {
-                            categoryUrlsToVisit.add(href);
-                        }
+                    if (!visitedCategoryUrls.contains(href)) {
+                        categoryUrlsToVisit.add(href);
                     }
-                    // If it's a detail page ("Informació" button), save it to scrape later
-                    else if (href.contains("DetallTramit.aspx")) {
+                }
+
+                // Take all procedure detail links from the current page
+                Elements procLinks = doc.select("a[href*='DetallTramit.aspx']");
+                for (Element link : procLinks) {
+                    String href = link.absUrl("href");
+                    // Do not include links that have "Tramitar=True" as they are not the actual detail pages but the ones that trigger the process
+                    if (!href.contains("Tramitar=True")) {
                         detailUrls.add(href);
                     }
                 }
@@ -70,7 +73,7 @@ public class PratEspaisScraper {
 
         System.out.println("Found " + detailUrls.size() + " unique procedures. Starting scrape...");
 
-        // 2. Scrape each detail page collected
+        // 2. Export every procedure detail page into a Map and add it to the list of procedures
         List<Map<String, String>> procedures = new ArrayList<>();
 
         for (String href : detailUrls) {
@@ -78,20 +81,16 @@ public class PratEspaisScraper {
                 Document doc = Jsoup.connect(href).get();
                 Map<String, String> proc = new HashMap<>();
 
-                // Add procedureId! ProcedureRagHelper expects this field.
-                // We generate a deterministic UUID based on the URL.
                 String procId = UUID.nameUUIDFromBytes(href.getBytes()).toString();
                 proc.put("procedureId", procId);
                 proc.put("url", href);
 
-                // Try to catch the title using various common ASPX title classes
                 Element title = doc.selectFirst(".iconesTramit, .senseCertificat, h1, .titolTramit");
-                proc.put("title", title != null ? title.text() : "");
+                proc.put("title", title != null ? title.text().trim() : "");
 
                 Element desc = doc.selectFirst(".introduccio");
-                proc.put("description", desc != null ? desc.text() : "");
+                proc.put("description", desc != null ? desc.text().trim() : "");
 
-                // Requirements: all <ul> inside .introduccio
                 Elements reqLists = doc.select(".introduccio ul");
                 StringBuilder reqText = new StringBuilder();
                 for (Element ul : reqLists) {
@@ -100,16 +99,21 @@ public class PratEspaisScraper {
                 proc.put("requirements", reqText.toString().trim());
 
                 Element steps = doc.selectFirst(".block, .blockFirst");
-                proc.put("steps", steps != null ? steps.text() : "");
+                proc.put("steps", steps != null ? steps.text().trim() : "");
 
-                procedures.add(proc);
-                System.out.println("Successfully scraped: " + href);
+                // get only the text content of the page, excluding headers, footers, and navigation
+                if (!proc.get("title").isEmpty()) {
+                    procedures.add(proc);
+                    System.out.println("Successfully scraped: " + href);
+                } else {
+                    System.out.println("Skipped (no valid content found): " + href);
+                }
             } catch (Exception e) {
                 System.err.println("Failed to scrape procedure page: " + href + " - " + e.getMessage());
             }
         }
 
-        // 3. Write to local file with the correct JSON structure requested in README.md
+        // 3. Create a JSON file with the list of procedures, including metadata about the generation time and source URL
         Map<String, Object> rootJson = new HashMap<>();
         rootJson.put("generatedAt", Instant.now().toString());
         rootJson.put("sourceUrl", baseUrl);
@@ -120,7 +124,7 @@ public class PratEspaisScraper {
             fw.write(new ObjectMapper().writeValueAsString(rootJson));
         }
 
-        // 4. Upload to S3
+        // 4. Upload the JSON file to the specified S3 bucket
         try (S3Client s3 = S3Client.builder()
                 .region(Region.EU_SOUTH_2)
                 .credentialsProvider(DefaultCredentialsProvider.create())
