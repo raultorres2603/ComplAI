@@ -22,20 +22,14 @@ public class ProcedureRagHelper {
         public final String description;
         public final String requirements;
         public final String steps;
-        public final String fees;
-        public final String office;
-        public final String deadlines;
         public final String url;
 
-        public Procedure(String procedureId, String title, String description, String requirements, String steps, String fees, String office, String deadlines, String url) {
+        public Procedure(String procedureId, String title, String description, String requirements, String steps, String url) {
             this.procedureId = procedureId;
             this.title = title;
             this.description = description;
             this.requirements = requirements;
             this.steps = steps;
-            this.fees = fees;
-            this.office = office;
-            this.deadlines = deadlines;
             this.url = url;
         }
     }
@@ -64,11 +58,10 @@ public class ProcedureRagHelper {
         String region = System.getenv(ENV_PROCEDURES_REGION);
         if (bucket != null && key != null && region != null) {
             // Try to load from S3
-            try {
-                software.amazon.awssdk.services.s3.S3Client s3 = software.amazon.awssdk.services.s3.S3Client.builder()
-                        .region(software.amazon.awssdk.regions.Region.of(region))
-                        .credentialsProvider(software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider.create())
-                        .build();
+            try (software.amazon.awssdk.services.s3.S3Client s3 = software.amazon.awssdk.services.s3.S3Client.builder()
+                    .region(software.amazon.awssdk.regions.Region.of(region))
+                    .credentialsProvider(software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider.create())
+                    .build()) {
                 software.amazon.awssdk.services.s3.model.GetObjectRequest req = software.amazon.awssdk.services.s3.model.GetObjectRequest.builder()
                         .bucket(bucket)
                         .key(key)
@@ -96,9 +89,6 @@ public class ProcedureRagHelper {
                     node.path("description").asText(),
                     node.path("requirements").asText(),
                     node.path("steps").asText(),
-                    node.path("fees").asText(),
-                    node.path("office").asText(),
-                    node.path("deadlines").asText(),
                     node.path("url").asText()
             ));
         }
@@ -115,9 +105,6 @@ public class ProcedureRagHelper {
                 doc.add(new TextField("description", p.description, Field.Store.YES));
                 doc.add(new TextField("requirements", p.requirements, Field.Store.YES));
                 doc.add(new TextField("steps", p.steps, Field.Store.YES));
-                doc.add(new TextField("fees", p.fees, Field.Store.YES));
-                doc.add(new TextField("office", p.office, Field.Store.YES));
-                doc.add(new TextField("deadlines", p.deadlines, Field.Store.YES));
                 doc.add(new StringField("url", p.url, Field.Store.YES));
                 writer.addDocument(doc);
             }
@@ -140,9 +127,6 @@ public class ProcedureRagHelper {
                         doc.get("description"),
                         doc.get("requirements"),
                         doc.get("steps"),
-                        doc.get("fees"),
-                        doc.get("office"),
-                        doc.get("deadlines"),
                         doc.get("url")
                 ));
             }

@@ -173,12 +173,6 @@ export class LambdaStack extends cdk.Stack {
       throttlingRateLimit: 10,  // Steady-state rate (req/sec)
     };
 
-    // Expose the HTTP API endpoint as a CloudFormation output so deploys and CI can discover it easily.
-    new cdk.CfnOutput(this, 'ComplAIHttpApiEndpoint', {
-      value: httpApi.apiEndpoint,
-      description: `URL of the deployed ComplAI HTTP API (${environment})`,
-    });
-
     // Expose the Lambda name and ARN as CloudFormation outputs so deploys (and CI)
     // can easily discover the physical identifiers. These are safe to emit and
     // helpful for debugging and automation. The function name includes the CDK

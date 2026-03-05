@@ -20,13 +20,6 @@ import java.util.logging.Logger;
 import java.util.*;
 
 // PDFBox imports
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.pdmodel.PDPage;
-import org.apache.pdfbox.pdmodel.common.PDRectangle;
-import org.apache.pdfbox.pdmodel.font.PDType1Font;
-import org.apache.pdfbox.pdmodel.PDPageContentStream;
-
-import java.io.ByteArrayOutputStream;
 
 import cat.complai.openrouter.dto.OutputFormat;
 import cat.complai.openrouter.helpers.AiParsed;
@@ -76,14 +69,23 @@ public class OpenRouterServices implements IOpenRouterService {
         sb.append("CONTEXT FROM PRAT ESPAIS PROCEDURES:\n\n");
         for (ProcedureRagHelper.Procedure p : matches) {
             sb.append("---\n");
-            sb.append("Procedure: ").append(p.title).append("\n");
-            sb.append("Source: ").append(p.url).append("\n\n");
-            sb.append(p.description).append("\n");
-            if (!p.requirements.isBlank()) sb.append("Requirements: ").append(p.requirements).append("\n");
-            if (!p.steps.isBlank()) sb.append("Steps: ").append(p.steps).append("\n");
-            if (!p.fees.isBlank()) sb.append("Fees: ").append(p.fees).append("\n");
-            if (!p.office.isBlank()) sb.append("Office: ").append(p.office).append("\n");
-            if (!p.deadlines.isBlank()) sb.append("Deadlines: ").append(p.deadlines).append("\n");
+            sb.append("**").append(p.title).append("**\n");
+            sb.append("[More information] (").append(p.url).append(")\n\n");
+            if (!p.description.isBlank()) sb.append(p.description).append("\n\n");
+            if (!p.requirements.isBlank()) {
+                sb.append("**Requirements:**\n");
+                for (String req : p.requirements.split("\\n")) {
+                    if (!req.isBlank()) sb.append("- ").append(req.trim()).append("\n");
+                }
+                sb.append("\n");
+            }
+            if (!p.steps.isBlank()) {
+                sb.append("**Steps:**\n");
+                for (String step : p.steps.split("\\n")) {
+                    if (!step.isBlank()) sb.append("- ").append(step.trim()).append("\n");
+                }
+                sb.append("\n");
+            }
             sb.append("---\n\n");
         }
         sb.append("Use this context to answer the user's question. If the context is relevant, cite the procedure name and provide the source link. If the context does not help, answer based on your general knowledge about El Prat.");
@@ -354,120 +356,6 @@ public class OpenRouterServices implements IOpenRouterService {
             logger.log(Level.SEVERE, "Error calling AI service", e);
             return new OpenRouterResponseDto(false, null, e.getMessage(), null, OpenRouterErrorCode.INTERNAL);
         }
-    }
-
-    // ------------------ PDF generation refactor helpers ------------------
-    private byte[] generatePdfFromText(String text) throws Exception {
-        try (PDDocument doc = new PDDocument()) {
-            writeBodyToDocument(doc, text);
-            try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-                doc.save(out);
-                return out.toByteArray();
-            }
-        }
-    }
-
-    private void writeBodyToDocument(PDDocument doc, String text) throws Exception {
-        final float margin = 50f;
-        final PDRectangle pageSize = PDRectangle.LETTER;
-        final float pageHeight = pageSize.getHeight();
-        final float titleGap = 20f;
-        final float leading = 14f;
-
-        float yStart = pageHeight - margin - titleGap;
-        float yPosition = yStart;
-
-        PDPage page = new PDPage(pageSize);
-        doc.addPage(page);
-        PDPageContentStream contents = new PDPageContentStream(doc, page);
-
-        // Title
-        contents.beginText();
-        contents.setFont(PDType1Font.HELVETICA_BOLD, 16);
-        contents.newLineAtOffset(margin, yStart + 10);
-        contents.showText("Redacted complaint");
-        contents.endText();
-
-        // Begin body
-        contents.beginText();
-        contents.setFont(PDType1Font.HELVETICA, 12);
-        contents.newLineAtOffset(margin, yPosition);
-
-        // Normalize and split paragraphs
-        String normalized = (text == null) ? "" : text.replace("\r", "");
-        String[] paragraphs = normalized.split("\n\\s*\n");
-        int maxPerLine = 90;
-
-        for (String s : paragraphs) {
-            String paragraph = s.replace("\n", " ").trim();
-            if (paragraph.isEmpty()) {
-                yPosition -= leading;
-                contents.newLineAtOffset(0, -leading);
-                if (yPosition < margin) {
-                    contents.endText();
-                    contents.close();
-                    page = addNewPage(doc);
-                    contents = new PDPageContentStream(doc, page);
-                    yPosition = yStart;
-                    contents.beginText();
-                    contents.setFont(PDType1Font.HELVETICA, 12);
-                    contents.newLineAtOffset(margin, yPosition);
-                }
-                continue;
-            }
-
-            String[] words = paragraph.split("\\s+");
-            StringBuilder lineBuilder = new StringBuilder();
-            for (String w : words) {
-                if (lineBuilder.length() + w.length() + 1 > maxPerLine) {
-                    contents.showText(lineBuilder.toString().trim());
-                    contents.newLineAtOffset(0, -leading);
-                    yPosition -= leading;
-                    lineBuilder.setLength(0);
-
-                    if (yPosition < margin) {
-                        contents.endText();
-                        contents.close();
-                        page = addNewPage(doc);
-                        contents = new PDPageContentStream(doc, page);
-                        yPosition = yStart;
-                        contents.beginText();
-                        contents.setFont(PDType1Font.HELVETICA, 12);
-                        contents.newLineAtOffset(margin, yPosition);
-                    }
-                }
-                if (!lineBuilder.isEmpty()) lineBuilder.append(' ');
-                lineBuilder.append(w);
-            }
-            if (!lineBuilder.isEmpty()) {
-                contents.showText(lineBuilder.toString().trim());
-                contents.newLineAtOffset(0, -leading);
-                yPosition -= leading;
-            }
-
-            // paragraph gap
-            yPosition -= (leading / 2f);
-            contents.newLineAtOffset(0, -(leading / 2f));
-            if (yPosition < margin) {
-                contents.endText();
-                contents.close();
-                page = addNewPage(doc);
-                contents = new PDPageContentStream(doc, page);
-                yPosition = yStart;
-                contents.beginText();
-                contents.setFont(PDType1Font.HELVETICA, 12);
-                contents.newLineAtOffset(margin, yPosition);
-            }
-        }
-
-        contents.endText();
-        contents.close();
-    }
-
-    private PDPage addNewPage(PDDocument doc) {
-        PDPage newPage = new PDPage(PDRectangle.LETTER);
-        doc.addPage(newPage);
-        return newPage;
     }
 
     private void updateConversationHistory(String conversationId, String userMessage, String assistantMessage) {

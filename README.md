@@ -1180,7 +1180,7 @@ common procedures. Phase 2 follows naturally once the concept is validated.
 | **P1** | #9 PDF Extraction + Unicode Fix | 🟡 Medium | 🔴 Correctness (Catalan chars) | DONE     |
 | **P1** | #2 Rate Limiting (CDK) | 🟢 Small | 🔴 Security/Cost | DONE     |
 | **P1** | #3 Health Check | 🟢 Small | 🟡 Operability | DONE     |
-| **P2** | #11 Prat Espais Procedure Integration (Poor Man's RAG) — Phase 2–3 (S3 + Jsoup scraper) | 🟡 Medium | 🔴 Core Value Proposition | IN PROGRESS  |
+| **P2** | #11 Prat Espais Procedure Integration (Poor Man's RAG) — Phase 2–3 (S3 + Jsoup scraper) | 🟡 Medium | 🔴 Core Value Proposition | DONE     |
 | **P2** | #4 Language Selection | 🟢 Small | 🟡 UX | Pending  |
 | **P2** | #6 Audit Logging | 🟡 Medium | 🟡 Operability | Pending  |
 | **P2** | #10 Retry with Backoff | 🟡 Medium | 🟡 Reliability | Pending  |
