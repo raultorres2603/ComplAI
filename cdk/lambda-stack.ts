@@ -25,21 +25,6 @@ export class LambdaStack extends cdk.Stack {
 
     const { environment } = props;
 
-    // Create a CloudFormation parameter for the OpenRouter API key.
-    // We set noEcho: true so CloudFormation does not display the value in the console output.
-    // Note: passing secrets as CFN parameters means the secret will be present in the
-    // CloudFormation deployment context. This is a tradeoff when you can't use Secrets Manager.
-    const openRouterApiKey = new cdk.CfnParameter(this, 'OpenRouterApiKey', {
-      type: 'String',
-      noEcho: true,
-      description: 'OpenRouter API key (passed from CI during cdk deploy)',
-      // Ensure the parameter is not empty: CloudFormation will validate and fail the deploy
-      // if the provided value is an empty string. This prevents deploying a function with
-      // a missing API key. Using minLength is safer and fails early.
-      minLength: 1,
-      constraintDescription: 'OpenRouterApiKey must be provided and not be empty.',
-    });
-
     // Create a custom IAM role for Lambda with least privilege.
     // The logical ID includes the environment so both stacks can live in the same account.
     const lambdaRole = new iam.Role(this, `ComplAILambdaRole-${environment}`, {
@@ -107,7 +92,7 @@ export class LambdaStack extends cdk.Stack {
       // Be aware that environment variables are visible in the Lambda console; using
       // Secrets Manager or SSM Parameter Store with encryption is more secure if available.
       environment: {
-        OPENROUTER_API_KEY: openRouterApiKey.valueAsString,
+        OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
         OPENROUTER_REQUEST_TIMEOUT_SECONDS: process.env.OPENROUTER_REQUEST_TIMEOUT_SECONDS || '20',
         OPENROUTER_OVERALL_TIMEOUT_SECONDS: process.env.OPENROUTER_OVERALL_TIMEOUT_SECONDS || '30',
         PROCEDURES_BUCKET: proceduresBucket.bucketName,

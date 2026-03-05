@@ -257,7 +257,6 @@ jobs:
             --require-approval never \
             -c jarPath="$JAR_PATH" \
             -c environment="$TARGET_ENV" \
-            --parameters OpenRouterApiKey="$OPENROUTER_API_KEY" \
             --outputs-file "../cdk-outputs-${TARGET_ENV}.json"
 
       - name: Upload CDK outputs
