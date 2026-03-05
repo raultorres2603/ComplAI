@@ -15,16 +15,12 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 public class PratEspaisScraper {
     public static void main(String[] args) throws IOException {
-        String baseUrl = "https://tramits.pratespais.com/Ciutadania/";
+        // Updated Base URL to the categorization page
+        String baseUrl = "https://tramits.pratespais.com/Ciutadania/TramitsTemes.aspx";
         String bucket = System.getenv("PROCEDURES_BUCKET");
         String key = "procedures.json";
 
@@ -33,33 +29,63 @@ public class PratEspaisScraper {
             System.exit(1);
         }
 
-        // 1. Scrape index page
-        Document index = Jsoup.connect(baseUrl).get();
+        // 1. Discover all categories and procedure links via crawling
+        Set<String> categoryUrlsToVisit = new HashSet<>();
+        Set<String> visitedCategoryUrls = new HashSet<>();
+        Set<String> detailUrls = new HashSet<>();
 
-        // FIX 1: Look specifically for links that go to the detail pages
-        Elements links = index.select("a[href*='DetallTramit.aspx']");
+        categoryUrlsToVisit.add(baseUrl);
 
+        System.out.println("Crawling categories to find all procedures...");
+
+        while (!categoryUrlsToVisit.isEmpty()) {
+            String currentUrl = categoryUrlsToVisit.iterator().next();
+            categoryUrlsToVisit.remove(currentUrl);
+
+            // Skip if we've already parsed this category page
+            if (!visitedCategoryUrls.add(currentUrl)) continue;
+
+            try {
+                Document doc = Jsoup.connect(currentUrl).get();
+                Elements links = doc.select("a[href]");
+
+                for (Element link : links) {
+                    String href = link.absUrl("href");
+
+                    // If it's a category page (menu links), add it to the crawl queue
+                    if (href.contains("TramitsTemes.aspx")) {
+                        if (!visitedCategoryUrls.contains(href)) {
+                            categoryUrlsToVisit.add(href);
+                        }
+                    }
+                    // If it's a detail page ("Informació" button), save it to scrape later
+                    else if (href.contains("DetallTramit.aspx")) {
+                        detailUrls.add(href);
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Failed to fetch category page: " + currentUrl + " - " + e.getMessage());
+            }
+        }
+
+        System.out.println("Found " + detailUrls.size() + " unique procedures. Starting scrape...");
+
+        // 2. Scrape each detail page collected
         List<Map<String, String>> procedures = new ArrayList<>();
 
-        // FIX 2: Keep track of visited URLs to avoid scraping the same procedure multiple times
-        Set<String> visitedUrls = new HashSet<>();
-
-        for (Element link : links) {
-            String href = link.absUrl("href");
-
-            // Skip if we already scraped this exact procedure URL
-            if (!visitedUrls.add(href)) continue;
-
+        for (String href : detailUrls) {
             try {
                 Document doc = Jsoup.connect(href).get();
                 Map<String, String> proc = new HashMap<>();
+
+                // Add procedureId! ProcedureRagHelper expects this field.
+                // We generate a deterministic UUID based on the URL.
+                String procId = UUID.nameUUIDFromBytes(href.getBytes()).toString();
+                proc.put("procedureId", procId);
                 proc.put("url", href);
 
-                // FIX 3: YOU NEED TO UPDATE THESE SELECTORS!
-                // Inspect the DetallTramit.aspx page in your browser to find the real IDs or classes.
-                // For ASPX pages, they usually look like "#ctl00_MainContent_lblDescripcio"
-
-                Element title = doc.selectFirst(".iconesTramit, .senseCertificat");
+                // Try to catch the title using various common ASPX title classes
+                Element title = doc.selectFirst(".iconesTramit, .senseCertificat, h1, .titolTramit");
                 proc.put("title", title != null ? title.text() : "");
 
                 Element desc = doc.selectFirst(".introduccio");
@@ -76,16 +102,14 @@ public class PratEspaisScraper {
                 Element steps = doc.selectFirst(".block, .blockFirst");
                 proc.put("steps", steps != null ? steps.text() : "");
 
-
                 procedures.add(proc);
                 System.out.println("Successfully scraped: " + href);
             } catch (Exception e) {
-                // Prevent a single bad page from crashing the whole scraping job
                 System.err.println("Failed to scrape procedure page: " + href + " - " + e.getMessage());
             }
         }
 
-        // 2. Write to local file with the correct JSON structure requested in README.md
+        // 3. Write to local file with the correct JSON structure requested in README.md
         Map<String, Object> rootJson = new HashMap<>();
         rootJson.put("generatedAt", Instant.now().toString());
         rootJson.put("sourceUrl", baseUrl);
@@ -93,11 +117,10 @@ public class PratEspaisScraper {
 
         File out = new File("procedures.json");
         try (FileWriter fw = new FileWriter(out)) {
-            // Let ObjectMapper handle the full JSON serialization properly
             fw.write(new ObjectMapper().writeValueAsString(rootJson));
         }
 
-        // 3. Upload to S3
+        // 4. Upload to S3
         try (S3Client s3 = S3Client.builder()
                 .region(Region.EU_SOUTH_2)
                 .credentialsProvider(DefaultCredentialsProvider.create())
