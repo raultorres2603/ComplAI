@@ -7,6 +7,7 @@ import cat.complai.openrouter.interfaces.IOpenRouterService;
 import cat.complai.openrouter.controllers.dto.AskRequest;
 import cat.complai.openrouter.controllers.dto.RedactRequest;
 import cat.complai.openrouter.dto.OutputFormat;
+import cat.complai.openrouter.helpers.AuditLogger;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
@@ -33,10 +34,29 @@ public class OpenRouterController {
     @Post("/ask")
     public HttpResponse<OpenRouterPublicDto> ask(@Body AskRequest request) {
         logger.info("POST /openrouter/ask called");
+        long start = System.currentTimeMillis();
         try {
             OpenRouterResponseDto dto = service.ask(request.getText(), request.getConversationId());
+            long latency = System.currentTimeMillis() - start;
+            AuditLogger.log(
+                "/complai/ask",
+                AuditLogger.hashText(request.getText()),
+                dto != null ? dto.getErrorCode().getCode() : -1,
+                latency,
+                null, // outputFormat not relevant for ask
+                null  // language (future)
+            );
             return errorToHttpResponse(dto, "ask");
         } catch (Exception e) {
+            long latency = System.currentTimeMillis() - start;
+            AuditLogger.log(
+                "/complai/ask",
+                AuditLogger.hashText(request != null ? request.getText() : null),
+                OpenRouterErrorCode.INTERNAL.getCode(),
+                latency,
+                null,
+                null
+            );
             logger.log(Level.SEVERE, "ask: unexpected exception", e);
             OpenRouterPublicDto err = new OpenRouterPublicDto(false, null, e.getMessage(), OpenRouterErrorCode.INTERNAL.getCode());
             return HttpResponse.serverError(err);
@@ -47,15 +67,22 @@ public class OpenRouterController {
     @Produces({MediaType.APPLICATION_JSON, MediaType.APPLICATION_PDF})
     public HttpResponse<?> redact(@Body RedactRequest request) {
         logger.info("POST /openrouter/redact called");
+        long start = System.currentTimeMillis();
         try {
             String text = request != null ? request.getText() : null;
             OutputFormat format = request == null ? OutputFormat.AUTO : request.getFormat();
             String conversationId = request == null ? null : request.getConversationId();
 
-            // Reject unsupported format values at the HTTP boundary before touching the service.
-            // Only PDF, JSON, and AUTO are valid. Any other value (e.g. "xml", "docx") means the
-            // client sent something we will never support: only PDF is produced as a document.
             if (!OutputFormat.isSupportedClientFormat(format)) {
+                long latency = System.currentTimeMillis() - start;
+                AuditLogger.log(
+                    "/complai/redact",
+                    AuditLogger.hashText(text),
+                    OpenRouterErrorCode.VALIDATION.getCode(),
+                    latency,
+                    format != null ? format.name() : null,
+                    null
+                );
                 OpenRouterPublicDto err = new OpenRouterPublicDto(
                         false, null,
                         "Unsupported format. Only 'pdf', 'json', or 'auto' are accepted. Documents are always produced as PDF.",
@@ -65,20 +92,32 @@ public class OpenRouterController {
             }
 
             OpenRouterResponseDto dto = service.redactComplaint(text, format, conversationId);
-
-            // If PDF data present and success, return it directly as application/pdf.
-            // Content-Length must be set explicitly: without it Netty cannot determine the body
-            // boundary, falls back to Connection: close, and the client fires channelInactive
-            // before reading the body — causing ResponseClosedException in tests and in production.
+            long latency = System.currentTimeMillis() - start;
+            AuditLogger.log(
+                "/complai/redact",
+                AuditLogger.hashText(text),
+                dto != null ? dto.getErrorCode().getCode() : -1,
+                latency,
+                format != null ? format.name() : null,
+                null
+            );
             if (dto != null && dto.isSuccess() && dto.getPdfData() != null) {
                 byte[] pdf = dto.getPdfData();
                 return HttpResponse.ok(pdf)
                         .contentType(MediaType.APPLICATION_PDF)
                         .header(io.micronaut.http.HttpHeaders.CONTENT_LENGTH, String.valueOf(pdf.length));
             }
-
             return errorToHttpResponse(dto, "redact");
         } catch (Exception e) {
+            long latency = System.currentTimeMillis() - start;
+            AuditLogger.log(
+                "/complai/redact",
+                AuditLogger.hashText(request != null ? request.getText() : null),
+                OpenRouterErrorCode.INTERNAL.getCode(),
+                latency,
+                request != null && request.getFormat() != null ? request.getFormat().name() : null,
+                null
+            );
             logger.log(Level.SEVERE, "redact: unexpected exception", e);
             OpenRouterPublicDto err = new OpenRouterPublicDto(false, null, e.getMessage(), OpenRouterErrorCode.INTERNAL.getCode());
             return HttpResponse.serverError(err);

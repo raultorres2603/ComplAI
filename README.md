@@ -203,6 +203,26 @@ ComplAI follows a strict **layered architecture** with clear boundaries at every
   implementation. This makes the service trivially replaceable in tests.
 - **Never throw to the controller**: the service always returns an `OpenRouterResponseDto`. All
   exceptions are caught, logged, and converted to typed errors internally.
+- **Audit logging**: Every /complai/ask and /complai/redact request is logged by the controller using a structured, privacy-preserving audit log (see below).
+
+---
+
+## Audit Logging (Request/Response Metadata)
+
+Every /complai/ask and /complai/redact request is logged by the controller using a structured audit log. Only metadata is logged:
+- Endpoint (e.g. /complai/ask)
+- Request hash (not the full text)
+- Error code (OpenRouterErrorCode)
+- Latency (ms)
+- Output format (if applicable)
+- Language (future)
+
+No user text or AI response is ever logged. This ensures privacy and compliance.
+
+Example log line:
+```
+{"ts":"2026-03-06T12:34:56Z","endpoint":"/complai/ask","requestHash":"a1b2c3d4","errorCode":0,"latencyMs":42,"outputFormat":"PDF","language":"CA"}
+```
 
 ---
 
@@ -558,6 +578,8 @@ ComplAI has three layers of tests, each with a distinct purpose:
 - **`HttpWrapperTest`** — tests the HTTP infrastructure with a real `HttpServer` (JDK built-in).
   Covers: successful response parsing, non-2xx error handling, URL normalisation, missing API key
   handling.
+
+- **`AuditLoggerTest`** — unit tests for the audit logger: deterministic hashing, null handling, and log call safety.
 
 ### Integration tests
 
@@ -1186,9 +1208,9 @@ common procedures. Phase 2 follows naturally once the concept is validated.
 | **P1** | #2 Rate Limiting (CDK) | 🟢 Small | 🔴 Security/Cost | DONE     |
 | **P1** | #3 Health Check | 🟢 Small | 🟡 Operability | DONE     |
 | **P2** | #11 Prat Espais Procedure Integration (Poor Man's RAG) — Phase 2–3 (S3 + Jsoup scraper) | 🟡 Medium | 🔴 Core Value Proposition | DONE     |
-| **P2** | #4 Language Selection | 🟢 Small | 🟡 UX | Pending  |
-| **P2** | #6 Audit Logging | 🟡 Medium | 🟡 Operability | Pending  |
-| **P2** | #10 Retry with Backoff | 🟡 Medium | 🟡 Reliability | Pending  |
+| **P2** | #4 Language Selection | 🟢 Small | 🟡 UX | DONE  |
+| **P2** | #6 Audit Logging | 🟡 Medium | 🟡 Operability | DONE  |
+| **P2** | #10 Retry with Backoff | 🟡 Medium | 🟡 Reliability | DONE  |
 | **P3** | #5 Complaint Categories | 🟡 Medium | 🟡 UX | Pending  |
 | **P3** | #1 Conversation History | 🟡 Medium | 🟡 UX | DONE     |
 
