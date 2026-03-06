@@ -1,66 +1,89 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 
-# SAM template for local development with SAM CLI.
-# This mirrors the production Lambda configuration defined in cdk/lambda-stack.ts:
-#   - Same Java 21 runtime
-#   - Same handler class (Micronaut APIGatewayV2 HTTP event function)
-#   - Same memory and timeout values
-#   - Same environment variable names
-#
-# Usage:
-#   1. Build the shadow JAR:        ../gradlew clean shadowJar   (from the sam/ dir)
-#   2. Start LocalStack:            docker compose up -d
-#   3. Start SAM local API:         sam local start-api --env-vars env.json
-#
-# Or use the provided helper script:
-#   Linux / macOS / WSL:  ./start-local.sh
-#   Windows PowerShell:   .\start-local.ps1
-
 Description: ComplAI Lambda – local SAM development template
+
+Parameters:
+  Environment:
+    Type: String
+    Default: development
+    AllowedValues:
+      - development
+      - production
+    Description: Deployment environment (development or production)
+  LambdaRegion:
+    Type: String
+    Default: eu-west-1
+    Description: AWS region for Lambda and S3
+  OpenRouterApiKey:
+    Type: String
+    Description: OpenRouter API key (passed from CI or manually)
 
 Globals:
   Function:
     Timeout: 30
     MemorySize: 768
     Runtime: java21
-    # SnapStart is not supported by SAM CLI locally; it is a no-op here but
-    # documents intent if this template is ever adapted for a direct SAM deploy.
     Environment:
       Variables:
-        # Override this via env.json (--env-vars flag) or export it in your shell.
-        # Never commit a real API key here.
-        OPENROUTER_API_KEY: "REPLACE_ME"
-        # Point the AWS SDK at LocalStack so any S3 (or other AWS) calls are local.
+        OPENROUTER_API_KEY: !Ref OpenRouterApiKey
         AWS_ENDPOINT_URL: "http://localhost:4566"
 
 Resources:
+  ComplAILambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ComplAILambdaRole-${Environment}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Description: !Sub IAM role for ComplAI Lambda (${Environment}) with least privilege
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  ProceduresBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub complai-procedures-${Environment}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Status: Enabled
+            ExpirationInDays: 365
+      DeletionPolicy: Retain
+
   ComplAIFunction:
     Type: AWS::Serverless::Function
     Properties:
-      # CodeUri points at the build/libs/ directory rather than a specific JAR name.
-      # SAM packages whatever JAR it finds there. The start-local.ps1 script always
-      # runs `clean shadowJar` first, so the directory will contain exactly one JAR
-      # (the shadow/fat JAR) regardless of the project version. This avoids hardcoding
-      # the version number here, which would break every time build.gradle is bumped.
       CodeUri: ../build/libs/complai-all.jar
       Handler: io.micronaut.function.aws.proxy.payload2.APIGatewayV2HTTPEventFunction::handleRequest
       Runtime: java21
       MemorySize: 768
       Timeout: 30
+      Role: !GetAtt ComplAILambdaRole.Arn
       Environment:
         Variables:
           OPENROUTER_API_KEY: !Ref OpenRouterApiKey
           PROCEDURES_BUCKET: !Ref ProceduresBucket
           PROCEDURES_KEY: procedures.json
-          PROCEDURES_REGION: eu-west-1
+          PROCEDURES_REGION: !Ref LambdaRegion
           AWS_ENDPOINT_URL: "http://host.docker.internal:4566"
           OPENROUTER_REQUEST_TIMEOUT_SECONDS: "20"
           OPENROUTER_OVERALL_TIMEOUT_SECONDS: "30"
+          OPENROUTER_MODEL: arcee-ai/trinity-large-preview:free
       Events:
-        # Catch-all proxy: every HTTP method on every path is forwarded to the
-        # Micronaut handler, which routes internally — same as the CDK HttpApi
-        # defaultIntegration setup.
         ProxyRoot:
           Type: HttpApi
           Properties:
@@ -71,10 +94,11 @@ Resources:
           Properties:
             Path: /{proxy+}
             Method: ANY
-  ProceduresBucket:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketName: complai-procedures-development
-  OpenRouterApiKey:
-    Type: String
-    Description: OpenRouter API key (passed from CI or manually)
+
+Outputs:
+  ComplAILambdaFunctionName:
+    Description: Name of the deployed ComplAI Lambda function
+    Value: !Ref ComplAIFunction
+  ComplAILambdaArn:
+    Description: ARN of the deployed ComplAI Lambda function
+    Value: !GetAtt ComplAIFunction.Arn
