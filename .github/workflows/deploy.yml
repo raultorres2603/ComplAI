@@ -190,7 +190,6 @@ jobs:
           echo "OPENROUTER_MODEL is set (value: [REDACTED])."
 
       - name: Configure AWS credentials
-        env:
         uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: arn:aws:iam::134267836527:role/github-cdk-deploy-role
