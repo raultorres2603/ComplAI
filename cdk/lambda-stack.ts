@@ -2,11 +2,8 @@ import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as iam from 'aws-cdk-lib/aws-iam';
-import * as logs from 'aws-cdk-lib/aws-logs';
 import * as path from 'path';
 import * as fs from 'fs';
-import * as apigwv2 from 'aws-cdk-lib/aws-apigatewayv2';
-import * as integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 
 export type DeploymentEnvironment = 'development' | 'production';
@@ -103,66 +100,23 @@ export class LambdaStack extends cdk.Stack {
       role: lambdaRole,
     });
 
-    // Create an HTTP API (API Gateway v2) and connect it to the Lambda via a proxy integration.
-    // HTTP APIs are cheaper and recommended for most Lambda-backed HTTP workloads.
-    // HttpLambdaIntegration requires an id as the first argument in aws-cdk-lib v2.
-    const lambdaIntegration = new integrations.HttpLambdaIntegration(`ComplAILambdaIntegration-${environment}`, lambdaFn);
-    const httpApi = new apigwv2.HttpApi(this, `ComplAIHttpApi-${environment}`, {
-      defaultIntegration: lambdaIntegration,
+    // Lambda Function URL: free, no API Gateway needed.
+    // authType NONE makes the URL publicly reachable without IAM signing.
+    // The payload format sent by Lambda Function URLs is identical to API Gateway
+    // HTTP API payload format 2.0, so the Micronaut handler works without changes.
+    // NOTE: Unlike API Gateway, Function URLs have no built-in rate limiting.
+    // Add AWS WAF in front of the URL if throttling ever becomes a requirement.
+    const functionUrl = lambdaFn.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.NONE,
+      cors: {
+        allowedOrigins: ['*'],
+        allowedMethods: [lambda.HttpMethod.ALL],
+        allowedHeaders: ['*'],
+      },
     });
 
-    // CloudWatch log group for HTTP API access logs.
-    // 1 week retention keeps costs minimal while giving enough history to debug issues.
-    // The log group path is namespaced by environment so the two stacks write to
-    // separate log groups and do not share retention/deletion lifecycle.
-    const accessLogGroup = new logs.LogGroup(this, `ComplAIHttpApiAccessLogs-${environment}`, {
-      logGroupName: `/aws/apigateway/complai/${environment}/${this.stackName}`,
-      retention: logs.RetentionDays.ONE_WEEK,
-      // Delete the log group when the stack is destroyed to avoid orphaned resources.
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-    });
-
-    // API Gateway (delivery.logs.amazonaws.com) must be allowed to create log streams
-    // and write log events to the log group. Without this the stage will fail to deliver
-    // access logs and the setting silently has no effect.
-    accessLogGroup.addToResourcePolicy(new iam.PolicyStatement({
-      principals: [new iam.ServicePrincipal('delivery.logs.amazonaws.com')],
-      actions: ['logs:CreateLogStream', 'logs:PutLogEvents'],
-      resources: [`${accessLogGroup.logGroupArn}:*`],
-    }));
-
-    // The L2 HttpApi does not expose accessLogSettings on the default stage directly.
-    // Use the CfnStage escape hatch to enable access logging on the $default stage.
-    // Format: structured JSON per request — easy to query in CloudWatch Logs Insights.
-    if (!httpApi.defaultStage) {
-      throw new Error('HttpApi.defaultStage is undefined — cannot configure access logging.');
-    }
-    const cfnDefaultStage = httpApi.defaultStage.node.defaultChild as apigwv2.CfnStage;
-    cfnDefaultStage.accessLogSettings = {
-      destinationArn: accessLogGroup.logGroupArn,
-      format: JSON.stringify({
-        requestId:          '$context.requestId',
-        ip:                 '$context.identity.sourceIp',
-        httpMethod:         '$context.httpMethod',
-        routeKey:           '$context.routeKey',
-        status:             '$context.status',
-        integrationError:   '$context.integrationErrorMessage',
-        errorMessage:       '$context.error.message',
-        responseLatency:    '$context.responseLatency',
-        integrationLatency: '$context.integrationLatency',
-      }),
-    };
-
-    // Add rate limiting (throttle settings) to the $default stage
-    cfnDefaultStage.defaultRouteSettings = {
-      throttlingBurstLimit: 20, // Allow short bursts
-      throttlingRateLimit: 10,  // Steady-state rate (req/sec)
-    };
-
-    // Expose the Lambda name and ARN as CloudFormation outputs so deploys (and CI)
-    // can easily discover the physical identifiers. These are safe to emit and
-    // helpful for debugging and automation. The function name includes the CDK
-    // generated suffix, so using the output avoids guessing the hash.
+    // Expose the Lambda name, ARN, and the public Function URL as CloudFormation
+    // outputs so deploys (and CI) can easily discover the physical identifiers.
     new cdk.CfnOutput(this, 'ComplAILambdaFunctionName', {
       value: lambdaFn.functionName,
       description: `Name of the deployed ComplAI Lambda function (${environment})`,
