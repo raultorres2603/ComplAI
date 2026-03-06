@@ -108,7 +108,7 @@ any page of the portal.
 
 ### How the front-end calls the API
 
-The chat widget makes standard `POST` requests to the ComplAI API Gateway endpoint. Two flows exist:
+The chat widget makes standard `POST` requests to the ComplAI Lambda Function URL endpoint. Two flows exist:
 
 1. **Conversational questions** (`POST /complai/ask`) — the citizen types a question; the widget
    sends it and displays the AI response as a new chat bubble.
@@ -120,6 +120,11 @@ Both calls can include an optional `conversationId` (a UUID the front-end genera
 so the AI remembers the context of the conversation. This is what allows natural multi-turn
 exchanges: *"Can you add my neighbour's name to the letter?"* works because the previous turn is
 remembered.
+
+**Endpoint:**
+- The public endpoint is the Lambda Function URL, e.g.:
+  `https://<lambda-function-id>.lambda-url.<region>.on.aws/complai/ask`
+- CORS and public access are managed via Lambda Function URL configuration.
 
 ### What the front-end receives
 
@@ -139,7 +144,7 @@ ComplAI follows a strict **layered architecture** with clear boundaries at every
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│                     API Gateway v2 (HTTP API)                    │
+│                  Lambda Function URL (public HTTPS)              │
 │             AWS-managed: TLS, routing, throttle, CORS            │
 └───────────────────────────────┬──────────────────────────────────┘
                                 │ HTTP event (payload v2)
@@ -442,7 +447,7 @@ service generates a formal letter document in-memory using **Apache PDFBox**.
 ### AWS Architecture
 
 ```
-Internet → API Gateway v2 (HTTP API) → Lambda (Java 21 / SnapStart) → OpenRouter API
+Internet → Lambda Function URL (public HTTPS) → Lambda (Java 21) → OpenRouter API
 ```
 
 Two independent stacks deployed via **AWS CDK** (TypeScript):
@@ -453,8 +458,8 @@ Two independent stacks deployed via **AWS CDK** (TypeScript):
 | `ComplAILambdaStack-production` | Live environment. Only deployable from `master`, requires manual approval. |
 
 **Per-stack AWS resources:**
-- `AWS::Lambda::Function` (Java 21, SnapStart enabled, 512 MB memory, 30 s timeout)
-- `AWS::ApiGatewayV2::Api` + `$default` stage with `$default` route
+- `AWS::Lambda::Function` (Java 21, 512 MB memory, 30 s timeout)
+- `AWS::Lambda::Url` (public HTTPS endpoint, CORS enabled, no auth)
 - `AWS::IAM::Role` with least-privilege (`AWSLambdaBasicExecutionRole` only)
 - `AWS::Logs::LogGroup` with 30-day retention
 
@@ -473,7 +478,7 @@ The `sam/` folder provides a **SAM CLI + LocalStack** environment for running th
 ```bash
 cd sam
 ./start-local.sh           # builds JAR, starts LocalStack, starts SAM local API
-# API available at http://localhost:3000
+# API available at http://localhost:3000 (emulates Lambda Function URL)
 ```
 
 ---
@@ -932,7 +937,7 @@ similarity — and it runs entirely inside the Lambda with zero external calls.
 
 ### Step 1: Scraping — Getting the Procedure Data with Jsoup
 
-The procedure catalogue at `tramits.pratespais.com/Ciutadania/` contains structured pages with:
+The procedure catalogue at `tramits.pratspais.com/Ciutadania/` contains structured pages with:
 - Procedure name / title
 - Description and purpose
 - Requirements (documents, eligibility)
@@ -1213,5 +1218,3 @@ To enable Lambda to load the Prat Espais procedures corpus from S3, set the foll
    java -cp build/libs/complai-all.jar cat.complai.pratespais.PratEspaisScraper
    ```
 3. Confirm `procedures.json` is present in your S3 bucket.
-
----
