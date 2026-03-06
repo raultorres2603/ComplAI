@@ -30,7 +30,7 @@ jobs:
       PROCEDURES_BUCKET: ${{ vars.PROCEDURES_BUCKET }}
       PROCEDURES_KEY: ${{ vars.PROCEDURES_KEY }}
       PROCEDURES_REGION: ${{ vars.PROCEDURES_REGION }}
-      AWS_REGION: eu-south-2
+      AWS_REGION: ${{ vars.PROCEDURES_REGION }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
