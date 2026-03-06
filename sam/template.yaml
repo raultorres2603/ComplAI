@@ -53,7 +53,7 @@ Resources:
           OPENROUTER_API_KEY: !Ref OpenRouterApiKey
           PROCEDURES_BUCKET: !Ref ProceduresBucket
           PROCEDURES_KEY: procedures.json
-          PROCEDURES_REGION: eu-south-2
+          PROCEDURES_REGION: eu-west-1
           AWS_ENDPOINT_URL: "http://host.docker.internal:4566"
           OPENROUTER_REQUEST_TIMEOUT_SECONDS: "20"
           OPENROUTER_OVERALL_TIMEOUT_SECONDS: "30"
