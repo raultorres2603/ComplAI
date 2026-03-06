@@ -6,8 +6,8 @@ import { LambdaStack } from '../lambda-stack';
 const app = new cdk.App();
 
 const awsEnv = {
-  account: process.env.CDK_DEFAULT_ACCOUNT,
-  region: process.env.CDK_DEFAULT_REGION,
+  account: '134267836527',
+  region: 'eu-west-1',
 };
 
 // One stack per environment. Stack names match the pattern the CI uses when
