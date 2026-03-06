@@ -23,3 +23,6 @@ new LambdaStack(app, 'ComplAILambdaStack-production', {
   environment: 'production',
   env: awsEnv,
 });
+
+// THIS IS THE CRITICAL LINE TO ADD:
+app.synth();
