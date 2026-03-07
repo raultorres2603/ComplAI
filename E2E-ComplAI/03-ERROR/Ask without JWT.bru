@@ -1,0 +1,38 @@
+meta {
+  name: Ask without JWT returns 401
+  type: http
+  seq: 4
+  tags: [
+    auth
+  ]
+}
+
+post {
+  url: {{complaiPath}}/ask
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "text": "Hola, quina és la capital de Catalunya?"
+  }
+}
+
+tests {
+  test("HTTP status == 401", () => {
+    expect(res.getStatus()).to.equal(401);
+  });
+  test("Success prop == false", () => {
+    expect(res.getBody().success).to.equal(false);
+  });
+  test("Error code == 6 (UNAUTHORIZED)", () => {
+    expect(res.getBody().errorCode).to.equal(6);
+  });
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
+
