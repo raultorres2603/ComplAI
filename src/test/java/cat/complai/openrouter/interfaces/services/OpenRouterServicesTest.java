@@ -3,6 +3,7 @@ package cat.complai.openrouter.interfaces.services;
 import cat.complai.http.HttpWrapper;
 import cat.complai.http.dto.HttpDto;
 import cat.complai.openrouter.dto.OpenRouterResponseDto;
+import cat.complai.openrouter.services.OpenRouterServices;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

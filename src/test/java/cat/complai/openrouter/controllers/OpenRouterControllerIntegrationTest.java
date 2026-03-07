@@ -7,7 +7,7 @@ import cat.complai.openrouter.dto.OutputFormat;
 import cat.complai.openrouter.interfaces.IOpenRouterService;
 import cat.complai.openrouter.controllers.dto.AskRequest;
 import cat.complai.openrouter.controllers.dto.RedactRequest;
-import cat.complai.openrouter.interfaces.services.OpenRouterServices;
+import cat.complai.openrouter.services.OpenRouterServices;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Jwts;

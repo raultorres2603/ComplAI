@@ -1,4 +1,4 @@
-package cat.complai.openrouter.interfaces.services;
+package cat.complai.openrouter.services;
 
 import cat.complai.openrouter.interfaces.IOpenRouterService;
 import cat.complai.openrouter.dto.OpenRouterResponseDto;
