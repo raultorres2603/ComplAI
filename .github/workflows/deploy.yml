@@ -297,7 +297,7 @@ jobs:
         env:
           jwtToken: ${{ env.jwtToken }}
         run: >
-          bru run . -r --env Development --env jwtToken="$jwtToken" --reporter-json report/results.json
+          bru run . -r --env Development --env-var jwtToken="$jwtToken" --reporter-json report/results.json
 
       - name: Upload Bruno E2E JSON report
         if: always()
