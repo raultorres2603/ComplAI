@@ -367,6 +367,7 @@ Content-Length: 12345
 | `3` | `UPSTREAM` | `502` | OpenRouter returned an error or unexpected response |
 | `4` | `TIMEOUT` | `504` | OpenRouter call timed out (>30 seconds) |
 | `5` | `INTERNAL` | `500` | Unexpected server-side error |
+| `6` | `UNAUTHORIZED` | `401` | Missing, expired, or invalid JWT Bearer token |
 
 ---
 
@@ -487,7 +488,8 @@ Two independent stacks deployed via **AWS CDK** (TypeScript):
 
 ```properties
 # Runtime — Java 21 SnapStart
-OPENROUTER_API_KEY   # Bearer token, injected as Lambda env var, never committed
+OPENROUTER_API_KEY   # Bearer token for OpenRouter, injected as Lambda env var, never committed
+JWT_SECRET           # Base64-encoded HS256 key (min 32 bytes), injected as Lambda env var, never committed
 openrouter.url       # OpenRouter endpoint (overridable for local/test)
 ```
 
@@ -508,12 +510,35 @@ cd sam
 | Concern | How it is addressed |
 |---------|---------------------|
 | API key exposure | Passed as CloudFormation `noEcho` parameter; injected as Lambda env var; never committed to source |
+| **JWT Bearer authentication** | All `POST` endpoints require a valid `Authorization: Bearer <token>` header. `GET /` and `GET /health` are excluded (monitoring). Enforced by `JwtAuthFilter` before the controller is reached. |
+| **JWT secret strength** | `JwtValidator` enforces ≥ 256 bits (32 bytes) at startup — the application fails immediately if the secret is absent or too weak, with no silent degradation to an insecure state. |
+| **JWT claims enforced** | `exp` (token must have expiry), `sub` (must have subject), `iss` (must be `"complai"`). Tokens missing any of these are rejected with `401`. |
 | Input injection | All user text is passed to the AI as a `content` string in a structured `messages` array — never interpolated into raw JSON strings that could alter the API call structure |
 | Off-topic abuse | System prompt + programmatic refusal detection scope all AI responses to El Prat |
 | Input length abuse | Null/blank validation at service boundary. Length limits are on the roadmap (see Feature #8) |
 | IAM privilege | Lambda role has `AWSLambdaBasicExecutionRole` only — no S3, no DynamoDB, no secrets manager |
-| Secrets in logs | The API key is never logged. Refusal messages and AI text are logged at fine/info level only |
+| Secrets in logs | The API key and JWT secret are never logged. Refusal messages and AI text are logged at fine/info level only |
 | Unsupported format values | Rejected at controller boundary (`400 VALIDATION`) before touching the service |
+
+### Minting JWT Tokens
+
+Tokens are minted offline using the `TokenGenerator` CLI utility bundled in the shadow JAR. The operator runs this locally and distributes the resulting token to API consumers (front-end, CI, E2E tests).
+
+```bash
+# Generate a fresh JWT_SECRET (run once per environment, store in GitHub Environment Secrets):
+openssl rand -base64 32
+
+# Mint a token valid for 30 days:
+JWT_SECRET=<base64-secret> java -cp build/libs/complai-all.jar cat.complai.auth.TokenGenerator citizen-app 30
+
+# Pass the token in every API request:
+curl -X POST https://<lambda-url>/complai/ask \
+     -H 'Authorization: Bearer <token>' \
+     -H 'Content-Type: application/json' \
+     -d '{"text": "On queda l'\''ajuntament?"}'
+```
+
+**Token rotation:** update the GitHub Environment Secret → redeploy → mint new tokens with `TokenGenerator`. Old tokens are invalidated immediately because `JwtValidator` uses the new key.
 
 ---
 
@@ -543,10 +568,19 @@ cd sam
 
 ```bash
 cd sam
-cp env.json.example env.json   # fill in your OPENROUTER_API_KEY
+cp env.json.example env.json   # fill in OPENROUTER_API_KEY and JWT_SECRET
+
+# Generate a local JWT_SECRET if you don't have one:
+openssl rand -base64 32        # copy the output into env.json as JWT_SECRET
+
 ./start-local.sh
-# Test with curl:
+
+# Mint a token for local testing:
+JWT_SECRET=<your-local-secret> java -cp ../build/libs/complai-all.jar cat.complai.auth.TokenGenerator local-dev 30
+
+# Test with curl (token required for all POST endpoints):
 curl -X POST http://localhost:3000/complai/ask \
+     -H 'Authorization: Bearer <token>' \
      -H 'Content-Type: application/json' \
      -d '{"text": "On queda l'\''ajuntament?"}'
 ```
@@ -879,6 +913,310 @@ This is the single most impactful gap in the product. Without authoritative proc
 assistant is a general chatbot, not a civic tool.
 
 ---
+
+# JWT Bearer Authentication — Implementation Plan
+
+## Current State Assessment
+
+There is already a **partial, non-functional** JWT implementation in `src/main/java/cat/complai/auth/`:
+
+| File | Status | Issue |
+|------|--------|-------|
+| `JwtValidator.java` | ✅ Complete | Imports `io.jsonwebtoken.*` (JJWT) but **JJWT is not in `build.gradle`**. Won't compile. |
+| `JwtValidationResult.java` | ✅ Complete | Clean record. No issues. |
+| `JwtAuthFilter.java` | ⚠️ Broken | References `OpenRouterErrorCode.UNAUTHORIZED` which **does not exist** in the enum (enum only has codes 0–5). |
+| `TokenGenerator.java` | ✅ Complete | CLI utility. Also depends on JJWT (not in dependencies). |
+| `JwtAuthFilterTest.java` | ✅ Complete | Good coverage, but won't compile until deps/enum are fixed. |
+| `JwtValidatorTest.java` | ✅ Complete | Good coverage, same dependency issue. |
+
+**Infrastructure gaps:**
+- CDK `lambda-stack.ts` does **not** pass `JWT_SECRET` as a Lambda environment variable.
+- SAM `template.yaml` does **not** include `JWT_SECRET`.
+- `application.properties` (main & test) has **no** `jwt.secret` property.
+- Bruno E2E environments have **no** `jwtToken` variable; tests use `auth: inherit` but the collection has no auth configured.
+- The GitHub Actions deploy workflow does **not** inject `JWT_SECRET` from GitHub Environment Secrets.
+- Integration tests (`OpenRouterControllerIntegrationTest`) send requests **without** `Authorization` headers.
+
+---
+
+## Implementation Plan
+
+### Phase 1: Dependencies & Compilation (build.gradle)
+
+**File:** `build.gradle`
+
+Add JJWT dependencies (API + impl + jackson for JSON claims):
+
+```groovy
+// JWT validation (HS256)
+implementation("io.jsonwebtoken:jjwt-api:0.12.6")
+runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
+runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.6")
+```
+
+**Why:** `JwtValidator` and `TokenGenerator` import `io.jsonwebtoken.*`. Without these, nothing compiles. JJWT 0.12.x is the latest stable line and requires Java 8+.
+
+---
+
+### Phase 2: Error Code Enum (OpenRouterErrorCode)
+
+**File:** `src/main/java/cat/complai/openrouter/dto/OpenRouterErrorCode.java`
+
+Add:
+```java
+UNAUTHORIZED(6);
+```
+
+**Why:** `JwtAuthFilter` returns `OpenRouterErrorCode.UNAUTHORIZED.getCode()` in the 401 response body. The E2E test `"Ask without JWT"` already asserts `errorCode == 6`. The controller `switch` has a `default` branch that handles unknown codes as 500, so no controller changes are needed — the filter short-circuits before the controller runs.
+
+**Impact:** The existing exhaustive `switch` in `OpenRouterController.errorToHttpResponse()` does NOT need a new `case UNAUTHORIZED` branch because 401 responses are emitted by the filter, never by the controller. The `default` branch covers the theoretical case.
+
+---
+
+### Phase 3: Configuration Properties
+
+#### 3a. Main application.properties
+
+**File:** `src/main/resources/application.properties`
+
+Add:
+```properties
+# JWT_SECRET is injected as an environment variable by CDK / SAM.
+# The @Value expression in JwtValidator reads it: ${jwt.secret:${JWT_SECRET:}}
+# No default — the application will fail to start if the secret is missing.
+```
+
+No actual property value is added here — `JwtValidator` uses `@Value("${jwt.secret:${JWT_SECRET:}}")`, which reads the env var `JWT_SECRET` as fallback. This is the correct pattern for Lambda: the secret lives in the environment, not in committed config files.
+
+#### 3b. Test application.properties
+
+**File:** `src/test/resources/application.properties`
+
+Add:
+```properties
+jwt.secret=hEmatrRKbxfC/9PxZ14VsYksRkTZHMpqRScBUhshYzQ=
+```
+
+**Why:** `@MicronautTest` integration tests boot the full Micronaut context, which creates `JwtValidator` via `@Singleton` + `@Inject`. Without a test secret, `JwtValidator`'s constructor throws `IllegalStateException` and every integration test fails. This is the same Base64 key already used in `JwtAuthFilterTest` and `JwtValidatorTest`.
+
+---
+
+### Phase 4: Infrastructure — CDK
+
+**File:** `cdk/lambda-stack.ts`
+
+In the Lambda `environment` block, add:
+```typescript
+JWT_SECRET: process.env.JWT_SECRET || '',
+```
+
+**Why:** The deployed Lambda needs the secret as an environment variable. The value comes from a GitHub Environment Secret (`JWT_SECRET`) which the CI workflow injects as `process.env.JWT_SECRET` during `cdk deploy`.
+
+**Security note:** Like `OPENROUTER_API_KEY`, this is visible in the Lambda console. The existing pattern is acceptable per the project's current security posture (the comment in `lambda-stack.ts` already acknowledges this trade-off). If the project ever moves to Secrets Manager or SSM SecureString, both keys should migrate together.
+
+---
+
+### Phase 5: Infrastructure — SAM (local dev)
+
+**File:** `sam/template.yaml`
+
+In the `ComplAIFunction.Properties.Environment.Variables` block, add:
+```yaml
+JWT_SECRET: !Ref JwtSecret
+```
+
+And add a new SAM `Parameter`:
+```yaml
+JwtSecret:
+  Type: String
+  Description: Base64-encoded HS256 JWT secret (min 32 bytes)
+```
+
+**File:** `sam/env.json`
+
+The `JWT_SECRET` key is already present with a placeholder. Replace the placeholder with a real local-dev secret (or document that the operator must generate one with `openssl rand -base64 32`).
+
+**File:** `sam/env.json.example` (if it exists)
+
+Ensure the example also shows `JWT_SECRET` with a placeholder comment.
+
+---
+
+### Phase 6: Integration Tests — Add JWT Headers
+
+**File:** `src/test/java/cat/complai/openrouter/controllers/OpenRouterControllerIntegrationTest.java`
+
+Every `HttpRequest.POST(...)` call must add a valid `Authorization: Bearer <token>` header. Otherwise the `JwtAuthFilter` will reject all requests with 401 before they reach the controller.
+
+**Approach:**
+1. Add a `@BeforeAll` or `@BeforeEach` that mints a valid JWT using the test secret (`hEmatrRKbxfC/9PxZ14VsYksRkTZHMpqRScBUhshYzQ=`) with JJWT's builder API.
+2. Store the token in a `static` or instance field.
+3. Add `.header("Authorization", "Bearer " + token)` to every `HttpRequest` in the test.
+
+**Why not disable the filter in tests?** The filter is a critical security boundary. Testing with it active validates the real request pipeline. Disabling it in tests creates a false sense of security — a bug in filter exclusion logic would never be caught.
+
+**Add a dedicated test** that sends a POST to `/complai/ask` without a token and asserts 401 + error code 6. This mirrors the E2E test and validates the filter in the integration context.
+
+---
+
+### Phase 7: E2E Tests — Bruno Collection
+
+#### 7a. Bruno Environment Variables
+
+**Files:** `E2E-ComplAI/environments/Development.bru`, `E2E-ComplAI/environments/Local.bru`
+
+Add a `jwtToken` variable to each environment:
+
+```
+vars {
+  ...
+  jwtToken: <token-minted-with-the-environment's-JWT_SECRET>
+}
+```
+
+For `Development.bru`: the token is minted offline using `TokenGenerator` with the development `JWT_SECRET`. Use a long expiry (e.g., 365 days) so CI doesn't break every month.
+
+For `Local.bru`: same, but using the local-dev secret from `env.json`.
+
+#### 7b. Collection-Level Auth
+
+**File:** `E2E-ComplAI/bruno.json` (or a root `collection.bru` if Bruno supports it)
+
+Set collection-level auth to `bearer` with token `{{jwtToken}}`. All requests with `auth: inherit` will automatically include the `Authorization: Bearer {{jwtToken}}` header.
+
+If Bruno doesn't support collection-level auth in `bruno.json`, add a `collection.bru` file at the root:
+
+```
+auth {
+  mode: bearer
+}
+
+auth:bearer {
+  token: {{jwtToken}}
+}
+```
+
+#### 7c. "Ask without JWT" Test
+
+The existing `E2E-ComplAI/03-ERROR/Ask without JWT.bru` already uses `auth: none` and asserts 401 + error code 6. **No changes needed** — this test validates the negative case.
+
+#### 7d. Remaining E2E Tests
+
+All other `.bru` files use `auth: inherit`. Once collection-level auth is set (7b), they automatically send the JWT. **No individual test changes needed.**
+
+---
+
+### Phase 8: CI/CD — GitHub Actions
+
+**File:** `.github/workflows/deploy.yml` (or equivalent)
+
+In the CDK deploy step, expose the GitHub Environment Secret as an env var:
+
+```yaml
+env:
+  JWT_SECRET: ${{ secrets.JWT_SECRET }}
+  OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+```
+
+In the E2E test step, the Bruno environment must have a valid `jwtToken`. Two options:
+
+1. **Bake the token into `Development.bru`** (simpler, recommended). The token has a long expiry and is minted offline with the development JWT_SECRET. CI just runs Bruno as-is.
+2. **Mint the token in CI** using `TokenGenerator` and inject it as a Bruno variable override. More complex, but ensures the token is always fresh.
+
+**Recommendation:** Option 1. The development JWT_SECRET is not a high-value secret (it protects a dev environment), and a long-lived token in the Bruno environment file is the simplest approach. If the secret rotates, regenerate the token and update `Development.bru`.
+
+---
+
+### Phase 9: Operator Documentation (README)
+
+**File:** `README.md`
+
+Update the following sections:
+
+1. **Environment Variables table:** Add `JWT_SECRET` as required, with description: "Base64-encoded HS256 secret (min 32 bytes). Generate with `openssl rand -base64 32`."
+
+2. **Security Notes:** Document that JWT Bearer authentication is enforced on all endpoints except `GET /` and `GET /health`. Document the `TokenGenerator` CLI usage for minting tokens.
+
+3. **Error Codes table:** Add code `6 — UNAUTHORIZED — 401`.
+
+4. **API Endpoints:** Note that all POST endpoints require `Authorization: Bearer <token>`.
+
+5. **Local Development:** Document that `JWT_SECRET` must be set in `sam/env.json` and that a token must be generated with `TokenGenerator` for local testing.
+
+---
+
+## Execution Order & Dependencies
+
+```
+Phase 1 (build.gradle)          ← must be first, everything depends on JJWT compiling
+    │
+    ├── Phase 2 (ErrorCode enum) ← unblocks JwtAuthFilter compilation
+    │
+    ├── Phase 3 (properties)     ← unblocks @MicronautTest context startup
+    │
+    └── Phase 6 (integration tests) ← depends on 1+2+3
+            │
+Phase 4 (CDK)                   ← independent of tests, can be parallel
+Phase 5 (SAM)                   ← independent of tests, can be parallel
+Phase 7 (Bruno E2E)             ← depends on 4 (deployed env needs JWT_SECRET)
+Phase 8 (CI/CD)                 ← depends on 4+7
+Phase 9 (README)                ← last, documents everything above
+```
+
+---
+
+## Files Changed (Summary)
+
+| File | Change |
+|------|--------|
+| `build.gradle` | Add JJWT dependencies (3 lines) |
+| `OpenRouterErrorCode.java` | Add `UNAUTHORIZED(6)` |
+| `src/test/resources/application.properties` | Add `jwt.secret=...` for test context |
+| `cdk/lambda-stack.ts` | Add `JWT_SECRET` env var to Lambda |
+| `sam/template.yaml` | Add `JwtSecret` parameter + env var |
+| `OpenRouterControllerIntegrationTest.java` | Add JWT headers to all requests + 401 test |
+| `E2E-ComplAI/environments/Development.bru` | Add `jwtToken` variable |
+| `E2E-ComplAI/environments/Local.bru` | Add `jwtToken` variable |
+| `E2E-ComplAI/` (collection root) | Add collection-level bearer auth |
+| `.github/workflows/deploy.yml` | Expose `JWT_SECRET` env var in deploy step |
+| `README.md` | Document JWT_SECRET, error code 6, token generation |
+
+## Files NOT Changed (Already Correct)
+
+| File | Reason |
+|------|--------|
+| `JwtValidator.java` | Complete and correct. No changes needed. |
+| `JwtValidationResult.java` | Complete and correct. |
+| `JwtAuthFilter.java` | Complete and correct (once enum is fixed). |
+| `TokenGenerator.java` | Complete and correct (once deps are added). |
+| `JwtAuthFilterTest.java` | Complete and correct (once deps are added). |
+| `JwtValidatorTest.java` | Complete and correct (once deps are added). |
+| `OpenRouterController.java` | No changes needed. Filter handles 401 before the controller. |
+| `HomeController.java` | `GET /` is excluded from JWT in `JwtAuthFilter.isExcluded()`. |
+| `sam/env.json` | Already has `JWT_SECRET` placeholder. |
+
+---
+
+## Security Considerations
+
+1. **Secret strength:** `JwtValidator` enforces ≥ 256 bits (32 bytes) at startup. Weak secrets cause immediate startup failure — no silent degradation.
+2. **Required claims:** `exp` (enforced — tokens without expiry are rejected), `sub` (enforced — tokens without subject are rejected), `iss` (must be `"complai"`).
+3. **No secret in code:** The secret is only in environment variables (Lambda), `env.json` (local dev, gitignored), and GitHub Environment Secrets (CI). The test secret in `application.properties` is a known, non-production value.
+4. **Filter exclusions are minimal:** Only `GET /` and `GET /health` bypass JWT. All `POST` endpoints are protected.
+5. **Token rotation:** Rotating the secret requires: (1) updating the GitHub Environment Secret, (2) redeploying, (3) minting new tokens with `TokenGenerator`. Old tokens are immediately invalidated.
+
+---
+
+## Risks & Mitigations
+
+| Risk | Mitigation |
+|------|------------|
+| JJWT version conflict with Micronaut's Jackson | JJWT 0.12.x uses Jackson 2.x, same as Micronaut 4.x. Run `./gradlew dependencies` to verify no conflicts. |
+| Integration tests break because filter rejects all requests | Phase 3b (test secret) + Phase 6 (add headers) are done together. |
+| E2E tests break in CI | Phase 7 (Bruno auth) + Phase 8 (CI secret) are done together before merging. |
+| Lambda fails to start because JWT_SECRET is missing | CDK defaults to `''` (empty string), which triggers `JwtValidator`'s startup guard. This is intentional — a missing secret must fail loudly. The operator must set the GitHub Environment Secret before deploying. |
+| Long-lived E2E tokens become a security concern | Development environment only. The dev JWT_SECRET is low-value. Production tokens should use shorter expiry (e.g., 30–90 days). |
+
 
 ### Proposed Architecture: "Poor Man's RAG" — Zero-Cost Retrieval-Augmented Generation
 

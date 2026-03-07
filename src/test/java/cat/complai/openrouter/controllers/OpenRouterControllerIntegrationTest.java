@@ -10,6 +10,8 @@ import cat.complai.openrouter.controllers.dto.RedactRequest;
 import cat.complai.openrouter.interfaces.services.OpenRouterServices;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.http.HttpRequest;
@@ -21,23 +23,33 @@ import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import io.micronaut.test.annotation.MockBean;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import cat.complai.http.HttpWrapper;
 import cat.complai.http.dto.HttpDto;
 
+import javax.crypto.SecretKey;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Base64;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.*;
 
 @MicronautTest
 public class OpenRouterControllerIntegrationTest {
+
+    // Same Base64-encoded key used in JwtAuthFilterTest and JwtValidatorTest,
+    // and declared as jwt.secret in src/test/resources/application.properties.
+    // Using the same key in all places ensures tokens minted here are accepted
+    // by the JwtValidator that the test Micronaut context instantiates.
+    private static final String TEST_SECRET_B64 = "hEmatrRKbxfC/9PxZ14VsYksRkTZHMpqRScBUhshYzQ=";
+    private static final String ISSUER = "complai";
 
     @Inject
     @Client("/")
@@ -51,10 +63,29 @@ public class OpenRouterControllerIntegrationTest {
 
     private final ObjectMapper mapper = new ObjectMapper();
 
+    // A fresh, valid JWT is minted before each test.
+    // Keeping it per-test (rather than static) avoids flakiness if tests run near expiry.
+    private String authHeader;
+
+    @BeforeEach
+    void mintTestToken() {
+        byte[] keyBytes = Base64.getDecoder().decode(TEST_SECRET_B64);
+        SecretKey key = Keys.hmacShaKeyFor(keyBytes);
+        String token = Jwts.builder()
+                .subject("integration-test")
+                .issuer(ISSUER)
+                .issuedAt(new Date())
+                .expiration(Date.from(Instant.now().plus(1, ChronoUnit.HOURS)))
+                .signWith(key)
+                .compact();
+        authHeader = "Bearer " + token;
+    }
+
     @Test
     void integration_ask_success() {
         AskRequest req = new AskRequest("Is there a recycling center?");
-        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req);
+        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
+                .header("Authorization", authHeader);
         HttpResponse<OpenRouterPublicDto> resp = client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
         assertEquals(200, resp.getStatus().getCode());
         Optional<OpenRouterPublicDto> bodyOpt = resp.getBody();
@@ -67,7 +98,8 @@ public class OpenRouterControllerIntegrationTest {
     @Test
     void integration_redact_success() {
         RedactRequest req = new RedactRequest("There is noise from the airport");
-        HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req);
+        HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req)
+                .header("Authorization", authHeader);
         HttpResponse<OpenRouterPublicDto> resp = client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
         assertEquals(200, resp.getStatus().getCode());
         Optional<OpenRouterPublicDto> bodyOpt = resp.getBody();
@@ -80,7 +112,8 @@ public class OpenRouterControllerIntegrationTest {
     @Test
     void integration_ask_refusal() throws Exception {
         AskRequest req = new AskRequest("Tell me about France [REFUSE]");
-        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req);
+        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
+                .header("Authorization", authHeader);
         try {
             client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
             fail("Expected HttpClientResponseException for 422");
@@ -96,7 +129,8 @@ public class OpenRouterControllerIntegrationTest {
     @Test
     void integration_ask_upstream() throws Exception {
         AskRequest req = new AskRequest("Is there a recycling center? [UPSTREAM]");
-        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req);
+        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
+                .header("Authorization", authHeader);
         try {
             client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
             fail("Expected HttpClientResponseException for 502");
@@ -112,7 +146,8 @@ public class OpenRouterControllerIntegrationTest {
     @Test
     void integration_redact_refusal() throws Exception {
         RedactRequest req = new RedactRequest("How to cook paella? [REFUSE]");
-        HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req);
+        HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req)
+                .header("Authorization", authHeader);
         try {
             client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
             fail("Expected HttpClientResponseException for 422");
@@ -128,7 +163,8 @@ public class OpenRouterControllerIntegrationTest {
     @Test
     void integration_redact_upstream() throws Exception {
         RedactRequest req = new RedactRequest("Noise from airport [UPSTREAM]");
-        HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req);
+        HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req)
+                .header("Authorization", authHeader);
         try {
             client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
             fail("Expected HttpClientResponseException for 502");
@@ -159,7 +195,8 @@ public class OpenRouterControllerIntegrationTest {
         // Because the client did not explicitly request PDF (format=AUTO), the service degrades
         // gracefully and returns the raw AI message as a 200 JSON response.
         RedactRequest req = new RedactRequest("Complaint with no header [NOHEADER]");
-        HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req);
+        HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req)
+                .header("Authorization", authHeader);
         HttpResponse<OpenRouterPublicDto> resp = client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
         assertEquals(200, resp.getStatus().getCode());
         Optional<OpenRouterPublicDto> bodyOpt = resp.getBody();
@@ -197,7 +234,8 @@ public class OpenRouterControllerIntegrationTest {
         // treats unknown values as AUTO, which triggers the graceful fallback: the service returns
         // 200 with the raw AI message instead of failing with a 400.
         RedactRequest req = new RedactRequest("Complaint with invalid header [HEADER_INVALID]");
-        HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req);
+        HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req)
+                .header("Authorization", authHeader);
         HttpResponse<OpenRouterPublicDto> resp = client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
         assertEquals(200, resp.getStatus().getCode());
         Optional<OpenRouterPublicDto> bodyOpt = resp.getBody();
@@ -214,7 +252,54 @@ public class OpenRouterControllerIntegrationTest {
         assertNotNull(dto.getPdfData(), "Expected PDF data");
         assertTrue(dto.getPdfData().length > 0);
         assertTrue(new String(dto.getPdfData(), 0, 4).startsWith("%PDF"), "Expected PDF magic bytes");
-        // Optionally: parse PDF and check text extraction (requires PDFBox in test scope)
+    }
+
+    // --- JWT authentication ---
+
+    @Test
+    void integration_ask_missingJwt_returns401() throws Exception {
+        // The JwtAuthFilter must short-circuit and return 401 before the controller is invoked.
+        // No Authorization header is sent — simulating an unauthenticated client.
+        AskRequest req = new AskRequest("Hola, quina és la capital de Catalunya?");
+        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req);
+        try {
+            client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
+            fail("Expected HttpClientResponseException for 401");
+        } catch (HttpClientResponseException e) {
+            assertEquals(401, e.getStatus().getCode());
+            String bodyJson = e.getResponse().getBody(String.class).orElse("{}");
+            JsonNode node = mapper.readTree(bodyJson);
+            assertNotNull(node);
+            assertFalse(node.path("success").asBoolean(true));
+            assertEquals(OpenRouterErrorCode.UNAUTHORIZED.getCode(), node.path("errorCode").asInt());
+        }
+    }
+
+    @Test
+    void integration_ask_expiredJwt_returns401() throws Exception {
+        // An expired token must be rejected even if it is otherwise well-formed.
+        byte[] keyBytes = Base64.getDecoder().decode(TEST_SECRET_B64);
+        SecretKey key = Keys.hmacShaKeyFor(keyBytes);
+        String expiredToken = Jwts.builder()
+                .subject("integration-test")
+                .issuer(ISSUER)
+                .issuedAt(Date.from(Instant.now().minus(2, ChronoUnit.DAYS)))
+                .expiration(Date.from(Instant.now().minus(1, ChronoUnit.DAYS)))
+                .signWith(key)
+                .compact();
+
+        AskRequest req = new AskRequest("Hola");
+        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
+                .header("Authorization", "Bearer " + expiredToken);
+        try {
+            client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
+            fail("Expected HttpClientResponseException for 401");
+        } catch (HttpClientResponseException e) {
+            assertEquals(401, e.getStatus().getCode());
+            String bodyJson = e.getResponse().getBody(String.class).orElse("{}");
+            JsonNode node = mapper.readTree(bodyJson);
+            assertEquals(OpenRouterErrorCode.UNAUTHORIZED.getCode(), node.path("errorCode").asInt());
+        }
     }
 
     @MockBean(HttpWrapper.class)

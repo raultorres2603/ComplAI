@@ -18,6 +18,9 @@ Parameters:
   OpenRouterApiKey:
     Type: String
     Description: OpenRouter API key (passed from CI or manually)
+  JwtSecret:
+    Type: String
+    Description: Base64-encoded HS256 JWT secret (min 32 bytes). Generate with openssl rand -base64 32.
 
 Globals:
   Function:
@@ -83,6 +86,7 @@ Resources:
           OPENROUTER_REQUEST_TIMEOUT_SECONDS: "20"
           OPENROUTER_OVERALL_TIMEOUT_SECONDS: "30"
           OPENROUTER_MODEL: arcee-ai/trinity-large-preview:free
+          JWT_SECRET: !Ref JwtSecret
       Events:
         ProxyRoot:
           Type: HttpApi

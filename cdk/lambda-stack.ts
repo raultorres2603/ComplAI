@@ -96,6 +96,11 @@ export class LambdaStack extends cdk.Stack {
         PROCEDURES_KEY: 'procedures.json',
         PROCEDURES_REGION: this.region,
         OPENROUTER_MODEL: process.env.OPENROUTER_MODEL || 'arcee-ai/trinity-large-preview:free',
+        // JWT_SECRET is a Base64-encoded HS256 key (min 32 bytes).
+        // Injected from the GitHub Environment Secret of the same name during CDK deploy.
+        // Like OPENROUTER_API_KEY, this is visible in the Lambda console — see the security
+        // note in this file. Rotate via: update the GitHub secret → redeploy → mint new tokens.
+        JWT_SECRET: process.env.JWT_SECRET || '',
       },
       role: lambdaRole,
     });

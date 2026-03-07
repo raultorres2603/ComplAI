@@ -285,10 +285,19 @@ jobs:
       - name: Install Bruno CLI
         run: npm install -g @usebruno/cli
 
+      - name: Generate JWT token for Bruno E2E
+        run: |
+          export JWT_SECRET="${{ secrets.JWT_SECRET }}"
+          ./gradlew --no-daemon shadowJar
+          TOKEN=$(JWT_SECRET="$JWT_SECRET" java -cp build/libs/complai-all.jar cat.complai.auth.TokenGenerator e2e-development 2>/dev/null | tail -1)
+          echo "jwtToken=$TOKEN" >> $GITHUB_ENV
+
       - name: Run Bruno E2E tests (development)
         working-directory: ./E2E-ComplAI
+        env:
+          jwtToken: ${{ env.jwtToken }}
         run: >
-          bru run . -r --env Development --reporter-json report/results.json
+          bru run . -r --env Development --env jwtToken="$jwtToken" --reporter-json report/results.json
 
       - name: Upload Bruno E2E JSON report
         if: always()
