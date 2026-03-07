@@ -112,7 +112,7 @@ jobs:
         run: ./gradlew --no-daemon clean shadowJar
 
       - name: Upload JAR artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: lambda-jar
           path: build/libs/*.jar
@@ -152,7 +152,7 @@ jobs:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.branch || github.sha }}
 
       - name: Download JAR artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: lambda-jar
           path: build/libs
