@@ -46,6 +46,7 @@ jobs:
   guard:
     name: Validate deployment inputs
     runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
     steps:
       - name: Block production deploy from non-master branch
         if: >
@@ -69,7 +70,7 @@ jobs:
   # ---------------------------------------------------------------------------
   build:
     name: Build JAR
-    needs: guard
+    needs: [guard]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -126,6 +127,7 @@ jobs:
     name: Deploy to ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'development' }}
     needs: build
     runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
     environment:
       # Bind to the matching GitHub Environment so that:
       #   - development: deploys immediately (no approval required).
@@ -272,10 +274,9 @@ jobs:
   e2e:
     name: E2E API Tests (Bruno)
     needs: deploy
-    if: needs.deploy.result == 'success' && needs.deploy.outputs.environment == 'development'
+    if: github.event_name == 'workflow_dispatch' && needs.deploy.result == 'success' && needs.deploy.outputs.environment == 'development'
     runs-on: ubuntu-latest
     continue-on-error: true   # E2E job never fails the workflow
-    # FIX 1: Add the environment to access the GitHub Environment secrets
     environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'development' }}
     steps:
       - name: Checkout code
