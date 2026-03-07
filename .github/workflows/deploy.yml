@@ -289,7 +289,7 @@ jobs:
         run: |
           export JWT_SECRET="${{ secrets.JWT_SECRET }}"
           ./gradlew --no-daemon shadowJar
-          TOKEN=$(JWT_SECRET="$JWT_SECRET" java -cp build/libs/complai-all.jar cat.complai.auth.TokenGenerator e2e-development 2>/dev/null | tail -1)
+          TOKEN=$(JWT_SECRET="$JWT_SECRET" java -cp build/libs/complai-all.jar cat.complai.auth.TokenGenerator e2e-development 1 2>/dev/null | tail -1)
           echo "jwtToken=$TOKEN" >> $GITHUB_ENV
 
       - name: Run Bruno E2E tests (development)
