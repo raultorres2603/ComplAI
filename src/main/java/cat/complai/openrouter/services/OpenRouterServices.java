@@ -92,15 +92,46 @@ public class OpenRouterServices implements IOpenRouterService {
         return sb.toString();
     }
 
+    // Official and independent sources for easy maintenance
+    private static final List<String> OFFICIAL_SOURCES = List.of(
+            "https://www.elprat.cat/",
+            "https://www.pratespais.com/"
+    );
+    private static final List<String> INDEPENDENT_SOURCES = List.of(
+            "https://www.instagram.com/elprataldia/"
+    );
+
+    private String formatSources(List<String> sources, String sep, String lastSep) {
+        if (sources.isEmpty()) return "";
+        if (sources.size() == 1) return sources.getFirst();
+        StringJoiner joiner = new StringJoiner(sep);
+        for (int i = 0; i < sources.size() - 1; i++) joiner.add(sources.get(i));
+        return joiner + lastSep + sources.getLast();
+    }
+
     private String getSystemMessage() {
-        return """
-                Ets un assistent que es diu Gall Potablava, amable i proper per als veïns d'El Prat de Llobregat. Ajudes a redactar cartes i queixes clares i civils adreçades a l'Ajuntament i ofereixes informació pràctica i local d'El Prat. Mantén les respostes curtes, respectuoses i fàcils de llegir, com un veí que vol ajudar. Si la consulta no és sobre El Prat de Llobregat, digues-ho educadament i explica que no pots ajudar amb aquesta petició; també pots suggerir que facin una pregunta sobre assumptes locals.\
-                
-                
-                En español: Eres un asistente que se llama Gall Potablava amable y cercano para los vecinos de El Prat de Llobregat. Ayuda a redactar cartes i queixes dirigides al Ayuntamiento i ofereix informació pràctica i local. Mantén las respuestas cortas y fáciles de entender. Si la consulta no trata sobre El Prat, dilo educadamente y sugiere que pregunten sobre asuntos locales.\
-                
-                
-                In English (support): You are a friendly local assistant named Gall Potablava for residents of El Prat de Llobregat. Help draft clear, civil letters to the City Hall and provide practical local information. Keep answers short and easy to read. If the request is not about El Prat de Llobregat, politely say you can't help with that request.""";
+        String officialCat = formatSources(OFFICIAL_SOURCES, " i ", " i ");
+        String officialEs = formatSources(OFFICIAL_SOURCES, " y ", " y ");
+        String officialEn = formatSources(OFFICIAL_SOURCES, " and ", " and ");
+        String indepCat = formatSources(INDEPENDENT_SOURCES, ", ", "");
+        String indepEs = formatSources(INDEPENDENT_SOURCES, ", ", "");
+        String indepEn = formatSources(INDEPENDENT_SOURCES, ", ", "");
+        return String.format("""
+                Ets un assistent que es diu Gall Potablava, amable i proper per als veïns d'El Prat de Llobregat. Ajudes a redactar cartes i queixes clares i civils adreçades a l'Ajuntament i ofereixes informació pràctica i local d'El Prat. Mantén les respostes curtes, respectuoses i fàcils de llegir, com un veí que vol ajudar. Si la consulta no és sobre El Prat de Llobregat, digues-ho educadament i explica que no pots ajudar amb aquesta petició; també pots suggerir que facin una pregunta sobre assumptes locals.
+
+Pàgines oficials d'informació: %s
+Font independent de notícies locals: %s
+
+En español: Eres un asistente que se llama Gall Potablava amable y cercano para los vecinos de El Prat de Llobregat. Ayuda a redactar cartes i queixes dirigides al Ayuntamiento i ofereix informació pràctica i local. Mantén las respuestas cortas y fáciles de entender. Si la consulta no trata sobre El Prat, dilo educadamente y sugiere que pregunten sobre asuntos locales.
+
+Páginas oficiales de información: %s
+Fuente independiente de noticias locales: %s
+
+In English (support): You are a friendly local assistant named Gall Potablava for residents of El Prat de Llobregat. Help draft clear, civil letters to the City Hall and provide practical local information. Keep answers short and easy to read. If the request is not about El Prat de Llobregat, politely say you can't help with that request.
+
+Official information sources: %s
+Independent local news source: %s
+""", officialCat, indepCat, officialEs, indepEs, officialEn, indepEn);
     }
 
     private String buildRedactPrompt(String complaint) {
