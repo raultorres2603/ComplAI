@@ -231,6 +231,7 @@ jobs:
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
           TARGET_ENV: ${{ steps.target.outputs.environment }}
         run: |
           # Resolve the shadow JAR. Prefer *-all.jar (shadowJar output).
