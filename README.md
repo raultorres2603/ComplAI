@@ -30,16 +30,6 @@
 
 ---
 
-## License
-
-This project is proprietary and confidential.  
-No license is granted to use, copy, modify, or distribute any part of this code or its contents.  
-All rights reserved.
-
-Unauthorized use, reproduction, or distribution of this code or any portion of it may result in civil and criminal penalties.
-
----
-
 ## 1. What Is This Project?
 
 **ComplAI** is a serverless REST API that acts as the backend "brain" of a citizen-facing chatbot.
