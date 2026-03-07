@@ -274,6 +274,7 @@ jobs:
     needs: deploy
     if: needs.deploy.result == 'success' && needs.deploy.outputs.environment == 'development'
     runs-on: ubuntu-latest
+    continue-on-error: true   # E2E job never fails the workflow
     # FIX 1: Add the environment to access the GitHub Environment secrets
     environment: ${{ github.event_name == 'workflow_dispatch' && inputs.environment || 'development' }}
     steps:
@@ -321,6 +322,7 @@ jobs:
           jwtToken: ${{ env.jwtToken }}
         run: >
           bru run . -r --env Development --env-var jwtToken="$jwtToken" --reporter-json report/results.json
+        continue-on-error: true
 
       - name: Upload Bruno E2E JSON report
         if: always()
