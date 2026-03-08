@@ -22,12 +22,6 @@
 10. [Infrastructure](#10-infrastructure)
 11. [Security](#11-security)
 12. [JWT Bearer Authentication](#12-jwt-bearer-authentication)
-13. [Local Development](#13-local-development)
-14. [Testing Strategy](#14-testing-strategy)
-15. [CI/CD Pipeline](#15-cicd-pipeline)
-15.1. [Release Process](#151-release-process)
-16. [Feature Proposals and Roadmap](#16-feature-proposals-and-roadmap)
-
 ---
 
 ## 1. What Is This Project?
