@@ -1,0 +1,42 @@
+meta {
+  name: AUTO - Generate complai
+  type: http
+  seq: 7
+  tags: [
+    ask
+  ]
+}
+
+post {
+  url: {{complaiPath}}/redact
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "text": "Hola, tinc un problema greu amb els contenidors ubicats a Apel·les Mestres, no funcionen. M'agradaria fer una queixa formal, si us plau.",
+    "format": "auto",
+    "conversationId": "{{conversationId}}"
+  }
+}
+
+tests {
+  test("HTTP status != 500", () => {
+    expect(res.getStatus()).to.be.lessThan(500);
+  });
+  test("Success prop == true", () => {
+    expect(res.getBody().success).to.equal(true);
+  });
+  test("Message != empty", () => {
+    expect(res.getBody().message).to.not.be.empty;
+  });
+  test("Error code == 0", () => {
+    expect(res.getBody().errorCode).to.equal(0);
+  });
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

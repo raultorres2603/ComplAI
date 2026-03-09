@@ -1,5 +1,5 @@
 meta {
-  name: Generate complai
+  name: JSON - Generate complai
   type: http
   seq: 5
   tags: [
@@ -16,6 +16,7 @@ post {
 body:json {
   {
     "text": "Hola, tinc un problema greu amb els contenidors ubicats a Apel·les Mestres, no funcionen. M'agradaria fer una queixa formal, si us plau.",
+    "format": "json",
     "conversationId": "{{conversationId}}"
   }
 }
