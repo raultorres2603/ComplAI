@@ -55,7 +55,11 @@ public class PdfGenerator {
                 if (!line.isEmpty()) {
                     contentStream.showText(line);
                 }
-                contentStream.newLineAtOffset(0, -LINE_HEIGHT);
+                // newLine() advances by LINE_HEIGHT (set via setLeading in openContentStream).
+                // This must be called for every line — including empty ones — so that the text
+                // matrix position stays in sync with currentY. Using newLineAtOffset(0, -n) only
+                // for non-empty lines caused the cursor to drift off-page, producing a blank PDF.
+                contentStream.newLine();
                 currentY -= LINE_HEIGHT;
             }
 
@@ -80,6 +84,9 @@ public class PdfGenerator {
         PDPageContentStream stream = new PDPageContentStream(document, page);
         stream.beginText();
         stream.setFont(font, FONT_SIZE);
+        // setLeading tells PDFBox how far to advance per newLine() call.
+        // Without this, newLine() moves by zero and all lines are stacked on top of each other.
+        stream.setLeading(LINE_HEIGHT);
         stream.newLineAtOffset(MARGIN, PAGE_HEIGHT - MARGIN);
         return stream;
     }
