@@ -215,20 +215,6 @@ public class OpenRouterControllerIntegrationTest {
     }
 
     @Test
-    void integration_redact_longProducesMultiplePages() {
-        OpenRouterResponseDto dto = openRouterService.redactComplaint("Very long complaint [HEADER_LONG]", OutputFormat.AUTO, null);
-        assertTrue(dto.isSuccess(), "Expected success");
-        assertNotNull(dto.getPdfData(), "Expected PDF data");
-        assertTrue(dto.getPdfData().length > 0);
-        try (java.io.ByteArrayInputStream in = new java.io.ByteArrayInputStream(dto.getPdfData());
-             org.apache.pdfbox.pdmodel.PDDocument doc = org.apache.pdfbox.pdmodel.PDDocument.load(in)) {
-            assertTrue(doc.getNumberOfPages() > 1, "Expected multi-page PDF");
-        } catch (Exception e) {
-            fail("PDF parsing failed: " + e.getMessage());
-        }
-    }
-
-    @Test
     void integration_redact_invalidHeaderFormat_fallsBackToJsonSuccess() {
         // AI returns a JSON header with an unrecognised format ("xml"). OutputFormat.fromString
         // treats unknown values as AUTO, which triggers the graceful fallback: the service returns

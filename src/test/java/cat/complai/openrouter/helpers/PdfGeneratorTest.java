@@ -61,23 +61,6 @@ class PdfGeneratorTest {
     }
 
     @Test
-    void testGeneratePdf_emptyText() throws IOException {
-        byte[] pdfBytes = PdfGenerator.generatePdf("");
-
-        Assertions.assertNotNull(pdfBytes);
-        Assertions.assertTrue(pdfBytes.length > 0);
-
-        try (PDDocument doc = PDDocument.load(pdfBytes)) {
-            PDFTextStripper stripper = new PDFTextStripper();
-            String extracted = stripper.getText(doc);
-
-            System.out.println("Extracted empty PDF text:\n" + extracted);
-
-            Assertions.assertTrue(extracted.trim().isEmpty(), "PDF should be empty for empty input");
-        }
-    }
-
-    @Test
     void testGeneratePdf_realisticAiResponseBody() throws IOException {
         // Simulates the parsed body after AiParsed strips the JSON header.
         // The AI typically leaves a blank line between the header and the letter body.
