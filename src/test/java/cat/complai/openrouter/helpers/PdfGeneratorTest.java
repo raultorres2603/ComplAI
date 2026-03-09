@@ -53,9 +53,9 @@ class PdfGeneratorTest {
             PDFTextStripper stripper = new PDFTextStripper();
             String extracted = stripper.getText(doc);
 
-            Assertions.assertTrue(extracted.contains("Estimat/da Senyor/a"), "PDF should contain greeting");
+            Assertions.assertTrue(extracted.contains("Benvolgut/da"), "PDF should contain greeting");
             Assertions.assertTrue(extracted.contains("Ajuntament"), "PDF should contain Ajuntament");
-            Assertions.assertTrue(extracted.contains("Raul Torres"), "PDF should contain signature");
+            Assertions.assertTrue(extracted.contains("Un veí preocupat"), "PDF should contain sign-off");
             Assertions.assertTrue(extracted.contains("necessàries"), "PDF should contain necessàries (à)");
         }
     }

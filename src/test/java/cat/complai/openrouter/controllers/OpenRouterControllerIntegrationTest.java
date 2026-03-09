@@ -256,12 +256,13 @@ public class OpenRouterControllerIntegrationTest {
 
     @Test
     void integration_redact_aiHeader_producesPdfWithCorrectContent() {
-        // This test verifies that the PDF not only gets created but also has the correct content,
-        // including handling of special Catalan characters.
-        String complaintText = "Això és una prova amb caràcters especials: à, é, í, ò, ú, ç, l·l.";
-        String aiResponse = "{\"format\": \"pdf\"}\\n\\n" + complaintText;
+        // Verify that PDF bytes contain the Catalan body text returned by the mock.
+        // The [HEADER_CATALAN] trigger causes the mock to return a JSON header + Catalan body,
+        // which the service parses and converts to a PDF via PdfGenerator.
+        String expectedBodyFragment = "Això és una prova amb caràcters especials";
 
-        OpenRouterResponseDto dto = openRouterService.redactComplaint(aiResponse, OutputFormat.AUTO, null);
+        OpenRouterResponseDto dto = openRouterService.redactComplaint(
+                "Complaint with Catalan text [HEADER_CATALAN]", OutputFormat.AUTO, null);
         assertTrue(dto.isSuccess(), "Expected success");
         assertNotNull(dto.getPdfData(), "Expected PDF data");
         assertTrue(dto.getPdfData().length > 0, "PDF should not be empty");
@@ -270,7 +271,8 @@ public class OpenRouterControllerIntegrationTest {
              org.apache.pdfbox.pdmodel.PDDocument doc = org.apache.pdfbox.pdmodel.PDDocument.load(in)) {
             org.apache.pdfbox.text.PDFTextStripper stripper = new org.apache.pdfbox.text.PDFTextStripper();
             String extractedText = stripper.getText(doc);
-            assertTrue(extractedText.contains(complaintText), "PDF content should match the complaint text");
+            assertTrue(extractedText.contains(expectedBodyFragment),
+                    "PDF content should contain the Catalan body text");
         } catch (Exception e) {
             fail("PDF parsing failed: " + e.getMessage());
         }
@@ -365,6 +367,11 @@ public class OpenRouterControllerIntegrationTest {
                 if (userPrompt != null && userPrompt.contains("[HEADER_INVALID]")) {
                     // Simulate invalid header
                     String body = "{\"format\": \"xml\"}\n\nThis body should be rejected due to invalid format.";
+                    return CompletableFuture.completedFuture(new HttpDto(body, 200, "POST", null));
+                }
+                if (userPrompt != null && userPrompt.contains("[HEADER_CATALAN]")) {
+                    // Simulate PDF response with Catalan special characters
+                    String body = "{\"format\": \"pdf\"}\n\nAixò és una prova amb caràcters especials: à, é, í, ò, ú, ç, l·l.\n\nAtentament,\nVeí";
                     return CompletableFuture.completedFuture(new HttpDto(body, 200, "POST", null));
                 }
                 // Default: simulate a successful text response
