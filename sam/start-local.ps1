@@ -1,7 +1,7 @@
 # start-local.ps1
 #
 # Convenience script to build the shadow JAR, start LocalStack, and launch
-# SAM CLI local API — run from the sam/ directory in PowerShell.
+# SAM CLI local API - run from the sam/ directory in PowerShell.
 #
 # Prerequisites (must already be installed and on PATH):
 #   - Docker (with the Compose plugin)
@@ -46,7 +46,7 @@ if ($ShadowJars.Count -eq 0) {
     exit 1
 }
 if ($ShadowJars.Count -gt 1) {
-    Write-Error "[start-local] Multiple shadow JARs found in $LibsDir — cannot determine which to use: $($ShadowJars.Name -join ', '). Run clean and try again."
+    Write-Error "[start-local] Multiple shadow JARs found in $LibsDir - cannot determine which to use: $($ShadowJars.Name -join ', '). Run clean and try again."
     exit 1
 }
 Write-Host "[start-local] Shadow JAR confirmed: $($ShadowJars[0].Name)" -ForegroundColor Green
@@ -96,4 +96,3 @@ sam local start-api `
     --warm-containers EAGER `
     --host 127.0.0.1 `
     --port 3000
-
