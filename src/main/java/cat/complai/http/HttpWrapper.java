@@ -48,15 +48,15 @@ public class HttpWrapper {
         this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
         this.mapper = new ObjectMapper();
         this.headers = Map.of();
-        this.requestTimeoutSeconds = 20; // default fallback
-        this.openRouterModel = "google/gemini-3-flash-preview";
+        this.requestTimeoutSeconds = 60; // default fallback
+        this.openRouterModel = "arcee-ai/trinity-large-preview:free";
     }
 
     @Inject
     public HttpWrapper(@Value("${openrouter.url:https://openrouter.ai/api/v1/chat/completions}") String openRouterUrl,
                        @Value("${OPENROUTER_API_KEY:}") String openRouterApiKey,
-                       @Value("${OPENROUTER_REQUEST_TIMEOUT_SECONDS:20}") int requestTimeoutSeconds,
-                       @Value("${OPENROUTER_MODEL:google/gemini-3-flash-preview}") String openRouterModel) {
+                       @Value("${OPENROUTER_REQUEST_TIMEOUT_SECONDS:60}") int requestTimeoutSeconds,
+                       @Value("${OPENROUTER_MODEL:google/gemini-2.0-flash-lite-preview-02-05:free}") String openRouterModel) {
         this.openRouterUrl = normalizeOpenRouterUrl(openRouterUrl);
         this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
         this.mapper = new ObjectMapper();

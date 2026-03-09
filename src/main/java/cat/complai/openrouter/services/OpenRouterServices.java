@@ -51,7 +51,7 @@ public class OpenRouterServices implements IOpenRouterService {
 
     @Inject
     public OpenRouterServices(HttpWrapper httpWrapper, @Value("${complai.input.max-length-chars:5000}") int maxInputLength,
-                             @Value("${OPENROUTER_OVERALL_TIMEOUT_SECONDS:30}") int overallTimeoutSeconds) {
+                             @Value("${OPENROUTER_OVERALL_TIMEOUT_SECONDS:60}") int overallTimeoutSeconds) {
         this.httpWrapper = Objects.requireNonNull(httpWrapper, "httpWrapper");
         this.conversationCache = Caffeine.newBuilder()
                 .expireAfterWrite(30, TimeUnit.MINUTES)

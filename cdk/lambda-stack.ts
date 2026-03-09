@@ -90,8 +90,8 @@ export class LambdaStack extends cdk.Stack {
       // Secrets Manager or SSM Parameter Store with encryption is more secure if available.
       environment: {
         OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '',
-        OPENROUTER_REQUEST_TIMEOUT_SECONDS: process.env.OPENROUTER_REQUEST_TIMEOUT_SECONDS || '20',
-        OPENROUTER_OVERALL_TIMEOUT_SECONDS: process.env.OPENROUTER_OVERALL_TIMEOUT_SECONDS || '30',
+        OPENROUTER_REQUEST_TIMEOUT_SECONDS: process.env.OPENROUTER_REQUEST_TIMEOUT_SECONDS || '60',
+        OPENROUTER_OVERALL_TIMEOUT_SECONDS: process.env.OPENROUTER_OVERALL_TIMEOUT_SECONDS || '60',
         PROCEDURES_BUCKET: proceduresBucket.bucketName,
         PROCEDURES_KEY: 'procedures.json',
         PROCEDURES_REGION: this.region,
