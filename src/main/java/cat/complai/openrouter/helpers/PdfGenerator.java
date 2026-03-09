@@ -4,6 +4,7 @@ import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.font.PDType0Font;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 
@@ -18,24 +19,28 @@ public class PdfGenerator {
     private static final float FONT_SIZE = 11;
     private static final float LINE_HEIGHT = 14.5f;
     private static final float PAGE_HEIGHT = PDRectangle.A4.getHeight();
+    private static final float PAGE_WIDTH = PDRectangle.A4.getWidth();
+    private static final float USABLE_WIDTH = PAGE_WIDTH - 2 * MARGIN;
     private static final float BOTTOM_MARGIN = 50;
 
     public static byte[] generatePdf(String content) {
         if (content == null || content.trim().isEmpty()) {
-            content = "No content was generated or extracted."; // Fallback to prevent completely empty/corrupted PDFs
+            content = "No content was generated or extracted.";
         }
 
         try (PDDocument document = new PDDocument();
              ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
 
             InputStream fontStream = PdfGenerator.class.getResourceAsStream("/NotoSans-Regular.ttf");
-            PDType0Font customFont = fontStream != null ? PDType0Font.load(document, fontStream) : null;
-            PDType1Font fallbackFont = new PDType1Font(PDType1Font.HELVETICA.getCOSObject());
+            // Bug fix: PDType1Font.HELVETICA is the correct static constant to reuse.
+            // Constructing new PDType1Font(PDType1Font.HELVETICA.getCOSObject()) shares the same
+            // mutable COS dictionary, which can corrupt font encoding and produce a blank PDF.
+            PDFont font = fontStream != null ? PDType0Font.load(document, fontStream) : PDType1Font.HELVETICA;
 
-            List<String> visualLines = buildVisualLines(content, customFont != null ? customFont : fallbackFont);
+            List<String> visualLines = buildVisualLines(content, font);
 
             PDPage currentPage = addNewPage(document);
-            PDPageContentStream contentStream = openContentStream(document, currentPage, customFont, fallbackFont);
+            PDPageContentStream contentStream = openContentStream(document, currentPage, font);
             float currentY = PAGE_HEIGHT - MARGIN;
 
             for (String line : visualLines) {
@@ -43,7 +48,7 @@ public class PdfGenerator {
                     contentStream.endText();
                     contentStream.close();
                     currentPage = addNewPage(document);
-                    contentStream = openContentStream(document, currentPage, customFont, fallbackFont);
+                    contentStream = openContentStream(document, currentPage, font);
                     currentY = PAGE_HEIGHT - MARGIN;
                 }
 
@@ -71,19 +76,21 @@ public class PdfGenerator {
         return page;
     }
 
-    private static PDPageContentStream openContentStream(PDDocument document, PDPage page, PDType0Font customFont, PDType1Font fallbackFont) throws Exception {
+    private static PDPageContentStream openContentStream(PDDocument document, PDPage page, PDFont font) throws Exception {
         PDPageContentStream stream = new PDPageContentStream(document, page);
         stream.beginText();
-        if (customFont != null) {
-            stream.setFont(customFont, FONT_SIZE);
-        } else {
-            stream.setFont(fallbackFont, FONT_SIZE);
-        }
+        stream.setFont(font, FONT_SIZE);
         stream.newLineAtOffset(MARGIN, PAGE_HEIGHT - MARGIN);
         return stream;
     }
 
-    private static List<String> buildVisualLines(String content, Object font) throws Exception {
+    /**
+     * Splits content into visual lines that fit within USABLE_WIDTH.
+     * Each paragraph from the input is word-wrapped independently.
+     * Without this, lines longer than the page width are rendered off-page
+     * and the PDF appears blank.
+     */
+    private static List<String> buildVisualLines(String content, PDFont font) throws Exception {
         String[] paragraphs = content.split("\n");
         List<String> result = new ArrayList<>();
 
@@ -93,9 +100,34 @@ public class PdfGenerator {
                 result.add("");
                 continue;
             }
-            // Basic wrapping logic (simplified for standard constraints)
-            result.add(paragraph); // In full logic, wrap paragraph by string width based on font
+            result.addAll(wrapParagraph(paragraph, font));
         }
         return result;
+    }
+
+    /**
+     * Word-wraps a single paragraph into lines that fit within USABLE_WIDTH at FONT_SIZE.
+     * PDFBox's getStringWidth() returns width in 1/1000 text space units; divide by 1000
+     * and multiply by font size to get points.
+     */
+    private static List<String> wrapParagraph(String paragraph, PDFont font) throws Exception {
+        String[] words = paragraph.split(" ");
+        List<String> lines = new ArrayList<>();
+        StringBuilder currentLine = new StringBuilder();
+
+        for (String word : words) {
+            String candidate = currentLine.isEmpty() ? word : currentLine + " " + word;
+            float widthPt = font.getStringWidth(candidate) / 1000f * FONT_SIZE;
+            if (widthPt > USABLE_WIDTH && !currentLine.isEmpty()) {
+                lines.add(currentLine.toString());
+                currentLine = new StringBuilder(word);
+            } else {
+                currentLine = new StringBuilder(candidate);
+            }
+        }
+        if (!currentLine.isEmpty()) {
+            lines.add(currentLine.toString());
+        }
+        return lines;
     }
 }
