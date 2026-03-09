@@ -15,8 +15,10 @@ import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.server.types.files.StreamedFile;
 import jakarta.inject.Inject;
 
+import java.io.ByteArrayInputStream;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -103,9 +105,11 @@ public class OpenRouterController {
             );
             if (dto != null && dto.isSuccess() && dto.getPdfData() != null) {
                 byte[] pdf = dto.getPdfData();
-                return HttpResponse.ok(pdf)
-                        .contentType(MediaType.APPLICATION_PDF)
-                        .header(io.micronaut.http.HttpHeaders.CONTENT_LENGTH, String.valueOf(pdf.length));
+                // Wrap the byte array in an InputStream and return a StreamedFile
+                ByteArrayInputStream inputStream = new ByteArrayInputStream(pdf);
+                StreamedFile streamedFile = new StreamedFile(inputStream, MediaType.APPLICATION_PDF_TYPE);
+
+                return HttpResponse.ok(streamedFile);
             }
             return errorToHttpResponse(dto, "redact");
         } catch (Exception e) {
