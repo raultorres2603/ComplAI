@@ -24,7 +24,7 @@ Parameters:
 
 Globals:
   Function:
-    Timeout: 30
+    Timeout: 60
     MemorySize: 768
     Runtime: java21
     Environment:
@@ -74,7 +74,7 @@ Resources:
       Handler: io.micronaut.function.aws.proxy.payload2.APIGatewayV2HTTPEventFunction::handleRequest
       Runtime: java21
       MemorySize: 768
-      Timeout: 30
+      Timeout: 60
       Role: !GetAtt ComplAILambdaRole.Arn
       Environment:
         Variables:
@@ -83,9 +83,9 @@ Resources:
           PROCEDURES_KEY: procedures.json
           PROCEDURES_REGION: !Ref LambdaRegion
           AWS_ENDPOINT_URL: "http://host.docker.internal:4566"
-          OPENROUTER_REQUEST_TIMEOUT_SECONDS: "20"
-          OPENROUTER_OVERALL_TIMEOUT_SECONDS: "30"
-          OPENROUTER_MODEL: arcee-ai/trinity-large-preview:free
+          OPENROUTER_REQUEST_TIMEOUT_SECONDS: "60"
+          OPENROUTER_OVERALL_TIMEOUT_SECONDS: "60"
+          OPENROUTER_MODEL: google/gemini-2.0-flash-lite-preview-02-05:free
           JWT_SECRET: !Ref JwtSecret
       Events:
         ProxyRoot:
