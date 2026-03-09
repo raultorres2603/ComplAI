@@ -72,6 +72,10 @@ jobs:
     name: Build JAR
     needs: [guard]
     runs-on: ubuntu-latest
+    # guard only runs on workflow_dispatch; on pull_request it is skipped.
+    # A skipped dependency would block this job, so we explicitly allow both
+    # "success" (manual dispatch that passed guard) and "skipped" (PR trigger).
+    if: always() && (needs.guard.result == 'success' || needs.guard.result == 'skipped')
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -281,6 +285,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.branch || github.sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
