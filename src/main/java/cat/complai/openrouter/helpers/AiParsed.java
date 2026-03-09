@@ -50,7 +50,12 @@ public record AiParsed(OutputFormat format, String message) {
             Map<String, Object> map = mapper.readValue(jsonHeader, new TypeReference<>() {
             });
             Object fmt = map.get("format");
-            Object body = map.get("body") != null ? map.get("body") : map.get("message");
+            Object body = map.get("body");
+            if (body == null) body = map.get("message");
+            if (body == null) body = map.get("content");
+            if (body == null) body = map.get("text");
+            if (body == null) body = map.get("response");
+
             OutputFormat f = fmt == null ? OutputFormat.AUTO : OutputFormat.fromString(fmt.toString());
             String m = (body != null) ? body.toString() : rest;
             // If body missing in JSON, use the remaining text after the JSON header (if non-blank)

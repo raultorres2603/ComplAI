@@ -141,6 +141,12 @@ public class PdfGenerator {
                 contents.newLineAtOffset(MARGIN, yPosition);
             }
         }
+
+        if (paragraphs.length == 0 || (paragraphs.length == 1 && paragraphs[0].isEmpty())) {
+             contents.newLineAtOffset(0, -LEADING * 2);
+             contents.showText("(No complaint text could be generated.)");
+        }
+
         contents.endText();
         contents.close();
     }

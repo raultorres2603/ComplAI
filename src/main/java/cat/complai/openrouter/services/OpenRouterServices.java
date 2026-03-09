@@ -277,6 +277,11 @@ Independent local news source: %s
             return new OpenRouterResponseDto(true, parsed.message(), null, aiDto.getStatusCode(), OpenRouterErrorCode.NONE);
         }
 
+        // Final fallback: if parsed message is somehow strictly empty but format is valid, warn
+        if (parsed.message().isBlank()) {
+             logger.warning("AI format parsed as PDF but message body is empty. Original: " + aiDto.getMessage());
+        }
+
         try {
             byte[] pdf = PdfGenerator.generatePdf(parsed.message());
             return new OpenRouterResponseDto(true, null, null, null, OpenRouterErrorCode.NONE, pdf);
