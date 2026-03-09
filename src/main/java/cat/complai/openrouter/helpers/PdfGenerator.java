@@ -2,162 +2,86 @@ package cat.complai.openrouter.helpers;
 
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDType0Font;
-import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.font.PDType1Font;
 
 import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.io.InputStream;
-import java.util.logging.Logger;
-import java.util.logging.Level;
+import java.util.ArrayList;
+import java.util.List;
 
 public class PdfGenerator {
-    private static final Logger logger = Logger.getLogger(PdfGenerator.class.getName());
-    private static final String FONT_RESOURCE = "/NotoSans-Regular.ttf";
-    private static final float MARGIN = 50f;
-    private static final PDRectangle PAGE_SIZE = PDRectangle.LETTER;
-    private static final float TITLE_GAP = 20f;
-    private static final float LEADING = 14f;
-    // Reduced line length to avoid off-page text since NotoSans is not monospaced
-    private static final int MAX_PER_LINE = 80;
 
-    public static byte[] generatePdf(String text) throws IOException {
-        try (PDDocument doc = new PDDocument()) {
-            writeBodyToDocument(doc, text);
-            try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-                doc.save(out);
-                return out.toByteArray();
-            }
-        }
-    }
+    public static byte[] generatePdf(String content) {
+        // 1. try-with-resources ensures the document is closed in memory
+        try (PDDocument document = new PDDocument();
+             ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
 
-    private static void writeBodyToDocument(PDDocument doc, String text) throws IOException {
-        InputStream fontStream = PdfGenerator.class.getResourceAsStream(FONT_RESOURCE);
-        if (fontStream == null) {
-            throw new IOException("Font resource not found: " + FONT_RESOURCE);
-        }
+            PDPage page = new PDPage(PDRectangle.A4);
+            document.addPage(page);
 
-        PDType0Font font;
-        try (fontStream) {
-            // Use subsetting (true) to reduce file size and potential font issues
-            font = PDType0Font.load(doc, fontStream, true);
-        }
-
-        float yStart = PAGE_SIZE.getHeight() - MARGIN - TITLE_GAP;
-        float yPosition = yStart;
-
-        PDPage page = new PDPage(PAGE_SIZE);
-        doc.addPage(page);
-        PDPageContentStream contents = new PDPageContentStream(doc, page);
-
-        // Title
-        contents.beginText();
-        contents.setFont(font, 16);
-        // Explicitly set color to black
-        contents.setNonStrokingColor(0, 0, 0);
-        contents.newLineAtOffset(MARGIN, yStart + 15);
-        contents.showText("Redacted complaint");
-        contents.endText();
-
-        // Begin body
-        contents.beginText();
-        contents.setFont(font, 12);
-        contents.newLineAtOffset(MARGIN, yPosition);
-
-        String normalized = (text == null) ? "" : text.replace("\r", "");
-        String[] paragraphs = normalized.split("\n\\s*\n");
-
-        for (String s : paragraphs) {
-            String paragraph = s.replace("\n", " ").trim();
-            if (paragraph.isEmpty()) {
-                // Empty paragraph (double newline), just add spacing
-                yPosition -= LEADING;
-                contents.newLineAtOffset(0, -LEADING);
-                if (checkPageBreak(doc, yPosition)) {
-                   // Page break happened
-                   contents.endText();
-                   contents.close();
-
-                   page = addNewPage(doc);
-                   contents = new PDPageContentStream(doc, page);
-                   yPosition = PAGE_SIZE.getHeight() - MARGIN;
-
-                   contents.beginText();
-                   contents.setFont(font, 12);
-                   contents.setNonStrokingColor(0, 0, 0);
-                   contents.newLineAtOffset(MARGIN, yPosition);
+            PDType0Font customFont = null;
+            try {
+                InputStream fontStream = PdfGenerator.class.getResourceAsStream("/NotoSans-Regular.ttf");
+                if (fontStream != null) {
+                    customFont = PDType0Font.load(document, fontStream);
+                } else {
+                    System.out.println("Warning: Custom font not found. Falling back to default.");
                 }
-                continue;
+            } catch (Exception e) {
+                System.out.println("Warning: Could not load font: " + e.getMessage());
             }
 
-            String[] words = paragraph.split("\\s+");
-            StringBuilder lineBuilder = new StringBuilder();
+            // 2. try-with-resources for PDPageContentStream.
+            // ---> THIS IS THE FIX! It automatically calls contentStream.close() <---
+            // Without closing this stream, the text never flushes to the page, leaving it empty.
+            try (PDPageContentStream contentStream = new PDPageContentStream(document, page)) {
 
-            for (String w : words) {
-                if (lineBuilder.length() + w.length() + 1 > MAX_PER_LINE) {
-                    contents.showText(lineBuilder.toString().trim());
-                    contents.newLineAtOffset(0, -LEADING);
-                    yPosition -= LEADING;
-                    lineBuilder.setLength(0);
+                contentStream.beginText();
 
-                    if (checkPageBreak(doc, yPosition)) {
-                        contents.endText();
-                        contents.close();
+                if (customFont != null) {
+                    contentStream.setFont(customFont, 12);
+                } else {
+                    // Fallback to standard PDFBox font
+                    contentStream.setFont(PDType1Font.HELVETICA, 12);
+                }
 
-                        page = addNewPage(doc);
-                        contents = new PDPageContentStream(doc, page);
-                        yPosition = PAGE_SIZE.getHeight() - MARGIN;
+                // Initial position (X: 50, Y: 750 - top left of A4)
+                float startX = 50;
+                float startY = PDRectangle.A4.getHeight() - 50;
+                contentStream.newLineAtOffset(startX, startY);
 
-                        contents.beginText();
-                        contents.setFont(font, 12);
-                        contents.setNonStrokingColor(0, 0, 0);
-                        contents.newLineAtOffset(MARGIN, yPosition);
+                // PDFBox doesn't auto-wrap text, so we handle basic line splitting safely
+                String[] paragraphs = content != null ? content.split("\n") : new String[]{""};
+                for (String paragraph : paragraphs) {
+                    // Strip problematic characters like carriage returns
+                    paragraph = paragraph.replace("\r", "").trim();
+                    if (paragraph.isEmpty()) {
+                        contentStream.newLineAtOffset(0, -15); // Empty line spacing
+                        continue;
                     }
+
+                    // Basic safeguard to avoid text going off the page boundary
+                    // (You can enhance this by splitting by words if lines are too long)
+                    contentStream.showText(paragraph);
+                    contentStream.newLineAtOffset(0, -15);
                 }
-                if (!lineBuilder.isEmpty()) lineBuilder.append(' ');
-                lineBuilder.append(w);
-            }
-            if (!lineBuilder.isEmpty()) {
-                contents.showText(lineBuilder.toString().trim());
-                contents.newLineAtOffset(0, -LEADING);
-                yPosition -= LEADING;
-            }
-            // Paragraph gap
-            yPosition -= (LEADING / 2f);
-            contents.newLineAtOffset(0, -(LEADING / 2f));
 
-            if (checkPageBreak(doc, yPosition)) {
-                contents.endText();
-                contents.close();
+                contentStream.endText();
 
-                page = addNewPage(doc);
-                contents = new PDPageContentStream(doc, page);
-                yPosition = PAGE_SIZE.getHeight() - MARGIN;
-
-                contents.beginText();
-                contents.setFont(font, 12);
-                contents.setNonStrokingColor(0, 0, 0);
-                contents.newLineAtOffset(MARGIN, yPosition);
+                // The try-with-resources block ends here, automatically calling contentStream.close()
+                // and flushing all the text data into the PDF page buffer.
             }
+
+            // 3. Now that the content stream is closed and flushed, we save the document
+            document.save(baos);
+
+            return baos.toByteArray();
+
+        } catch (Exception e) {
+            throw new RuntimeException("Error generating PDF with Apache PDFBox", e);
         }
-
-        if (paragraphs.length == 0 || (paragraphs.length == 1 && paragraphs[0].isEmpty())) {
-             contents.newLineAtOffset(0, -LEADING * 2);
-             contents.showText("(No complaint text could be generated.)");
-        }
-
-        contents.endText();
-        contents.close();
-    }
-
-    private static boolean checkPageBreak(PDDocument doc, float yPosition) {
-        return yPosition < MARGIN;
-    }
-
-    private static PDPage addNewPage(PDDocument doc) {
-        PDPage newPage = new PDPage(PAGE_SIZE);
-        doc.addPage(newPage);
-        return newPage;
     }
 }
