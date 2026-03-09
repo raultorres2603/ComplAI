@@ -66,7 +66,7 @@ public class OpenRouterController {
     }
 
     @Post("/redact")
-    @Produces({MediaType.APPLICATION_JSON, MediaType.APPLICATION_PDF})
+    @Produces({MediaType.APPLICATION_PDF, MediaType.APPLICATION_JSON})
     public HttpResponse<?> redact(@Body RedactRequest request) {
         logger.info("POST /openrouter/redact called");
         long start = System.currentTimeMillis();
