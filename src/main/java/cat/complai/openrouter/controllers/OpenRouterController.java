@@ -11,6 +11,7 @@ import cat.complai.openrouter.helpers.AuditLogger;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
@@ -90,7 +91,7 @@ public class OpenRouterController {
                         "Unsupported format. Only 'pdf', 'json', or 'auto' are accepted. Documents are always produced as PDF.",
                         OpenRouterErrorCode.VALIDATION.getCode()
                 );
-                return HttpResponse.badRequest(err);
+                return HttpResponse.badRequest(err).contentType(MediaType.APPLICATION_JSON);
             }
 
             OpenRouterResponseDto dto = service.redactComplaint(text, format, conversationId);
@@ -124,7 +125,7 @@ public class OpenRouterController {
             );
             logger.log(Level.SEVERE, "redact: unexpected exception", e);
             OpenRouterPublicDto err = new OpenRouterPublicDto(false, null, e.getMessage(), OpenRouterErrorCode.INTERNAL.getCode());
-            return HttpResponse.serverError(err);
+            return HttpResponse.serverError(err).contentType(MediaType.APPLICATION_JSON);
         }
     }
 
@@ -137,12 +138,12 @@ public class OpenRouterController {
         OpenRouterPublicDto publicDto = OpenRouterPublicDto.from(dto);
 
         if (dto != null && dto.isSuccess()) {
-            return HttpResponse.ok(publicDto);
+            return HttpResponse.ok(publicDto).contentType(MediaType.APPLICATION_JSON);
         }
 
         OpenRouterErrorCode errorCode = dto != null ? dto.getErrorCode() : OpenRouterErrorCode.INTERNAL;
 
-        return switch (errorCode) {
+        MutableHttpResponse<OpenRouterPublicDto> response = switch (errorCode) {
             case VALIDATION -> {
                 logger.fine(operation + ": bad request - " + dto.getError());
                 yield HttpResponse.badRequest(publicDto);
@@ -164,5 +165,7 @@ public class OpenRouterController {
                 yield HttpResponse.serverError(publicDto);
             }
         };
+
+        return response.contentType(MediaType.APPLICATION_JSON);
     }
 }
