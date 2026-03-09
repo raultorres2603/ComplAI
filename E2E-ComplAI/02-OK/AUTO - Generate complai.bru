@@ -22,17 +22,20 @@ body:json {
 }
 
 tests {
-  test("HTTP status != 500", () => {
-    expect(res.getStatus()).to.be.lessThan(500);
+  test("HTTP status is 200", () => {
+    expect(res.getStatus()).to.equal(200);
   });
-  test("Success prop == true", () => {
-    expect(res.getBody().success).to.equal(true);
-  });
-  test("Message != empty", () => {
-    expect(res.getBody().message).to.not.be.empty;
-  });
-  test("Error code == 0", () => {
-    expect(res.getBody().errorCode).to.equal(0);
+  test("Response is either PDF binary or JSON success", () => {
+    const contentType = res.getHeader("content-type") || "";
+    if (contentType.includes("application/pdf")) {
+      // AUTO resolved to PDF — assert binary response is non-empty
+      expect(res.getBody()).to.not.be.empty;
+    } else {
+      // AUTO resolved to JSON — assert success shape
+      expect(res.getBody().success).to.equal(true);
+      expect(res.getBody().message).to.not.be.empty;
+      expect(res.getBody().errorCode).to.equal(0);
+    }
   });
 }
 

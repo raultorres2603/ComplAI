@@ -16,10 +16,7 @@ import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.server.types.files.StreamedFile;
 import jakarta.inject.Inject;
-
-import java.io.ByteArrayInputStream;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -106,14 +103,15 @@ public class OpenRouterController {
             );
             if (dto != null && dto.isSuccess() && dto.getPdfData() != null) {
                 byte[] pdf = dto.getPdfData();
-                // Wrap the byte array in an InputStream and return a StreamedFile
-                ByteArrayInputStream inputStream = new ByteArrayInputStream(pdf);
-                StreamedFile streamedFile = new StreamedFile(inputStream, MediaType.APPLICATION_PDF_TYPE);
-
-                // 3. Return the StreamedFile.
-                // Micronaut will automatically handle the Content-Length header for you!
-                return HttpResponse.ok(streamedFile)
-                        // Optional: 'inline' tells Chrome/Bruno to display it in the viewer rather than downloading it
+                // Return raw byte[] with an explicit, parameter-free Content-Type header.
+                // The Micronaut Lambda runtime (BinaryTypeConfiguration) checks content type via
+                // an exact List.contains() match against "application/pdf". Any extra parameters
+                // (e.g. "; charset=UTF-8") added by StreamedFile would break that match, causing
+                // the PDF bytes to be written as a UTF-8 string instead of base64 — producing a
+                // blank PDF on the client. Content-Length prevents Netty chunked-encoding issues.
+                return HttpResponse.ok(pdf)
+                        .contentType(MediaType.APPLICATION_PDF)
+                        .header(io.micronaut.http.HttpHeaders.CONTENT_LENGTH, String.valueOf(pdf.length))
                         .header(io.micronaut.http.HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"complaint.pdf\"");
             }
             return errorToHttpResponse(dto, "redact");
