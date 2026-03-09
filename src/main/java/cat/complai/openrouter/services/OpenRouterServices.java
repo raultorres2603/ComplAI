@@ -277,9 +277,12 @@ Independent local news source: %s
             return new OpenRouterResponseDto(true, parsed.message(), null, aiDto.getStatusCode(), OpenRouterErrorCode.NONE);
         }
 
-        // Final fallback: if parsed message is somehow strictly empty but format is valid, warn
+        // The AI emitted the JSON header but forgot to write the letter body.
+        // Generating a PDF from an empty body produces a useless placeholder document,
+        // so we return an error and let the client retry.
         if (parsed.message().isBlank()) {
-             logger.warning("AI format parsed as PDF but message body is empty. Original: " + aiDto.getMessage());
+            logger.warning("AI emitted format header but letter body is empty. Original response: " + aiDto.getMessage());
+            return new OpenRouterResponseDto(false, null, "AI returned a format header but no letter body.", aiDto.getStatusCode(), OpenRouterErrorCode.UPSTREAM);
         }
 
         try {
