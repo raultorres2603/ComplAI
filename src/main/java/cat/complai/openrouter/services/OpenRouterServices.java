@@ -282,7 +282,7 @@ Independent local news source: %s
             return new OpenRouterResponseDto(true, null, null, null, OpenRouterErrorCode.NONE, pdf);
         } catch (Exception e) {
             logger.log(Level.SEVERE, "PDF generation failed", e);
-            return new OpenRouterResponseDto(false, null, "PDF generation failed.", null, OpenRouterErrorCode.INTERNAL);
+            return new OpenRouterResponseDto(false, null, "PDF generation failed: " + e.getMessage(), null, OpenRouterErrorCode.INTERNAL);
         }
     }
 
