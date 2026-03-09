@@ -42,23 +42,23 @@ public class OpenRouterController {
             OpenRouterResponseDto dto = service.ask(request.getText(), request.getConversationId());
             long latency = System.currentTimeMillis() - start;
             AuditLogger.log(
-                "/complai/ask",
-                AuditLogger.hashText(request.getText()),
-                dto != null ? dto.getErrorCode().getCode() : -1,
-                latency,
-                null, // outputFormat not relevant for ask
-                null  // language (future)
+                    "/complai/ask",
+                    AuditLogger.hashText(request.getText()),
+                    dto != null ? dto.getErrorCode().getCode() : -1,
+                    latency,
+                    null, // outputFormat not relevant for ask
+                    null  // language (future)
             );
             return errorToHttpResponse(dto, "ask");
         } catch (Exception e) {
             long latency = System.currentTimeMillis() - start;
             AuditLogger.log(
-                "/complai/ask",
-                AuditLogger.hashText(request != null ? request.getText() : null),
-                OpenRouterErrorCode.INTERNAL.getCode(),
-                latency,
-                null,
-                null
+                    "/complai/ask",
+                    AuditLogger.hashText(request != null ? request.getText() : null),
+                    OpenRouterErrorCode.INTERNAL.getCode(),
+                    latency,
+                    null,
+                    null
             );
             logger.log(Level.SEVERE, "ask: unexpected exception", e);
             OpenRouterPublicDto err = new OpenRouterPublicDto(false, null, e.getMessage(), OpenRouterErrorCode.INTERNAL.getCode());
@@ -79,12 +79,12 @@ public class OpenRouterController {
             if (!OutputFormat.isSupportedClientFormat(format)) {
                 long latency = System.currentTimeMillis() - start;
                 AuditLogger.log(
-                    "/complai/redact",
-                    AuditLogger.hashText(text),
-                    OpenRouterErrorCode.VALIDATION.getCode(),
-                    latency,
-                    format != null ? format.name() : null,
-                    null
+                        "/complai/redact",
+                        AuditLogger.hashText(text),
+                        OpenRouterErrorCode.VALIDATION.getCode(),
+                        latency,
+                        format != null ? format.name() : null,
+                        null
                 );
                 OpenRouterPublicDto err = new OpenRouterPublicDto(
                         false, null,
@@ -97,12 +97,12 @@ public class OpenRouterController {
             OpenRouterResponseDto dto = service.redactComplaint(text, format, conversationId);
             long latency = System.currentTimeMillis() - start;
             AuditLogger.log(
-                "/complai/redact",
-                AuditLogger.hashText(text),
-                dto != null ? dto.getErrorCode().getCode() : -1,
-                latency,
-                format != null ? format.name() : null,
-                null
+                    "/complai/redact",
+                    AuditLogger.hashText(text),
+                    dto != null ? dto.getErrorCode().getCode() : -1,
+                    latency,
+                    format != null ? format.name() : null,
+                    null
             );
             if (dto != null && dto.isSuccess() && dto.getPdfData() != null) {
                 byte[] pdf = dto.getPdfData();
@@ -110,18 +110,22 @@ public class OpenRouterController {
                 ByteArrayInputStream inputStream = new ByteArrayInputStream(pdf);
                 StreamedFile streamedFile = new StreamedFile(inputStream, MediaType.APPLICATION_PDF_TYPE);
 
-                return HttpResponse.ok(streamedFile);
+                // 3. Return the StreamedFile.
+                // Micronaut will automatically handle the Content-Length header for you!
+                return HttpResponse.ok(streamedFile)
+                        // Optional: 'inline' tells Chrome/Bruno to display it in the viewer rather than downloading it
+                        .header(io.micronaut.http.HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"complaint.pdf\"");
             }
             return errorToHttpResponse(dto, "redact");
         } catch (Exception e) {
             long latency = System.currentTimeMillis() - start;
             AuditLogger.log(
-                "/complai/redact",
-                AuditLogger.hashText(request != null ? request.getText() : null),
-                OpenRouterErrorCode.INTERNAL.getCode(),
-                latency,
-                request != null && request.getFormat() != null ? request.getFormat().name() : null,
-                null
+                    "/complai/redact",
+                    AuditLogger.hashText(request != null ? request.getText() : null),
+                    OpenRouterErrorCode.INTERNAL.getCode(),
+                    latency,
+                    request != null && request.getFormat() != null ? request.getFormat().name() : null,
+                    null
             );
             logger.log(Level.SEVERE, "redact: unexpected exception", e);
             OpenRouterPublicDto err = new OpenRouterPublicDto(false, null, e.getMessage(), OpenRouterErrorCode.INTERNAL.getCode());
