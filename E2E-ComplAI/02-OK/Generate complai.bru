@@ -13,14 +13,9 @@ post {
   auth: inherit
 }
 
-headers {
-  Content-Type: application/pdf
-}
-
 body:json {
   {
     "text": "Hola, tinc un problema greu amb els contenidors ubicats a Apel·les Mestres, no funcionen. M'agradaria fer una queixa formal, si us plau.",
-    "format": "pdf"
     "conversationId": "{{conversationId}}"
   }
 }
