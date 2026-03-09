@@ -129,7 +129,7 @@ public class PratEspaisScraper {
 
         // 4. Upload the JSON file to the specified S3 bucket
         try (S3Client s3 = S3Client.builder()
-                .region(Region.EU_SOUTH_2)
+                .region(Region.EU_WEST_1) // Change to your region
                 .credentialsProvider(DefaultCredentialsProvider.create())
                 .build()) {
 
