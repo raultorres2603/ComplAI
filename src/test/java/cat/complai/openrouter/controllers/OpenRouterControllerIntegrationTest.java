@@ -254,6 +254,28 @@ public class OpenRouterControllerIntegrationTest {
         assertTrue(new String(dto.getPdfData(), 0, 4).startsWith("%PDF"), "Expected PDF magic bytes");
     }
 
+    @Test
+    void integration_redact_aiHeader_producesPdfWithCorrectContent() {
+        // This test verifies that the PDF not only gets created but also has the correct content,
+        // including handling of special Catalan characters.
+        String complaintText = "Això és una prova amb caràcters especials: à, é, í, ò, ú, ç, l·l.";
+        String aiResponse = "{\"format\": \"pdf\"}\\n\\n" + complaintText;
+
+        OpenRouterResponseDto dto = openRouterService.redactComplaint(aiResponse, OutputFormat.AUTO, null);
+        assertTrue(dto.isSuccess(), "Expected success");
+        assertNotNull(dto.getPdfData(), "Expected PDF data");
+        assertTrue(dto.getPdfData().length > 0, "PDF should not be empty");
+
+        try (java.io.ByteArrayInputStream in = new java.io.ByteArrayInputStream(dto.getPdfData());
+             org.apache.pdfbox.pdmodel.PDDocument doc = org.apache.pdfbox.pdmodel.PDDocument.load(in)) {
+            org.apache.pdfbox.text.PDFTextStripper stripper = new org.apache.pdfbox.text.PDFTextStripper();
+            String extractedText = stripper.getText(doc);
+            assertTrue(extractedText.contains(complaintText), "PDF content should match the complaint text");
+        } catch (Exception e) {
+            fail("PDF parsing failed: " + e.getMessage());
+        }
+    }
+
     // --- JWT authentication ---
 
     @Test

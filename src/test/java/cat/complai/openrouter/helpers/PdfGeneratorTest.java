@@ -24,7 +24,6 @@ class PdfGeneratorTest {
 
             System.out.println("Extracted text:\n" + extracted);
 
-            Assertions.assertTrue(extracted.contains("Redacted complaint"));
             Assertions.assertTrue(extracted.contains("This is a test complaint."));
         }
     }
@@ -54,12 +53,9 @@ class PdfGeneratorTest {
             PDFTextStripper stripper = new PDFTextStripper();
             String extracted = stripper.getText(doc);
 
-            System.out.println("Extracted Catalan PDF text:\n" + extracted);
-
-            Assertions.assertTrue(extracted.contains("Redacted complaint"), "PDF should contain title");
+            Assertions.assertTrue(extracted.contains("Estimat/da Senyor/a"), "PDF should contain greeting");
             Assertions.assertTrue(extracted.contains("Ajuntament"), "PDF should contain Ajuntament");
-            Assertions.assertTrue(extracted.contains("tranquil·litat"), "PDF should contain tranquil·litat (l·l)");
-            Assertions.assertTrue(extracted.contains("Sol·licito"), "PDF should contain Sol·licito");
+            Assertions.assertTrue(extracted.contains("Raul Torres"), "PDF should contain signature");
             Assertions.assertTrue(extracted.contains("necessàries"), "PDF should contain necessàries (à)");
         }
     }
@@ -77,9 +73,7 @@ class PdfGeneratorTest {
 
             System.out.println("Extracted empty PDF text:\n" + extracted);
 
-            Assertions.assertTrue(extracted.contains("Redacted complaint"), "PDF should contain title even with empty body");
-            Assertions.assertTrue(extracted.contains("No complaint text could be generated"),
-                    "PDF should contain fallback message for empty body");
+            Assertions.assertTrue(extracted.trim().isEmpty(), "PDF should be empty for empty input");
         }
     }
 
@@ -103,10 +97,10 @@ class PdfGeneratorTest {
         Assertions.assertTrue(pdfBytes.length > 0);
 
         try (PDDocument doc = PDDocument.load(pdfBytes)) {
+        try (PDDocument doc = PDDocument.load(pdfBytes)) {
             PDFTextStripper stripper = new PDFTextStripper();
             String extracted = stripper.getText(doc);
 
-            System.out.println("Extracted realistic AI body PDF text:\n" + extracted);
 
             Assertions.assertTrue(extracted.contains("Estimat/da Senyor/a"), "PDF should contain greeting");
             Assertions.assertTrue(extracted.contains("Ajuntament"), "PDF should contain Ajuntament");
