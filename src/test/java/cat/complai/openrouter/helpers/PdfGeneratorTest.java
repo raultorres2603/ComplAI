@@ -97,7 +97,6 @@ class PdfGeneratorTest {
         Assertions.assertTrue(pdfBytes.length > 0);
 
         try (PDDocument doc = PDDocument.load(pdfBytes)) {
-        try (PDDocument doc = PDDocument.load(pdfBytes)) {
             PDFTextStripper stripper = new PDFTextStripper();
             String extracted = stripper.getText(doc);
 
