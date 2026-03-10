@@ -5,6 +5,7 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as logs from 'aws-cdk-lib/aws-logs';
 
 export type DeploymentEnvironment = 'development' | 'production';
 
@@ -74,6 +75,27 @@ export class LambdaStack extends cdk.Stack {
     // Grant Lambda read-only access to the procedures bucket
     proceduresBucket.grantRead(lambdaRole);
 
+    // Explicit log group so we control retention and can attach metric filters.
+    // Lambda would create a log group automatically, but that gives us no control
+    // over retention or any ability to reference it in CFN outputs.
+    // Production keeps logs longer for audit/compliance; development is kept short.
+    const logRetention = environment === 'production'
+      ? logs.RetentionDays.THREE_MONTHS
+      : logs.RetentionDays.ONE_WEEK;
+
+    const logGroup = new logs.LogGroup(this, `ComplAILogGroup-${environment}`, {
+      // The Lambda runtime writes to /aws/lambda/<functionName> by convention.
+      // We set this name explicitly so the log group exists before the first
+      // invocation and our metric filters are in place from day one.
+      logGroupName: `/aws/lambda/ComplAILambda-${environment}`,
+      retention: logRetention,
+      // Destroy the log group when the stack is torn down (development).
+      // Production retains logs independently of the stack for compliance.
+      removalPolicy: environment === 'production'
+        ? cdk.RemovalPolicy.RETAIN
+        : cdk.RemovalPolicy.DESTROY,
+    });
+
     const lambdaFn = new lambda.Function(this, `ComplAILambda-${environment}`, {
       runtime: lambda.Runtime.JAVA_21,
       // The project uses the Micronaut APIGateway V2 runtime; use the Micronaut
@@ -103,6 +125,9 @@ export class LambdaStack extends cdk.Stack {
         JWT_SECRET: process.env.JWT_SECRET || '',
       },
       role: lambdaRole,
+      // Attach to the log group we created above so Lambda writes to it from the
+      // first invocation instead of auto-creating an unmanaged group.
+      logGroup: logGroup,
     });
 
     // Lambda Function URL: free, no API Gateway needed.
@@ -130,6 +155,49 @@ export class LambdaStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'ComplAILambdaArn', {
       value: lambdaFn.functionArn,
       description: `ARN of the deployed ComplAI Lambda function (${environment})`,
+    });
+
+    // AuditLogger emits JSON lines like:
+    //   {"ts":"...","endpoint":"/complai/ask","requestHash":"...","errorCode":0,"latencyMs":312,"outputFormat":"","language":""}
+    // We attach metric filters to the log group to make error rates and slow
+    // invocations visible in CloudWatch without a third-party log processor.
+
+    // Counts every request that completed with a non-zero errorCode.
+    new logs.MetricFilter(this, `ComplAIErrorMetricFilter-${environment}`, {
+      logGroup,
+      metricNamespace: `ComplAI/${environment}`,
+      metricName: 'AuditErrorCount',
+      // Match any audit log line where errorCode is not 0 (NONE).
+      // The pattern intentionally excludes errorCode:0 by matching the literal field.
+      filterPattern: logs.FilterPattern.exists('$.errorCode'),
+      metricValue: '1',
+      defaultValue: 0,
+      dimensions: {
+        endpoint: '$.endpoint',
+        errorCode: '$.errorCode',
+      },
+    });
+
+    // Captures the latencyMs value from every audit log line as a metric so we
+    // can build P50/P95/P99 dashboards or alarms without exporting raw logs.
+    new logs.MetricFilter(this, `ComplAILatencyMetricFilter-${environment}`, {
+      logGroup,
+      metricNamespace: `ComplAI/${environment}`,
+      metricName: 'AuditLatencyMs',
+      filterPattern: logs.FilterPattern.exists('$.latencyMs'),
+      // Use the extracted latency value directly — CloudWatch treats this as a
+      // numeric observation, enabling statistics (Average, p99, etc.).
+      metricValue: '$.latencyMs',
+      defaultValue: 0,
+      dimensions: {
+        endpoint: '$.endpoint',
+      },
+    });
+
+    // Output the log group name so CI/CD and runbooks can reference it directly.
+    new cdk.CfnOutput(this, 'ComplAILogGroupName', {
+      value: logGroup.logGroupName,
+      description: `CloudWatch Log Group for the ComplAI Lambda function (${environment})`,
     });
   }
 }
