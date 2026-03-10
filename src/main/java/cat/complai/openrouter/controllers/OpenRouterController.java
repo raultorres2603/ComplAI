@@ -91,7 +91,7 @@ public class OpenRouterController {
                 return HttpResponse.badRequest(err).contentType(MediaType.APPLICATION_JSON);
             }
 
-            OpenRouterResponseDto dto = service.redactComplaint(text, format, conversationId);
+            OpenRouterResponseDto dto = service.redactComplaint(text, format, conversationId, request != null ? request.getComplainantIdentity() : null);
             long latency = System.currentTimeMillis() - start;
             AuditLogger.log(
                     "/complai/redact",

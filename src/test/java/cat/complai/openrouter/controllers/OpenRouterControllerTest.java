@@ -1,5 +1,6 @@
 package cat.complai.openrouter.controllers;
 
+import cat.complai.openrouter.dto.ComplainantIdentity;
 import cat.complai.openrouter.dto.OpenRouterErrorCode;
 import cat.complai.openrouter.dto.OpenRouterPublicDto;
 import cat.complai.openrouter.dto.OpenRouterResponseDto;
@@ -18,7 +19,7 @@ public class OpenRouterControllerTest {
         public OpenRouterResponseDto ask(String question, String conversationId) {
             return new OpenRouterResponseDto(true, "OK from AI", null, 200, OpenRouterErrorCode.NONE);
         }
-        public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format, String conversationId) {
+        public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format, String conversationId, ComplainantIdentity identity) {
             return new OpenRouterResponseDto(true, "Redacted letter", null, 200, OpenRouterErrorCode.NONE);
         }
     }
@@ -27,7 +28,7 @@ public class OpenRouterControllerTest {
         public OpenRouterResponseDto ask(String question, String conversationId) {
             return new OpenRouterResponseDto(false, null, "Request is not about El Prat de Llobregat.", 200, OpenRouterErrorCode.REFUSAL);
         }
-        public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format, String conversationId) {
+        public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format, String conversationId, ComplainantIdentity identity) {
             return new OpenRouterResponseDto(false, null, "Request is not about El Prat de Llobregat.", 200, OpenRouterErrorCode.REFUSAL);
         }
     }
@@ -36,8 +37,32 @@ public class OpenRouterControllerTest {
         public OpenRouterResponseDto ask(String question, String conversationId) {
             return new OpenRouterResponseDto(false, null, "Missing OPENROUTER_API_KEY", 500, OpenRouterErrorCode.UPSTREAM);
         }
-        public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format, String conversationId) {
+        public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format, String conversationId, ComplainantIdentity identity) {
             return new OpenRouterResponseDto(false, null, "OpenRouter non-2xx response: 500", 500, OpenRouterErrorCode.UPSTREAM);
+        }
+    }
+
+    // Service that rejects anonymous requests (mirrors service-layer behaviour)
+    static class FakeServiceRejectAnonymous implements IOpenRouterService {
+        public OpenRouterResponseDto ask(String question, String conversationId) {
+            return new OpenRouterResponseDto(true, "OK", null, 200, OpenRouterErrorCode.NONE);
+        }
+        public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format, String conversationId, ComplainantIdentity identity) {
+            return new OpenRouterResponseDto(false, null,
+                    "Anonymous complaints cannot be drafted. The Ajuntament requires full name and ID/DNI/NIF on all formal complaints.",
+                    null, OpenRouterErrorCode.VALIDATION);
+        }
+    }
+
+    // Service that returns a question asking for missing identity fields
+    static class FakeServiceRequestsIdentity implements IOpenRouterService {
+        public OpenRouterResponseDto ask(String question, String conversationId) {
+            return new OpenRouterResponseDto(true, "OK", null, 200, OpenRouterErrorCode.NONE);
+        }
+        public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format, String conversationId, ComplainantIdentity identity) {
+            return new OpenRouterResponseDto(true,
+                    "To draft your complaint I need your first name, surname, and ID/DNI/NIF.",
+                    null, 200, OpenRouterErrorCode.NONE);
         }
     }
 
@@ -124,5 +149,33 @@ public class OpenRouterControllerTest {
         assertEquals(OpenRouterErrorCode.VALIDATION.getCode(), body.getErrorCode());
         assertNotNull(body.getError());
         assertTrue(body.getError().contains("PDF"), "Error message must mention PDF as the only supported document format");
+    }
+
+    @Test
+    void redact_anonymousRequest_returns400() {
+        // Anonymous complaints must be rejected at the service layer and surfaced as 400 VALIDATION.
+        OpenRouterController c = new OpenRouterController(new FakeServiceRejectAnonymous());
+        RedactRequest req = new RedactRequest("Noise from the airport. I want to be anonymous.");
+        HttpResponse<?> raw = c.redact(req);
+        assertEquals(400, raw.getStatus().getCode());
+        assertTrue(raw.getBody().isPresent());
+        OpenRouterPublicDto body = (OpenRouterPublicDto) raw.getBody().get();
+        assertFalse(body.isSuccess());
+        assertEquals(OpenRouterErrorCode.VALIDATION.getCode(), body.getErrorCode());
+        assertTrue(body.getError().contains("Anonymous"), "Error must mention anonymous complaints");
+    }
+
+    @Test
+    void redact_missingIdentity_returns200WithQuestion() {
+        // When identity is absent the service asks for it via the AI response; the controller
+        // must return 200 so the client can show the question to the user.
+        OpenRouterController c = new OpenRouterController(new FakeServiceRequestsIdentity());
+        RedactRequest req = new RedactRequest("Noise from the airport");
+        HttpResponse<?> raw = c.redact(req);
+        assertEquals(200, raw.getStatus().getCode());
+        assertTrue(raw.getBody().isPresent());
+        OpenRouterPublicDto body = (OpenRouterPublicDto) raw.getBody().get();
+        assertTrue(body.isSuccess());
+        assertTrue(body.getMessage().contains("first name"), "Response must ask for the missing identity fields");
     }
 }
