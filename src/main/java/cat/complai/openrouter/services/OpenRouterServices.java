@@ -377,27 +377,26 @@ Independent local news source: %s
             updateConversationHistory(conversationId, userPrompt, aiDto.getMessage());
         }
 
-        // When identity is incomplete the AI response is normally a question asking the user
-        // for the missing fields. Return it as a JSON success so the client can display the
-        // question and collect the missing data.
-        //
-        // Exception: if the client explicitly requested PDF, fall through to the format-handling
-        // logic unconditionally. The AI sometimes drafts the full letter directly from context it
-        // already has (e.g. the user provided identity as free text), and we must honour the
-        // requested output format in that case. The PDF path already handles headerless responses
-        // gracefully by generating a PDF from the raw AI message.
-        OutputFormat effectiveFormat = format == null ? OutputFormat.AUTO : format;
-        if (!identityComplete && effectiveFormat != OutputFormat.PDF) {
-            return new OpenRouterResponseDto(true, aiDto.getMessage(), null, aiDto.getStatusCode(), OpenRouterErrorCode.NONE);
-        }
-
         // Parse optional AI-supplied header: either JSON first-line or simple 'FORMAT: pdf' header.
         AiParsed parsed = AiParsed.parseAiFormatHeader(aiDto.getMessage());
+        OutputFormat effectiveFormat = format == null ? OutputFormat.AUTO : format;
 
         // If client requested AUTO and the AI supplied a format hint, promote to that format.
         // If the client was explicit (PDF or JSON), keep their choice unconditionally.
         if (effectiveFormat == OutputFormat.AUTO && parsed.format() != null && parsed.format() != OutputFormat.AUTO) {
             effectiveFormat = parsed.format();
+        }
+
+        // When identity is incomplete the AI response is normally a question asking the user
+        // for the missing fields. Return it as a JSON success so the client can display the
+        // question and collect the missing data.
+        //
+        // Exception: if effectiveFormat is PDF (either explicitly requested or promoted due to
+        // successful identity extraction), we fall through to the PDF generation logic.
+        if (!identityComplete && effectiveFormat != OutputFormat.PDF) {
+            // Return parsed.message() to ensure we strip any potential header if present,
+            // though normally in this case (Scenario B) the AI wouldn't emit one.
+            return new OpenRouterResponseDto(true, parsed.message(), null, aiDto.getStatusCode(), OpenRouterErrorCode.NONE);
         }
 
         // The AI did not emit the required JSON header. Log the raw response prefix to aid diagnosis.

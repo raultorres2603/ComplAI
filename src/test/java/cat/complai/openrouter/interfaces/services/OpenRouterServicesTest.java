@@ -84,6 +84,11 @@ public class OpenRouterServicesTest {
                 String body = "{\"format\": \"pdf\"}\n\nEl Prat de Llobregat, 10 de març de 2026\n\nSr. Alcalde,\n\nJo, Joan Garcia, amb DNI 12345678A, vull presentar una queixa...\n\nAtentament,\nJoan Garcia\nDNI: 12345678A";
                 return CompletableFuture.completedFuture(new HttpDto(body, 200, "POST", null));
             }
+            if (userPrompt != null && userPrompt.contains("[SMART_EXTRACT]")) {
+                // Simulate AI successfully extracting identity from text and promoting to PDF
+                String body = "{\"format\": \"pdf\"}\n\nEl Prat de Llobregat, 10 de març de 2026\n\nSr. Alcalde,\n\nJo, Raul Torres, amb DNI 49872354C...\n\nAtentament,\nRaul Torres";
+                return CompletableFuture.completedFuture(new HttpDto(body, 200, "POST", null));
+            }
             if (userPrompt != null && userPrompt.contains("recycling center")) {
                 return CompletableFuture.completedFuture(new HttpDto("Hello from El Prat AI", 200, "POST", null));
             }
@@ -340,5 +345,19 @@ public class OpenRouterServicesTest {
         assertTrue(prompt.contains("Do NOT use Markdown formatting"), "Prompt must forbid markdown");
         assertTrue(prompt.contains("Raul Torres"), "Prompt must contain the name");
         assertTrue(prompt.contains("12345678A"), "Prompt must contain the ID");
+    }
+
+    @Test
+    void redact_incompleteIdentity_butTextHasIdentity_extractsAndSimulatesPdf() {
+        ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30);
+
+        // Identity is null, but text contains the trigger which mocks a successful extraction response
+        OpenRouterResponseDto out = svc.redactComplaint(
+                "My name is Raul Torres, ID 49872354C. [SMART_EXTRACT]", OutputFormat.PDF, null, null);
+
+        assertTrue(out.isSuccess());
+        assertNotNull(out.getPdfData(), "Should produce PDF because AI extracted identity and returned PDF header");
+        assertEquals(OpenRouterErrorCode.NONE, out.getErrorCode());
     }
 }
