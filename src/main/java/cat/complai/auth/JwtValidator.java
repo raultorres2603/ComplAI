@@ -5,6 +5,7 @@ import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -27,6 +28,11 @@ import java.util.logging.Logger;
  *
  * The secret value is never logged.
  */
+// Only instantiate this bean when jwt.secret is configured.  The API Lambda supplies
+// JWT_SECRET; the SQS worker Lambda does not — it never handles HTTP requests and has
+// no need for JWT validation.  Without this guard Micronaut eagerly initialises the bean
+// in both Lambdas and the worker crashes at startup with a missing-property error.
+@Requires(property = "jwt.secret")
 @Singleton
 public class JwtValidator {
 
