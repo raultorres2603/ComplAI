@@ -15,21 +15,28 @@ post {
 
 body:json {
   {
-    "text": "El meu nom es Raúl Torres Alarcón amb DNI 49872354C, tinc un problema greu amb els contenidors ubicats a Apel·les Mestres, no funcionen. M'agradaria fer una queixa formal, si us plau.",
+    "text": "Tinc un problema greu amb els contenidors ubicats a Apel·les Mestres, no funcionen. M'agradaria fer una queixa formal, si us plau.",
     "format": "pdf",
-    "conversationId": "{{conversationId}}"
+    "conversationId": "{{conversationId}}",
+    "requesterName": "Raúl",
+    "requesterSurname": "Torres Alarcón",
+    "requesterIdNumber": "49872354C"
   }
 }
 
 tests {
-  test("HTTP status is 200", () => {
-    expect(res.getStatus()).to.equal(200);
+  test("HTTP status is 202 Accepted (async PDF queued)", () => {
+    expect(res.getStatus()).to.equal(202);
   });
-  test("Content-Type is application/pdf", () => {
-    expect(res.getHeader("content-type")).to.include("application/pdf");
+  test("Response body has success: true", () => {
+    expect(res.getBody().success).to.equal(true);
   });
-  test("Response body is non-empty (PDF bytes received)", () => {
-    expect(res.getBody()).to.not.be.empty;
+  test("Response body contains a pdfUrl", () => {
+    expect(res.getBody().pdfUrl).to.not.be.empty;
+    expect(res.getBody().pdfUrl).to.include("complaint.pdf");
+  });
+  test("errorCode is 0 (NONE)", () => {
+    expect(res.getBody().errorCode).to.equal(0);
   });
 }
 
