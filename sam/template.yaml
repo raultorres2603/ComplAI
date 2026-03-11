@@ -125,7 +125,7 @@ Resources:
           AWS_ENDPOINT_URL: "http://host.docker.internal:4566"
           OPENROUTER_REQUEST_TIMEOUT_SECONDS: "60"
           OPENROUTER_OVERALL_TIMEOUT_SECONDS: "60"
-          OPENROUTER_MODEL: google/gemini-2.0-flash-lite-preview-02-05:free
+          OPENROUTER_MODEL: google/gemma-3-27b-it:free
           JWT_SECRET: !Ref JwtSecret
       Events:
         ProxyRoot:
