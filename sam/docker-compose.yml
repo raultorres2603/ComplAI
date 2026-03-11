@@ -18,9 +18,8 @@ services:
     ports:
       - "4566:4566"
     environment:
-      # Services to activate. Add more (e.g. sqs,ssm) only when needed to keep
-      # startup fast and resource usage minimal.
-      - SERVICES=s3
+      # Services to activate. s3 for procedures/complaints, sqs for the async redact queue.
+      - SERVICES=s3,sqs
       - DEFAULT_REGION=eu-west-1
       # Keep LocalStack data across restarts so you do not have to re-seed on
       # every `docker compose up`. Delete .localstack-data/ to reset state.

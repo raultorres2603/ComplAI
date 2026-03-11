@@ -4,8 +4,21 @@ import cat.complai.openrouter.dto.ComplainantIdentity;
 import cat.complai.openrouter.dto.OpenRouterResponseDto;
 import cat.complai.openrouter.dto.OutputFormat;
 
+import java.util.Optional;
+
 public interface IOpenRouterService {
     OpenRouterResponseDto ask(String question, String conversationId);
+
+    /**
+     * Validates a redact complaint input at the boundary (null/blank, length, anonymity).
+     * Returns {@link Optional#empty()} when the input is valid.
+     * Returns a non-empty {@link Optional} containing the error DTO when the input must
+     * be rejected, so the controller can short-circuit before doing any async work.
+     *
+     * <p>This is intentionally separated from {@link #redactComplaint} so the async
+     * controller path can validate without executing the full synchronous flow.
+     */
+    Optional<OpenRouterResponseDto> validateRedactInput(String complaint);
 
     /**
      * Drafts a formal complaint letter addressed to the Ajuntament.

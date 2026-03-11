@@ -5,7 +5,9 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
 
 export type DeploymentEnvironment = 'development' | 'production';
 
@@ -63,17 +65,60 @@ export class LambdaStack extends cdk.Stack {
 // S3 bucket for procedures corpus (Free Tier, no public access)
     const proceduresBucket = new s3.Bucket(this, `ComplAIProceduresBucket-${environment}`, {
       bucketName: `complai-procedures-${environment.toLowerCase()}`,
-      removalPolicy: cdk.RemovalPolicy.RETAIN, // Retain data by default
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       encryption: s3.BucketEncryption.S3_MANAGED,
       versioned: false,
       lifecycleRules: [{
-        expiration: cdk.Duration.days(365), // Clean up old files after 1 year
+        expiration: cdk.Duration.days(365),
       }],
     });
 
     // Grant Lambda read-only access to the procedures bucket
     proceduresBucket.grantRead(lambdaRole);
+
+    // -------------------------------------------------------------------------
+    // S3 bucket for generated complaint PDFs
+    // PDFs are ephemeral — deleted after 30 days so storage stays free-tier-ish.
+    // -------------------------------------------------------------------------
+    const complaintsBucket = new s3.Bucket(this, `ComplAIComplaintsBucket-${environment}`, {
+      bucketName: `complai-complaints-${environment.toLowerCase()}`,
+      removalPolicy: environment === 'production'
+        ? cdk.RemovalPolicy.RETAIN
+        : cdk.RemovalPolicy.DESTROY,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      versioned: false,
+      lifecycleRules: [{
+        expiration: cdk.Duration.days(30),
+      }],
+    });
+
+    // -------------------------------------------------------------------------
+    // SQS — redact queue + DLQ
+    // Visibility timeout = 90s (≥ 1.5× the worker Lambda timeout of 60s).
+    // Message retention = 4h (short-lived; stale messages are useless after that).
+    // -------------------------------------------------------------------------
+    const redactDlq = new sqs.Queue(this, `ComplAIRedactDLQ-${environment}`, {
+      queueName: `complai-redact-dlq-${environment}`,
+      retentionPeriod: cdk.Duration.days(7),
+      removalPolicy: environment === 'production'
+        ? cdk.RemovalPolicy.RETAIN
+        : cdk.RemovalPolicy.DESTROY,
+    });
+
+    const redactQueue = new sqs.Queue(this, `ComplAIRedactQueue-${environment}`, {
+      queueName: `complai-redact-${environment}`,
+      visibilityTimeout: cdk.Duration.seconds(90),
+      retentionPeriod: cdk.Duration.hours(4),
+      deadLetterQueue: {
+        maxReceiveCount: 3,
+        queue: redactDlq,
+      },
+      removalPolicy: environment === 'production'
+        ? cdk.RemovalPolicy.RETAIN
+        : cdk.RemovalPolicy.DESTROY,
+    });
 
     // Explicit log group so we control retention and can attach metric filters.
     // Lambda would create a log group automatically, but that gives us no control
@@ -118,17 +163,83 @@ export class LambdaStack extends cdk.Stack {
         PROCEDURES_KEY: 'procedures.json',
         PROCEDURES_REGION: this.region,
         OPENROUTER_MODEL: process.env.OPENROUTER_MODEL || 'arcee-ai/trinity-large-preview:free',
-        // JWT_SECRET is a Base64-encoded HS256 key (min 32 bytes).
-        // Injected from the GitHub Environment Secret of the same name during CDK deploy.
-        // Like OPENROUTER_API_KEY, this is visible in the Lambda console — see the security
-        // note in this file. Rotate via: update the GitHub secret → redeploy → mint new tokens.
         JWT_SECRET: process.env.JWT_SECRET || '',
+        // Async redact flow: queue URL for publishing + bucket details for pre-signed URLs.
+        REDACT_QUEUE_URL: redactQueue.queueUrl,
+        COMPLAINTS_BUCKET: complaintsBucket.bucketName,
+        COMPLAINTS_REGION: this.region,
       },
       role: lambdaRole,
-      // Attach to the log group we created above so Lambda writes to it from the
-      // first invocation instead of auto-creating an unmanaged group.
       logGroup: logGroup,
     });
+
+    // API Lambda needs to publish to the redact queue.
+    redactQueue.grantSendMessages(lambdaRole);
+
+    // API Lambda needs s3:GetObject to sign pre-signed GET URLs on behalf of callers.
+    // Pre-signed URLs embed the signer's credentials; without this permission the
+    // signed URL would return 403 when the user tries to download the PDF.
+    complaintsBucket.grantRead(lambdaRole);
+
+    // -------------------------------------------------------------------------
+    // Worker Lambda — processes SQS messages and uploads generated PDFs to S3.
+    // Runs the same shadow JAR with a different handler class.
+    // -------------------------------------------------------------------------
+    const workerRole = new iam.Role(this, `ComplAIWorkerRole-${environment}`, {
+      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+      description: `IAM role for ComplAI worker Lambda (${environment}) — SQS consume + S3 write`,
+    });
+    workerRole.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
+    );
+    // Worker needs to receive, delete, and inspect queue attributes (required by the
+    // Lambda SQS event source mapping to manage the polling lifecycle).
+    redactQueue.grantConsumeMessages(workerRole);
+    // Worker writes the generated PDF to the complaints bucket.
+    complaintsBucket.grantPut(workerRole);
+    // Worker needs procedures access for RAG context in the AI prompt.
+    proceduresBucket.grantRead(workerRole);
+
+    const workerLogGroup = new logs.LogGroup(this, `ComplAIWorkerLogGroup-${environment}`, {
+      logGroupName: `/aws/lambda/ComplAIRedactorLambda-${environment}`,
+      retention: logRetention,
+      removalPolicy: environment === 'production'
+        ? cdk.RemovalPolicy.RETAIN
+        : cdk.RemovalPolicy.DESTROY,
+    });
+
+    const workerFn = new lambda.Function(this, `ComplAIRedactorLambda-${environment}`, {
+      runtime: lambda.Runtime.JAVA_21,
+      // Same shadow JAR, different handler class — no separate build needed.
+      handler: 'cat.complai.worker.RedactWorkerHandler::handleRequest',
+      code: lambda.Code.fromAsset(jarPath),
+      memorySize: 768,
+      // Must be ≤ SQS visibility timeout (90s). Lambda extends visibility automatically
+      // while running, so using the same duration is the safest choice here.
+      timeout: cdk.Duration.seconds(60),
+      environment: {
+        OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '',
+        OPENROUTER_REQUEST_TIMEOUT_SECONDS: process.env.OPENROUTER_REQUEST_TIMEOUT_SECONDS || '60',
+        OPENROUTER_OVERALL_TIMEOUT_SECONDS: process.env.OPENROUTER_OVERALL_TIMEOUT_SECONDS || '60',
+        OPENROUTER_MODEL: process.env.OPENROUTER_MODEL || 'arcee-ai/trinity-large-preview:free',
+        COMPLAINTS_BUCKET: complaintsBucket.bucketName,
+        COMPLAINTS_REGION: this.region,
+        PROCEDURES_BUCKET: proceduresBucket.bucketName,
+        PROCEDURES_KEY: 'procedures.json',
+        PROCEDURES_REGION: this.region,
+      },
+      role: workerRole,
+      logGroup: workerLogGroup,
+    });
+
+    // Wire SQS → worker Lambda.
+    // batchSize=1: each complaint is independent and takes ~30s; batching adds
+    // complexity with no throughput benefit at this scale.
+    // reportBatchItemFailures=true: partial failures don't re-process succeeded items.
+    workerFn.addEventSource(new lambdaEventSources.SqsEventSource(redactQueue, {
+      batchSize: 1,
+      reportBatchItemFailures: true,
+    }));
 
     // Lambda Function URL: free, no API Gateway needed.
     // authType NONE makes the URL publicly reachable without IAM signing.
@@ -198,6 +309,26 @@ export class LambdaStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'ComplAILogGroupName', {
       value: logGroup.logGroupName,
       description: `CloudWatch Log Group for the ComplAI Lambda function (${environment})`,
+    });
+
+    new cdk.CfnOutput(this, 'ComplAIRedactQueueUrl', {
+      value: redactQueue.queueUrl,
+      description: `SQS queue URL for the async redact flow (${environment})`,
+    });
+
+    new cdk.CfnOutput(this, 'ComplAIComplaintsBucketName', {
+      value: complaintsBucket.bucketName,
+      description: `S3 bucket for generated complaint PDFs (${environment})`,
+    });
+
+    new cdk.CfnOutput(this, 'ComplAIWorkerLambdaName', {
+      value: workerFn.functionName,
+      description: `Name of the worker Lambda function (${environment})`,
+    });
+
+    new cdk.CfnOutput(this, 'ComplAIWorkerLogGroupName', {
+      value: workerLogGroup.logGroupName,
+      description: `CloudWatch Log Group for the worker Lambda function (${environment})`,
     });
   }
 }

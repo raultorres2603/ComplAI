@@ -27,6 +27,11 @@ import jakarta.inject.Singleton;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import cat.complai.openrouter.dto.RedactAcceptedDto;
+import cat.complai.s3.S3PdfUploader;
+import cat.complai.sqs.SqsComplaintPublisher;
+import cat.complai.sqs.dto.RedactSqsMessage;
+
 import cat.complai.http.HttpWrapper;
 import cat.complai.http.dto.HttpDto;
 
@@ -374,6 +379,35 @@ public class OpenRouterControllerIntegrationTest {
         assertTrue(new String(dto.getPdfData(), 0, 4).startsWith("%PDF"), "Expected PDF magic bytes");
     }
 
+    @Test
+    void integration_redact_completeIdentityAndPdfFormat_returns202WithPdfUrl() {
+        // Complete identity + PDF format → async path → 202 Accepted with pdfUrl.
+        RedactRequest req = RedactRequest.fromJson(
+                "Noise from the airport", "pdf", null, "Joan", "Garcia", "12345678A");
+        HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req)
+                .header("Authorization", authHeader);
+        HttpResponse<RedactAcceptedDto> resp = client.toBlocking().exchange(httpReq, RedactAcceptedDto.class);
+        assertEquals(202, resp.getStatus().getCode());
+        assertTrue(resp.getBody().isPresent());
+        RedactAcceptedDto body = resp.getBody().get();
+        assertTrue(body.success());
+        assertNotNull(body.pdfUrl(), "pdfUrl must be present in 202 response");
+        assertTrue(body.pdfUrl().contains("complaint.pdf"), "pdfUrl must reference a PDF key");
+    }
+
+    @Test
+    void integration_redact_completeIdentityAndJsonFormat_returnsSyncPath200() {
+        // JSON format with complete identity must stay synchronous (200, not 202).
+        RedactRequest req = RedactRequest.fromJson(
+                "Noise from the airport", "json", null, "Joan", "Garcia", "12345678A");
+        HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req)
+                .header("Authorization", authHeader);
+        HttpResponse<OpenRouterPublicDto> resp = client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
+        assertEquals(200, resp.getStatus().getCode());
+        assertTrue(resp.getBody().isPresent());
+        assertTrue(resp.getBody().get().isSuccess());
+    }
+
     @MockBean(HttpWrapper.class)
     @Replaces(HttpWrapper.class)
     HttpWrapper openRouterHttpWrapper() {
@@ -449,12 +483,32 @@ public class OpenRouterControllerIntegrationTest {
         };
     }
 
+    @MockBean(SqsComplaintPublisher.class)
+    @Replaces(SqsComplaintPublisher.class)
+    SqsComplaintPublisher noopSqsPublisher() {
+        return new SqsComplaintPublisher() {
+            @Override
+            public void publish(RedactSqsMessage message) { /* no-op for tests */ }
+        };
+    }
+
+    @MockBean(S3PdfUploader.class)
+    @Replaces(S3PdfUploader.class)
+    S3PdfUploader fixedUrlS3Uploader() {
+        return new S3PdfUploader() {
+            @Override
+            public String generatePresignedGetUrl(String key) {
+                return "https://bucket.s3.eu-west-1.amazonaws.com/" + key;
+            }
+        };
+    }
+
     @Factory
     static class TestBeans {
         @Singleton
         @Replaces(OpenRouterServices.class)
         IOpenRouterService openRouterService(HttpWrapper httpWrapper) {
-            return new OpenRouterServices(httpWrapper, 5000, 30);
+            return new OpenRouterServices(httpWrapper, 5000, 30, new cat.complai.openrouter.helpers.RedactPromptBuilder());
         }
     }
 }

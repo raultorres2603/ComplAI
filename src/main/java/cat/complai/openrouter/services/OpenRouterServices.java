@@ -5,6 +5,7 @@ import cat.complai.openrouter.dto.OpenRouterResponseDto;
 import cat.complai.openrouter.dto.OpenRouterErrorCode;
 import cat.complai.http.HttpWrapper;
 import cat.complai.http.dto.HttpDto;
+import cat.complai.openrouter.helpers.RedactPromptBuilder;
 import jakarta.inject.Singleton;
 import jakarta.inject.Inject;
 import com.github.benmanes.caffeine.cache.Cache;
@@ -12,6 +13,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import io.micronaut.context.annotation.Value;
 
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -19,15 +21,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.*;
 
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-
-// PDFBox imports
-
 import cat.complai.openrouter.dto.ComplainantIdentity;
 import cat.complai.openrouter.dto.OutputFormat;
 import cat.complai.openrouter.helpers.AiParsed;
-import cat.complai.openrouter.helpers.ProcedureRagHelper;
 import cat.complai.openrouter.helpers.PdfGenerator;
 
 @Singleton
@@ -35,6 +31,7 @@ public class OpenRouterServices implements IOpenRouterService {
 
     private static final int MAX_HISTORY_TURNS = 10;
     private final HttpWrapper httpWrapper;
+    private final RedactPromptBuilder promptBuilder;
     private final Logger logger = Logger.getLogger(OpenRouterServices.class.getName());
     private final Cache<String, List<MessageEntry>> conversationCache;
     // Stores the original complaint text for conversations where identity was missing on the first
@@ -45,21 +42,13 @@ public class OpenRouterServices implements IOpenRouterService {
 
     public record MessageEntry(String role, String content) {}
 
-    private static ProcedureRagHelper procedureRagHelper;
-    static {
-        try {
-            procedureRagHelper = new ProcedureRagHelper();
-        } catch (Exception e) {
-            // Log error, but allow fallback to no context
-            Logger.getLogger(OpenRouterServices.class.getName()).log(Level.SEVERE, "Failed to initialize ProcedureRagHelper", e);
-            procedureRagHelper = null;
-        }
-    }
-
     @Inject
-    public OpenRouterServices(HttpWrapper httpWrapper, @Value("${complai.input.max-length-chars:5000}") int maxInputLength,
-                             @Value("${OPENROUTER_OVERALL_TIMEOUT_SECONDS:60}") int overallTimeoutSeconds) {
-        this.httpWrapper = Objects.requireNonNull(httpWrapper, "httpWrapper");
+    public OpenRouterServices(HttpWrapper httpWrapper,
+                              @Value("${complai.input.max-length-chars:5000}") int maxInputLength,
+                              @Value("${OPENROUTER_OVERALL_TIMEOUT_SECONDS:60}") int overallTimeoutSeconds,
+                              RedactPromptBuilder promptBuilder) {
+        this.httpWrapper    = Objects.requireNonNull(httpWrapper, "httpWrapper");
+        this.promptBuilder  = Objects.requireNonNull(promptBuilder, "promptBuilder");
         this.conversationCache = Caffeine.newBuilder()
                 .expireAfterWrite(30, TimeUnit.MINUTES)
                 .maximumSize(10000)
@@ -69,181 +58,30 @@ public class OpenRouterServices implements IOpenRouterService {
                 .maximumSize(10000)
                 .build();
         this.maxInputLength = maxInputLength;
-        this.overallTimeoutSeconds = (overallTimeoutSeconds > 0) ? overallTimeoutSeconds : 30; // fallback to 30s if invalid
+        this.overallTimeoutSeconds = (overallTimeoutSeconds > 0) ? overallTimeoutSeconds : 30;
     }
 
-    private String buildProcedureContextBlock(String query) {
-        if (procedureRagHelper == null) return null;
-        List<ProcedureRagHelper.Procedure> matches = procedureRagHelper.search(query);
-        if (matches.isEmpty()) return null;
-        StringBuilder sb = new StringBuilder();
-        sb.append("CONTEXT FROM PRAT ESPAIS PROCEDURES:\n\n");
-        for (ProcedureRagHelper.Procedure p : matches) {
-            sb.append("---\n");
-            sb.append("**").append(p.title).append("**\n");
-            sb.append("[More information] (").append(p.url).append(")\n\n");
-            if (!p.description.isBlank()) sb.append(p.description).append("\n\n");
-            if (!p.requirements.isBlank()) {
-                sb.append("**Requirements:**\n");
-                for (String req : p.requirements.split("\\n")) {
-                    if (!req.isBlank()) sb.append("- ").append(req.trim()).append("\n");
-                }
-                sb.append("\n");
-            }
-            if (!p.steps.isBlank()) {
-                sb.append("**Steps:**\n");
-                for (String step : p.steps.split("\\n")) {
-                    if (!step.isBlank()) sb.append("- ").append(step.trim()).append("\n");
-                }
-                sb.append("\n");
-            }
-            sb.append("---\n\n");
+    // -------------------------------------------------------------------------
+    // IOpenRouterService
+    // -------------------------------------------------------------------------
+
+    @Override
+    public Optional<OpenRouterResponseDto> validateRedactInput(String complaint) {
+        if (complaint == null || complaint.isBlank()) {
+            return Optional.of(new OpenRouterResponseDto(false, null, "Complaint must not be empty.", null, OpenRouterErrorCode.VALIDATION));
         }
-        sb.append("Use this context to answer the user's question. If the context is relevant, cite the procedure name and provide the source link. If the context does not help, answer based on your general knowledge about El Prat.");
-        return sb.toString();
+        if (complaint.length() > maxInputLength) {
+            return Optional.of(new OpenRouterResponseDto(false, null,
+                    "Complaint exceeds maximum allowed length (" + maxInputLength + " characters).", null, OpenRouterErrorCode.VALIDATION));
+        }
+        if (requestsAnonymity(complaint)) {
+            return Optional.of(new OpenRouterResponseDto(false, null,
+                    "Anonymous complaints cannot be drafted. The Ajuntament requires full name and ID/DNI/NIF on all formal complaints.",
+                    null, OpenRouterErrorCode.VALIDATION));
+        }
+        return Optional.empty();
     }
 
-    // Official and independent sources for easy maintenance
-    private static final List<String> OFFICIAL_SOURCES = List.of(
-            "https://www.elprat.cat/",
-            "https://www.pratespais.com/"
-    );
-    private static final List<String> INDEPENDENT_SOURCES = List.of(
-            "https://www.instagram.com/elprataldia/"
-    );
-
-    private String formatSources(List<String> sources, String sep, String lastSep) {
-        if (sources.isEmpty()) return "";
-        if (sources.size() == 1) return sources.getFirst();
-        StringJoiner joiner = new StringJoiner(sep);
-        for (int i = 0; i < sources.size() - 1; i++) joiner.add(sources.get(i));
-        return joiner + lastSep + sources.getLast();
-    }
-
-    private String getSystemMessage() {
-        String officialCat = formatSources(OFFICIAL_SOURCES, " i ", " i ");
-        String officialEs = formatSources(OFFICIAL_SOURCES, " y ", " y ");
-        String officialEn = formatSources(OFFICIAL_SOURCES, " and ", " and ");
-        String indepCat = formatSources(INDEPENDENT_SOURCES, ", ", "");
-        String indepEs = formatSources(INDEPENDENT_SOURCES, ", ", "");
-        String indepEn = formatSources(INDEPENDENT_SOURCES, ", ", "");
-        return String.format("""
-                Ets un assistent que es diu Gall Potablava, amable i proper per als veïns d'El Prat de Llobregat. Ajudes a redactar cartes i queixes clares i civils adreçades a l'Ajuntament i ofereixes informació pràctica i local d'El Prat. Mantén les respostes curtes, respectuoses i fàcils de llegir, com un veí que vol ajudar. Si la consulta no és sobre El Prat de Llobregat, digues-ho educadament i explica que no pots ajudar amb aquesta petició; també pots suggerir que facin una pregunta sobre assumptes locals.
-
-Pàgines oficials d'informació: %s
-Font independent de notícies locals: %s
-
-En español: Eres un asistente que se llama Gall Potablava amable y cercano para los vecinos de El Prat de Llobregat. Ayuda a redactar cartes i queixes dirigides al Ayuntamiento i ofereix informació pràctica i local. Mantén las respuestas cortas y fáciles de entender. Si la consulta no trata sobre El Prat, dilo educadamente y sugiere que pregunten sobre asuntos locales.
-
-Páginas oficiales de información: %s
-Fuente independiente de noticias locales: %s
-
-In English (support): You are a friendly local assistant named Gall Potablava for residents of El Prat de Llobregat. Help draft clear, civil letters to the City Hall and provide practical local information. Keep answers short and easy to read. If the request is not about El Prat de Llobregat, politely say you can't help with that request.
-
-Official information sources: %s
-Independent local news source: %s
-""", officialCat, indepCat, officialEs, indepEs, officialEn, indepEn);
-    }
-
-    /**
-     * Builds the redact prompt when the complainant's identity is fully known.
-     * Today's date is injected so the AI does not leave a placeholder. The prompt
-     * explicitly forbids placeholder fields and follow-up questions: the goal is a
-     * final, complete, ready-to-submit letter with no blanks for the user to fill in.
-     *
-     * Only name, surname and ID are mandatory. Address, phone and other contact details
-     * are optional: the AI must include them if the user mentioned them anywhere in the
-     * complaint text, and silently omit them otherwise — never use a placeholder.
-     */
-    private String buildRedactPromptWithIdentity(String complaint, ComplainantIdentity identity) {
-        String today = LocalDate.now().format(DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", Locale.forLanguageTag("ca")));
-        return String.format(
-                """
-                        IMPORTANT: Your response MUST start with a single-line JSON header on line 1.
-                        No text, no markdown, no explanation before it.
-                        The header must be exactly: {"format": "pdf"}
-                        After that JSON header, leave one blank line, then write the letter body.
-
-                        Task: Write a formal complaint letter addressed to the Ajuntament d'El Prat de Llobregat.
-
-                        Rules you MUST follow — no exceptions:
-                        1. Use specifically this date: "%s". Do NOT use placeholders like [Data] or [Date].
-                        2. Mandatory complainant data — always include these in the letter header and signature:
-                           - Full name: %s %s
-                           - ID/DNI/NIF: %s
-                        3. Optional complainant data — include ONLY if the user mentioned them in the complaint text below. If they are not mentioned, omit them entirely:
-                           - Address, phone number, email, or any other contact detail.
-                        4. NEVER invent data. NEVER use bracket placeholders like [address], [phone], [your data here], or anything similar. If a field is not provided, leave it out completely.
-                        5. Do NOT ask any follow-up questions. Do NOT add "What do you think?", "Would you like to add anything?", notes, suggestions or tips after the letter. The letter is final as-is.
-                        6. Write a complete, ready-to-submit letter.
-                        7. If the complaint is not about El Prat de Llobregat, politely say you can't help.
-                        8. Output the letter body as PLAIN TEXT. Do NOT use Markdown formatting (like **, __, #).
-
-                        Complaint text (may contain optional contact details to include):
-                        %s""",
-                today,
-                identity.name().trim(),
-                identity.surname().trim(),
-                identity.idNumber().trim(),
-                complaint.trim()
-        );
-    }
-
-    /**
-     * Builds the redact prompt when one or more mandatory identity fields are missing.
-     * The AI is instructed to ask the user only for the three mandatory fields (name, surname,
-     * ID). Address, phone and other contact details are optional and must never be requested.
-     */
-    private String buildRedactPromptRequestingIdentity(String complaint, ComplainantIdentity partialIdentity) {
-        StringBuilder missing = new StringBuilder();
-        boolean hasName = partialIdentity != null && partialIdentity.name() != null && !partialIdentity.name().isBlank();
-        boolean hasSurname = partialIdentity != null && partialIdentity.surname() != null && !partialIdentity.surname().isBlank();
-        boolean hasId = partialIdentity != null && partialIdentity.idNumber() != null && !partialIdentity.idNumber().isBlank();
-
-        if (!hasName) missing.append("- First name (nom)\n");
-        if (!hasSurname) missing.append("- Surname (cognoms)\n");
-        if (!hasId) missing.append("- ID/DNI/NIF number\n");
-
-        String today = LocalDate.now().format(DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", Locale.forLanguageTag("ca")));
-
-        return String.format(
-                """
-                        The user wants to draft a formal complaint addressed to the Ajuntament of El Prat de Llobregat.
-
-                        Current status: Missing mandatory identity fields.
-
-                        YOUR TASK:
-                        1. Analyze the complaint text below.
-                        2. Check if the user has provided the following missing fields in the text:
-                        %s
-
-                        SCENARIO A: The text DOES contain ALL the missing fields (e.g. they wrote "My name is John Doe, ID 12345").
-                           -> ACTION: Extract the identity and DRAFT THE LETTER immediately.
-                           -> You MUST start with the JSON header on line 1: {"format": "pdf"}
-                           -> Follow these drafting rules:
-                              1. Use date: "%s".
-                              2. Include the extracted Full Name and ID/DNI/NIF in the header and signature.
-                              3. Include address/phone ONLY if mentioned.
-                              4. NO placeholders. NO follow-up questions.
-                              5. COMPLAINT BODY: Write a clear, formal complaint based on the user's text.
-                              6. Output the letter body as PLAIN TEXT after the JSON header.
-
-                        SCENARIO B: The text DOES NOT contain all missing fields.
-                           -> ACTION: Ask the user politely for the missing information.
-                           -> Do NOT draft the letter yet.
-                           -> Do NOT output the JSON header.
-                           -> Simply ask for:
-                           %s
-                           -> Respond in the same language the user is using.
-
-                        Complaint text:
-                        %s""",
-                missing.toString().trim(),
-                today,
-                missing.toString().trim(),
-                complaint.trim()
-        );
-    }
 
     @Override
     public OpenRouterResponseDto ask(String question, String conversationId) {
@@ -258,14 +96,11 @@ Independent local news source: %s
         }
 
         List<Map<String, Object>> messages = new ArrayList<>();
-        // System message
-        messages.add(Map.of("role", "system", "content", getSystemMessage()));
-        // Inject procedure context if available
-        String contextBlock = buildProcedureContextBlock(question);
+        messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage()));
+        String contextBlock = promptBuilder.buildProcedureContextBlock(question);
         if (contextBlock != null) {
             messages.add(Map.of("role", "system", "content", contextBlock));
         }
-        // Conversation history
         if (conversationId != null && !conversationId.isBlank()) {
             List<MessageEntry> history = conversationCache.getIfPresent(conversationId);
             if (history != null) {
@@ -274,13 +109,11 @@ Independent local news source: %s
                 }
             }
         }
-        // Current user message
         messages.add(Map.of("role", "user", "content", question.trim()));
 
         logger.fine(() -> "ask() messages prepared: " + messages.size() + " total");
         OpenRouterResponseDto response = callOpenRouterAndExtract(messages);
 
-        // On success, update conversation history
         if (conversationId != null && !conversationId.isBlank() && response.getMessage() != null) {
             updateConversationHistory(conversationId, question, response.getMessage());
         }
@@ -290,28 +123,16 @@ Independent local news source: %s
     @Override
     public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format, String conversationId, ComplainantIdentity identity) {
         logger.info("redactComplaint() called");
-        if (complaint == null || complaint.isBlank()) {
-            logger.fine("redactComplaint() rejected: empty complaint");
-            return new OpenRouterResponseDto(false, null, "Complaint must not be empty.", null, OpenRouterErrorCode.VALIDATION);
-        }
-        if (complaint.length() > maxInputLength) {
-            logger.fine("redactComplaint() rejected: complaint too long");
-            return new OpenRouterResponseDto(false, null, "Complaint exceeds maximum allowed length (" + maxInputLength + " characters).", null, OpenRouterErrorCode.VALIDATION);
-        }
 
-        // Reject explicit anonymity requests up front. The Ajuntament does not accept anonymous
-        // complaints — formal letters require the complainant's full name and ID number.
-        if (requestsAnonymity(complaint)) {
-            logger.info("redactComplaint() rejected: user explicitly requested anonymous complaint");
-            return new OpenRouterResponseDto(false, null,
-                    "Anonymous complaints cannot be drafted. The Ajuntament requires full name and ID/DNI/NIF on all formal complaints.",
-                    null, OpenRouterErrorCode.VALIDATION);
+        Optional<OpenRouterResponseDto> validationError = validateRedactInput(complaint);
+        if (validationError.isPresent()) {
+            logger.fine("redactComplaint() rejected: " + validationError.get().getError());
+            return validationError.get();
         }
 
         List<Map<String, Object>> messages = new ArrayList<>();
-        messages.add(Map.of("role", "system", "content", getSystemMessage()));
-        // Inject procedure context if available
-        String contextBlock = buildProcedureContextBlock(complaint);
+        messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage()));
+        String contextBlock = promptBuilder.buildProcedureContextBlock(complaint);
         if (contextBlock != null) {
             messages.add(Map.of("role", "system", "content", contextBlock));
         }
@@ -343,21 +164,16 @@ Independent local news source: %s
                 pendingComplaintCache.invalidate(conversationId);
                 logger.fine("redactComplaint() using stored original complaint for conversationId=" + conversationId);
             }
-            // If there is an original complaint, prepend it so the AI has full context.
-            // If identity was supplied on the very first call, use the current message as-is.
             String complaintForPrompt = (originalComplaint != null)
                     ? originalComplaint + "\n\n" + complaint
                     : complaint;
-            userPrompt = buildRedactPromptWithIdentity(complaintForPrompt, identity);
+            userPrompt = promptBuilder.buildRedactPromptWithIdentity(complaintForPrompt, identity);
         } else {
-            // Save the original complaint so we can retrieve it when the user provides identity
-            // on a follow-up turn. Without this, the second-turn prompt would use the identity
-            // message as the complaint text, producing an incoherent letter.
             if (conversationId != null && !conversationId.isBlank()) {
                 pendingComplaintCache.put(conversationId, complaint);
                 logger.fine("redactComplaint() saved original complaint for conversationId=" + conversationId);
             }
-            userPrompt = buildRedactPromptRequestingIdentity(complaint, identity);
+            userPrompt = promptBuilder.buildRedactPromptRequestingIdentity(complaint, identity);
         }
 
         messages.add(Map.of("role", "user", "content", userPrompt));
@@ -365,46 +181,31 @@ Independent local news source: %s
         logger.fine(() -> "redactComplaint() messages prepared: " + messages.size() + " total, identityComplete=" + identityComplete);
         OpenRouterResponseDto aiDto = callOpenRouterAndExtract(messages);
 
-        // Propagate any non-success result (refusal, upstream error, timeout, internal error) immediately.
-        // Continuing to the header-parsing logic with a failed AI response would produce incorrect
-        // fallback behaviour — e.g. a refusal would silently become a 200 JSON response.
+        // Propagate any non-success result immediately.
         if (aiDto.getErrorCode() != OpenRouterErrorCode.NONE) {
             return aiDto;
         }
 
-        // On success, update conversation history
         if (conversationId != null && !conversationId.isBlank() && aiDto.getMessage() != null) {
             updateConversationHistory(conversationId, userPrompt, aiDto.getMessage());
         }
 
-        // Parse optional AI-supplied header: either JSON first-line or simple 'FORMAT: pdf' header.
         AiParsed parsed = AiParsed.parseAiFormatHeader(aiDto.getMessage());
         OutputFormat effectiveFormat = format == null ? OutputFormat.AUTO : format;
 
-        // If client requested AUTO and the AI supplied a format hint, promote to that format.
-        // If the client was explicit (PDF or JSON), keep their choice unconditionally.
         if (effectiveFormat == OutputFormat.AUTO && parsed.format() != null && parsed.format() != OutputFormat.AUTO) {
             effectiveFormat = parsed.format();
         }
 
-        // When identity is incomplete the AI response is normally a question asking the user
-        // for the missing fields. Return it as a JSON success so the client can display the
-        // question and collect the missing data.
-        //
-        // Exception: if effectiveFormat is PDF (either explicitly requested or promoted due to
-        // successful identity extraction), we fall through to the PDF generation logic.
+        // When identity is incomplete the AI response is a question asking the user for missing
+        // fields. Return it as a JSON success so the client can display the question.
+        // Exception: if effectiveFormat is PDF (AI extracted identity and promoted format), fall
+        // through to PDF generation.
         if (!identityComplete && effectiveFormat != OutputFormat.PDF) {
-            // Return parsed.message() to ensure we strip any potential header if present,
-            // though normally in this case (Scenario B) the AI wouldn't emit one.
             return new OpenRouterResponseDto(true, parsed.message(), null, aiDto.getStatusCode(), OpenRouterErrorCode.NONE);
         }
 
-        // The AI did not emit the required JSON header. Log the raw response prefix to aid diagnosis.
-        // Graceful fallback: use the full AI message as the letter body.
-        // - PDF requested: generate the PDF from the raw message; the header was only a format hint
-        //   and its absence does not make the letter content unusable.
-        // - AUTO or JSON requested: return the raw AI message as a JSON response so the user still
-        //   gets their letter.
+        // Graceful fallback when the AI omits the required JSON header.
         if (parsed.format() == null || parsed.format() == OutputFormat.AUTO) {
             String rawPreview = aiDto.getMessage() == null ? "<null>"
                     : (aiDto.getMessage().length() > 200 ? aiDto.getMessage().substring(0, 200) + "..." : aiDto.getMessage());
@@ -423,20 +224,13 @@ Independent local news source: %s
                     return new OpenRouterResponseDto(false, null, "PDF generation failed: " + e.getMessage(), null, OpenRouterErrorCode.INTERNAL);
                 }
             }
-            // Fall back: return the raw AI message as a JSON response so the user gets their letter.
             return new OpenRouterResponseDto(true, aiDto.getMessage(), null, aiDto.getStatusCode(), OpenRouterErrorCode.NONE);
         }
 
-        boolean producePdf = effectiveFormat == OutputFormat.PDF;
-
-        if (!producePdf) {
-            // return the cleaned AI message (without header)
+        if (effectiveFormat != OutputFormat.PDF) {
             return new OpenRouterResponseDto(true, parsed.message(), null, aiDto.getStatusCode(), OpenRouterErrorCode.NONE);
         }
 
-        // The AI emitted the JSON header but forgot to write the letter body.
-        // Generating a PDF from an empty body produces a useless placeholder document,
-        // so we return an error and let the client retry.
         if (parsed.message().isBlank()) {
             logger.warning("AI emitted format header but letter body is empty. Original response: " + aiDto.getMessage());
             return new OpenRouterResponseDto(false, null, "AI returned a format header but no letter body.", aiDto.getStatusCode(), OpenRouterErrorCode.UPSTREAM);
@@ -450,6 +244,7 @@ Independent local news source: %s
             return new OpenRouterResponseDto(false, null, "PDF generation failed: " + e.getMessage(), null, OpenRouterErrorCode.INTERNAL);
         }
     }
+
 
     /**
      * Detects whether the user's message explicitly asks for the complaint to be anonymous.
