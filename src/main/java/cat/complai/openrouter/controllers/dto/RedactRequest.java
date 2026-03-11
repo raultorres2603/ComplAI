@@ -1,5 +1,7 @@
 package cat.complai.openrouter.controllers.dto;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.core.annotation.Introspected;
 import cat.complai.openrouter.dto.ComplainantIdentity;
 import cat.complai.openrouter.dto.OutputFormat;
@@ -18,7 +20,7 @@ import cat.complai.openrouter.dto.OutputFormat;
 @Introspected
 public class RedactRequest {
     private final String text;
-    private OutputFormat format = OutputFormat.AUTO;
+    private final OutputFormat format;
     private final String conversationId;
     private final String requesterName;
     private final String requesterSurname;
@@ -44,6 +46,26 @@ public class RedactRequest {
         this.requesterName = requesterName;
         this.requesterSurname = requesterSurname;
         this.requesterIdNumber = requesterIdNumber;
+    }
+
+    /**
+     * Jackson deserialization entry point. The format field is received as a raw String so
+     * that OutputFormat.fromString can return null for unrecognised values (e.g. "xml"), which
+     * the controller then rejects with a 400. A null/absent format field maps to AUTO.
+     */
+    @JsonCreator
+    public static RedactRequest fromJson(
+            @JsonProperty("text") String text,
+            @JsonProperty("format") String format,
+            @JsonProperty("conversationId") String conversationId,
+            @JsonProperty("requesterName") String requesterName,
+            @JsonProperty("requesterSurname") String requesterSurname,
+            @JsonProperty("requesterIdNumber") String requesterIdNumber) {
+        // OutputFormat.fromString returns null for unrecognised values (e.g. "xml") and AUTO
+        // for null (absent field). Passing null through to the constructor preserves the
+        // "unknown format" sentinel so isSupportedClientFormat in the controller can reject it.
+        return new RedactRequest(text, OutputFormat.fromString(format), conversationId,
+                requesterName, requesterSurname, requesterIdNumber);
     }
 
     public String getText() {
