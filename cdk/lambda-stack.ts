@@ -8,8 +8,7 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
-
-export type DeploymentEnvironment = 'development' | 'production';
+import { DeploymentEnvironment } from './deployment-environment';
 
 export interface LambdaStackProps extends cdk.StackProps {
   // Identifies which environment this stack owns. Every AWS resource is suffixed
@@ -17,13 +16,20 @@ export interface LambdaStackProps extends cdk.StackProps {
   // name collisions, and so it is immediately obvious in the console which
   // resource belongs to which environment.
   readonly environment: DeploymentEnvironment;
+  // Storage resources owned by StorageStack — passed in so this stack can wire
+  // IAM grants and inject bucket names into Lambda environment variables.
+  readonly proceduresBucket: s3.IBucket;
+  readonly complaintsBucket: s3.IBucket;
+  // Queue owned by QueueStack — passed in for IAM grants, env vars, and the
+  // SQS event source mapping on the worker Lambda.
+  readonly redactQueue: sqs.IQueue;
 }
 
 export class LambdaStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: LambdaStackProps) {
     super(scope, id, props);
 
-    const { environment } = props;
+    const { environment, proceduresBucket, complaintsBucket, redactQueue } = props;
 
     // Create a custom IAM role for Lambda with least privilege.
     // The logical ID includes the environment so both stacks can live in the same account.
@@ -34,12 +40,6 @@ export class LambdaStack extends cdk.Stack {
 
     // Attach AWS managed policy for basic Lambda logging
     lambdaRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'));
-
-    // Add custom permissions here if needed, e.g.:
-    // lambdaRole.addToPolicy(new iam.PolicyStatement({
-    //   actions: ['s3:GetObject'],
-    //   resources: ['arn:aws:s3:::your-bucket/*'],
-    // }));
 
     // Minimal JAR selection:
     // 1) If CI sets JAR_PATH (or CDK context 'jarPath'), use it.
@@ -61,64 +61,6 @@ export class LambdaStack extends cdk.Stack {
       jarPath = path.join(libsDir, allJar);
     }
     if (!jarPath || !fs.existsSync(jarPath)) throw new Error(`Unable to determine JAR path. Computed: ${jarPath}`);
-
-// S3 bucket for procedures corpus (Free Tier, no public access)
-    const proceduresBucket = new s3.Bucket(this, `ComplAIProceduresBucket-${environment}`, {
-      bucketName: `complai-procedures-${environment.toLowerCase()}`,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      encryption: s3.BucketEncryption.S3_MANAGED,
-      versioned: false,
-      lifecycleRules: [{
-        expiration: cdk.Duration.days(365),
-      }],
-    });
-
-    // Grant Lambda read-only access to the procedures bucket
-    proceduresBucket.grantRead(lambdaRole);
-
-    // -------------------------------------------------------------------------
-    // S3 bucket for generated complaint PDFs
-    // PDFs are ephemeral — deleted after 30 days so storage stays free-tier-ish.
-    // -------------------------------------------------------------------------
-    const complaintsBucket = new s3.Bucket(this, `ComplAIComplaintsBucket-${environment}`, {
-      bucketName: `complai-complaints-${environment.toLowerCase()}`,
-      removalPolicy: environment === 'production'
-        ? cdk.RemovalPolicy.RETAIN
-        : cdk.RemovalPolicy.DESTROY,
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      encryption: s3.BucketEncryption.S3_MANAGED,
-      versioned: false,
-      lifecycleRules: [{
-        expiration: cdk.Duration.days(30),
-      }],
-    });
-
-    // -------------------------------------------------------------------------
-    // SQS — redact queue + DLQ
-    // Visibility timeout = 90s (≥ 1.5× the worker Lambda timeout of 60s).
-    // Message retention = 4h (short-lived; stale messages are useless after that).
-    // -------------------------------------------------------------------------
-    const redactDlq = new sqs.Queue(this, `ComplAIRedactDLQ-${environment}`, {
-      queueName: `complai-redact-dlq-${environment}`,
-      retentionPeriod: cdk.Duration.days(7),
-      removalPolicy: environment === 'production'
-        ? cdk.RemovalPolicy.RETAIN
-        : cdk.RemovalPolicy.DESTROY,
-    });
-
-    const redactQueue = new sqs.Queue(this, `ComplAIRedactQueue-${environment}`, {
-      queueName: `complai-redact-${environment}`,
-      visibilityTimeout: cdk.Duration.seconds(90),
-      retentionPeriod: cdk.Duration.hours(4),
-      deadLetterQueue: {
-        maxReceiveCount: 3,
-        queue: redactDlq,
-      },
-      removalPolicy: environment === 'production'
-        ? cdk.RemovalPolicy.RETAIN
-        : cdk.RemovalPolicy.DESTROY,
-    });
 
     // Explicit log group so we control retention and can attach metric filters.
     // Lambda would create a log group automatically, but that gives us no control
@@ -180,6 +122,7 @@ export class LambdaStack extends cdk.Stack {
     // Pre-signed URLs embed the signer's credentials; without this permission the
     // signed URL would return 403 when the user tries to download the PDF.
     complaintsBucket.grantRead(lambdaRole);
+    proceduresBucket.grantRead(lambdaRole);
 
     // -------------------------------------------------------------------------
     // Worker Lambda — processes SQS messages and uploads generated PDFs to S3.
@@ -247,25 +190,13 @@ export class LambdaStack extends cdk.Stack {
     // HTTP API payload format 2.0, so the Micronaut handler works without changes.
     // NOTE: Unlike API Gateway, Function URLs have no built-in rate limiting.
     // Add AWS WAF in front of the URL if throttling ever becomes a requirement.
-    const functionUrl = lambdaFn.addFunctionUrl({
+    lambdaFn.addFunctionUrl({
       authType: lambda.FunctionUrlAuthType.NONE,
       cors: {
         allowedOrigins: ['*'],
         allowedMethods: [lambda.HttpMethod.ALL],
         allowedHeaders: ['*'],
       },
-    });
-
-    // Expose the Lambda name, ARN, and the public Function URL as CloudFormation
-    // outputs so deploys (and CI) can easily discover the physical identifiers.
-    new cdk.CfnOutput(this, 'ComplAILambdaFunctionName', {
-      value: lambdaFn.functionName,
-      description: `Name of the deployed ComplAI Lambda function (${environment})`,
-    });
-
-    new cdk.CfnOutput(this, 'ComplAILambdaArn', {
-      value: lambdaFn.functionArn,
-      description: `ARN of the deployed ComplAI Lambda function (${environment})`,
     });
 
     // AuditLogger emits JSON lines like:
@@ -305,20 +236,21 @@ export class LambdaStack extends cdk.Stack {
       },
     });
 
-    // Output the log group name so CI/CD and runbooks can reference it directly.
+    // Expose the Lambda name, ARN, and log group as CloudFormation outputs so
+    // deploys (and CI) can easily discover the physical identifiers.
+    new cdk.CfnOutput(this, 'ComplAILambdaFunctionName', {
+      value: lambdaFn.functionName,
+      description: `Name of the deployed ComplAI Lambda function (${environment})`,
+    });
+
+    new cdk.CfnOutput(this, 'ComplAILambdaArn', {
+      value: lambdaFn.functionArn,
+      description: `ARN of the deployed ComplAI Lambda function (${environment})`,
+    });
+
     new cdk.CfnOutput(this, 'ComplAILogGroupName', {
       value: logGroup.logGroupName,
       description: `CloudWatch Log Group for the ComplAI Lambda function (${environment})`,
-    });
-
-    new cdk.CfnOutput(this, 'ComplAIRedactQueueUrl', {
-      value: redactQueue.queueUrl,
-      description: `SQS queue URL for the async redact flow (${environment})`,
-    });
-
-    new cdk.CfnOutput(this, 'ComplAIComplaintsBucketName', {
-      value: complaintsBucket.bucketName,
-      description: `S3 bucket for generated complaint PDFs (${environment})`,
     });
 
     new cdk.CfnOutput(this, 'ComplAIWorkerLambdaName', {
