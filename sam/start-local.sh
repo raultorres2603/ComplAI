@@ -80,6 +80,29 @@ done
 echo "[start-local] LocalStack is healthy."
 
 # ---------------------------------------------------------------------------
+# 2b. Wait for the init script to have created the SQS queue.
+#     LocalStack's health check passes as soon as the HTTP gateway is up,
+#     which is before the ready.d init scripts finish executing.  If SAM
+#     receives a request before the queue exists we get QueueDoesNotExistException.
+#     We poll via docker exec so we don't need the aws CLI on the host.
+# ---------------------------------------------------------------------------
+echo "[start-local] Waiting for SQS queue 'complai-redact-local' to be ready..."
+QUEUE_RETRIES=20
+until docker exec complai-localstack \
+    awslocal sqs get-queue-url --queue-name complai-redact-local \
+    --output text 2>/dev/null | grep -q "complai-redact-local"; do
+  QUEUE_RETRIES=$((QUEUE_RETRIES - 1))
+  if [ "${QUEUE_RETRIES}" -le 0 ]; then
+    echo "[start-local] ERROR: SQS queue 'complai-redact-local' was not created in time." >&2
+    echo "[start-local] Check LocalStack init logs:" >&2
+    echo "[start-local]   docker compose -f ${SCRIPT_DIR}/docker-compose.yml logs localstack" >&2
+    exit 1
+  fi
+  sleep 2
+done
+echo "[start-local] SQS queue is ready."
+
+# ---------------------------------------------------------------------------
 # 3. Start SAM CLI local API.
 #    --env-vars  injects environment variables (including OPENROUTER_API_KEY)
 #                from env.json — edit that file before running.

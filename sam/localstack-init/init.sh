@@ -51,11 +51,21 @@ create_queue "complai-redact-dlq-local"
 # Create the main queue with a redrive policy pointing to the DLQ.
 # LocalStack PERSISTENCE=1 keeps state across restarts; the idempotency guard above
 # ensures we do not fail if the queue already exists from a previous run.
-DLQ_ARN=$(awslocal sqs get-queue-attributes \
-  --queue-url "http://localhost:4566/000000000000/complai-redact-dlq-local" \
-  --attribute-names QueueArn \
-  --query 'Attributes.QueueArn' --output text 2>/dev/null || echo "")
+#
+# Resolve the DLQ URL dynamically rather than using a hardcoded value: LocalStack v3
+# switched to domain-style queue URLs by default, so a hard-coded http://localhost:4566/...
+# URL causes get-queue-attributes to fail silently, which would drop the redrive policy.
+DLQ_URL=$(awslocal sqs get-queue-url \
+  --queue-name "complai-redact-dlq-local" \
+  --query 'QueueUrl' --output text 2>/dev/null || echo "")
 
+DLQ_ARN=""
+if [ -n "${DLQ_URL}" ]; then
+  DLQ_ARN=$(awslocal sqs get-queue-attributes \
+    --queue-url "${DLQ_URL}" \
+    --attribute-names QueueArn \
+    --query 'Attributes.QueueArn' --output text 2>/dev/null || echo "")
+fi
 if [ -n "${DLQ_ARN}" ]; then
   REDRIVE_POLICY="{\"deadLetterTargetArn\":\"${DLQ_ARN}\",\"maxReceiveCount\":\"3\"}"
   echo "[init] Creating SQS queue: complai-redact-local (with DLQ redrive)"
