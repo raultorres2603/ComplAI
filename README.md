@@ -2,6 +2,8 @@
 
 © 2026 Raúl Torres Alarcón. All rights reserved.
 
+Last version: [![GitHub Release](https://img.shields.io/github/v/release/raultorres2603/ComplAI)](https://github.com/raultorres2603/ComplAI/releases/latest)
+
 > **Gall Potablava** is an AI assistant for the residents of El Prat de Llobregat (Catalonia, Spain).
 > It helps citizens ask questions about local services, understand municipal procedures, and draft
 > formal complaints addressed to the City Hall (Ajuntament d'El Prat de Llobregat).
@@ -552,4 +554,3 @@ curl -X POST https://<lambda-url>/complai/ask \
 | `OPENROUTER_API_KEY`  | Yes      | Bearer token for the OpenRouter API              |
 | `openrouter.url`      | No       | Override the OpenRouter endpoint (default: `https://openrouter.ai/api/v1/chat/completions`) |
 
----
