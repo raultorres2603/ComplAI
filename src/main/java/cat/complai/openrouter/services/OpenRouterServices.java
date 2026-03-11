@@ -204,19 +204,42 @@ Independent local news source: %s
         if (!hasSurname) missing.append("- Surname (cognoms)\n");
         if (!hasId) missing.append("- ID/DNI/NIF number\n");
 
+        String today = LocalDate.now().format(DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", Locale.forLanguageTag("ca")));
+
         return String.format(
                 """
                         The user wants to draft a formal complaint addressed to the Ajuntament of El Prat de Llobregat.
-                        Before drafting the letter, you need the following mandatory identification fields.\s
-                        These are the ONLY fields you must ask for — do NOT ask for address, phone, email or any other details:\s
-                       \s
+
+                        Current status: Missing mandatory identity fields.
+
+                        YOUR TASK:
+                        1. Analyze the complaint text below.
+                        2. Check if the user has provided the following missing fields in the text:
                         %s
-                        Ask the user politely for this information. Do NOT draft any letter until you\s
-                        have all three: first name, surname, and ID/DNI/NIF.\s
-                        Respond in the same language the user is using.\s
-                       \s
-                        The complaint they want to draft (for context only — do not draft yet):\s
+
+                        SCENARIO A: The text DOES contain ALL the missing fields (e.g. they wrote "My name is John Doe, ID 12345").
+                           -> ACTION: Extract the identity and DRAFT THE LETTER immediately.
+                           -> You MUST start with the JSON header on line 1: {"format": "pdf"}
+                           -> Follow these drafting rules:
+                              1. Use date: "%s".
+                              2. Include the extracted Full Name and ID/DNI/NIF in the header and signature.
+                              3. Include address/phone ONLY if mentioned.
+                              4. NO placeholders. NO follow-up questions.
+                              5. COMPLAINT BODY: Write a clear, formal complaint based on the user's text.
+                              6. Output the letter body as PLAIN TEXT after the JSON header.
+
+                        SCENARIO B: The text DOES NOT contain all missing fields.
+                           -> ACTION: Ask the user politely for the missing information.
+                           -> Do NOT draft the letter yet.
+                           -> Do NOT output the JSON header.
+                           -> Simply ask for:
+                           %s
+                           -> Respond in the same language the user is using.
+
+                        Complaint text:
                         %s""",
+                missing.toString().trim(),
+                today,
                 missing.toString().trim(),
                 complaint.trim()
         );
