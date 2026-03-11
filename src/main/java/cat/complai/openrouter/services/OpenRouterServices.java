@@ -331,17 +331,28 @@ Independent local news source: %s
         }
 
         // The AI did not emit the required JSON header. Log the raw response prefix to aid diagnosis.
-        // Graceful fallback: if the client explicitly requested PDF we cannot produce one without a
-        // clean letter body, so we return an error. In all other cases (AUTO or JSON) we treat the
-        // full AI message as the letter body and return it as a JSON response — the user still gets
-        // their letter rather than an opaque 400.
+        // Graceful fallback: use the full AI message as the letter body.
+        // - PDF requested: generate the PDF from the raw message; the header was only a format hint
+        //   and its absence does not make the letter content unusable.
+        // - AUTO or JSON requested: return the raw AI message as a JSON response so the user still
+        //   gets their letter.
         if (parsed.format() == null || parsed.format() == OutputFormat.AUTO) {
             String rawPreview = aiDto.getMessage() == null ? "<null>"
                     : (aiDto.getMessage().length() > 200 ? aiDto.getMessage().substring(0, 200) + "..." : aiDto.getMessage());
             logger.warning("AI response missing required JSON header; raw response prefix: " + rawPreview);
 
             if (effectiveFormat == OutputFormat.PDF) {
-                return new OpenRouterResponseDto(false, null, "AI response missing required JSON header; cannot produce PDF.", aiDto.getStatusCode(), OpenRouterErrorCode.UPSTREAM);
+                String letterBody = aiDto.getMessage() == null ? "" : aiDto.getMessage();
+                if (letterBody.isBlank()) {
+                    return new OpenRouterResponseDto(false, null, "AI returned an empty response; cannot produce PDF.", aiDto.getStatusCode(), OpenRouterErrorCode.UPSTREAM);
+                }
+                try {
+                    byte[] pdf = PdfGenerator.generatePdf(letterBody);
+                    return new OpenRouterResponseDto(true, null, null, null, OpenRouterErrorCode.NONE, pdf);
+                } catch (Exception e) {
+                    logger.log(Level.SEVERE, "PDF generation failed (headerless fallback)", e);
+                    return new OpenRouterResponseDto(false, null, "PDF generation failed: " + e.getMessage(), null, OpenRouterErrorCode.INTERNAL);
+                }
             }
             // Fall back: return the raw AI message as a JSON response so the user gets their letter.
             return new OpenRouterResponseDto(true, aiDto.getMessage(), null, aiDto.getStatusCode(), OpenRouterErrorCode.NONE);

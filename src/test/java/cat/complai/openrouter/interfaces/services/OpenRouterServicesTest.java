@@ -255,17 +255,20 @@ public class OpenRouterServicesTest {
     }
 
     @Test
-    void redact_missingJsonHeader_withPdfFormat_returnsError() {
-        // When the client explicitly asked for PDF but the AI omits the header we cannot extract
-        // a clean letter body, so the service must return an error rather than produce a broken PDF.
+    void redact_missingJsonHeader_withPdfFormat_producesPdfFromRawMessage() {
+        // When the client explicitly asked for PDF but the AI omits the JSON header, the service
+        // must still produce a PDF. The header is only a format hint — the letter content is in
+        // the raw AI message and is usable for PDF generation without it.
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
         OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30);
 
         ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
         OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [NOHEADER]", OutputFormat.PDF, null, identity);
 
-        assertFalse(out.isSuccess(), "Missing header with explicit PDF must report failure");
-        assertEquals(OpenRouterErrorCode.UPSTREAM, out.getErrorCode());
+        assertTrue(out.isSuccess(), "Missing header with explicit PDF must still succeed");
+        assertNotNull(out.getPdfData(), "PDF must be generated from the raw AI message");
+        String head = new String(out.getPdfData(), 0, Math.min(4, out.getPdfData().length), StandardCharsets.US_ASCII);
+        assertTrue(head.startsWith("%PDF"), "PDF magic bytes expected at start of file");
     }
 
     @Test
