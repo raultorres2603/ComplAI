@@ -1,7 +1,7 @@
 meta {
-  name: PDF - Generate complai
+  name: PDF - Redact a complaint
   type: http
-  seq: 6
+  seq: 5
   tags: [
     ask
   ]
@@ -15,7 +15,7 @@ post {
 
 body:json {
   {
-    "text": "Hola, tinc un problema greu amb els contenidors ubicats a Apel·les Mestres, no funcionen. M'agradaria fer una queixa formal, si us plau.",
+    "text": "El meu nom es Raúl Torres Alarcón amb DNI 49872354C, tinc un problema greu amb els contenidors ubicats a Apel·les Mestres, no funcionen. M'agradaria fer una queixa formal, si us plau.",
     "format": "pdf",
     "conversationId": "{{conversationId}}"
   }

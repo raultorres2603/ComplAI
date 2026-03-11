@@ -1,5 +1,6 @@
 package cat.complai.openrouter.controllers;
 
+import cat.complai.openrouter.dto.ComplainantIdentity;
 import cat.complai.openrouter.dto.OpenRouterErrorCode;
 import cat.complai.openrouter.dto.OpenRouterPublicDto;
 import cat.complai.openrouter.dto.OpenRouterResponseDto;
@@ -182,7 +183,9 @@ public class OpenRouterControllerIntegrationTest {
         // Verify the service produces valid PDF bytes when the mock returns a JSON header with format=pdf.
         // Tested at service level: Micronaut's embedded Netty server closes the connection for binary
         // HTTP responses, making byte[] retrieval through the test HTTP client unreliable.
-        OpenRouterResponseDto dto = openRouterService.redactComplaint("Complaint about noise [HEADER]", OutputFormat.AUTO, null);
+        // A complete identity is required — without it the service short-circuits to ask for missing fields.
+        ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
+        OpenRouterResponseDto dto = openRouterService.redactComplaint("Complaint about noise [HEADER]", OutputFormat.AUTO, null, identity);
         assertTrue(dto.isSuccess(), "Expected success");
         assertNotNull(dto.getPdfData(), "Expected PDF data");
         assertTrue(dto.getPdfData().length > 0);
@@ -207,7 +210,13 @@ public class OpenRouterControllerIntegrationTest {
 
     @Test
     void integration_redact_headerWithInlineJsonBody_producesPdf() {
-        OpenRouterResponseDto dto = openRouterService.redactComplaint("Complaint that requests inline body [HEADER]", OutputFormat.AUTO, null);
+        // Tests Shape 3 of AiParsed: AI returns a single JSON object with both the format and body
+        // inline (e.g. {"format":"pdf","body":"..."}) instead of a header + separate letter body.
+        // A complete identity is required to reach PDF generation — without it the service
+        // short-circuits to ask for missing fields before drafting.
+        ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
+        OpenRouterResponseDto dto = openRouterService.redactComplaint(
+                "Complaint that requests inline body [HEADER_INLINE]", OutputFormat.AUTO, null, identity);
         assertTrue(dto.isSuccess(), "Expected success");
         assertNotNull(dto.getPdfData(), "Expected PDF data");
         assertTrue(dto.getPdfData().length > 0);
@@ -231,9 +240,11 @@ public class OpenRouterControllerIntegrationTest {
 
     @Test
     void integration_redact_pdfUnicodeCatalanCharacters() {
-        // Simulate a PDF response with Catalan special characters
+        // Simulate a PDF response with Catalan special characters.
+        // A complete identity is required — without it the service short-circuits to ask for missing fields.
+        ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
         OpenRouterResponseDto dto = openRouterService.redactComplaint(
-            "Prova unicode català [HEADER]", OutputFormat.PDF, null);
+            "Prova unicode català [HEADER]", OutputFormat.PDF, null, identity);
         assertTrue(dto.isSuccess(), "Expected success");
         assertNotNull(dto.getPdfData(), "Expected PDF data");
         assertTrue(dto.getPdfData().length > 0);
@@ -245,10 +256,12 @@ public class OpenRouterControllerIntegrationTest {
         // Verify that PDF bytes contain the Catalan body text returned by the mock.
         // The [HEADER_CATALAN] trigger causes the mock to return a JSON header + Catalan body,
         // which the service parses and converts to a PDF via PdfGenerator.
+        // A complete identity is required — without it the service short-circuits to ask for missing fields.
         String expectedBodyFragment = "Això és una prova amb caràcters especials";
 
+        ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
         OpenRouterResponseDto dto = openRouterService.redactComplaint(
-                "Complaint with Catalan text [HEADER_CATALAN]", OutputFormat.AUTO, null);
+                "Complaint with Catalan text [HEADER_CATALAN]", OutputFormat.AUTO, null, identity);
         assertTrue(dto.isSuccess(), "Expected success");
         assertNotNull(dto.getPdfData(), "Expected PDF data");
         assertTrue(dto.getPdfData().length > 0, "PDF should not be empty");
@@ -312,6 +325,55 @@ public class OpenRouterControllerIntegrationTest {
         }
     }
 
+    @Test
+    void integration_redact_anonymousRequest_returns400() throws Exception {
+        // Anonymous complaints must be rejected at the service layer and surfaced as 400 VALIDATION.
+        // The AI must never be called — the service rejects before building the prompt.
+        RedactRequest req = new RedactRequest("Noise from the airport. I want to remain anonymous.");
+        HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req)
+                .header("Authorization", authHeader);
+        try {
+            client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
+            fail("Expected HttpClientResponseException for 400");
+        } catch (HttpClientResponseException e) {
+            assertEquals(400, e.getStatus().getCode());
+            String bodyJson = e.getResponse().getBody(String.class).orElse("{}");
+            JsonNode node = mapper.readTree(bodyJson);
+            assertEquals(OpenRouterErrorCode.VALIDATION.getCode(), node.path("errorCode").asInt());
+            assertTrue(node.path("error").asText().contains("Anonymous"),
+                    "Error must mention anonymous complaints");
+        }
+    }
+
+    @Test
+    void integration_redact_missingIdentity_returns200WithQuestion() {
+        // When no identity is provided, the AI is instructed to ask for the missing fields.
+        // The response must be 200 so the client can display the question to the user.
+        RedactRequest req = new RedactRequest("Noise from the airport [ASKS_IDENTITY]");
+        HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req)
+                .header("Authorization", authHeader);
+        HttpResponse<OpenRouterPublicDto> resp = client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
+        assertEquals(200, resp.getStatus().getCode());
+        assertTrue(resp.getBody().isPresent());
+        OpenRouterPublicDto body = resp.getBody().get();
+        assertTrue(body.isSuccess());
+        assertTrue(body.getMessage().contains("first name"),
+                "Response must ask for the missing identity fields");
+    }
+
+    @Test
+    void integration_redact_completeIdentity_producesPdf() {
+        // When full identity is provided, the service must produce a PDF letter.
+        // Tested at service level to avoid binary-response connection issues in Netty test server.
+        ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
+        OpenRouterResponseDto dto = openRouterService.redactComplaint(
+                "Noise from the airport [IDENTITY_LETTER]", OutputFormat.PDF, null, identity);
+        assertTrue(dto.isSuccess(), "Expected success");
+        assertNotNull(dto.getPdfData(), "Expected PDF data");
+        assertTrue(dto.getPdfData().length > 0);
+        assertTrue(new String(dto.getPdfData(), 0, 4).startsWith("%PDF"), "Expected PDF magic bytes");
+    }
+
     @MockBean(HttpWrapper.class)
     @Replaces(HttpWrapper.class)
     HttpWrapper openRouterHttpWrapper() {
@@ -350,6 +412,12 @@ public class OpenRouterControllerIntegrationTest {
                             "\n\nSincerely,\nResident";
                     return CompletableFuture.completedFuture(new HttpDto(sb, 200, "POST", null));
                 }
+                if (userPrompt != null && userPrompt.contains("[HEADER_INLINE]")) {
+                    // Simulate Shape 3: AI returns format and letter body inlined in a single JSON object,
+                    // rather than a first-line header followed by a separate letter body.
+                    String body = "{\"format\": \"pdf\", \"body\": \"Dear Ajuntament,\\n\\nI am writing to complain about noise from the airport.\\n\\nSincerely,\\nJoan Garcia\"}";
+                    return CompletableFuture.completedFuture(new HttpDto(body, 200, "POST", null));
+                }
                 if (userPrompt != null && userPrompt.contains("[HEADER_INVALID]")) {
                     // Simulate invalid header
                     String body = "{\"format\": \"xml\"}\n\nThis body should be rejected due to invalid format.";
@@ -358,6 +426,17 @@ public class OpenRouterControllerIntegrationTest {
                 if (userPrompt != null && userPrompt.contains("[HEADER_CATALAN]")) {
                     // Simulate PDF response with Catalan special characters
                     String body = "{\"format\": \"pdf\"}\n\nAixò és una prova amb caràcters especials: à, é, í, ò, ú, ç, l·l.\n\nAtentament,\nVeí";
+                    return CompletableFuture.completedFuture(new HttpDto(body, 200, "POST", null));
+                }
+                if (userPrompt != null && userPrompt.contains("[ASKS_IDENTITY]")) {
+                    // Simulate the AI asking for missing identity fields
+                    return CompletableFuture.completedFuture(new HttpDto(
+                            "To draft your complaint I need your first name, surname, and ID/DNI/NIF. Could you please provide them?",
+                            200, "POST", null));
+                }
+                if (userPrompt != null && userPrompt.contains("[IDENTITY_LETTER]")) {
+                    // Simulate the AI drafting a letter with identity embedded
+                    String body = "{\"format\": \"pdf\"}\n\nEl Prat de Llobregat, 10 de març de 2026\n\nSr. Alcalde,\n\nJo, Joan Garcia, amb DNI 12345678A, vull presentar una queixa...\n\nAtentament,\nJoan Garcia\nDNI: 12345678A";
                     return CompletableFuture.completedFuture(new HttpDto(body, 200, "POST", null));
                 }
                 // Default: simulate a successful text response

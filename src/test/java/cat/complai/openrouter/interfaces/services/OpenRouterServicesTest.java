@@ -2,6 +2,7 @@ package cat.complai.openrouter.interfaces.services;
 
 import cat.complai.http.HttpWrapper;
 import cat.complai.http.dto.HttpDto;
+import cat.complai.openrouter.dto.ComplainantIdentity;
 import cat.complai.openrouter.dto.OpenRouterResponseDto;
 import cat.complai.openrouter.services.OpenRouterServices;
 import org.junit.jupiter.api.Test;
@@ -27,11 +28,14 @@ public class OpenRouterServicesTest {
     static class ScenarioFakeWrapper extends HttpWrapper {
         // Add a field to allow test to override the next response
         private String nextResponse = null;
+        public List<Map<String, Object>> lastMessages;
+
         public void overrideNextResponse(String response) {
             this.nextResponse = response;
         }
         @Override
         public CompletableFuture<HttpDto> postToOpenRouterAsync(List<Map<String, Object>> messages) {
+            this.lastMessages = messages;
             if (nextResponse != null) {
                 String resp = nextResponse;
                 nextResponse = null;
@@ -67,6 +71,22 @@ public class OpenRouterServicesTest {
             }
             if (userPrompt != null && userPrompt.contains("[HEADER_INVALID]")) {
                 String body = "{\"format\": \"xml\"}\n\nThis body should be rejected due to invalid format.";
+                return CompletableFuture.completedFuture(new HttpDto(body, 200, "POST", null));
+            }
+            if (userPrompt != null && userPrompt.contains("[ASKS_IDENTITY]")) {
+                // Simulate the AI asking for missing identity fields
+                return CompletableFuture.completedFuture(new HttpDto(
+                        "To draft your complaint I need your first name, surname, and ID/DNI/NIF. Could you please provide them?",
+                        200, "POST", null));
+            }
+            if (userPrompt != null && userPrompt.contains("[IDENTITY_LETTER]")) {
+                // Simulate the AI drafting a letter with identity embedded
+                String body = "{\"format\": \"pdf\"}\n\nEl Prat de Llobregat, 10 de març de 2026\n\nSr. Alcalde,\n\nJo, Joan Garcia, amb DNI 12345678A, vull presentar una queixa...\n\nAtentament,\nJoan Garcia\nDNI: 12345678A";
+                return CompletableFuture.completedFuture(new HttpDto(body, 200, "POST", null));
+            }
+            if (userPrompt != null && userPrompt.contains("[SMART_EXTRACT]")) {
+                // Simulate AI successfully extracting identity from text and promoting to PDF
+                String body = "{\"format\": \"pdf\"}\n\nEl Prat de Llobregat, 10 de març de 2026\n\nSr. Alcalde,\n\nJo, Raul Torres, amb DNI 49872354C...\n\nAtentament,\nRaul Torres";
                 return CompletableFuture.completedFuture(new HttpDto(body, 200, "POST", null));
             }
             if (userPrompt != null && userPrompt.contains("recycling center")) {
@@ -116,9 +136,90 @@ public class OpenRouterServicesTest {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
         OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30);
 
-        OpenRouterResponseDto out = svc.redactComplaint("   ", OutputFormat.JSON, null);
+        OpenRouterResponseDto out = svc.redactComplaint("   ", OutputFormat.JSON, null, null);
         assertFalse(out.isSuccess());
         assertEquals("Complaint must not be empty.", out.getError());
+    }
+
+    @Test
+    void redact_anonymousRequest_english_rejectsWithValidation() {
+        // The service must reject anonymous complaints immediately without calling the AI.
+        ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30);
+
+        OpenRouterResponseDto out = svc.redactComplaint(
+                "Noise from the airport. I want to remain anonymous.", OutputFormat.JSON, null, null);
+        assertFalse(out.isSuccess());
+        assertEquals(OpenRouterErrorCode.VALIDATION, out.getErrorCode());
+        assertTrue(out.getError().contains("Anonymous"), "Error must mention anonymous complaints");
+    }
+
+    @Test
+    void redact_anonymousRequest_spanish_rejectsWithValidation() {
+        ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30);
+
+        OpenRouterResponseDto out = svc.redactComplaint(
+                "Ruido del aeropuerto. Quiero que sea anónimo.", OutputFormat.JSON, null, null);
+        assertFalse(out.isSuccess());
+        assertEquals(OpenRouterErrorCode.VALIDATION, out.getErrorCode());
+    }
+
+    @Test
+    void redact_anonymousRequest_catalan_rejectsWithValidation() {
+        ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30);
+
+        OpenRouterResponseDto out = svc.redactComplaint(
+                "Soroll de l'aeroport. Vull ser anònim.", OutputFormat.JSON, null, null);
+        assertFalse(out.isSuccess());
+        assertEquals(OpenRouterErrorCode.VALIDATION, out.getErrorCode());
+    }
+
+    @Test
+    void redact_missingIdentity_aiAsksForIt_returns200WithQuestion() {
+        // When identity is absent, the service must instruct the AI to ask the user for
+        // the missing fields, and return the AI's question as a 200 success to the client.
+        ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30);
+
+        OpenRouterResponseDto out = svc.redactComplaint(
+                "Noise from the airport [ASKS_IDENTITY]", OutputFormat.JSON, null, null);
+        assertTrue(out.isSuccess(), "Service must return success so the client can show the AI's question");
+        assertNotNull(out.getMessage());
+        assertTrue(out.getMessage().contains("first name"), "AI response must ask for the missing identity fields");
+        assertNull(out.getPdfData(), "No PDF should be produced when identity is missing");
+    }
+
+    @Test
+    void redact_completeIdentity_producesPdf() {
+        // When full identity is provided, the service must produce a PDF letter with the
+        // complainant's information embedded.
+        ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30);
+
+        ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
+        OpenRouterResponseDto out = svc.redactComplaint(
+                "Noise from the airport [IDENTITY_LETTER]", OutputFormat.PDF, null, identity);
+        assertTrue(out.isSuccess());
+        assertNotNull(out.getPdfData());
+        String head = new String(out.getPdfData(), 0, Math.min(4, out.getPdfData().length), StandardCharsets.US_ASCII);
+        assertTrue(head.startsWith("%PDF"), "PDF magic bytes expected at start of file");
+    }
+
+    @Test
+    void redact_partialIdentity_aiAsksForMissingFields() {
+        // A partially-filled identity (e.g. name only, no surname or ID) is treated as
+        // missing — the AI must be asked to collect the remaining fields.
+        ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30);
+
+        ComplainantIdentity partial = new ComplainantIdentity("Joan", null, null);
+        OpenRouterResponseDto out = svc.redactComplaint(
+                "Noise from the airport [ASKS_IDENTITY]", OutputFormat.JSON, null, partial);
+        assertTrue(out.isSuccess());
+        assertNotNull(out.getMessage());
+        assertNull(out.getPdfData());
     }
 
     @Test
@@ -126,7 +227,8 @@ public class OpenRouterServicesTest {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
         OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30);
 
-        OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [HEADER]", OutputFormat.PDF, null);
+        ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
+        OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [HEADER]", OutputFormat.PDF, null, identity);
         assertTrue(out.isSuccess());
         assertNotNull(out.getPdfData());
         String head = new String(out.getPdfData(), 0, Math.min(4, out.getPdfData().length), StandardCharsets.US_ASCII);
@@ -139,7 +241,8 @@ public class OpenRouterServicesTest {
         OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30);
 
         String aiMessage = "Dear Ajuntament,\n\nI am writing to complain about...\n\nSincerely,\nResident";
-        OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [NOHEADER]", OutputFormat.AUTO, null);
+        ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
+        OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [NOHEADER]", OutputFormat.AUTO, null, identity);
 
         assertTrue(out.isSuccess(), "Missing header with AUTO must not fail the request");
         assertEquals(aiMessage, out.getMessage(), "Raw AI message must be returned as-is");
@@ -152,23 +255,28 @@ public class OpenRouterServicesTest {
         OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30);
 
         String aiMessage = "Dear Ajuntament,\n\nI am writing to complain about...\n\nSincerely,\nResident";
-        OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [NOHEADER]", OutputFormat.JSON, null);
+        ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
+        OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [NOHEADER]", OutputFormat.JSON, null, identity);
 
         assertTrue(out.isSuccess(), "Missing header with JSON must not fail the request");
         assertEquals(aiMessage, out.getMessage());
     }
 
     @Test
-    void redact_missingJsonHeader_withPdfFormat_returnsError() {
-        // When the client explicitly asked for PDF but the AI omits the header we cannot extract
-        // a clean letter body, so the service must return an error rather than produce a broken PDF.
+    void redact_missingJsonHeader_withPdfFormat_producesPdfFromRawMessage() {
+        // When the client explicitly asked for PDF but the AI omits the JSON header, the service
+        // must still produce a PDF. The header is only a format hint — the letter content is in
+        // the raw AI message and is usable for PDF generation without it.
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
         OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30);
 
-        OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [NOHEADER]", OutputFormat.PDF, null);
+        ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
+        OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [NOHEADER]", OutputFormat.PDF, null, identity);
 
-        assertFalse(out.isSuccess(), "Missing header with explicit PDF must report failure");
-        assertEquals(OpenRouterErrorCode.UPSTREAM, out.getErrorCode());
+        assertTrue(out.isSuccess(), "Missing header with explicit PDF must still succeed");
+        assertNotNull(out.getPdfData(), "PDF must be generated from the raw AI message");
+        String head = new String(out.getPdfData(), 0, Math.min(4, out.getPdfData().length), StandardCharsets.US_ASCII);
+        assertTrue(head.startsWith("%PDF"), "PDF magic bytes expected at start of file");
     }
 
     @Test
@@ -176,10 +284,8 @@ public class OpenRouterServicesTest {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
         OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30);
 
-        "I am writing to express my concern about noise pollution near my residence. This has been ongoing and affects quality of life. ".repeat(30);
-
-        // The fake will return a valid PDF header for [HEADER_LONG]
-        OpenRouterResponseDto out = svc.redactComplaint("Some long complaint text [HEADER_LONG]", OutputFormat.AUTO, null);
+        ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
+        OpenRouterResponseDto out = svc.redactComplaint("Some long complaint text [HEADER_LONG]", OutputFormat.AUTO, null, identity);
         assertTrue(out.isSuccess(), "Service should report success");
         assertNotNull(out.getPdfData(), "PDF data should be produced for AUTO when AI message is a formal letter");
         String head = new String(out.getPdfData(), 0, Math.min(4, out.getPdfData().length), StandardCharsets.US_ASCII);
@@ -200,7 +306,7 @@ public class OpenRouterServicesTest {
     void redactComplaint_tooLong_rejects() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
         OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30);
-        OpenRouterResponseDto out = svc.redactComplaint("b".repeat(5001), OutputFormat.JSON, null);
+        OpenRouterResponseDto out = svc.redactComplaint("b".repeat(5001), OutputFormat.JSON, null, null);
         assertFalse(out.isSuccess());
         assertEquals(OpenRouterErrorCode.VALIDATION, out.getErrorCode());
         assertTrue(out.getError().contains("maximum allowed length"));
@@ -214,11 +320,44 @@ public class OpenRouterServicesTest {
         String catalanText = "Això és una prova amb ç, à, ü, ·l, ñ, and œ.";
         String aiResponse = "{\"format\": \"pdf\"}\n\n" + catalanText;
         wrapper.overrideNextResponse(aiResponse);
-        OpenRouterResponseDto out = svc.redactComplaint("Prova unicode català [HEADER]", OutputFormat.PDF, null);
+        ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
+        OpenRouterResponseDto out = svc.redactComplaint("Prova unicode català [HEADER]", OutputFormat.PDF, null, identity);
         assertTrue(out.isSuccess());
         assertNotNull(out.getPdfData());
         String head = new String(out.getPdfData(), 0, Math.min(4, out.getPdfData().length), StandardCharsets.US_ASCII);
         assertTrue(head.startsWith("%PDF"), "PDF magic bytes expected at start of file");
-        // Optionally: parse PDF and check text extraction (requires PDFBox in test scope)
+    }
+
+    @Test
+    void redact_verifiesPromptInstructions() {
+        ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
+        // pre-load a fake response so the service call completes successfully
+        wrapper.overrideNextResponse("{\"format\": \"pdf\"}\n\nLetter content...");
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30);
+
+        ComplainantIdentity identity = new ComplainantIdentity("Raul", "Torres", "12345678A");
+        svc.redactComplaint("Fix the street", OutputFormat.PDF, null, identity);
+
+        assertNotNull(wrapper.lastMessages, "Messages must be captured");
+        String prompt = (String) wrapper.lastMessages.getLast().get("content");
+
+        assertTrue(prompt.contains("Use specifically this date:"), "Prompt must contain strict date instruction");
+        assertTrue(prompt.contains("Do NOT use Markdown formatting"), "Prompt must forbid markdown");
+        assertTrue(prompt.contains("Raul Torres"), "Prompt must contain the name");
+        assertTrue(prompt.contains("12345678A"), "Prompt must contain the ID");
+    }
+
+    @Test
+    void redact_incompleteIdentity_butTextHasIdentity_extractsAndSimulatesPdf() {
+        ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30);
+
+        // Identity is null, but text contains the trigger which mocks a successful extraction response
+        OpenRouterResponseDto out = svc.redactComplaint(
+                "My name is Raul Torres, ID 49872354C. [SMART_EXTRACT]", OutputFormat.PDF, null, null);
+
+        assertTrue(out.isSuccess());
+        assertNotNull(out.getPdfData(), "Should produce PDF because AI extracted identity and returned PDF header");
+        assertEquals(OpenRouterErrorCode.NONE, out.getErrorCode());
     }
 }
