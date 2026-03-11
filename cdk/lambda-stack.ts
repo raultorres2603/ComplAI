@@ -104,7 +104,7 @@ export class LambdaStack extends cdk.Stack {
         PROCEDURES_BUCKET: proceduresBucket.bucketName,
         PROCEDURES_KEY: 'procedures.json',
         PROCEDURES_REGION: this.region,
-        OPENROUTER_MODEL: process.env.OPENROUTER_MODEL || 'arcee-ai/trinity-large-preview:free',
+        OPENROUTER_MODEL: process.env.OPENROUTER_MODEL || 'stepfun/step-3.5-flash:free',
         JWT_SECRET: process.env.JWT_SECRET || '',
         // Async redact flow: queue URL for publishing + bucket details for pre-signed URLs.
         REDACT_QUEUE_URL: redactQueue.queueUrl,
@@ -164,7 +164,7 @@ export class LambdaStack extends cdk.Stack {
         OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '',
         OPENROUTER_REQUEST_TIMEOUT_SECONDS: process.env.OPENROUTER_REQUEST_TIMEOUT_SECONDS || '60',
         OPENROUTER_OVERALL_TIMEOUT_SECONDS: process.env.OPENROUTER_OVERALL_TIMEOUT_SECONDS || '60',
-        OPENROUTER_MODEL: process.env.OPENROUTER_MODEL || 'arcee-ai/trinity-large-preview:free',
+        OPENROUTER_MODEL: process.env.OPENROUTER_MODEL || 'stepfun/step-3.5-flash:free',
         COMPLAINTS_BUCKET: complaintsBucket.bucketName,
         COMPLAINTS_REGION: this.region,
         PROCEDURES_BUCKET: proceduresBucket.bucketName,
