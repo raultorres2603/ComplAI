@@ -20,7 +20,12 @@ services:
     environment:
       # Services to activate. s3 for procedures/complaints, sqs for the async redact queue.
       - SERVICES=s3,sqs
-      - DEFAULT_REGION=eu-west-1
+      # DEFAULT_REGION is deprecated in LocalStack v3 and has no effect.
+      # AWS_DEFAULT_REGION is the standard env var that the aws CLI (and therefore awslocal)
+      # reads, so this is what actually controls the region used when init.sh creates queues.
+      # Must match COMPLAINTS_REGION in env.json (used by SqsComplaintPublisher) or LocalStack
+      # v3's region-aware queue lookup will return QueueDoesNotExistException.
+      - AWS_DEFAULT_REGION=eu-west-1
       # Keep LocalStack data across restarts so you do not have to re-seed on
       # every `docker compose up`. Delete .localstack-data/ to reset state.
       - PERSISTENCE=1

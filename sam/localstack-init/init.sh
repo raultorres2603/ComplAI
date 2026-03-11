@@ -67,14 +67,18 @@ if [ -n "${DLQ_URL}" ]; then
     --query 'Attributes.QueueArn' --output text 2>/dev/null || echo "")
 fi
 if [ -n "${DLQ_ARN}" ]; then
-  REDRIVE_POLICY="{\"deadLetterTargetArn\":\"${DLQ_ARN}\",\"maxReceiveCount\":\"3\"}"
+  # AWS CLI v2's shorthand notation cannot embed a JSON blob as an attribute value —
+  # the " characters in the RedrivePolicy JSON cause a parse error.  Switch to JSON
+  # format for --attributes and escape the inner RedrivePolicy string correctly.
+  REDRIVE_POLICY_RAW="{\"deadLetterTargetArn\":\"${DLQ_ARN}\",\"maxReceiveCount\":\"3\"}"
+  REDRIVE_POLICY_ESCAPED=$(printf '%s' "${REDRIVE_POLICY_RAW}" | sed 's/"/\\"/g')
   echo "[init] Creating SQS queue: complai-redact-local (with DLQ redrive)"
   if awslocal sqs get-queue-url --queue-name "complai-redact-local" 2>/dev/null; then
     echo "[init] Queue 'complai-redact-local' already exists — skipping creation."
   else
     awslocal sqs create-queue \
       --queue-name "complai-redact-local" \
-      --attributes "VisibilityTimeout=90,MessageRetentionPeriod=14400,RedrivePolicy=${REDRIVE_POLICY}"
+      --attributes "{\"VisibilityTimeout\":\"90\",\"MessageRetentionPeriod\":\"14400\",\"RedrivePolicy\":\"${REDRIVE_POLICY_ESCAPED}\"}"
     echo "[init] Queue 'complai-redact-local' created."
   fi
 else
