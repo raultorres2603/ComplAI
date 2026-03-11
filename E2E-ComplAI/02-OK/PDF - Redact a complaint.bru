@@ -1,0 +1,39 @@
+meta {
+  name: PDF - Redact a complaint
+  type: http
+  seq: 5
+  tags: [
+    ask
+  ]
+}
+
+post {
+  url: {{complaiPath}}/redact
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "text": "El meu nom es Raúl Torres Alarcón amb DNI 49872354C, tinc un problema greu amb els contenidors ubicats a Apel·les Mestres, no funcionen. M'agradaria fer una queixa formal, si us plau.",
+    "format": "pdf",
+    "conversationId": "{{conversationId}}"
+  }
+}
+
+tests {
+  test("HTTP status is 200", () => {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Content-Type is application/pdf", () => {
+    expect(res.getHeader("content-type")).to.include("application/pdf");
+  });
+  test("Response body is non-empty (PDF bytes received)", () => {
+    expect(res.getBody()).to.not.be.empty;
+  });
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
