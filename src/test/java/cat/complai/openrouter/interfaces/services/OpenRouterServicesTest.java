@@ -28,11 +28,14 @@ public class OpenRouterServicesTest {
     static class ScenarioFakeWrapper extends HttpWrapper {
         // Add a field to allow test to override the next response
         private String nextResponse = null;
+        public List<Map<String, Object>> lastMessages;
+
         public void overrideNextResponse(String response) {
             this.nextResponse = response;
         }
         @Override
         public CompletableFuture<HttpDto> postToOpenRouterAsync(List<Map<String, Object>> messages) {
+            this.lastMessages = messages;
             if (nextResponse != null) {
                 String resp = nextResponse;
                 nextResponse = null;
@@ -318,5 +321,24 @@ public class OpenRouterServicesTest {
         assertNotNull(out.getPdfData());
         String head = new String(out.getPdfData(), 0, Math.min(4, out.getPdfData().length), StandardCharsets.US_ASCII);
         assertTrue(head.startsWith("%PDF"), "PDF magic bytes expected at start of file");
+    }
+
+    @Test
+    void redact_verifiesPromptInstructions() {
+        ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
+        // pre-load a fake response so the service call completes successfully
+        wrapper.overrideNextResponse("{\"format\": \"pdf\"}\n\nLetter content...");
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30);
+
+        ComplainantIdentity identity = new ComplainantIdentity("Raul", "Torres", "12345678A");
+        svc.redactComplaint("Fix the street", OutputFormat.PDF, null, identity);
+
+        assertNotNull(wrapper.lastMessages, "Messages must be captured");
+        String prompt = (String) wrapper.lastMessages.getLast().get("content");
+
+        assertTrue(prompt.contains("Use specifically this date:"), "Prompt must contain strict date instruction");
+        assertTrue(prompt.contains("Do NOT use Markdown formatting"), "Prompt must forbid markdown");
+        assertTrue(prompt.contains("Raul Torres"), "Prompt must contain the name");
+        assertTrue(prompt.contains("12345678A"), "Prompt must contain the ID");
     }
 }

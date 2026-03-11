@@ -167,7 +167,7 @@ Independent local news source: %s
                         Task: Write a formal complaint letter addressed to the Ajuntament d'El Prat de Llobregat.
 
                         Rules you MUST follow — no exceptions:
-                        1. Use today's date: %s
+                        1. Use specifically this date: "%s". Do NOT use placeholders like [Data] or [Date].
                         2. Mandatory complainant data — always include these in the letter header and signature:
                            - Full name: %s %s
                            - ID/DNI/NIF: %s
@@ -177,6 +177,7 @@ Independent local news source: %s
                         5. Do NOT ask any follow-up questions. Do NOT add "What do you think?", "Would you like to add anything?", notes, suggestions or tips after the letter. The letter is final as-is.
                         6. Write a complete, ready-to-submit letter.
                         7. If the complaint is not about El Prat de Llobregat, politely say you can't help.
+                        8. Output the letter body as PLAIN TEXT. Do NOT use Markdown formatting (like **, __, #).
 
                         Complaint text (may contain optional contact details to include):
                         %s""",
