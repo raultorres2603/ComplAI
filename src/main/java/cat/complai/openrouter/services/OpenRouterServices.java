@@ -19,6 +19,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.*;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+
 // PDFBox imports
 
 import cat.complai.openrouter.dto.ComplainantIdentity;
@@ -34,6 +37,9 @@ public class OpenRouterServices implements IOpenRouterService {
     private final HttpWrapper httpWrapper;
     private final Logger logger = Logger.getLogger(OpenRouterServices.class.getName());
     private final Cache<String, List<MessageEntry>> conversationCache;
+    // Stores the original complaint text for conversations where identity was missing on the first
+    // turn. Keyed by conversationId. Cleared once the identity is complete and the letter is drafted.
+    private final Cache<String, String> pendingComplaintCache;
     private final int maxInputLength;
     private final int overallTimeoutSeconds;
 
@@ -55,6 +61,10 @@ public class OpenRouterServices implements IOpenRouterService {
                              @Value("${OPENROUTER_OVERALL_TIMEOUT_SECONDS:60}") int overallTimeoutSeconds) {
         this.httpWrapper = Objects.requireNonNull(httpWrapper, "httpWrapper");
         this.conversationCache = Caffeine.newBuilder()
+                .expireAfterWrite(30, TimeUnit.MINUTES)
+                .maximumSize(10000)
+                .build();
+        this.pendingComplaintCache = Caffeine.newBuilder()
                 .expireAfterWrite(30, TimeUnit.MINUTES)
                 .maximumSize(10000)
                 .build();
@@ -137,34 +147,40 @@ Independent local news source: %s
 
     /**
      * Builds the redact prompt when the complainant's identity is fully known.
-     * The name, surname, and ID number are injected so the AI can address the letter correctly
-     * and include the mandatory identification block required by the Ajuntament.
+     * Today's date is injected so the AI does not leave a placeholder. The prompt
+     * explicitly forbids placeholder fields and follow-up questions: the goal is a
+     * final, complete, ready-to-submit letter with no blanks for the user to fill in.
+     *
+     * Only name, surname and ID are mandatory. Address, phone and other contact details
+     * are optional: the AI must include them if the user mentioned them anywhere in the
+     * complaint text, and silently omit them otherwise — never use a placeholder.
      */
     private String buildRedactPromptWithIdentity(String complaint, ComplainantIdentity identity) {
+        String today = LocalDate.now().format(DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", Locale.forLanguageTag("ca")));
         return String.format(
                 """
-                        IMPORTANT: Your response MUST start with a single-line JSON header on line 1.\s
-                        No text, no markdown, no explanation before it.\s
-                        The header must contain the 'format' field set to "pdf" or "json".\s
-                        Example of a valid first line: {"format": "pdf"}
-                       \s
+                        IMPORTANT: Your response MUST start with a single-line JSON header on line 1.
+                        No text, no markdown, no explanation before it.
+                        The header must be exactly: {"format": "pdf"}
                         After that JSON header, leave one blank line, then write the letter body.
-                       \s
-                        Task: Redact a formal, civil, and concise letter addressed to the City Hall\s
-                        (Ajuntament) of El Prat de Llobregat based on the complaint below.\s
-                        If the complaint is not about El Prat de Llobregat, politely say you can't\s
-                        help with that request.\s
-                        Include a short summary, the specific request or remedy sought, and a polite closing.
-                       \s
-                        The letter must be signed by and attributed to the following person:\s
-                        Full name: %s %s\s
-                        ID/DNI/NIF: %s\s
-                        Include this identification in the appropriate place in the letter (e.g. opening and signature block).
-                       \s
-                        Reminder: first line of your response MUST be the JSON header {"format": "pdf"} or {"format": "json"}.
-                       \s
-                        Complaint text:
+
+                        Task: Write a formal complaint letter addressed to the Ajuntament d'El Prat de Llobregat.
+
+                        Rules you MUST follow — no exceptions:
+                        1. Use today's date: %s
+                        2. Mandatory complainant data — always include these in the letter header and signature:
+                           - Full name: %s %s
+                           - ID/DNI/NIF: %s
+                        3. Optional complainant data — include ONLY if the user mentioned them in the complaint text below. If they are not mentioned, omit them entirely:
+                           - Address, phone number, email, or any other contact detail.
+                        4. NEVER invent data. NEVER use bracket placeholders like [address], [phone], [your data here], or anything similar. If a field is not provided, leave it out completely.
+                        5. Do NOT ask any follow-up questions. Do NOT add "What do you think?", "Would you like to add anything?", notes, suggestions or tips after the letter. The letter is final as-is.
+                        6. Write a complete, ready-to-submit letter.
+                        7. If the complaint is not about El Prat de Llobregat, politely say you can't help.
+
+                        Complaint text (may contain optional contact details to include):
                         %s""",
+                today,
                 identity.name().trim(),
                 identity.surname().trim(),
                 identity.idNumber().trim(),
@@ -173,11 +189,9 @@ Independent local news source: %s
     }
 
     /**
-     * Builds the redact prompt when one or more identity fields are missing.
-     * The AI is instructed to ask the user for the missing data before drafting the letter,
-     * rather than producing an incomplete or anonymous complaint.
-     *
-     * Missing fields are listed explicitly so the AI asks for exactly what is needed.
+     * Builds the redact prompt when one or more mandatory identity fields are missing.
+     * The AI is instructed to ask the user only for the three mandatory fields (name, surname,
+     * ID). Address, phone and other contact details are optional and must never be requested.
      */
     private String buildRedactPromptRequestingIdentity(String complaint, ComplainantIdentity partialIdentity) {
         StringBuilder missing = new StringBuilder();
@@ -192,12 +206,12 @@ Independent local news source: %s
         return String.format(
                 """
                         The user wants to draft a formal complaint addressed to the Ajuntament of El Prat de Llobregat.
-                        However, before you can draft the letter, you need the following mandatory identification\s
-                        information that is required on all official complaints to the Ajuntament:\s
+                        Before drafting the letter, you need the following mandatory identification fields.\s
+                        These are the ONLY fields you must ask for — do NOT ask for address, phone, email or any other details:\s
                        \s
                         %s
-                        Please ask the user politely for this information. Do NOT draft any letter until you\s
-                        have received all three pieces of information: first name, surname, and ID/DNI/NIF.\s
+                        Ask the user politely for this information. Do NOT draft any letter until you\s
+                        have all three: first name, surname, and ID/DNI/NIF.\s
                         Respond in the same language the user is using.\s
                        \s
                         The complaint they want to draft (for context only — do not draft yet):\s
@@ -293,8 +307,32 @@ Independent local news source: %s
         final String userPrompt;
         final boolean identityComplete = identity != null && identity.isComplete();
         if (identityComplete) {
-            userPrompt = buildRedactPromptWithIdentity(complaint, identity);
+            // On the second turn the user's message contains the identity data they typed (e.g.
+            // "My name is Raul Torres, DNI 49872354C, I live at Carrer Major 10"). The original
+            // complaint was saved on the first turn. We combine both so that any optional contact
+            // details the user included in their identity reply (address, phone, etc.) are visible
+            // to the prompt and can be included in the letter.
+            String originalComplaint = (conversationId != null && !conversationId.isBlank())
+                    ? pendingComplaintCache.getIfPresent(conversationId)
+                    : null;
+            if (originalComplaint != null) {
+                pendingComplaintCache.invalidate(conversationId);
+                logger.fine("redactComplaint() using stored original complaint for conversationId=" + conversationId);
+            }
+            // If there is an original complaint, prepend it so the AI has full context.
+            // If identity was supplied on the very first call, use the current message as-is.
+            String complaintForPrompt = (originalComplaint != null)
+                    ? originalComplaint + "\n\n" + complaint
+                    : complaint;
+            userPrompt = buildRedactPromptWithIdentity(complaintForPrompt, identity);
         } else {
+            // Save the original complaint so we can retrieve it when the user provides identity
+            // on a follow-up turn. Without this, the second-turn prompt would use the identity
+            // message as the complaint text, producing an incoherent letter.
+            if (conversationId != null && !conversationId.isBlank()) {
+                pendingComplaintCache.put(conversationId, complaint);
+                logger.fine("redactComplaint() saved original complaint for conversationId=" + conversationId);
+            }
             userPrompt = buildRedactPromptRequestingIdentity(complaint, identity);
         }
 
