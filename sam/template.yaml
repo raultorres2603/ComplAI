@@ -22,6 +22,9 @@ Parameters:
     Type: String
     Description: Base64-encoded HS256 JWT secret (min 32 bytes). Generate with openssl rand -base64 32.
 
+Conditions:
+  IsProduction: !Equals [!Ref Environment, production]
+
 Globals:
   Function:
     Timeout: 60
@@ -47,6 +50,43 @@ Resources:
       Description: !Sub IAM role for ComplAI Lambda (${Environment}) with least privilege
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  ComplAILogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      # Use !Sub /aws/lambda/${ComplAIFunction} to ensure logs go to the function's actual log group
+      LogGroupName: !Sub /aws/lambda/${ComplAIFunction}
+      RetentionInDays: !If [IsProduction, 90, 7]
+
+  ComplAIErrorMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ComplAILogGroup
+      FilterPattern: "{ $.errorCode = * }"
+      MetricTransformations:
+        - MetricNamespace: !Sub ComplAI/${Environment}
+          MetricName: AuditErrorCount
+          MetricValue: 1
+          DefaultValue: 0
+          Dimensions:
+            - Key: endpoint
+              Value: $.endpoint
+            - Key: errorCode
+              Value: $.errorCode
+
+  ComplAILatencyMetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Ref ComplAILogGroup
+      FilterPattern: "{ $.latencyMs = * }"
+      MetricTransformations:
+        - MetricNamespace: !Sub ComplAI/${Environment}
+          MetricName: AuditLatencyMs
+          MetricValue: $.latencyMs
+          DefaultValue: 0
+          Dimensions:
+            - Key: endpoint
+              Value: $.endpoint
 
   ProceduresBucket:
     Type: AWS::S3::Bucket
