@@ -34,6 +34,7 @@ Globals:
       Variables:
         OPENROUTER_API_KEY: !Ref OpenRouterApiKey
         AWS_ENDPOINT_URL: "http://localhost:4566"
+        COMPLAINTS_REGION: !Ref LambdaRegion
 
 Resources:
   ComplAILambdaRole:
@@ -51,11 +52,31 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
 
+  ComplAIWorkerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ComplAIWorkerRole-${Environment}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Description: !Sub IAM role for ComplAI worker Lambda (${Environment})
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
   ComplAILogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      # Use !Sub /aws/lambda/${ComplAIFunction} to ensure logs go to the function's actual log group
       LogGroupName: !Sub /aws/lambda/${ComplAIFunction}
+      RetentionInDays: !If [IsProduction, 90, 7]
+
+  ComplAIWorkerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${ComplAIRedactorFunction}
       RetentionInDays: !If [IsProduction, 90, 7]
 
   ComplAIErrorMetricFilter:
@@ -67,7 +88,6 @@ Resources:
         - MetricNamespace: !Sub ComplAI/${Environment}
           MetricName: AuditErrorCount
           MetricValue: 1
-          DefaultValue: 0
           Dimensions:
             - Key: endpoint
               Value: $.endpoint
@@ -83,7 +103,6 @@ Resources:
         - MetricNamespace: !Sub ComplAI/${Environment}
           MetricName: AuditLatencyMs
           MetricValue: $.latencyMs
-          DefaultValue: 0
           Dimensions:
             - Key: endpoint
               Value: $.endpoint
@@ -107,6 +126,40 @@ Resources:
             ExpirationInDays: 365
       DeletionPolicy: Retain
 
+  ComplaintsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub complai-complaints-${Environment}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Status: Enabled
+            ExpirationInDays: 30
+
+  RedactDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub complai-redact-dlq-${Environment}
+      MessageRetentionPeriod: 604800  # 7 days
+
+  RedactQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub complai-redact-${Environment}
+      VisibilityTimeout: 90
+      MessageRetentionPeriod: 14400  # 4 hours
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt RedactDLQ.Arn
+        maxReceiveCount: 3
+
   ComplAIFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -127,6 +180,9 @@ Resources:
           OPENROUTER_OVERALL_TIMEOUT_SECONDS: "60"
           OPENROUTER_MODEL: google/gemma-3-27b-it:free
           JWT_SECRET: !Ref JwtSecret
+          REDACT_QUEUE_URL: !Ref RedactQueue
+          COMPLAINTS_BUCKET: !Ref ComplaintsBucket
+          COMPLAINTS_REGION: !Ref LambdaRegion
       Events:
         ProxyRoot:
           Type: HttpApi
@@ -139,6 +195,36 @@ Resources:
             Path: /{proxy+}
             Method: ANY
 
+  ComplAIRedactorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../build/libs/complai-all.jar
+      Handler: cat.complai.worker.RedactWorkerHandler::handleRequest
+      Runtime: java21
+      MemorySize: 768
+      Timeout: 60
+      Role: !GetAtt ComplAIWorkerRole.Arn
+      Environment:
+        Variables:
+          OPENROUTER_API_KEY: !Ref OpenRouterApiKey
+          OPENROUTER_REQUEST_TIMEOUT_SECONDS: "60"
+          OPENROUTER_OVERALL_TIMEOUT_SECONDS: "60"
+          OPENROUTER_MODEL: google/gemma-3-27b-it:free
+          COMPLAINTS_BUCKET: !Ref ComplaintsBucket
+          COMPLAINTS_REGION: !Ref LambdaRegion
+          PROCEDURES_BUCKET: !Ref ProceduresBucket
+          PROCEDURES_KEY: procedures.json
+          PROCEDURES_REGION: !Ref LambdaRegion
+          AWS_ENDPOINT_URL: "http://host.docker.internal:4566"
+      Events:
+        SQSTrigger:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt RedactQueue.Arn
+            BatchSize: 1
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+
 Outputs:
   ComplAILambdaFunctionName:
     Description: Name of the deployed ComplAI Lambda function
@@ -146,3 +232,9 @@ Outputs:
   ComplAILambdaArn:
     Description: ARN of the deployed ComplAI Lambda function
     Value: !GetAtt ComplAIFunction.Arn
+  ComplAIRedactQueueUrl:
+    Description: SQS queue URL for the async redact flow
+    Value: !Ref RedactQueue
+  ComplAIComplaintsBucketName:
+    Description: S3 bucket for generated complaint PDFs
+    Value: !Ref ComplaintsBucket

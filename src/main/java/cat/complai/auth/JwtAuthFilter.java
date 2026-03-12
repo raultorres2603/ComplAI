@@ -1,6 +1,7 @@
 package cat.complai.auth;
 
 import cat.complai.openrouter.dto.OpenRouterErrorCode;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -27,6 +28,10 @@ import java.util.logging.Logger;
  * The exclusion list is explicit here rather than in configuration so the security surface
  * is obvious and auditable in one place.
  */
+// Only active when jwt.secret is present — mirrors the guard on JwtValidator.
+// The SQS worker Lambda has no HTTP server and no JWT_SECRET; loading this filter
+// there would cause a missing-bean error when injecting JwtValidator.
+@Requires(property = "jwt.secret")
 @ServerFilter("/**")
 public class JwtAuthFilter {
 

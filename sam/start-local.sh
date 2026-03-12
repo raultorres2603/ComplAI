@@ -16,7 +16,12 @@
 #   ./start-local.sh
 #
 # The SAM local API will listen on http://127.0.0.1:3000 by default.
-# Press Ctrl-C to stop SAM; then run `docker compose down` to stop LocalStack.
+# A background SQS worker poller will invoke ComplAIRedactorFunction via
+# `sam local invoke` whenever a message arrives on complai-redact-local,
+# mirroring the Lambda/SQS integration that runs automatically in real AWS.
+#
+# Press Ctrl-C to stop both processes.
+# LocalStack keeps running — use `docker compose down` to shut it down.
 
 set -euo pipefail
 
@@ -80,11 +85,48 @@ done
 echo "[start-local] LocalStack is healthy."
 
 # ---------------------------------------------------------------------------
-# 3. Start SAM CLI local API.
-#    --env-vars  injects environment variables (including OPENROUTER_API_KEY)
-#                from env.json — edit that file before running.
-#    --warm-containers EAGER  keeps the JVM container alive between requests
-#                             so cold-start latency only hits the first call.
+# 2b. Wait for the init script to have created the SQS queue.
+#     LocalStack's health check passes as soon as the HTTP gateway is up,
+#     which is before the ready.d init scripts finish executing.  If SAM
+#     receives a request before the queue exists we get QueueDoesNotExistException.
+#     We poll via docker exec so we don't need the aws CLI on the host.
+# ---------------------------------------------------------------------------
+echo "[start-local] Waiting for SQS queue 'complai-redact-local' to be ready..."
+QUEUE_RETRIES=20
+until docker exec complai-localstack \
+    awslocal sqs get-queue-url --queue-name complai-redact-local \
+    --output text 2>/dev/null | grep -q "complai-redact-local"; do
+  QUEUE_RETRIES=$((QUEUE_RETRIES - 1))
+  if [ "${QUEUE_RETRIES}" -le 0 ]; then
+    echo "[start-local] ERROR: SQS queue 'complai-redact-local' was not created in time." >&2
+    echo "[start-local] Check LocalStack init logs:" >&2
+    echo "[start-local]   docker compose -f ${SCRIPT_DIR}/docker-compose.yml logs localstack" >&2
+    exit 1
+  fi
+  sleep 2
+done
+echo "[start-local] SQS queue is ready."
+
+# ---------------------------------------------------------------------------
+# 3. SQS worker poller.
+#
+#    sam local start-api handles only HTTP/API Gateway events — it never polls
+#    SQS.  sqs_worker_poller.py closes that gap by long-polling
+#    complai-redact-local via boto3 (directly against LocalStack) and invoking
+#    ComplAIRedactorFunction via `sam local invoke` for each message, mirroring
+#    the Lambda/SQS integration that runs automatically in real AWS.
+#
+#    A standalone Python script is used instead of an inline bash function
+#    because a bash background subshell inherits set -euo pipefail and any
+#    subtle failure (empty receive-message response, docker exec quirk) kills
+#    the subshell silently.  Python handles errors explicitly and keeps running.
+#
+#    --warm-containers LAZY is used for the API below so that EAGER mode does
+#    not pre-start the worker container and conflict with sam local invoke.
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# 4. Start the API Lambda and the SQS worker poller as background processes.
 # ---------------------------------------------------------------------------
 echo "[start-local] Starting SAM local API on http://127.0.0.1:3000 ..."
 echo "[start-local] Make sure env.json contains your OPENROUTER_API_KEY."
@@ -93,7 +135,27 @@ echo ""
 sam local start-api \
   --template "${SCRIPT_DIR}/template.yaml" \
   --env-vars "${SCRIPT_DIR}/env.json" \
-  --warm-containers EAGER \
+  --warm-containers LAZY \
   --host 127.0.0.1 \
-  --port 3000
+  --port 3000 &
+SAM_API_PID=$!
 
+python3 "${SCRIPT_DIR}/sqs_worker_poller.py" \
+  "${SCRIPT_DIR}/template.yaml" \
+  "${SCRIPT_DIR}/env.json" &
+SQS_WORKER_PID=$!
+
+# ---------------------------------------------------------------------------
+# 5. Clean up both background processes on Ctrl-C / SIGTERM.
+# ---------------------------------------------------------------------------
+cleanup() {
+  echo ""
+  echo "[start-local] Shutting down SAM API and SQS worker poller..."
+  kill "${SAM_API_PID}" "${SQS_WORKER_PID}" 2>/dev/null || true
+  wait "${SAM_API_PID}" "${SQS_WORKER_PID}" 2>/dev/null || true
+  echo "[start-local] Stopped. LocalStack is still running — run 'docker compose down' to stop it."
+  exit 0
+}
+trap cleanup INT TERM
+
+wait "${SAM_API_PID}"

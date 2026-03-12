@@ -34,8 +34,9 @@ dependencies {
 
     // Jsoup for HTML parsing
     implementation("org.jsoup:jsoup:1.17.2")
-    // AWS SDK for S3 integration
+    // AWS SDK for S3 and SQS integration
     implementation("software.amazon.awssdk:s3:2.25.18")
+    implementation("software.amazon.awssdk:sqs:2.25.18")
 
     // JWT validation — HS256 Bearer token support (JwtValidator, TokenGenerator)
     // jjwt-api is the compile-time dependency; impl and jackson are runtime-only.
