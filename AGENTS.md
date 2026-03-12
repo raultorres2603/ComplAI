@@ -114,7 +114,9 @@ The `pdfUrl` in the `202` response is a pre-signed S3 GET URL (24h expiry) gener
     - **Exclusions:** `GET /` and `GET /health` bypass JWT validation — this is explicit in `JwtAuthFilter.isExcluded()`, not in configuration.
     - **Secrets:** `JWT_SECRET` and `OPENROUTER_API_KEY` are injected via environment variables (Lambda config).
 - **PDF Generation:** Use `PdfGenerator` (Apache PDFBox). **Crucial:** `application.properties` registers `application/pdf` as a binary type to ensure correct base64 encoding by the Lambda runtime.
+- **PDF Unicode Font Embedding:** PDF generation now embeds `NotoSans-Regular.ttf` (see `src/main/resources/`). This ensures full Unicode coverage for Catalan, Spanish, and English characters in complaint letters. The previous Helvetica limitation is resolved.
 - **Async boundary:** The SQS message schema (`RedactSqsMessage`) is the contract between the API Lambda and the worker Lambda. Treat it as a versioned API — changes must be backwards-compatible or deployed atomically.
+- **Input Length Validation:** All user input is limited to 5000 characters (`complai.input.max-length-chars` in `application.properties`). Inputs exceeding this limit are rejected at the service boundary with a validation error.
 
 ## 4. Key Files & Directories
 
@@ -194,6 +196,8 @@ The `pdfUrl` in the `202` response is a pre-signed S3 GET URL (24h expiry) gener
 ## 8. Common Pitfalls
 
 - **Binary Response:** If PDFs return blank/corrupted on the synchronous path, check `micronaut.function.binary-types` in `application.properties`.
+- **PDF Unicode Support:** PDF output now uses an embedded Unicode font (`NotoSans-Regular.ttf`). If you see missing or garbled characters, verify the font file is present in `src/main/resources/` and not corrupted.
+- **Input Length Exceeded:** Requests with input text longer than 5000 characters are rejected with a validation error. This is enforced by the service layer and configured in `application.properties`.
 - **Cold Starts:** `snapstart` is enabled in `build.gradle` (CRaC) to mitigate this. Applies to both Lambdas.
 - **Memory:** Both Lambdas are configured with 768MB. Lucene index and PDFBox both hold data in-heap; stay within this budget.
 - **SQS Visibility Timeout:** The worker Lambda timeout (60s) must always be ≤ the queue's visibility timeout (90s). If you increase the Lambda timeout, increase the queue's visibility timeout first.
