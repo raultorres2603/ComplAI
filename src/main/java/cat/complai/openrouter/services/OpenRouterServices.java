@@ -24,7 +24,6 @@ import java.util.*;
 import cat.complai.openrouter.dto.ComplainantIdentity;
 import cat.complai.openrouter.dto.OutputFormat;
 import cat.complai.openrouter.helpers.AiParsed;
-import cat.complai.openrouter.helpers.PdfGenerator;
 
 @Singleton
 public class OpenRouterServices implements IOpenRouterService {
@@ -191,59 +190,27 @@ public class OpenRouterServices implements IOpenRouterService {
         }
 
         AiParsed parsed = AiParsed.parseAiFormatHeader(aiDto.getMessage());
-        OutputFormat effectiveFormat = format == null ? OutputFormat.AUTO : format;
 
-        if (effectiveFormat == OutputFormat.AUTO && parsed.format() != null && parsed.format() != OutputFormat.AUTO) {
-            effectiveFormat = parsed.format();
-        }
-
-        // When identity is incomplete the AI response is a question asking the user for missing
-        // fields. Return it as a JSON success so the client can display the question.
-        // Exception: if effectiveFormat is PDF (AI extracted identity and promoted format), fall
-        // through to PDF generation.
-        if (!identityComplete && effectiveFormat != OutputFormat.PDF) {
+        // Identity incomplete: the AI is asking the user for missing fields.
+        // Return its question as text so the client can display it.
+        if (!identityComplete) {
             return new OpenRouterResponseDto(true, parsed.message(), null, aiDto.getStatusCode(), OpenRouterErrorCode.NONE);
         }
 
-        // Graceful fallback when the AI omits the required JSON header.
+        // Graceful fallback when the AI omits the required JSON header: return the raw message.
+        // PDF generation has been removed from the sync path — PDFs are always produced by the
+        // async worker Lambda.
         if (parsed.format() == null || parsed.format() == OutputFormat.AUTO) {
             String rawPreview = aiDto.getMessage() == null ? "<null>"
                     : (aiDto.getMessage().length() > 200 ? aiDto.getMessage().substring(0, 200) + "..." : aiDto.getMessage());
             logger.warning("AI response missing required JSON header; raw response prefix: " + rawPreview);
-
-            if (effectiveFormat == OutputFormat.PDF) {
-                String letterBody = aiDto.getMessage() == null ? "" : aiDto.getMessage();
-                if (letterBody.isBlank()) {
-                    return new OpenRouterResponseDto(false, null, "AI returned an empty response; cannot produce PDF.", aiDto.getStatusCode(), OpenRouterErrorCode.UPSTREAM);
-                }
-                try {
-                    byte[] pdf = PdfGenerator.generatePdf(letterBody);
-                    return new OpenRouterResponseDto(true, null, null, null, OpenRouterErrorCode.NONE, pdf);
-                } catch (Exception e) {
-                    logger.log(Level.SEVERE, "PDF generation failed (headerless fallback)", e);
-                    return new OpenRouterResponseDto(false, null, "PDF generation failed: " + e.getMessage(), null, OpenRouterErrorCode.INTERNAL);
-                }
-            }
             return new OpenRouterResponseDto(true, aiDto.getMessage(), null, aiDto.getStatusCode(), OpenRouterErrorCode.NONE);
         }
 
-        if (effectiveFormat != OutputFormat.PDF) {
-            return new OpenRouterResponseDto(true, parsed.message(), null, aiDto.getStatusCode(), OpenRouterErrorCode.NONE);
-        }
-
-        if (parsed.message().isBlank()) {
-            logger.warning("AI emitted format header but letter body is empty. Original response: " + aiDto.getMessage());
-            return new OpenRouterResponseDto(false, null, "AI returned a format header but no letter body.", aiDto.getStatusCode(), OpenRouterErrorCode.UPSTREAM);
-        }
-
-        try {
-            byte[] pdf = PdfGenerator.generatePdf(parsed.message());
-            return new OpenRouterResponseDto(true, null, null, null, OpenRouterErrorCode.NONE, pdf);
-        } catch (Exception e) {
-            logger.log(Level.SEVERE, "PDF generation failed", e);
-            return new OpenRouterResponseDto(false, null, "PDF generation failed: " + e.getMessage(), null, OpenRouterErrorCode.INTERNAL);
-        }
+        // Header present: return the extracted letter body as text.
+        return new OpenRouterResponseDto(true, parsed.message(), null, aiDto.getStatusCode(), OpenRouterErrorCode.NONE);
     }
+
 
 
     /**

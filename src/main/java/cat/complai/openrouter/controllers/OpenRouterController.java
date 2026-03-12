@@ -105,13 +105,6 @@ public class OpenRouterController {
                     dto != null ? dto.getErrorCode().getCode() : -1, latency,
                     format != null ? format.name() : null, null);
 
-            if (dto != null && dto.isSuccess() && dto.getPdfData() != null) {
-                byte[] pdf = dto.getPdfData();
-                return HttpResponse.ok(pdf)
-                        .contentType(MediaType.APPLICATION_PDF)
-                        .header(io.micronaut.http.HttpHeaders.CONTENT_LENGTH, String.valueOf(pdf.length))
-                        .header(io.micronaut.http.HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"complaint.pdf\"");
-            }
             return errorToHttpResponse(dto, "redact");
 
         } catch (Exception e) {

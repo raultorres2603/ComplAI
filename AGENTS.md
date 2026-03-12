@@ -13,7 +13,7 @@ ComplAI is a **Java 21 Micronaut application** designed to run as **AWS Lambda f
     - Managing conversation history (cached in Caffeine).
     - Retrieving context via RAG (`ProcedureRagHelper`).
     - Communicating with the LLM via OpenRouter (`HttpWrapper`).
-    - Generating PDF complaint letters synchronously (`PdfGenerator`) — used only for the JSON-format path.
+    - Always returns text — never produces PDF bytes. PDF generation is exclusively the worker Lambda's responsibility.
 - **Async Complaint Flow:**
     - `cat.complai.sqs.SqsComplaintPublisher` — publishes `RedactSqsMessage` to SQS when a complete identity is provided with a PDF request. The controller returns `202 Accepted` immediately with a pre-signed `pdfUrl`.
     - `cat.complai.worker.RedactWorkerHandler` — SQS-triggered Lambda handler. Deserialises the message, calls the AI via `ComplaintLetterGenerator`, generates the PDF with `PdfGenerator`, and uploads it to S3 via `S3PdfUploader`.
@@ -40,11 +40,11 @@ ComplAI is a **Java 21 Micronaut application** designed to run as **AWS Lambda f
 `Prat Espais` widget → `POST /complai/ask` (JSON) → `OpenRouterServices` → RAG context + conversation history → OpenRouter API → `200 OK` JSON.
 
 #### 2. Complaint Redact — Synchronous Path
-Used when identity is **incomplete** (AI must ask for missing fields) or format is `json`.
+Used when identity is **incomplete** (AI must ask for missing fields) or format is `json`. Always returns text — never produces PDF bytes.
 
 `POST /complai/redact` → controller validates → `OpenRouterServices.redactComplaint()` → AI prompt → `200 OK` (JSON text or `application/pdf` bytes inline).
 
-#### 3. Complaint Redact — Async Path *(new)*
+#### 3. Complaint Redact — Async Path
 Used when identity is **complete** (all three fields present) and format is `pdf` or `auto`.
 
 ```
