@@ -21,6 +21,17 @@ ComplAI is a **Java 21 Micronaut application** designed to run as **AWS Lambda f
     - `cat.complai.openrouter.helpers.RedactPromptBuilder` — stateless helper that builds the AI prompt for complaint letter generation. Used by both the synchronous service path and the worker Lambda.
     - `cat.complai.s3.S3PdfUploader` — wraps `S3Client`. Uploads PDFs and generates pre-signed GET URLs (24h expiry).
 - **Data Access (RAG):** `ProcedureRagHelper` uses **Apache Lucene** in-memory to index and search municipal procedures loaded from `src/main/resources/procedures.json`.
+- **HTTP / Health:**
+    - `cat.complai.home.HomeController` — `GET /` returns a `HomeDto` welcome response. No JWT required.
+    - `cat.complai.home.HealthController` — `GET /health` returns a `HealthDto` with `status`, `version`, and `checks` (e.g. `openRouterApiKeyConfigured`). No JWT required.
+- **HTTP Client:** `cat.complai.http.HttpWrapper` — `@Singleton` wrapper around Java's `HttpClient`. Calls OpenRouter. Holds the API key and model config. Has a protected no-arg constructor so tests can subclass it without DI.
+- **Service Interface:** `cat.complai.openrouter.interfaces.IOpenRouterService` — the controller depends on this interface, not `OpenRouterServices` directly. Declares `ask`, `validateRedactInput`, and `redactComplaint`.
+- **AI Response Parsing:** `cat.complai.openrouter.helpers.AiParsed` — `record` that parses AI reply format headers (3 shapes: clean first-line JSON, markdown-fenced JSON, inline `body` key). Used by `OpenRouterServices`.
+- **Audit Logging:** `cat.complai.openrouter.helpers.AuditLogger` — writes one structured JSON log line per request (`ts`, `endpoint`, `requestHash`, `errorCode`, `latencyMs`, `outputFormat`, `language`). Never logs raw text or AI responses. CloudWatch metric filters in CDK/SAM parse this format.
+- **Operator Tools (not deployed endpoints):**
+    - `cat.complai.auth.TokenGenerator` — CLI that mints HS256 JWT tokens. Run with `java -cp complai-all.jar cat.complai.auth.TokenGenerator <subject> <expiry-days>`. Requires `JWT_SECRET` env var.
+    - `cat.complai.pratespais.PratEspaisScraper` — CLI that crawls `tramits.pratespais.com` and uploads a fresh `procedures.json` to S3. Requires `PROCEDURES_BUCKET` env var. Run standalone; not part of the Lambda boot path.
+    - `cat.complai.pratespais.ProcedureIndexLoader` — downloads `procedures.json` from S3 to a temp file. Used by `ProcedureRagHelper` at Lambda start.
 - **Infrastructure:** AWS CDK (`cdk/`) defines the infrastructure in three stacks. AWS SAM (`sam/`) is used for local emulation.
 
 ### Key Data Flows
@@ -56,13 +67,25 @@ The `pdfUrl` in the `202` response is a pre-signed S3 GET URL (24h expiry) gener
 ### Build & Test
 - **Build Fat JAR:** `./gradlew clean shadowJar` (Creates `build/libs/complai-all.jar`).
 - **Run Unit Tests:** `./gradlew test`.
+- **Run CI Tests:** `./gradlew ciTest` — explicit CI task with detailed logging; fails the build on any test failure.
 - **Local Execution (SAM):**
     - Ensure Docker is running.
-    - Run `./sam/start-local.sh` (Builds and starts the Lambda locally on port 3000).
+    - Run `./sam/start-local.sh` (Builds shadow JAR, starts LocalStack via `docker compose`, starts the SAM API on port 3000, and launches `sam/sqs_worker_poller.py` in the background to poll the local SQS queue and invoke `ComplAIRedactorFunction` via `sam local invoke`).
     - LocalStack (started by `docker compose up -d` in `sam/`) provides S3 and SQS locally.
     - Test via `curl` or Bruno (see below).
 - **E2E Testing:** Use **Bruno** locally. Collection located in `E2E-ComplAI/`.
     - Key requests: `E2E-ComplAI/02-OK/Ask to ComplAI.bru`, `E2E-ComplAI/02-OK/PDF - Redact a complaint.bru`.
+- **Mint a JWT token (local/CI):**
+  ```bash
+  JWT_SECRET=$(openssl rand -base64 32) \
+  java -cp build/libs/complai-all.jar cat.complai.auth.TokenGenerator citizen-app 30
+  ```
+- **Refresh `procedures.json` from Prat Espais:**
+  ```bash
+  PROCEDURES_BUCKET=complai-procedures-development \
+  java -cp build/libs/complai-all.jar cat.complai.pratespais.PratEspaisScraper
+  ```
+  This crawls `tramits.pratespais.com`, writes `procedures.json`, and uploads it to S3.
 
 ### Deployment
 - **Infrastructure Code:** TypeScript CDK in `cdk/`.
@@ -79,10 +102,16 @@ The `pdfUrl` in the `202` response is a pre-signed S3 GET URL (24h expiry) gener
 
 - **Framework:** **Micronaut 4.x**. Heavy use of `@Singleton`, `@Controller`, `@Inject`.
 - **Language:** **Java 21**. Use `record` for DTOs and immutable data carriers.
-- **DTOs:** Located in `*.dto` packages. Use strict typing.
-- **Error Handling:** Use `OpenRouterErrorCode` enum to map specific error conditions to standardised error codes and HTTP statuses.
+- **DTOs:** Located in `*.dto` packages. Use strict typing. Request DTOs for the controller (`AskRequest`, `RedactRequest`) live in `openrouter.controllers.dto`; shared domain DTOs (`OutputFormat`, `ComplainantIdentity`, `OpenRouterErrorCode`) live in `openrouter.dto`.
+- **Service Interface:** Always depend on `IOpenRouterService`, never on `OpenRouterServices` directly. The interface declares `ask`, `validateRedactInput`, and `redactComplaint`.
+- **Error Handling:** Use `OpenRouterErrorCode` enum to map specific error conditions to standardised error codes and HTTP statuses. Codes: `NONE(0)`, `VALIDATION(1)`, `REFUSAL(2)`, `UPSTREAM(3)`, `TIMEOUT(4)`, `INTERNAL(5)`, `UNAUTHORIZED(6)`. `UNAUTHORIZED` is emitted by `JwtAuthFilter` before the controller is reached — the controller switch does not need a case for it.
+- **Audit Logging:** Every `/ask` and `/redact` request must call `AuditLogger.log(...)` exactly once. The logger writes a single JSON line with `ts`, `endpoint`, `requestHash`, `errorCode`, `latencyMs`, `outputFormat`, `language`. **Never log raw input text, AI responses, or any PII** — use `AuditLogger.hashText(text)` for the `requestHash` field. CloudWatch metric filters in CDK/SAM parse the `errorCode` and `latencyMs` fields by name — do not rename them.
+- **OutputFormat:** `cat.complai.openrouter.dto.OutputFormat` enum (`JSON | PDF | AUTO`). `OutputFormat.fromString()` returns `null` for unrecognised values (intentional sentinel — the controller rejects them with 400). `isSupportedClientFormat(f)` validates at the HTTP boundary.
+- **ComplainantIdentity:** `cat.complai.openrouter.dto.ComplainantIdentity` record. Use `isComplete()` to gate the async path and `isPartiallyProvided()` to distinguish "nothing provided" from "partial". Never pass raw name/surname/id strings through service boundaries — always use this record.
+- **Pending complaint cache:** `OpenRouterServices` keeps a `pendingComplaintCache` (Caffeine, 30-min TTL) keyed by `conversationId`. It stores the original complaint text when identity is incomplete on the first turn so it can be resumed when the user provides identity on a follow-up turn.
 - **Security:**
     - **JWT:** Requests must have a valid Bearer token (HS256). Validated by `JwtAuthFilter`.
+    - **Exclusions:** `GET /` and `GET /health` bypass JWT validation — this is explicit in `JwtAuthFilter.isExcluded()`, not in configuration.
     - **Secrets:** `JWT_SECRET` and `OPENROUTER_API_KEY` are injected via environment variables (Lambda config).
 - **PDF Generation:** Use `PdfGenerator` (Apache PDFBox). **Crucial:** `application.properties` registers `application/pdf` as a binary type to ensure correct base64 encoding by the Lambda runtime.
 - **Async boundary:** The SQS message schema (`RedactSqsMessage`) is the contract between the API Lambda and the worker Lambda. Treat it as a versioned API — changes must be backwards-compatible or deployed atomically.
@@ -91,19 +120,29 @@ The `pdfUrl` in the `202` response is a pre-signed S3 GET URL (24h expiry) gener
 
 - `src/main/resources/procedures.json`: The source of truth for RAG data.
 - `src/main/java/cat/complai/openrouter/services/OpenRouterServices.java`: Synchronous ask/redact orchestration.
+- `src/main/java/cat/complai/openrouter/interfaces/IOpenRouterService.java`: Service interface — depend on this, not the concrete class.
 - `src/main/java/cat/complai/openrouter/helpers/RedactPromptBuilder.java`: Shared AI prompt builder (used by sync service and async worker).
+- `src/main/java/cat/complai/openrouter/helpers/AiParsed.java`: Parses AI reply format headers (3 shapes).
+- `src/main/java/cat/complai/openrouter/helpers/AuditLogger.java`: Privacy-preserving structured audit log writer.
 - `src/main/java/cat/complai/openrouter/helpers/PdfGenerator.java`: PDF creation logic.
+- `src/main/java/cat/complai/http/HttpWrapper.java`: OpenRouter HTTP client (`@Singleton`).
+- `src/main/java/cat/complai/home/HealthController.java`: `GET /health` — no JWT required.
+- `src/main/java/cat/complai/auth/JwtAuthFilter.java`: JWT filter; explicit exclusion list for `/` and `/health`.
+- `src/main/java/cat/complai/auth/TokenGenerator.java`: Offline CLI to mint JWT tokens.
 - `src/main/java/cat/complai/sqs/SqsComplaintPublisher.java`: Publishes `RedactSqsMessage` to SQS.
 - `src/main/java/cat/complai/sqs/dto/RedactSqsMessage.java`: SQS message contract between API Lambda and worker Lambda.
 - `src/main/java/cat/complai/worker/RedactWorkerHandler.java`: SQS-triggered worker Lambda entry point.
 - `src/main/java/cat/complai/worker/ComplaintLetterGenerator.java`: AI-call + PDF-render orchestration for the worker.
 - `src/main/java/cat/complai/s3/S3PdfUploader.java`: Uploads PDFs to S3 and generates pre-signed GET URLs.
+- `src/main/java/cat/complai/pratespais/PratEspaisScraper.java`: Standalone CLI to refresh `procedures.json` from `tramits.pratespais.com`.
+- `src/main/java/cat/complai/pratespais/ProcedureIndexLoader.java`: Downloads `procedures.json` from S3 at Lambda start.
 - `cdk/deployment-environment.ts`: Shared `DeploymentEnvironment` type (`'development' | 'production'`).
 - `cdk/storage-stack.ts`: S3 bucket definitions (procedures + complaints).
 - `cdk/queue-stack.ts`: SQS queue + DLQ definitions.
 - `cdk/lambda-stack.ts`: API Lambda + Worker Lambda + IAM + log groups + metric filters.
 - `sam/template.yaml`: SAM definition for local testing (mirrors CDK infrastructure).
 - `sam/docker-compose.yml`: LocalStack services (S3 + SQS) for local development.
+- `sam/sqs_worker_poller.py`: Polls local SQS and invokes `ComplAIRedactorFunction` via `sam local invoke`. Started by `start-local.sh`.
 - `sam/localstack-init/init.sh`: Creates local S3 buckets and SQS queues on first LocalStack startup.
 
 ## 5. External Integrations
@@ -136,6 +175,8 @@ The `pdfUrl` in the `202` response is a pre-signed S3 GET URL (24h expiry) gener
 
 | Endpoint | Method | Request | Response | Notes |
 |---|---|---|---|---|
+| `/` | GET | — | `200` `HomeDto` | No JWT required |
+| `/health` | GET | — | `200` `HealthDto` (`status`, `version`, `checks`) | No JWT required |
 | `/complai/ask` | POST | `{ text, conversationId }` | `200` `OpenRouterPublicDto` | Always synchronous |
 | `/complai/redact` | POST | `{ text, format, conversationId, requesterName?, requesterSurname?, requesterIdNumber? }` | `202` `RedactAcceptedDto` **or** `200` JSON/PDF | 202 when identity complete + format≠json; 200 otherwise |
 
@@ -158,3 +199,5 @@ The `pdfUrl` in the `202` response is a pre-signed S3 GET URL (24h expiry) gener
 - **SQS Visibility Timeout:** The worker Lambda timeout (60s) must always be ≤ the queue's visibility timeout (90s). If you increase the Lambda timeout, increase the queue's visibility timeout first.
 - **Pre-signed URL expiry:** The `pdfUrl` in a `202` response expires in 24h. If a client stores the URL and retrieves it later, it may receive `403 Forbidden`. Generate a fresh URL via a new request if needed.
 - **Cross-stack references:** CDK generates CloudFormation Exports/Imports when the `LambdaStack` references resources from `StorageStack` or `QueueStack`. Never delete `StorageStack` or `QueueStack` while `LambdaStack` is deployed — CloudFormation will refuse to delete an exported value that is still in use.
+- **UNAUTHORIZED errorCode:** `OpenRouterErrorCode.UNAUTHORIZED(6)` is set by `JwtAuthFilter` before the controller runs. The controller's `errorToHttpResponse` switch has no case for it by design — do not add one.
+- **Audit log field names are load-bearing:** `AuditLogger` writes `errorCode`, `latencyMs`, and `endpoint` as JSON field names. CloudWatch metric filters in both CDK (`lambda-stack.ts`) and SAM (`template.yaml`) match these exact names. Renaming them will silently break all CloudWatch metrics.
