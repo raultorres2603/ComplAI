@@ -130,7 +130,7 @@ export class LambdaStack extends cdk.Stack {
     // -------------------------------------------------------------------------
     const workerRole = new iam.Role(this, `ComplAIWorkerRole-${environment}`, {
       assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
-      description: `IAM role for ComplAI worker Lambda (${environment}) — SQS consume + S3 write`,
+      description: `IAM role for ComplAI worker Lambda (${environment}) - SQS consume + S3 write`,
     });
     workerRole.addManagedPolicy(
       iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
