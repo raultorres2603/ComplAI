@@ -88,7 +88,6 @@ Resources:
         - MetricNamespace: !Sub ComplAI/${Environment}
           MetricName: AuditErrorCount
           MetricValue: 1
-          DefaultValue: 0
           Dimensions:
             - Key: endpoint
               Value: $.endpoint
@@ -104,7 +103,6 @@ Resources:
         - MetricNamespace: !Sub ComplAI/${Environment}
           MetricName: AuditLatencyMs
           MetricValue: $.latencyMs
-          DefaultValue: 0
           Dimensions:
             - Key: endpoint
               Value: $.endpoint

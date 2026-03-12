@@ -213,7 +213,6 @@ export class LambdaStack extends cdk.Stack {
       // The pattern intentionally excludes errorCode:0 by matching the literal field.
       filterPattern: logs.FilterPattern.exists('$.errorCode'),
       metricValue: '1',
-      defaultValue: 0,
       dimensions: {
         endpoint: '$.endpoint',
         errorCode: '$.errorCode',
@@ -230,7 +229,6 @@ export class LambdaStack extends cdk.Stack {
       // Use the extracted latency value directly — CloudWatch treats this as a
       // numeric observation, enabling statistics (Average, p99, etc.).
       metricValue: '$.latencyMs',
-      defaultValue: 0,
       dimensions: {
         endpoint: '$.endpoint',
       },
