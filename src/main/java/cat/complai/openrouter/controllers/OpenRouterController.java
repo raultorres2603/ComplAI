@@ -4,6 +4,7 @@ import cat.complai.openrouter.dto.OpenRouterPublicDto;
 import cat.complai.openrouter.dto.OpenRouterResponseDto;
 import cat.complai.openrouter.dto.OpenRouterErrorCode;
 import cat.complai.openrouter.dto.RedactAcceptedDto;
+import cat.complai.openrouter.helpers.LanguageDetector;
 import cat.complai.openrouter.interfaces.IOpenRouterService;
 import cat.complai.openrouter.controllers.dto.AskRequest;
 import cat.complai.openrouter.controllers.dto.RedactRequest;
@@ -165,12 +166,19 @@ public class OpenRouterController {
         }
 
         long latency = System.currentTimeMillis() - requestStart;
+        String detectedLanguage = LanguageDetector.detect(text);
         AuditLogger.log("/complai/redact", AuditLogger.hashText(text),
-                OpenRouterErrorCode.NONE.getCode(), latency, format != null ? format.name() : null, null);
+                OpenRouterErrorCode.NONE.getCode(), latency, format != null ? format.name() : null, detectedLanguage);
+
+        String acceptedMessage = switch (detectedLanguage) {
+            case "CA" -> "La vostra carta de reclamació s'està generant. Estarà disponible d'aquí a pocs minuts a l'adreça de sota.";
+            case "ES" -> "Su carta de queja se está generando. Estará disponible en breve en la dirección siguiente.";
+            default   -> "Your complaint letter is being created. It will be available shortly at the URL below.";
+        };
 
         RedactAcceptedDto accepted = new RedactAcceptedDto(
                 true,
-                "Your complaint letter is being created. It will be available shortly at the URL below.",
+                acceptedMessage,
                 pdfUrl,
                 OpenRouterErrorCode.NONE.getCode());
         return HttpResponse.status(HttpStatus.ACCEPTED).body(accepted).contentType(MediaType.APPLICATION_JSON);
