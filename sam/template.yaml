@@ -178,6 +178,7 @@ Resources:
           AWS_ENDPOINT_URL: "http://host.docker.internal:4566"
           OPENROUTER_REQUEST_TIMEOUT_SECONDS: "60"
           OPENROUTER_OVERALL_TIMEOUT_SECONDS: "60"
+          OPENROUTER_MAX_RETRIES: "3"
           OPENROUTER_MODEL: google/gemma-3-27b-it:free
           JWT_SECRET: !Ref JwtSecret
           REDACT_QUEUE_URL: !Ref RedactQueue
@@ -209,6 +210,7 @@ Resources:
           OPENROUTER_API_KEY: !Ref OpenRouterApiKey
           OPENROUTER_REQUEST_TIMEOUT_SECONDS: "60"
           OPENROUTER_OVERALL_TIMEOUT_SECONDS: "60"
+          OPENROUTER_MAX_RETRIES: "3"
           OPENROUTER_MODEL: google/gemma-3-27b-it:free
           COMPLAINTS_BUCKET: !Ref ComplaintsBucket
           COMPLAINTS_REGION: !Ref LambdaRegion
