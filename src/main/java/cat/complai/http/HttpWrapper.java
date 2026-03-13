@@ -23,6 +23,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * HTTP wrapper for calling OpenRouter (or compatible) endpoints.
+ *
+ * <p>Retry policy: on a 5xx response, the request is retried up to {@code maxRetries} times
+ * (controlled by {@code OPENROUTER_MAX_RETRIES}, default 3). 4xx responses and network
+ * exceptions are never retried — they are either client errors or unrecoverable failures.</p>
  */
 @Singleton
 public class HttpWrapper {
@@ -38,6 +42,7 @@ public class HttpWrapper {
 
     private final int requestTimeoutSeconds;
     private final String openRouterModel;
+    private final int maxRetries;
 
     /**
      * Protected no-arg constructor to allow tests to subclass HttpWrapper without needing DI.
@@ -50,18 +55,21 @@ public class HttpWrapper {
         this.headers = Map.of();
         this.requestTimeoutSeconds = 60; // default fallback
         this.openRouterModel = "arcee-ai/trinity-large-preview:free";
+        this.maxRetries = 3;
     }
 
     @Inject
     public HttpWrapper(@Value("${openrouter.url:https://openrouter.ai/api/v1/chat/completions}") String openRouterUrl,
                        @Value("${OPENROUTER_API_KEY:}") String openRouterApiKey,
                        @Value("${OPENROUTER_REQUEST_TIMEOUT_SECONDS:60}") int requestTimeoutSeconds,
-                       @Value("${OPENROUTER_MODEL:google/gemini-2.0-flash-lite-preview-02-05:free}") String openRouterModel) {
+                       @Value("${OPENROUTER_MODEL:google/gemini-2.0-flash-lite-preview-02-05:free}") String openRouterModel,
+                       @Value("${OPENROUTER_MAX_RETRIES:3}") int maxRetries) {
         this.openRouterUrl = normalizeOpenRouterUrl(openRouterUrl);
         this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
         this.mapper = new ObjectMapper();
         this.requestTimeoutSeconds = (requestTimeoutSeconds > 0) ? requestTimeoutSeconds : 20; // fallback to 20s if invalid
         this.openRouterModel = openRouterModel;
+        this.maxRetries = (maxRetries > 0) ? maxRetries : 1; // 1 = no retry, just one attempt
         Map<String, String> h = new HashMap<>();
         if (openRouterApiKey != null && !openRouterApiKey.isBlank()) {
             h.put("Authorization", openRouterApiKey);
@@ -74,7 +82,6 @@ public class HttpWrapper {
     public CompletableFuture<HttpDto> postToOpenRouterAsync(String userPrompt) {
         logger.fine(() -> "postToOpenRouterAsync called; prompt length=" + (userPrompt == null ? 0 : userPrompt.length()));
         try {
-
             // Friendlier, town-tone system message for civilian users from El Prat de Llobregat.
             String systemMessage = """
                     Ets un assistent que es diu Gall Potablava, amable i proper per als veïns d'El Prat de Llobregat. Ajudes a redactar cartes i queixes clares i civils adreçades a l'Ajuntament i ofereixes informació pràctica i local d'El Prat. Mantén les respostes curtes, respectuoses i fàcils de llegir, com un veí que vol ajudar. Si la consulta no és sobre El Prat de Llobregat, digues-ho educadament i explica que no pots ajudar amb aquesta petició; també pots suggerir que facin una pregunta sobre assumptes locals.\
@@ -97,49 +104,15 @@ public class HttpWrapper {
             logger.fine(() -> "postToOpenRouterAsync: request body prepared; payload size=" + requestBody.length());
             logger.finer(() -> "postToOpenRouterAsync: request snippet=" + (userPrompt.length() > 200 ? userPrompt.substring(0, 200) + "..." : userPrompt));
 
-            String authValue = headers.get("Authorization");
-            if (authValue == null || authValue.isBlank()) {
-                logger.warning("Authorization header not present in headers map; falling back to environment variable OPENROUTER_API_KEY");
-                authValue = System.getenv("OPENROUTER_API_KEY");
-            }
+            String authValue = resolveAuthHeader();
             if (authValue == null) {
                 logger.warning("Missing OPENROUTER_API_KEY");
                 return CompletableFuture.completedFuture(new HttpDto(null, null, "POST", "Missing OPENROUTER_API_KEY"));
             }
-            if (!authValue.toLowerCase().startsWith("bearer ")) {
-                authValue = "Bearer " + authValue;
-            }
 
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(openRouterUrl))
-                    .timeout(Duration.ofSeconds(requestTimeoutSeconds)) // Configurable per-request timeout
-                    .header("Content-Type", "application/json")
-                    .header("Authorization", authValue)
-                    .header("Referer", headers.getOrDefault("HTTP-Referer", "https://complai.cat"))
-                    .header("X-Title", headers.getOrDefault("X-Title", "complai"))
-                    .POST(BodyPublishers.ofString(requestBody))
-                    .build();
-
+            HttpRequest request = buildHttpRequest(requestBody, authValue);
             logger.fine(() -> "Sending request to OpenRouter URL: " + openRouterUrl);
-
-            return httpClient.sendAsync(request, BodyHandlers.ofString())
-                    .thenApply(response -> {
-                        int status = response.statusCode();
-                        String body = response.body();
-                        logger.fine(() -> "Received response from OpenRouter: status=" + status + " bodyLength=" + (body == null ? 0 : body.length()));
-                        if (status >= 200 && status < 300) {
-                            String extracted = extractTextFromOpenRouterResponse(body, mapper);
-                            logger.fine(() -> "Extracted message length=" + (extracted == null ? 0 : extracted.length()));
-                            return new HttpDto(extracted, status, "POST", null);
-                        } else {
-                            logger.warning(() -> "OpenRouter returned non-2xx status: " + status);
-                            return new HttpDto(body, status, "POST", String.format("OpenRouter non-2xx response: %d", status));
-                        }
-                    })
-                    .exceptionally(ex -> {
-                        logger.log(Level.SEVERE, "Exception when calling OpenRouter", ex);
-                        return new HttpDto(null, null, "POST", ex.getMessage());
-                    });
+            return sendWithRetry(request, maxRetries);
 
         } catch (Exception e) {
             logger.log(Level.SEVERE, "Failed preparing request to OpenRouter", e);
@@ -156,53 +129,88 @@ public class HttpWrapper {
             );
             String requestBody = mapper.writeValueAsString(payload);
 
-            String authValue = headers.get("Authorization");
-            if (authValue == null || authValue.isBlank()) {
-                logger.warning("Authorization header not present in headers map; falling back to environment variable OPENROUTER_API_KEY");
-                authValue = System.getenv("OPENROUTER_API_KEY");
-            }
+            String authValue = resolveAuthHeader();
             if (authValue == null) {
                 logger.warning("Missing OPENROUTER_API_KEY");
                 return CompletableFuture.completedFuture(new HttpDto(null, null, "POST", "Missing OPENROUTER_API_KEY"));
             }
-            if (!authValue.toLowerCase().startsWith("bearer ")) {
-                authValue = "Bearer " + authValue;
-            }
 
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(openRouterUrl))
-                    .timeout(Duration.ofSeconds(requestTimeoutSeconds)) // Configurable per-request timeout
-                    .header("Content-Type", "application/json")
-                    .header("Authorization", authValue)
-                    .header("Referer", headers.getOrDefault("HTTP-Referer", "https://complai.cat"))
-                    .header("X-Title", headers.getOrDefault("X-Title", "complai"))
-                    .POST(BodyPublishers.ofString(requestBody))
-                    .build();
-
+            HttpRequest request = buildHttpRequest(requestBody, authValue);
             logger.fine(() -> "Sending request to OpenRouter URL: " + openRouterUrl);
+            return sendWithRetry(request, maxRetries);
 
-            return httpClient.sendAsync(request, BodyHandlers.ofString())
-                    .thenApply(response -> {
-                        int status = response.statusCode();
-                        String body = response.body();
-                        logger.fine(() -> "Received response from OpenRouter: status=" + status + " bodyLength=" + (body == null ? 0 : body.length()));
-                        if (status >= 200 && status < 300) {
-                            String extracted = extractTextFromOpenRouterResponse(body, mapper);
-                            logger.fine(() -> "Extracted message length=" + (extracted == null ? 0 : extracted.length()));
-                            return new HttpDto(extracted, status, "POST", null);
-                        } else {
-                            logger.warning(() -> "OpenRouter returned non-2xx status: " + status);
-                            return new HttpDto(body, status, "POST", String.format("OpenRouter non-2xx response: %d", status));
-                        }
-                    })
-                    .exceptionally(ex -> {
-                        logger.log(Level.SEVERE, "Exception when calling OpenRouter", ex);
-                        return new HttpDto(null, null, "POST", ex.getMessage());
-                    });
         } catch (Exception e) {
             logger.log(Level.SEVERE, "Failed preparing request to OpenRouter (multi-turn)", e);
             return CompletableFuture.completedFuture(new HttpDto(null, null, "POST", e.getMessage()));
         }
+    }
+
+    /**
+     * Sends {@code request} and retries on 5xx responses until {@code attemptsLeft} reaches 1.
+     *
+     * <p>Only 5xx (server-side transient errors) trigger a retry. 4xx responses are definitive
+     * client errors and are returned immediately. Network exceptions are also not retried — they
+     * are unlikely to self-heal within the same request lifecycle.</p>
+     */
+    private CompletableFuture<HttpDto> sendWithRetry(HttpRequest request, int attemptsLeft) {
+        return httpClient.sendAsync(request, BodyHandlers.ofString())
+                .thenCompose(response -> {
+                    int status = response.statusCode();
+                    String body = response.body();
+                    logger.fine(() -> "Received response from OpenRouter: status=" + status
+                            + " bodyLength=" + (body == null ? 0 : body.length())
+                            + " attemptsLeft=" + attemptsLeft);
+
+                    if (status >= 500 && attemptsLeft > 1) {
+                        logger.warning(() -> "OpenRouter returned " + status
+                                + "; retrying (" + (attemptsLeft - 1) + " attempt(s) left)");
+                        return sendWithRetry(request, attemptsLeft - 1);
+                    }
+
+                    if (status >= 200 && status < 300) {
+                        String extracted = extractTextFromOpenRouterResponse(body, mapper);
+                        logger.fine(() -> "Extracted message length=" + (extracted == null ? 0 : extracted.length()));
+                        return CompletableFuture.completedFuture(new HttpDto(extracted, status, "POST", null));
+                    }
+
+                    logger.warning(() -> "OpenRouter returned non-2xx status: " + status);
+                    return CompletableFuture.completedFuture(
+                            new HttpDto(body, status, "POST", String.format("OpenRouter non-2xx response: %d", status)));
+                })
+                .exceptionally(ex -> {
+                    logger.log(Level.SEVERE, "Exception when calling OpenRouter", ex);
+                    return new HttpDto(null, null, "POST", ex.getMessage());
+                });
+    }
+
+    /**
+     * Resolves the Bearer token from the pre-configured headers, falling back to the
+     * {@code OPENROUTER_API_KEY} environment variable if absent.
+     *
+     * @return the full "Bearer …" auth value, or {@code null} if no key is available.
+     */
+    private String resolveAuthHeader() {
+        String authValue = headers.get("Authorization");
+        if (authValue == null || authValue.isBlank()) {
+            logger.warning("Authorization header not present in headers map; falling back to environment variable OPENROUTER_API_KEY");
+            authValue = System.getenv("OPENROUTER_API_KEY");
+        }
+        if (authValue == null) {
+            return null;
+        }
+        return authValue.toLowerCase().startsWith("bearer ") ? authValue : "Bearer " + authValue;
+    }
+
+    private HttpRequest buildHttpRequest(String requestBody, String authValue) {
+        return HttpRequest.newBuilder()
+                .uri(URI.create(openRouterUrl))
+                .timeout(Duration.ofSeconds(requestTimeoutSeconds))
+                .header("Content-Type", "application/json")
+                .header("Authorization", authValue)
+                .header("Referer", headers.getOrDefault("HTTP-Referer", "https://complai.cat"))
+                .header("X-Title", headers.getOrDefault("X-Title", "complai"))
+                .POST(BodyPublishers.ofString(requestBody))
+                .build();
     }
 
     private String extractTextFromOpenRouterResponse(String responseBody, ObjectMapper mapper) {
@@ -259,4 +267,5 @@ public class HttpWrapper {
         }
     }
 }
-// Timeout is now configurable via the OPENROUTER_REQUEST_TIMEOUT_SECONDS environment variable (default 20s).
+// Timeout is configurable via OPENROUTER_REQUEST_TIMEOUT_SECONDS (default 60s).
+// Retry count is configurable via OPENROUTER_MAX_RETRIES (default 3). Only 5xx responses are retried.
