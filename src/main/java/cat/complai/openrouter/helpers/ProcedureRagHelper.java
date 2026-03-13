@@ -38,7 +38,10 @@ public class ProcedureRagHelper {
 
     private static final String[] SEARCH_FIELDS = {"title", "description", "requirements", "steps"};
     private static final int MAX_RESULTS = 3;
-    private static final String RESOURCE_PATH = "/procedures.json";
+    // TODO(multi-city): When JWT city routing is implemented, this default will be resolved
+    // dynamically from the JWT "city" claim so each city serves its own procedures index.
+    // For now the single city "elprat" is the only supported deployment target.
+    private static final String RESOURCE_PATH = "/procedures-elprat.json";
     private static final String ENV_PROCEDURES_BUCKET = "PROCEDURES_BUCKET";
     private static final String ENV_PROCEDURES_KEY = "PROCEDURES_KEY";
     private static final String ENV_PROCEDURES_REGION = "PROCEDURES_REGION";
@@ -81,7 +84,7 @@ public class ProcedureRagHelper {
         // Fallback to resource
         logger.info("Loading procedures from classpath resource: " + RESOURCE_PATH);
         InputStream is = ProcedureRagHelper.class.getResourceAsStream(RESOURCE_PATH);
-        if (is == null) throw new IOException("procedures.json not found in resources or S3");
+        if (is == null) throw new IOException("procedures-elprat.json not found in resources or S3");
         return is;
     }
 

@@ -20,7 +20,7 @@ ComplAI is a **Java 21 Micronaut application** designed to run as **AWS Lambda f
     - `cat.complai.worker.ComplaintLetterGenerator` — orchestrates the AI call and PDF render for the worker. Uses `RedactPromptBuilder` for the prompt and `PdfGenerator` for the PDF bytes.
     - `cat.complai.openrouter.helpers.RedactPromptBuilder` — stateless helper that builds the AI prompt for complaint letter generation. Used by both the synchronous service path and the worker Lambda.
     - `cat.complai.s3.S3PdfUploader` — wraps `S3Client`. Uploads PDFs and generates pre-signed GET URLs (24h expiry).
-- **Data Access (RAG):** `ProcedureRagHelper` uses **Apache Lucene** in-memory to index and search municipal procedures. Loads `procedures.json` from S3 when `PROCEDURES_BUCKET`/`PROCEDURES_KEY`/`PROCEDURES_REGION` env vars are set, falling back to the classpath resource. S3 loading is handled directly in `getProceduresInputStream()` — `ProcedureIndexLoader` is no longer invoked in the Lambda boot path.
+- **Data Access (RAG):** `ProcedureRagHelper` uses **Apache Lucene** in-memory to index and search municipal procedures. Loads `procedures-<cityId>.json` from S3 when `PROCEDURES_BUCKET`/`PROCEDURES_KEY`/`PROCEDURES_REGION` env vars are set, falling back to the classpath resource (`procedures-elprat.json`). S3 loading is handled directly in `getProceduresInputStream()` — `ProcedureIndexLoader` is no longer invoked in the Lambda boot path.
 - **HTTP / Health:**
     - `cat.complai.home.HomeController` — `GET /` returns a `HomeDto` welcome response. No JWT required.
     - `cat.complai.home.HealthController` — `GET /health` returns a `HealthDto` with `status`, `version`, and `checks` (e.g. `openRouterApiKeyConfigured`). No JWT required.
@@ -31,8 +31,9 @@ ComplAI is a **Java 21 Micronaut application** designed to run as **AWS Lambda f
 - **Language Detection:** `cat.complai.openrouter.helpers.LanguageDetector` — stateless heuristic that returns `"CA"`, `"ES"`, or `"EN"` using signal-counting (Catalan markers checked first; `ñ` and Spanish stop-words second; English is the fallback). Call via `LanguageDetector.detect(text)`. Used by `OpenRouterController` to populate the `language` audit log field and to localise the `202 Accepted` response `message`. Default for null/blank input is `"CA"` (El Prat residents are predominantly Catalan speakers).
 - **Operator Tools (not deployed endpoints):**
     - `cat.complai.auth.TokenGenerator` — CLI that mints HS256 JWT tokens. Run with `java -cp complai-all.jar cat.complai.auth.TokenGenerator <subject> <expiry-days>`. Requires `JWT_SECRET` env var.
-    - `cat.complai.pratespais.PratEspaisScraper` — CLI that crawls `tramits.pratespais.com` and uploads a fresh `procedures.json` to S3. Requires `PROCEDURES_BUCKET` env var. Run standalone; not part of the Lambda boot path.
-    - `cat.complai.pratespais.ProcedureIndexLoader` — downloads `procedures.json` from S3 to a temp file. **No longer invoked in the Lambda boot path** — `ProcedureRagHelper` now handles S3 loading internally via `getProceduresInputStream()`. Retained as a standalone utility.
+    - `cat.complai.scrapper.ProcedureScraper` — CLI that crawls a city's procedure website and uploads `procedures-<cityId>.json` to S3. City-specific crawl behaviour (base URL, CSS selectors, skip rules) is driven by `src/main/resources/scrapers/procedures-mapping-<cityId>.json`. Requires `PROCEDURES_BUCKET` env var. Trigger via the `scrape-upload-procedures.yml` GitHub Actions workflow or run standalone. Not part of the Lambda boot path.
+    - `cat.complai.scrapper.PratEspaisScraper` — **deprecated**, delegates to `ProcedureScraper` with `cityId=elprat`. Will be removed in a future release.
+    - `cat.complai.scrapper.ProcedureIndexLoader` — downloads `procedures-<cityId>.json` from S3 to a temp file. **No longer invoked in the Lambda boot path** — `ProcedureRagHelper` now handles S3 loading internally via `getProceduresInputStream()`. Retained as a standalone utility.
 - **Infrastructure:** AWS CDK (`cdk/`) defines the infrastructure in three stacks. AWS SAM (`sam/`) is used for local emulation.
 
 ### Key Data Flows
@@ -81,12 +82,13 @@ The `pdfUrl` in the `202` response is a pre-signed S3 GET URL (24h expiry) gener
   JWT_SECRET=$(openssl rand -base64 32) \
   java -cp build/libs/complai-all.jar cat.complai.auth.TokenGenerator citizen-app 30
   ```
-- **Refresh `procedures.json` from Prat Espais:**
+- **Refresh procedures for a city:**
   ```bash
   PROCEDURES_BUCKET=complai-procedures-development \
-  java -cp build/libs/complai-all.jar cat.complai.pratespais.PratEspaisScraper
+  java -cp build/libs/complai-all.jar cat.complai.scrapper.ProcedureScraper elprat
   ```
-  This crawls `tramits.pratespais.com`, writes `procedures.json`, and uploads it to S3.
+  This crawls the city's website using `scrapers/procedures-mapping-elprat.json`, writes `procedures-elprat.json`, and uploads it to S3.
+  Alternatively, trigger the `scrape-upload-procedures.yml` GitHub Actions workflow manually (Actions tab → "Scrape and Upload Procedures") with the desired `city` and `environment` inputs.
 
 ### Deployment
 - **Infrastructure Code:** TypeScript CDK in `cdk/`.
@@ -124,7 +126,8 @@ The `pdfUrl` in the `202` response is a pre-signed S3 GET URL (24h expiry) gener
 
 ## 4. Key Files & Directories
 
-- `src/main/resources/procedures.json`: The source of truth for RAG data.
+- `src/main/resources/procedures-elprat.json`: Classpath fallback RAG data for El Prat (used when S3 env vars are absent, e.g. local tests).
+- `src/main/resources/scrapers/procedures-mapping-elprat.json`: Scraper mapping for El Prat — defines the base URL, CSS selectors, field extraction rules, and skip conditions used by `ProcedureScraper`. Add a new `procedures-mapping-<cityId>.json` here to support a new city.
 - `src/main/java/cat/complai/openrouter/services/OpenRouterServices.java`: Synchronous ask/redact orchestration.
 - `src/main/java/cat/complai/openrouter/interfaces/IOpenRouterService.java`: Service interface — depend on this, not the concrete class.
 - `src/main/java/cat/complai/openrouter/helpers/RedactPromptBuilder.java`: Shared AI prompt builder (used by sync service and async worker).
@@ -141,8 +144,9 @@ The `pdfUrl` in the `202` response is a pre-signed S3 GET URL (24h expiry) gener
 - `src/main/java/cat/complai/worker/RedactWorkerHandler.java`: SQS-triggered worker Lambda entry point.
 - `src/main/java/cat/complai/worker/ComplaintLetterGenerator.java`: AI-call + PDF-render orchestration for the worker.
 - `src/main/java/cat/complai/s3/S3PdfUploader.java`: Uploads PDFs to S3 and generates pre-signed GET URLs.
-- `src/main/java/cat/complai/pratespais/PratEspaisScraper.java`: Standalone CLI to refresh `procedures.json` from `tramits.pratespais.com`.
-- `src/main/java/cat/complai/pratespais/ProcedureIndexLoader.java`: Downloads `procedures.json` from S3 at Lambda start.
+- `src/main/java/cat/complai/pratespais/ProcedureScraper.java`: Generic city procedures scraper — reads `scrapers/procedures-mapping-<cityId>.json`, produces `procedures-<cityId>.json`, uploads to S3.
+- `src/main/java/cat/complai/pratespais/PratEspaisScraper.java`: **Deprecated** — delegates to `ProcedureScraper` with `cityId=elprat`. Will be removed in a future release.
+- `src/main/java/cat/complai/pratespais/ProcedureIndexLoader.java`: Downloads `procedures-<cityId>.json` from S3 at Lambda start.
 - `cdk/deployment-environment.ts`: Shared `DeploymentEnvironment` type (`'development' | 'production'`).
 - `cdk/storage-stack.ts`: S3 bucket definitions (procedures + complaints).
 - `cdk/queue-stack.ts`: SQS queue + DLQ definitions.
@@ -151,13 +155,14 @@ The `pdfUrl` in the `202` response is a pre-signed S3 GET URL (24h expiry) gener
 - `sam/docker-compose.yml`: LocalStack services (S3 + SQS) for local development.
 - `sam/sqs_worker_poller.py`: Polls local SQS and invokes `ComplAIRedactorFunction` via `sam local invoke`. Started by `start-local.sh`.
 - `sam/localstack-init/init.sh`: Creates local S3 buckets and SQS queues on first LocalStack startup.
+- `.github/workflows/scrape-upload-procedures.yml`: GitHub Actions workflow for manually triggering a city scrape. Inputs: `city` (e.g. `elprat`) and `environment` (`development` or `production`).
 
 ## 5. External Integrations
 
 - **OpenRouter:** The AI model provider. Called by both the API Lambda (sync path) and the worker Lambda (async path).
 - **Prat Espais (Frontend):** The client application. Expects specific JSON formats defined in `OpenRouterPublicDto` and `RedactAcceptedDto`.
 - **AWS S3:**
-    - `complai-procedures-<env>`: Stores `procedures.json` for RAG. Read by both Lambdas.
+    - `complai-procedures-<env>`: Stores `procedures-<cityId>.json` for RAG. Read by both Lambdas.
     - `complai-complaints-<env>`: Stores generated complaint PDFs. Written by the worker Lambda; read (pre-signed URL) by the API Lambda.
 - **AWS SQS:** `complai-redact-<env>` decouples the HTTP request lifecycle from AI + PDF generation. DLQ: `complai-redact-dlq-<env>` (3 retries, 7-day retention).
 - **AWS Lambda:** Two functions per environment — `ComplAILambda-<env>` (API) and `ComplAIRedactorLambda-<env>` (worker). Both run the same `complai-all.jar` with different handler classes.
@@ -172,8 +177,8 @@ The `pdfUrl` in the `202` response is a pre-signed S3 GET URL (24h expiry) gener
 | `OPENROUTER_OVERALL_TIMEOUT_SECONDS` | Both Lambdas | Total operation timeout |
 | `OPENROUTER_MAX_RETRIES` | Both Lambdas | Max retries for `429`/`5xx` responses (default `3`; set to `1` to disable retries) |
 | `JWT_SECRET` | API Lambda | Base64-encoded HS256 secret for JWT validation |
-| `PROCEDURES_BUCKET` | Both Lambdas | S3 bucket name for `procedures.json` |
-| `PROCEDURES_KEY` | Both Lambdas | S3 object key for the procedures file (always `procedures.json`) |
+| `PROCEDURES_BUCKET` | Both Lambdas | S3 bucket name for `procedures-<cityId>.json` |
+| `PROCEDURES_KEY` | Both Lambdas | S3 object key for the procedures file (e.g. `procedures-elprat.json`) |
 | `PROCEDURES_REGION` | Both Lambdas | AWS region of the procedures bucket |
 | `REDACT_QUEUE_URL` | API Lambda | SQS queue URL for publishing async redact messages |
 | `COMPLAINTS_BUCKET` | Both Lambdas | S3 bucket name where generated PDFs are stored |

@@ -1,4 +1,4 @@
-package cat.complai.pratespais;
+package cat.complai.scrapper;
 
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
