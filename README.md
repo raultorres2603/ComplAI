@@ -118,7 +118,8 @@ remembered.
 | Scenario | Response |
 |---|---|
 | Successful answer | `200 OK` with JSON body containing the AI text |
-| Successful PDF letter | `200 OK` with `Content-Type: application/pdf` binary body |
+| PDF queued (identity complete, format ≠ json) | `202 Accepted` with `pdfUrl` pre-signed S3 link |
+| Successful JSON letter or AI asking for identity | `200 OK` with JSON body containing the letter/question text |
 | Question not about El Prat | `422 Unprocessable Entity` with error code `REFUSAL` |
 | Invalid request | `400 Bad Request` with error code `VALIDATION` |
 | AI service unavailable | `502 Bad Gateway` with error code `UPSTREAM` |
@@ -152,7 +153,7 @@ ComplAI follows a strict **layered architecture** with clear boundaries at every
 │  │  • Builds AI prompt + message history                      │  │
 │  │  • Detects AI refusals                                     │  │
 │  │  • Parses AI format header                                 │  │
-│  │  • Generates PDFs with PDFBox                              │  │
+│  │  • Publishes to SQS for async PDF generation               │  │
 │  │  • Returns typed OpenRouterResponseDto — never throws      │  │
 │  └───────────────────────────┬────────────────────────────────┘  │
 │                              │ calls                              │
@@ -174,7 +175,7 @@ ComplAI follows a strict **layered architecture** with clear boundaries at every
                                 │ Bearer token auth
 ┌───────────────────────────────▼──────────────────────────────────┐
 │                    OpenRouter API                                │
-│               model: arcee-ai/trinity-large-preview:free         │
+│               model: stepfun/step-3.5-flash:free (default)      │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -183,6 +184,11 @@ ComplAI follows a strict **layered architecture** with clear boundaries at every
 - **Stateless Lambda**: the function holds no state between invocations. Conversation history
   lives in a Caffeine in-memory cache scoped to a warm Lambda instance — enough for a typical
   user session without requiring DynamoDB.
+- **Async PDF generation**: when the caller provides a complete identity and requests a PDF,
+  the controller enqueues a message on SQS and returns `202 Accepted` immediately with a
+  pre-signed S3 URL. A separate **worker Lambda** consumes the queue, calls the AI, renders
+  the PDF with PDFBox, and uploads it to S3. This decouples PDF generation latency from the
+  HTTP request lifecycle.
 - **Typed error codes**: `OpenRouterErrorCode` enum (NONE, VALIDATION, REFUSAL, UPSTREAM, TIMEOUT,
   INTERNAL) is the authoritative signal from service to controller. No string-matching on error
   messages.
@@ -202,7 +208,7 @@ Every /complai/ask and /complai/redact request is logged by the controller using
 - Error code (OpenRouterErrorCode)
 - Latency (ms)
 - Output format (if applicable)
-- Language (future)
+- Language (detected via `LanguageDetector` — `"CA"`, `"ES"`, or `"EN"`)
 
 No user text or AI response is ever logged. This ensures privacy and compliance.
 
@@ -234,21 +240,36 @@ Example log line:
 
 ### `/complai/redact` — Draft a complaint letter
 
+Two paths exist depending on whether the caller provides a complete identity (name, surname, ID number) and the requested format.
+
+**Synchronous path** — identity incomplete, or `format: "json"`:
 ```
-1.  Front-end sends: { "text": "El carrer no té llum.", "format": "pdf", "conversationId": "uuid" }
-2.  Controller validates format field (rejects "xml", "docx", etc. with 400 before touching service)
+1.  Front-end sends: { "text": "El carrer no té llum.", "format": "json", "conversationId": "uuid" }
+2.  Controller validates format field (rejects "xml", "docx", etc. with 400)
 3.  Service:
-      a. Validates text is not blank
-      b. Builds prompt instructing AI to output a JSON header line + letter body
+      a. Validates text is not blank and within the 5,000-character limit
+      b. Builds prompt; if identity is missing, AI is instructed to ask for it
       c. Calls OpenRouter with conversation history prepended
-      d. On non-success result (refusal, error): returns immediately — no PDF attempted
-      e. Parses AI JSON header (e.g. {"format": "pdf"}) from first response line
-      f. If header missing and format is PDF → returns UPSTREAM error
-      g. If header missing and format is AUTO/JSON → returns raw text gracefully
-      h. If format is PDF → generates PDF in-memory with PDFBox
-      i. Returns OpenRouterResponseDto with pdfData byte[]
-4.  Controller detects pdfData present → returns HTTP 200 application/pdf with Content-Length
-5.  Front-end triggers browser PDF download
+      d. Returns the AI's response text (question or letter body)
+4.  Controller returns HTTP 200 JSON — no PDF is generated on this path
+```
+
+**Async path** — identity is complete (name + surname + ID) and `format` is `"pdf"` or `"auto"`:
+```
+1.  Front-end sends: { "text": "...", "format": "pdf",
+      "requesterName": "Maria", "requesterSurname": "Garcia", "requesterIdNumber": "12345678A" }
+2.  Controller validates, generates an S3 key, creates a 24-hour pre-signed GET URL
+3.  Publishes a RedactSqsMessage to the SQS redact queue
+4.  Returns 202 Accepted: { success, message (localised), pdfUrl, errorCode: 0 }
+
+Worker Lambda (triggered by SQS):
+      a. Deserialises the message
+      b. Calls OpenRouter to draft the letter
+      c. Renders PDF in-memory with PDFBox (NotoSans-Regular.ttf embedded for full Unicode)
+      d. Uploads PDF to s3://complai-complaints-<env>/<s3Key>
+
+Client polls the pdfUrl — returns 403/404 while the worker is running,
+200 application/pdf once the PDF is available (usually within seconds).
 ```
 
 ---
@@ -314,17 +335,34 @@ Draft a formal complaint letter addressed to the Ajuntament.
 {
   "text": "El carrer de la Pau porta tres setmanes sense il·luminació.",
   "format": "pdf",
-  "conversationId": "550e8400-e29b-41d4-a716-446655440000"
+  "conversationId": "550e8400-e29b-41d4-a716-446655440000",
+  "requesterName": "Maria",
+  "requesterSurname": "Garcia",
+  "requesterIdNumber": "12345678A"
 }
 ```
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `text` | string | ✅ | Description of the complaint |
+| `text` | string | ✅ | Description of the complaint (max 5,000 chars) |
 | `format` | `"pdf"` \| `"json"` \| `"auto"` | ❌ | Output format (default: `"auto"`) |
 | `conversationId` | string (UUID) | ❌ | Session identifier for multi-turn context |
+| `requesterName` | string | ❌ | Complainant first name |
+| `requesterSurname` | string | ❌ | Complainant surname |
+| `requesterIdNumber` | string | ❌ | Complainant DNI / NIF / NIE |
 
-**Successful JSON response `200 OK`** (`format: "json"` or `"auto"`):
+**`202 Accepted` — async PDF queued** (identity complete + format ≠ `"json"`):
+```json
+{
+  "success": true,
+  "message": "La vostra carta de reclamació s'està generant. Estarà disponible d'aquí a pocs minuts a l'adreça de sota.",
+  "pdfUrl": "https://complai-complaints-development.s3.eu-west-1.amazonaws.com/complaints/abc-123/1741689600-complaint.pdf",
+  "errorCode": 0
+}
+```
+The `message` field is localised (Catalan / Spanish / English) based on the detected language of the complaint text. The `pdfUrl` is a pre-signed S3 GET URL valid for 24 hours. Poll it — it returns `403/404` while the worker is running and `200 application/pdf` once complete.
+
+**`200 OK` — synchronous JSON letter** (identity incomplete or `format: "json"`):
 ```json
 {
   "success": true,
@@ -334,13 +372,6 @@ Draft a formal complaint letter addressed to the Ajuntament.
 }
 ```
 
-**Successful PDF response `200 OK`** (`format: "pdf"`):
-```
-Content-Type: application/pdf
-Content-Length: 12345
-
-<binary PDF data>
-```
 
 ---
 
@@ -417,36 +448,37 @@ name is a nod to El Prat's emblematic bird, the *Ànec Collverd* (Mallard duck),
 
 ## 9. PDF Complaint Letter Generation
 
-When the citizen requests a PDF (or when the AI decides PDF is appropriate in `auto` mode), the
-service generates a formal letter document in-memory using **Apache PDFBox**.
+PDF generation is handled exclusively by the **worker Lambda** via an asynchronous SQS flow. The API Lambda never produces PDF bytes — it only queues the job and returns a `202 Accepted` with a pre-signed URL.
 
-**PDF generation flow:**
+**Async PDF flow:**
 
-1. The AI is instructed to emit a JSON header on the first line of its response:
-   ```
-   {"format": "pdf"}
-   
-   Estimat/da Ajuntament d'El Prat de Llobregat,
-   
-   Em dirigeixo a vostès per...
-   ```
-2. `AiParsed.parseAiFormatHeader()` extracts the header and the clean letter body.
-3. PDFBox renders the body as a multi-page LETTER-format document with word-wrap and
-   paragraph spacing.
-4. The PDF bytes are returned in-memory — no disk I/O, no temp files.
-5. The controller sets `Content-Type: application/pdf` and an explicit `Content-Length` header.
-   The latter is required to prevent Netty from closing the connection before the client reads
-   the full binary response.
+1. The API Lambda validates the request, generates an S3 key, and creates a 24-hour pre-signed GET URL for that key.
+2. A `RedactSqsMessage` is published to the SQS redact queue and `202 Accepted` is returned immediately to the caller.
+3. The worker Lambda is triggered by SQS and:
+   - Calls `ComplaintLetterGenerator.generate(message)`
+   - Builds the AI prompt via `RedactPromptBuilder.buildRedactPromptWithIdentity()`
+   - Calls OpenRouter via `HttpWrapper`
+   - Parses the AI response header with `AiParsed.parseAiFormatHeader()`
+   - Renders the letter body as a PDF in-memory using `PdfGenerator` (Apache PDFBox)
+   - Uploads the PDF bytes to S3 at the pre-determined key via `S3PdfUploader.upload(key, bytes)`
+4. The caller polls the `pdfUrl` — it returns `403/404` while the worker is running and `200 application/pdf` once the PDF is uploaded (typically within seconds).
+
+**AI format header:**
+The AI is instructed to emit a JSON header on the first line of its response:
+```
+{"format": "pdf"}
+
+Estimat/da Ajuntament d'El Prat de Llobregat,
+
+Em dirigeixo a vostès per...
+```
+`AiParsed.parseAiFormatHeader()` handles three response shapes: clean first-line JSON, markdown-fenced JSON (` ```json ... ``` `), and JSON with an inline `body` key.
 
 **Current PDF characteristics:**
-- Font: Helvetica / Helvetica Bold
-- Page size: LETTER
-- Title: "Redacted complaint"
+- Font: `NotoSans-Regular.ttf` (embedded Unicode TrueType font — full coverage for Catalan, Spanish, and English characters including `ç`, `à`, `ü`, `·l`). Falls back to Helvetica if the resource is missing.
+- Page size: A4
 - Word-wrapped body with paragraph breaks and multi-page support
-
-> ⚠️ Known limitation: `PDType1Font.HELVETICA` has incomplete Unicode coverage. Catalan-specific
-> characters such as `ç`, `à`, `ü`, and `·l` may not render correctly. Embedding a TrueType/OpenType
-> font is planned (see Roadmap).
+- No disk I/O — all rendering is in-memory
 
 ---
 
@@ -455,39 +487,56 @@ service generates a formal letter document in-memory using **Apache PDFBox**.
 ### AWS Architecture
 
 ```
-Internet → Lambda Function URL (public HTTPS) → Lambda (Java 21) → OpenRouter API
+Internet → Lambda Function URL (public HTTPS) → ComplAILambda (Java 21) → OpenRouter API
+                                                       │
+                                                       │ SQS (complai-redact-<env>)
+                                                       ▼
+                                              ComplAIRedactorLambda (Java 21)
+                                                       │
+                                                       ▼
+                                            S3 (complai-complaints-<env>)
 ```
 
-Two independent stacks deployed via **AWS CDK** (TypeScript):
+Three independent CDK stacks are deployed per environment via **AWS CDK** (TypeScript):
 
 | Stack | Purpose |
 |-------|---------|
-| `ComplAILambdaStack-development` | Pre-production. Used by CI on every PR and manual deploys. |
-| `ComplAILambdaStack-production` | Live environment. Only deployable from `master`, requires manual approval. |
+| `ComplAIStorageStack-<env>` | S3 buckets: `complai-procedures-<env>` (RAG data) and `complai-complaints-<env>` (generated PDFs) |
+| `ComplAIQueueStack-<env>` | SQS redact queue + DLQ (`complai-redact-<env>`, `complai-redact-dlq-<env>`) |
+| `ComplAILambdaStack-<env>` | Both Lambda functions, IAM roles, CloudWatch log groups, metric filters |
 
-**Per-stack AWS resources:**
-- `AWS::Lambda::Function` (Java 21, 512 MB memory, 30 s timeout)
-- `AWS::Lambda::Url` (public HTTPS endpoint, CORS enabled, no auth)
-- `AWS::IAM::Role` with least-privilege (`AWSLambdaBasicExecutionRole` only)
-- `AWS::Logs::LogGroup` with 30-day retention
+**Per-environment Lambda resources:**
+- `ComplAILambda-<env>` — API handler (`APIGatewayV2HTTPEventFunction`), 768 MB memory, 60 s timeout, Lambda Function URL (public HTTPS, CORS enabled)
+- `ComplAIRedactorLambda-<env>` — Worker handler (`RedactWorkerHandler`), 768 MB memory, 60 s timeout, SQS event source (batch size 1, report batch item failures)
+- IAM roles with least privilege:
+  - API Lambda: `AWSLambdaBasicExecutionRole` + SQS `SendMessage` + S3 `GetObject` (complaints bucket for pre-signed URLs) + S3 `GetObject` (procedures bucket)
+  - Worker Lambda: `AWSLambdaBasicExecutionRole` + SQS `ReceiveMessage`/`DeleteMessage` + S3 `PutObject` (complaints bucket) + S3 `GetObject` (procedures bucket)
+- CloudWatch log groups with metric filters on `errorCode` and `latencyMs` audit log fields
+
+**Stack deployment order** (cross-stack references via CloudFormation Exports):
+```bash
+cdk deploy 'ComplAI*Stack-development'   # deploys all three in dependency order
+```
+Never delete `StorageStack` or `QueueStack` while `LambdaStack` is deployed — CloudFormation will refuse to delete exported values still in use.
 
 ### Key configuration
 
 ```properties
-# Runtime — Java 21 SnapStart
-OPENROUTER_API_KEY   # Bearer token for OpenRouter, injected as Lambda env var, never committed
-JWT_SECRET           # Base64-encoded HS256 key (min 32 bytes), injected as Lambda env var, never committed
-openrouter.url       # OpenRouter endpoint (overridable for local/test)
+# Runtime — Java 21, both Lambdas use the same complai-all.jar (shadowJar)
+OPENROUTER_API_KEY     # Bearer token for OpenRouter, injected as Lambda env var, never committed
+JWT_SECRET             # Base64-encoded HS256 key (min 32 bytes), injected as Lambda env var, never committed
+OPENROUTER_MODEL       # Model identifier, e.g. stepfun/step-3.5-flash:free
 ```
 
 ### Local development
 
-The `sam/` folder provides a **SAM CLI + LocalStack** environment for running the Lambda locally:
+The `sam/` folder provides a **SAM CLI + LocalStack** environment for running both Lambdas locally:
 
 ```bash
 cd sam
-./start-local.sh           # builds JAR, starts LocalStack, starts SAM local API
-# API available at http://localhost:3000 (emulates Lambda Function URL)
+./start-local.sh           # builds JAR, starts LocalStack (S3 + SQS), starts SAM local API on :3000
+# API available at http://localhost:3000
+# SQS worker poller runs in the background and invokes ComplAIRedactorFunction via sam local invoke
 ```
 
 ---
@@ -502,8 +551,8 @@ cd sam
 | **JWT claims enforced** | `exp` (token must have expiry), `sub` (must have subject), `iss` (must be `"complai"`). Tokens missing any of these are rejected with `401`. |
 | Input injection | All user text is passed to the AI as a `content` string in a structured `messages` array — never interpolated into raw JSON strings that could alter the API call structure |
 | Off-topic abuse | System prompt + programmatic refusal detection scope all AI responses to El Prat |
-| Input length abuse | Null/blank validation at service boundary. Length limits are on the roadmap (see Feature #8) |
-| IAM privilege | Lambda role has `AWSLambdaBasicExecutionRole` only — no S3, no DynamoDB, no secrets manager |
+| Input length abuse | All user input is limited to 5,000 characters (`complai.input.max-length-chars`). Inputs exceeding the limit are rejected at the service boundary with `400 VALIDATION` before any AI call is made |
+| IAM privilege | API Lambda role: `AWSLambdaBasicExecutionRole` + SQS send + S3 read. Worker Lambda role: `AWSLambdaBasicExecutionRole` + SQS consume + S3 write (complaints bucket only) |
 | Secrets in logs | The API key and JWT secret are never logged. Refusal messages and AI text are logged at fine/info level only |
 | Unsupported format values | Rejected at controller boundary (`400 VALIDATION`) before touching the service |
 
