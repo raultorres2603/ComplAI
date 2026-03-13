@@ -24,9 +24,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 /**
  * HTTP wrapper for calling OpenRouter (or compatible) endpoints.
  *
- * <p>Retry policy: on a 5xx response, the request is retried up to {@code maxRetries} times
- * (controlled by {@code OPENROUTER_MAX_RETRIES}, default 3). 4xx responses and network
- * exceptions are never retried — they are either client errors or unrecoverable failures.</p>
+ * <p>Retry policy: on a {@code 429} (upstream rate-limit) or {@code 5xx} response, the request
+ * is retried up to {@code maxRetries} times (controlled by {@code OPENROUTER_MAX_RETRIES},
+ * default 3). Other 4xx responses and network exceptions are never retried.</p>
  */
 @Singleton
 public class HttpWrapper {
@@ -153,11 +153,16 @@ public class HttpWrapper {
     }
 
     /**
-     * Sends {@code request} and retries on 5xx responses until {@code attemptsLeft} reaches 1.
+     * Sends {@code request} and retries on transient failures until {@code attemptsLeft} reaches 1.
      *
-     * <p>Only 5xx (server-side transient errors) trigger a retry. 4xx responses are definitive
-     * client errors and are returned immediately. Network exceptions are also not retried — they
-     * are unlikely to self-heal within the same request lifecycle.</p>
+     * <p>Retried statuses:
+     * <ul>
+     *   <li>{@code 429} — OpenRouter upstream rate-limit (transient; retrying after a moment succeeds)</li>
+     *   <li>{@code 5xx} — server-side errors</li>
+     * </ul>
+     * 4xx responses other than 429 are definitive client errors and are returned immediately.
+     * Network exceptions are also not retried — they are unlikely to self-heal within the same
+     * request lifecycle.</p>
      */
     private CompletableFuture<HttpDto> sendWithRetry(HttpRequest request, int attemptsLeft) {
         int attemptNumber = maxRetries - attemptsLeft + 1;
@@ -171,8 +176,9 @@ public class HttpWrapper {
                             + " attempt=" + attemptNumber + "/" + maxRetries
                             + " url=" + openRouterUrl);
 
-                    if (status >= 500 && attemptsLeft > 1) {
-                        logger.warning(() -> "OpenRouter server error — httpStatus=" + status
+                    if ((status == 429 || status >= 500) && attemptsLeft > 1) {
+                        String reason = status == 429 ? "rate-limited" : "server error";
+                        logger.warning(() -> "OpenRouter " + reason + " — httpStatus=" + status
                                 + " retrying attempt=" + (attemptNumber + 1) + "/" + maxRetries
                                 + " url=" + openRouterUrl);
                         return sendWithRetry(request, attemptsLeft - 1);
@@ -284,4 +290,4 @@ public class HttpWrapper {
     }
 }
 // Timeout is configurable via OPENROUTER_REQUEST_TIMEOUT_SECONDS (default 60s).
-// Retry count is configurable via OPENROUTER_MAX_RETRIES (default 3). Only 5xx responses are retried.
+// Retry count is configurable via OPENROUTER_MAX_RETRIES (default 3). 429 and 5xx responses are retried.
