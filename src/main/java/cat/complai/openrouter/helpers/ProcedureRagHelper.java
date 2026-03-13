@@ -14,6 +14,8 @@ import org.apache.lucene.store.ByteBuffersDirectory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class ProcedureRagHelper {
     public static class Procedure {
@@ -40,6 +42,7 @@ public class ProcedureRagHelper {
     private static final String ENV_PROCEDURES_BUCKET = "PROCEDURES_BUCKET";
     private static final String ENV_PROCEDURES_KEY = "PROCEDURES_KEY";
     private static final String ENV_PROCEDURES_REGION = "PROCEDURES_REGION";
+    private static final Logger logger = Logger.getLogger(ProcedureRagHelper.class.getName());
 
     private final List<Procedure> procedures;
     private final ByteBuffersDirectory ramDirectory;
@@ -50,6 +53,7 @@ public class ProcedureRagHelper {
         this.analyzer = new StandardAnalyzer();
         this.ramDirectory = new ByteBuffersDirectory();
         buildIndex();
+        logger.info(() -> "ProcedureRagHelper initialised — procedureCount=" + procedures.size());
     }
 
     private static InputStream getProceduresInputStream() throws IOException {
@@ -66,12 +70,16 @@ public class ProcedureRagHelper {
                         .bucket(bucket)
                         .key(key)
                         .build();
+                logger.info(() -> "Loading procedures from S3 — bucket=" + bucket + " key=" + key + " region=" + region);
                 return s3.getObject(req);
             } catch (Exception e) {
-                // Fallback to resource
+                logger.log(Level.WARNING, "Failed to load procedures from S3 — bucket=" + bucket
+                        + " key=" + key + " region=" + region + " error=" + e.getMessage()
+                        + "; falling back to classpath resource", e);
             }
         }
         // Fallback to resource
+        logger.info("Loading procedures from classpath resource: " + RESOURCE_PATH);
         InputStream is = ProcedureRagHelper.class.getResourceAsStream(RESOURCE_PATH);
         if (is == null) throw new IOException("procedures.json not found in resources or S3");
         return is;
@@ -130,8 +138,10 @@ public class ProcedureRagHelper {
                         doc.get("url")
                 ));
             }
+            logger.fine(() -> "RAG search — queryLength=" + query.length() + " resultCount=" + results.size());
         } catch (IOException | ParseException e) {
-            // Log and return empty
+            logger.log(Level.WARNING, "RAG search failed — queryLength=" + query.length()
+                    + " error=" + e.getMessage(), e);
         }
         return results;
     }

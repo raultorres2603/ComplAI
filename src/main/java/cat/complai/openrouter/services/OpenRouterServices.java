@@ -84,13 +84,15 @@ public class OpenRouterServices implements IOpenRouterService {
 
     @Override
     public OpenRouterResponseDto ask(String question, String conversationId) {
-        logger.info("ask() called");
+        int inputLength = question != null ? question.length() : 0;
+        logger.info(() -> "ask() called — conversationId=" + conversationId + " inputLength=" + inputLength);
         if (question == null || question.isBlank()) {
-            logger.fine("ask() rejected: empty question");
+            logger.fine(() -> "ask() rejected — reason=emptyQuestion conversationId=" + conversationId);
             return new OpenRouterResponseDto(false, null, "Question must not be empty.", null, OpenRouterErrorCode.VALIDATION);
         }
         if (question.length() > maxInputLength) {
-            logger.fine("ask() rejected: question too long");
+            logger.fine(() -> "ask() rejected — reason=inputTooLong inputLength=" + inputLength
+                    + " maxAllowed=" + maxInputLength + " conversationId=" + conversationId);
             return new OpenRouterResponseDto(false, null, "Question exceeds maximum allowed length (" + maxInputLength + " characters).", null, OpenRouterErrorCode.VALIDATION);
         }
 
@@ -110,7 +112,8 @@ public class OpenRouterServices implements IOpenRouterService {
         }
         messages.add(Map.of("role", "user", "content", question.trim()));
 
-        logger.fine(() -> "ask() messages prepared: " + messages.size() + " total");
+        logger.fine(() -> "ask() messages prepared — messageCount=" + messages.size()
+                + " conversationId=" + conversationId);
         OpenRouterResponseDto response = callOpenRouterAndExtract(messages);
 
         if (conversationId != null && !conversationId.isBlank() && response.getMessage() != null) {
@@ -121,11 +124,15 @@ public class OpenRouterServices implements IOpenRouterService {
 
     @Override
     public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format, String conversationId, ComplainantIdentity identity) {
-        logger.info("redactComplaint() called");
+        int inputLength = complaint != null ? complaint.length() : 0;
+        boolean identityProvided = identity != null && identity.isPartiallyProvided();
+        logger.info(() -> "redactComplaint() called — conversationId=" + conversationId
+                + " inputLength=" + inputLength + " format=" + format + " identityProvided=" + identityProvided);
 
         Optional<OpenRouterResponseDto> validationError = validateRedactInput(complaint);
         if (validationError.isPresent()) {
-            logger.fine("redactComplaint() rejected: " + validationError.get().getError());
+            logger.fine(() -> "redactComplaint() rejected — reason=" + validationError.get().getError()
+                    + " conversationId=" + conversationId);
             return validationError.get();
         }
 
@@ -161,7 +168,8 @@ public class OpenRouterServices implements IOpenRouterService {
                     : null;
             if (originalComplaint != null) {
                 pendingComplaintCache.invalidate(conversationId);
-                logger.fine("redactComplaint() using stored original complaint for conversationId=" + conversationId);
+                logger.fine(() -> "redactComplaint() resumed stored complaint — conversationId=" + conversationId
+                        + " originalLength=" + originalComplaint.length());
             }
             String complaintForPrompt = (originalComplaint != null)
                     ? originalComplaint + "\n\n" + complaint
@@ -170,14 +178,15 @@ public class OpenRouterServices implements IOpenRouterService {
         } else {
             if (conversationId != null && !conversationId.isBlank()) {
                 pendingComplaintCache.put(conversationId, complaint);
-                logger.fine("redactComplaint() saved original complaint for conversationId=" + conversationId);
+                logger.fine(() -> "redactComplaint() saved complaint for identity follow-up — conversationId=" + conversationId);
             }
             userPrompt = promptBuilder.buildRedactPromptRequestingIdentity(complaint, identity);
         }
 
         messages.add(Map.of("role", "user", "content", userPrompt));
 
-        logger.fine(() -> "redactComplaint() messages prepared: " + messages.size() + " total, identityComplete=" + identityComplete);
+        logger.fine(() -> "redactComplaint() messages prepared — messageCount=" + messages.size()
+                + " identityComplete=" + identityComplete + " conversationId=" + conversationId);
         OpenRouterResponseDto aiDto = callOpenRouterAndExtract(messages);
 
         // Propagate any non-success result immediately.
@@ -325,36 +334,38 @@ public class OpenRouterServices implements IOpenRouterService {
     }
 
     private OpenRouterResponseDto callOpenRouterAndExtract(List<Map<String, Object>> messages) {
-        logger.fine("callOpenRouterAndExtract: calling HttpWrapper");
+        logger.fine(() -> "callOpenRouterAndExtract — sending " + messages.size() + " messages to OpenRouter");
         try {
             CompletableFuture<HttpDto> future = httpWrapper.postToOpenRouterAsync(messages);
             HttpDto dto = future.get(overallTimeoutSeconds, TimeUnit.SECONDS);
-            logger.fine(() -> "callOpenRouterAndExtract: received dto=" + (dto == null ? "null" : String.valueOf(dto.statusCode())));
             if (dto == null) {
-                logger.warning("callOpenRouterAndExtract: No response from AI service");
+                logger.warning("callOpenRouterAndExtract — OpenRouter returned null response (no HTTP status)");
                 return new OpenRouterResponseDto(false, null, "No response from AI service.", null, OpenRouterErrorCode.UPSTREAM);
             }
+            logger.fine(() -> "callOpenRouterAndExtract — OpenRouter responded httpStatus=" + dto.statusCode()
+                    + " hasMessage=" + (dto.message() != null && !dto.message().isBlank())
+                    + " hasError=" + (dto.error() != null && !dto.error().isBlank()));
             if (dto.error() != null && !dto.error().isBlank()) {
-                logger.log(Level.WARNING, "AI wrapper returned error: {0}", dto.error());
+                logger.warning(() -> "callOpenRouterAndExtract — OpenRouter error httpStatus=" + dto.statusCode()
+                        + " error=" + dto.error());
                 return new OpenRouterResponseDto(false, dto.message(), dto.error(), dto.statusCode(), OpenRouterErrorCode.UPSTREAM);
             }
             if (dto.message() != null && !dto.message().isBlank()) {
-                // If the AI refused because it's not about El Prat, map to a standardized error
                 if (aiRefusedAsNotAboutElPrat(dto.message())) {
-                    logger.info("AI refused - not about El Prat");
-                    // Return success=false but PRESERVE the AI message so callers can log/display the assistant's text
+                    logger.info(() -> "callOpenRouterAndExtract — AI refused (not about El Prat) httpStatus=" + dto.statusCode());
                     return new OpenRouterResponseDto(false, dto.message(), "Request is not about El Prat de Llobregat.", dto.statusCode(), OpenRouterErrorCode.REFUSAL);
                 }
-                logger.fine("AI returned a message successfully");
+                logger.fine(() -> "callOpenRouterAndExtract — AI responded successfully httpStatus=" + dto.statusCode()
+                        + " responseLength=" + dto.message().length());
                 return new OpenRouterResponseDto(true, dto.message(), null, dto.statusCode(), OpenRouterErrorCode.NONE);
             }
-            logger.warning("AI returned no message");
+            logger.warning(() -> "callOpenRouterAndExtract — AI returned empty message httpStatus=" + dto.statusCode());
             return new OpenRouterResponseDto(false, null, "AI returned no message.", dto.statusCode(), OpenRouterErrorCode.UPSTREAM);
         } catch (TimeoutException te) {
-            logger.log(Level.SEVERE, "AI service timed out", te);
+            logger.log(Level.SEVERE, "callOpenRouterAndExtract — AI service timed out after " + overallTimeoutSeconds + "s", te);
             return new OpenRouterResponseDto(false, null, "AI service timed out.", null, OpenRouterErrorCode.TIMEOUT);
         } catch (Exception e) {
-            logger.log(Level.SEVERE, "Error calling AI service", e);
+            logger.log(Level.SEVERE, "callOpenRouterAndExtract — unexpected exception calling AI service", e);
             return new OpenRouterResponseDto(false, null, e.getMessage(), null, OpenRouterErrorCode.INTERNAL);
         }
     }

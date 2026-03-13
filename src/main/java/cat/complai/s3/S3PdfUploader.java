@@ -89,7 +89,7 @@ public class S3PdfUploader {
      * message to the queue for a retry.
      */
     public void upload(String key, byte[] pdfBytes) {
-        logger.fine(() -> "Uploading PDF to s3://" + bucketName + "/" + key + " (" + pdfBytes.length + " bytes)");
+        logger.info(() -> "S3 upload starting — bucket=" + bucketName + " key=" + key + " sizeBytes=" + pdfBytes.length);
         PutObjectRequest request = PutObjectRequest.builder()
                 .bucket(bucketName)
                 .key(key)
@@ -99,9 +99,10 @@ public class S3PdfUploader {
                 .build();
         try {
             s3Client.putObject(request, RequestBody.fromBytes(pdfBytes));
-            logger.fine(() -> "PDF uploaded successfully: " + key);
+            logger.info(() -> "S3 upload completed — bucket=" + bucketName + " key=" + key + " sizeBytes=" + pdfBytes.length);
         } catch (Exception e) {
-            logger.log(Level.SEVERE, "Failed to upload PDF to S3 key: " + key, e);
+            logger.log(Level.SEVERE, "S3 upload failed — bucket=" + bucketName + " key=" + key
+                    + " sizeBytes=" + pdfBytes.length + " error=" + e.getMessage(), e);
             throw new RuntimeException("S3 upload failed for key '" + key + "': " + e.getMessage(), e);
         }
     }
