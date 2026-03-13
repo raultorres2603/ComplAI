@@ -5,10 +5,13 @@ name: Scrape and Upload Procedures
 # (src/main/resources/scrapers/procedures-mapping-<city>.json),
 # produces procedures-<city>.json, and uploads it to the procedures S3 bucket.
 #
-# AWS credentials must be stored as repository secrets:
-#   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
-# The target bucket is derived automatically from the chosen environment:
+# AWS credentials are obtained via OIDC (github-cdk-deploy-role). No static key
+# secrets are required. The target bucket is derived automatically from the chosen environment:
 #   complai-procedures-development  /  complai-procedures-production
+
+permissions:
+  id-token: write
+  contents: read
 
 on:
   workflow_dispatch:
@@ -32,6 +35,7 @@ on:
 jobs:
   scrape-and-upload:
     runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
 
     steps:
       - name: Checkout repository
@@ -56,10 +60,16 @@ jobs:
       - name: Build fat JAR
         run: ./gradlew clean shadowJar
 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::134267836527:role/github-cdk-deploy-role
+          aws-region: ${{ vars.PROCEDURES_REGION }}
+          audience: sts.amazonaws.com
+          output-env-credentials: true
+
       - name: Scrape procedures and upload to S3
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           PROCEDURES_BUCKET: complai-procedures-${{ inputs.environment }}
         run: |
           java -cp build/libs/complai-all.jar \
