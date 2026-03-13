@@ -1,6 +1,7 @@
 package cat.complai.openrouter.helpers;
 
 import cat.complai.openrouter.dto.ComplainantIdentity;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 import java.time.LocalDate;
@@ -35,17 +36,19 @@ public class RedactPromptBuilder {
             "https://www.instagram.com/elprataldia/"
     );
 
-    private final ProcedureRagHelper procedureRagHelper;
+    private final ProcedureRagHelperRegistry ragRegistry;
 
+    @Inject
+    public RedactPromptBuilder(ProcedureRagHelperRegistry ragRegistry) {
+        this.ragRegistry = ragRegistry;
+    }
+
+    // Test-only no-arg constructor. Creates a registry with an empty cache; it loads
+    // procedures-<cityId>.json from the classpath on first use, which works in tests
+    // because the classpath resource is present. Public so test classes in any package
+    // can instantiate it without a full DI context.
     public RedactPromptBuilder() {
-        ProcedureRagHelper helper;
-        try {
-            helper = new ProcedureRagHelper();
-        } catch (Exception e) {
-            logger.log(Level.SEVERE, "Failed to initialize ProcedureRagHelper", e);
-            helper = null;
-        }
-        this.procedureRagHelper = helper;
+        this(new ProcedureRagHelperRegistry());
     }
 
     /**
@@ -78,12 +81,20 @@ Independent local news source: %s
     }
 
     /**
-     * Queries the in-memory Lucene index for procedures relevant to the given text.
-     * Returns {@code null} when the index is unavailable or no matches are found.
+     * Queries the in-memory Lucene index for procedures relevant to the given text,
+     * using the city-specific procedures loaded for the caller's JWT city claim.
+     * Returns {@code null} when no matches are found or the index fails to load.
      */
-    public String buildProcedureContextBlock(String query) {
-        if (procedureRagHelper == null) return null;
-        List<ProcedureRagHelper.Procedure> matches = procedureRagHelper.search(query);
+    public String buildProcedureContextBlock(String query, String cityId) {
+        ProcedureRagHelper helper;
+        try {
+            helper = ragRegistry.getForCity(cityId);
+        } catch (Exception e) {
+            logger.log(Level.WARNING, "Failed to get ProcedureRagHelper for city=" + cityId
+                    + "; skipping RAG context: " + e.getMessage(), e);
+            return null;
+        }
+        List<ProcedureRagHelper.Procedure> matches = helper.search(query);
         if (matches.isEmpty()) return null;
         StringBuilder sb = new StringBuilder();
         sb.append("CONTEXT FROM PRAT ESPAIS PROCEDURES:\n\n");

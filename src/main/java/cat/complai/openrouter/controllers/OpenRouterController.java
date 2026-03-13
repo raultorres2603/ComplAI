@@ -14,6 +14,8 @@ import cat.complai.openrouter.helpers.AuditLogger;
 import cat.complai.s3.S3PdfUploader;
 import cat.complai.sqs.SqsComplaintPublisher;
 import cat.complai.sqs.dto.RedactSqsMessage;
+import cat.complai.auth.JwtAuthFilter;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
@@ -48,13 +50,15 @@ public class OpenRouterController {
     }
 
     @Post("/ask")
-    public HttpResponse<OpenRouterPublicDto> ask(@Body AskRequest request) {
+    public HttpResponse<OpenRouterPublicDto> ask(@Body AskRequest request, HttpRequest<?> httpRequest) {
+        String cityId = httpRequest.getAttribute(JwtAuthFilter.CITY_ATTRIBUTE, String.class)
+                .orElseThrow(() -> new IllegalStateException("city attribute missing from request — JWT filter should have set it"));
         String conversationId = request != null ? request.getConversationId() : null;
         int inputLength = request != null && request.getText() != null ? request.getText().length() : 0;
-        logger.info(() -> "POST /complai/ask received — conversationId=" + conversationId + " inputLength=" + inputLength);
+        logger.info(() -> "POST /complai/ask received — conversationId=" + conversationId + " inputLength=" + inputLength + " city=" + cityId);
         long start = System.currentTimeMillis();
         try {
-            OpenRouterResponseDto dto = service.ask(request.getText(), request.getConversationId());
+            OpenRouterResponseDto dto = service.ask(request.getText(), request.getConversationId(), cityId);
             long latency = System.currentTimeMillis() - start;
             AuditLogger.log("/complai/ask", AuditLogger.hashText(request.getText()),
                     dto != null ? dto.getErrorCode().getCode() : -1, latency, null, null);
@@ -77,12 +81,14 @@ public class OpenRouterController {
 
     @Post("/redact")
     @Produces({MediaType.APPLICATION_PDF, MediaType.APPLICATION_JSON})
-    public HttpResponse<?> redact(@Body RedactRequest request) {
+    public HttpResponse<?> redact(@Body RedactRequest request, HttpRequest<?> httpRequest) {
+        String cityId = httpRequest.getAttribute(JwtAuthFilter.CITY_ATTRIBUTE, String.class)
+                .orElseThrow(() -> new IllegalStateException("city attribute missing from request — JWT filter should have set it"));
         String conversationId = request != null ? request.getConversationId() : null;
         int inputLength = request != null && request.getText() != null ? request.getText().length() : 0;
         OutputFormat requestedFormat = request != null ? request.getFormat() : null;
         logger.info(() -> "POST /complai/redact received — conversationId=" + conversationId
-                + " inputLength=" + inputLength + " format=" + requestedFormat);
+                + " inputLength=" + inputLength + " format=" + requestedFormat + " city=" + cityId);
         long start = System.currentTimeMillis();
         try {
             String text           = request != null ? request.getText() : null;
@@ -103,16 +109,11 @@ public class OpenRouterController {
 
             boolean identityComplete = identity != null && identity.isComplete();
 
-            // Async path: identity is known and the caller wants a PDF (or will accept one).
-            // We validate, enqueue, and return 202 immediately — the worker Lambda generates
-            // the PDF and uploads it to S3.
-            // JSON-format requests always stay synchronous: the caller wants inline text.
             if (identityComplete && format != OutputFormat.JSON) {
-                return handleAsyncRedact(text, format, conversationId, identity, start);
+                return handleAsyncRedact(text, format, conversationId, identity, cityId, start);
             }
 
-            // Synchronous path: identity incomplete (AI will ask) or caller wants JSON text.
-            OpenRouterResponseDto dto = service.redactComplaint(text, format, conversationId, identity);
+            OpenRouterResponseDto dto = service.redactComplaint(text, format, conversationId, identity, cityId);
             long latency = System.currentTimeMillis() - start;
             AuditLogger.log("/complai/redact", AuditLogger.hashText(text),
                     dto != null ? dto.getErrorCode().getCode() : -1, latency,
@@ -149,7 +150,7 @@ public class OpenRouterController {
      */
     private HttpResponse<?> handleAsyncRedact(String text, OutputFormat format,
                                               String conversationId, ComplainantIdentity identity,
-                                              long requestStart) {
+                                              String cityId, long requestStart) {
         // Run the same validation the sync path does (input length, anonymity).
         Optional<OpenRouterResponseDto> validationError = service.validateRedactInput(text);
         if (validationError.isPresent()) {
@@ -174,7 +175,7 @@ public class OpenRouterController {
 
         RedactSqsMessage sqsMessage = new RedactSqsMessage(
                 text, identity.name(), identity.surname(), identity.idNumber(),
-                s3Key, conversationId);
+                s3Key, conversationId, cityId);
         try {
             sqsPublisher.publish(sqsMessage);
         } catch (Exception e) {

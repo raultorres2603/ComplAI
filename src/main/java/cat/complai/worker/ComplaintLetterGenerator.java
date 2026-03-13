@@ -60,7 +60,15 @@ class ComplaintLetterGenerator {
         ComplainantIdentity identity = new ComplainantIdentity(
                 message.requesterName(), message.requesterSurname(), message.requesterIdNumber());
 
-        List<Map<String, Object>> aiMessages = buildAiMessages(message.complaintText(), identity);
+        // cityId is required — the API Lambda must set it when publishing the SQS message.
+        // Failing here ensures a missing cityId surfaces immediately rather than silently
+        // using the wrong procedures context.
+        String cityId = message.cityId();
+        if (cityId == null || cityId.isBlank()) {
+            throw new IllegalArgumentException("RedactSqsMessage is missing cityId — cannot determine procedures context");
+        }
+
+        List<Map<String, Object>> aiMessages = buildAiMessages(message.complaintText(), identity, cityId);
         logger.fine(() -> "ComplaintLetterGenerator — AI prompt built messageCount=" + aiMessages.size()
                 + " s3Key=" + message.s3Key());
 
@@ -91,11 +99,11 @@ class ComplaintLetterGenerator {
     // Private helpers
     // -------------------------------------------------------------------------
 
-    private List<Map<String, Object>> buildAiMessages(String complaintText, ComplainantIdentity identity) {
+    private List<Map<String, Object>> buildAiMessages(String complaintText, ComplainantIdentity identity, String cityId) {
         List<Map<String, Object>> messages = new ArrayList<>();
         messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage()));
 
-        String contextBlock = promptBuilder.buildProcedureContextBlock(complaintText);
+        String contextBlock = promptBuilder.buildProcedureContextBlock(complaintText, cityId);
         if (contextBlock != null) {
             messages.add(Map.of("role", "system", "content", contextBlock));
         }

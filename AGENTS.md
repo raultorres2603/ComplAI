@@ -20,7 +20,7 @@ ComplAI is a **Java 21 Micronaut application** designed to run as **AWS Lambda f
     - `cat.complai.worker.ComplaintLetterGenerator` — orchestrates the AI call and PDF render for the worker. Uses `RedactPromptBuilder` for the prompt and `PdfGenerator` for the PDF bytes.
     - `cat.complai.openrouter.helpers.RedactPromptBuilder` — stateless helper that builds the AI prompt for complaint letter generation. Used by both the synchronous service path and the worker Lambda.
     - `cat.complai.s3.S3PdfUploader` — wraps `S3Client`. Uploads PDFs and generates pre-signed GET URLs (24h expiry).
-- **Data Access (RAG):** `ProcedureRagHelper` uses **Apache Lucene** in-memory to index and search municipal procedures. Loads `procedures-<cityId>.json` from S3 when `PROCEDURES_BUCKET`/`PROCEDURES_KEY`/`PROCEDURES_REGION` env vars are set, falling back to the classpath resource (`procedures-elprat.json`). S3 loading is handled directly in `getProceduresInputStream()` — `ProcedureIndexLoader` is no longer invoked in the Lambda boot path.
+- **Data Access (RAG):** `ProcedureRagHelper` uses **Apache Lucene** in-memory to index and search municipal procedures. Loads `procedures-<cityId>.json` from S3 when `PROCEDURES_BUCKET`/`PROCEDURES_REGION` env vars are set; the S3 key is always derived from the city as `procedures-<cityId>.json` (no `PROCEDURES_KEY` env var needed). Falls back to the classpath resource (`procedures-elprat.json`). The city is read from the caller's JWT `city` claim (set by `JwtAuthFilter` as the `city` request attribute) and threaded through the service layer to `ProcedureRagHelperRegistry.getForCity(cityId)`, which builds and caches one Lucene index per city per warm Lambda instance.
 - **HTTP / Health:**
     - `cat.complai.home.HomeController` — `GET /` returns a `HomeDto` welcome response. No JWT required.
     - `cat.complai.home.HealthController` — `GET /health` returns a `HealthDto` with `status`, `version`, and `checks` (e.g. `openRouterApiKeyConfigured`). No JWT required.
@@ -80,8 +80,9 @@ The `pdfUrl` in the `202` response is a pre-signed S3 GET URL (24h expiry) gener
 - **Mint a JWT token (local/CI):**
   ```bash
   JWT_SECRET=$(openssl rand -base64 32) \
-  java -cp build/libs/complai-all.jar cat.complai.auth.TokenGenerator citizen-app 30
+  java -cp build/libs/complai-all.jar cat.complai.auth.TokenGenerator citizen-app 30 elprat
   ```
+  The third argument is the city identifier — it becomes the `city` claim in the token. Tokens minted without a city (two-argument form) default to `elprat` at validation time for backwards compatibility.
 - **Refresh procedures for a city:**
   ```bash
   PROCEDURES_BUCKET=complai-procedures-development \
@@ -134,7 +135,8 @@ The `pdfUrl` in the `202` response is a pre-signed S3 GET URL (24h expiry) gener
 - `src/main/java/cat/complai/openrouter/helpers/AiParsed.java`: Parses AI reply format headers (3 shapes).
 - `src/main/java/cat/complai/openrouter/helpers/AuditLogger.java`: Privacy-preserving structured audit log writer.
 - `src/main/java/cat/complai/openrouter/helpers/LanguageDetector.java`: Heuristic language detector (CA/ES/EN). Stateless; call `LanguageDetector.detect(text)`.
-- `src/main/java/cat/complai/openrouter/helpers/PdfGenerator.java`: PDF creation logic.
+- `src/main/java/cat/complai/openrouter/helpers/ProcedureRagHelper.java`: Per-city Lucene index builder. Takes a `cityId` constructor parameter.
+- `src/main/java/cat/complai/openrouter/helpers/ProcedureRagHelperRegistry.java`: `@Singleton` lazy cache of `ProcedureRagHelper` instances keyed by cityId. Initialises a new helper on first request per city, then reuses it.
 - `src/main/java/cat/complai/http/HttpWrapper.java`: OpenRouter HTTP client (`@Singleton`).
 - `src/main/java/cat/complai/home/HealthController.java`: `GET /health` — no JWT required.
 - `src/main/java/cat/complai/auth/JwtAuthFilter.java`: JWT filter; explicit exclusion list for `/` and `/health`.
@@ -178,7 +180,6 @@ The `pdfUrl` in the `202` response is a pre-signed S3 GET URL (24h expiry) gener
 | `OPENROUTER_MAX_RETRIES` | Both Lambdas | Max retries for `429`/`5xx` responses (default `3`; set to `1` to disable retries) |
 | `JWT_SECRET` | API Lambda | Base64-encoded HS256 secret for JWT validation |
 | `PROCEDURES_BUCKET` | Both Lambdas | S3 bucket name for `procedures-<cityId>.json` |
-| `PROCEDURES_KEY` | Both Lambdas | S3 object key for the procedures file (e.g. `procedures-elprat.json`) |
 | `PROCEDURES_REGION` | Both Lambdas | AWS region of the procedures bucket |
 | `REDACT_QUEUE_URL` | API Lambda | SQS queue URL for publishing async redact messages |
 | `COMPLAINTS_BUCKET` | Both Lambdas | S3 bucket name where generated PDFs are stored |

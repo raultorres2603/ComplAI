@@ -43,7 +43,7 @@ class SqsComplaintPublisherTest {
                 "Noise from the airport",
                 "Joan", "Garcia", "12345678A",
                 "complaints/abc/1700000000-complaint.pdf",
-                "conv-123");
+                "conv-123", "elprat");
 
         publisher.publish(message);
 
@@ -71,7 +71,7 @@ class SqsComplaintPublisherTest {
                 throw new IllegalStateException("REDACT_QUEUE_URL is not configured — cannot publish complaint message");
             }
         };
-        RedactSqsMessage message = new RedactSqsMessage("text", "A", "B", "C", "key", null);
+        RedactSqsMessage message = new RedactSqsMessage("text", "A", "B", "C", "key", null, "elprat");
 
         assertThrows(IllegalStateException.class, () -> publisher.publish(message),
                 "Publisher must throw when queueUrl is absent");

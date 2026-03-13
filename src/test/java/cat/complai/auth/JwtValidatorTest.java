@@ -34,7 +34,7 @@ class JwtValidatorTest {
 
     @Test
     void validToken_returnsSuccessWithSubject() {
-        String token = buildToken("citizen-app", ISSUER, futureDate(30));
+        String token = buildTokenWithCity("citizen-app", ISSUER, futureDate(30), "testcity");
 
         JwtValidationResult result = validator.validate("Bearer " + token);
 
@@ -151,6 +151,30 @@ class JwtValidatorTest {
         assertTrue(result.failureReason().toLowerCase().contains("sub"));
     }
 
+    // --- City claim ---
+
+    @Test
+    void validTokenWithCityClaim_returnsCityFromToken() {
+        String token = buildTokenWithCity("citizen-app", ISSUER, futureDate(30), "someothercity");
+
+        JwtValidationResult result = validator.validate("Bearer " + token);
+
+        assertTrue(result.valid());
+        assertEquals("someothercity", result.city());
+    }
+
+    @Test
+    void validTokenWithoutCityClaim_isRejected() {
+        // Token built without .claim("city", ...) — city is now required.
+        String token = buildToken("citizen-app", ISSUER, futureDate(30));
+
+        JwtValidationResult result = validator.validate("Bearer " + token);
+
+        assertFalse(result.valid());
+        assertTrue(result.failureReason().contains("city"),
+                "Rejection reason must mention the missing city claim");
+    }
+
     // --- Startup guard ---
 
     @Test
@@ -182,6 +206,17 @@ class JwtValidatorTest {
                 .issuer(issuer)
                 .issuedAt(new Date())
                 .expiration(expiry)
+                .signWith(key)
+                .compact();
+    }
+
+    private String buildTokenWithCity(String subject, String issuer, Date expiry, String city) {
+        return Jwts.builder()
+                .subject(subject)
+                .issuer(issuer)
+                .issuedAt(new Date())
+                .expiration(expiry)
+                .claim("city", city)
                 .signWith(key)
                 .compact();
     }

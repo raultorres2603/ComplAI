@@ -32,10 +32,11 @@ public class TokenGenerator {
     private static final int MIN_SECRET_BYTES = 32;
 
     public static void main(String[] args) {
-        if (args.length != 2) {
-            System.err.println("Usage: TokenGenerator <subject> <expiry-days>");
+        if (args.length != 3) {
+            System.err.println("Usage: TokenGenerator <subject> <expiry-days> <city>");
             System.err.println("  subject      — consumer identifier (e.g. citizen-app)");
             System.err.println("  expiry-days  — positive integer, e.g. 30");
+            System.err.println("  city         — city identifier (e.g. elprat)");
             System.exit(1);
         }
 
@@ -46,6 +47,12 @@ public class TokenGenerator {
             if (expiryDays <= 0) throw new NumberFormatException("must be positive");
         } catch (NumberFormatException e) {
             System.err.println("expiry-days must be a positive integer");
+            System.exit(1);
+            return;
+        }
+        String city = args[2].trim();
+        if (city.isBlank()) {
+            System.err.println("city must not be blank");
             System.exit(1);
             return;
         }
@@ -82,12 +89,13 @@ public class TokenGenerator {
                 .issuer(ISSUER)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expiry))
+                .claim("city", city)
                 .signWith(key)
                 .compact();
 
         System.out.println(token);
-        System.err.printf("Token for subject='%s', expires in %d days (%s)%n",
-                subject, expiryDays, expiry);
+        System.err.printf("Token for subject='%s' city='%s', expires in %d days (%s)%n",
+                subject, city, expiryDays, expiry);
     }
 }
 

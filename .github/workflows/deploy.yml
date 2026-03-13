@@ -320,7 +320,7 @@ jobs:
             CANDIDATE=$(ls -S build/libs/*.jar 2>/dev/null | head -n1)
           fi
           
-          TOKEN=$(JWT_SECRET="$JWT_SECRET" java -cp "$CANDIDATE" cat.complai.auth.TokenGenerator e2e-development 1 2>/dev/null | tail -1)
+          TOKEN=$(JWT_SECRET="$JWT_SECRET" java -cp "$CANDIDATE" cat.complai.auth.TokenGenerator e2e-development 1 elprat 2>/dev/null | tail -1)
           echo "jwtToken=$TOKEN" >> $GITHUB_ENV
 
       - name: Run Bruno E2E tests (development)
