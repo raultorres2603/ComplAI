@@ -38,54 +38,67 @@ public class ProcedureRagHelper {
 
     private static final String[] SEARCH_FIELDS = {"title", "description", "requirements", "steps"};
     private static final int MAX_RESULTS = 3;
-    private static final String RESOURCE_PATH = "/procedures.json";
     private static final String ENV_PROCEDURES_BUCKET = "PROCEDURES_BUCKET";
-    private static final String ENV_PROCEDURES_KEY = "PROCEDURES_KEY";
     private static final String ENV_PROCEDURES_REGION = "PROCEDURES_REGION";
     private static final Logger logger = Logger.getLogger(ProcedureRagHelper.class.getName());
 
+    private final String cityId;
     private final List<Procedure> procedures;
     private final ByteBuffersDirectory ramDirectory;
     private final Analyzer analyzer;
 
-    public ProcedureRagHelper() throws IOException {
-        this.procedures = loadProceduresFromResource();
+    /**
+     * Builds an in-memory Lucene index for the given city's procedures.
+     *
+     * <p>Procedures are loaded from S3 when {@code PROCEDURES_BUCKET} and
+     * {@code PROCEDURES_REGION} are set; the S3 object key is always
+     * {@code procedures-<cityId>.json}. Falls back to the classpath resource
+     * {@code /procedures-<cityId>.json} when S3 env vars are absent (e.g. local tests).
+     */
+    public ProcedureRagHelper(String cityId) throws IOException {
+        this.cityId = cityId;
+        this.procedures = loadProcedures();
         this.analyzer = new StandardAnalyzer();
         this.ramDirectory = new ByteBuffersDirectory();
         buildIndex();
-        logger.info(() -> "ProcedureRagHelper initialised — procedureCount=" + procedures.size());
+        logger.info(() -> "ProcedureRagHelper initialised — city=" + cityId + " procedureCount=" + procedures.size());
     }
 
-    private static InputStream getProceduresInputStream() throws IOException {
+    private InputStream getProceduresInputStream() throws IOException {
         String bucket = System.getenv(ENV_PROCEDURES_BUCKET);
-        String key = System.getenv(ENV_PROCEDURES_KEY);
         String region = System.getenv(ENV_PROCEDURES_REGION);
-        if (bucket != null && key != null && region != null) {
-            // Try to load from S3
+        // The S3 key is always derived from the cityId — no env var override.
+        // This ensures multi-city requests each load the correct file.
+        String s3Key = "procedures-" + cityId + ".json";
+        if (bucket != null && region != null) {
             try (software.amazon.awssdk.services.s3.S3Client s3 = software.amazon.awssdk.services.s3.S3Client.builder()
                     .region(software.amazon.awssdk.regions.Region.of(region))
                     .credentialsProvider(software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider.create())
                     .build()) {
-                software.amazon.awssdk.services.s3.model.GetObjectRequest req = software.amazon.awssdk.services.s3.model.GetObjectRequest.builder()
-                        .bucket(bucket)
-                        .key(key)
-                        .build();
-                logger.info(() -> "Loading procedures from S3 — bucket=" + bucket + " key=" + key + " region=" + region);
+                software.amazon.awssdk.services.s3.model.GetObjectRequest req =
+                        software.amazon.awssdk.services.s3.model.GetObjectRequest.builder()
+                                .bucket(bucket)
+                                .key(s3Key)
+                                .build();
+                logger.info(() -> "Loading procedures from S3 — bucket=" + bucket + " key=" + s3Key + " region=" + region);
                 return s3.getObject(req);
             } catch (Exception e) {
                 logger.log(Level.WARNING, "Failed to load procedures from S3 — bucket=" + bucket
-                        + " key=" + key + " region=" + region + " error=" + e.getMessage()
+                        + " key=" + s3Key + " region=" + region + " error=" + e.getMessage()
                         + "; falling back to classpath resource", e);
             }
         }
-        // Fallback to resource
-        logger.info("Loading procedures from classpath resource: " + RESOURCE_PATH);
-        InputStream is = ProcedureRagHelper.class.getResourceAsStream(RESOURCE_PATH);
-        if (is == null) throw new IOException("procedures.json not found in resources or S3");
+        String resourcePath = "/procedures-" + cityId + ".json";
+        logger.info("Loading procedures from classpath resource: " + resourcePath);
+        InputStream is = ProcedureRagHelper.class.getResourceAsStream(resourcePath);
+        if (is == null) {
+            throw new IOException("procedures-" + cityId + ".json not found — "
+                    + "add it to src/main/resources/ or configure PROCEDURES_BUCKET/PROCEDURES_REGION");
+        }
         return is;
     }
 
-    private List<Procedure> loadProceduresFromResource() throws IOException {
+    private List<Procedure> loadProcedures() throws IOException {
         ObjectMapper mapper = new ObjectMapper();
         InputStream is = getProceduresInputStream();
         JsonNode root = mapper.readTree(is);

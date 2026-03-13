@@ -83,9 +83,9 @@ public class OpenRouterServices implements IOpenRouterService {
 
 
     @Override
-    public OpenRouterResponseDto ask(String question, String conversationId) {
+    public OpenRouterResponseDto ask(String question, String conversationId, String cityId) {
         int inputLength = question != null ? question.length() : 0;
-        logger.info(() -> "ask() called — conversationId=" + conversationId + " inputLength=" + inputLength);
+        logger.info(() -> "ask() called — conversationId=" + conversationId + " inputLength=" + inputLength + " city=" + cityId);
         if (question == null || question.isBlank()) {
             logger.fine(() -> "ask() rejected — reason=emptyQuestion conversationId=" + conversationId);
             return new OpenRouterResponseDto(false, null, "Question must not be empty.", null, OpenRouterErrorCode.VALIDATION);
@@ -98,7 +98,7 @@ public class OpenRouterServices implements IOpenRouterService {
 
         List<Map<String, Object>> messages = new ArrayList<>();
         messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage()));
-        String contextBlock = promptBuilder.buildProcedureContextBlock(question);
+        String contextBlock = promptBuilder.buildProcedureContextBlock(question, cityId);
         if (contextBlock != null) {
             messages.add(Map.of("role", "system", "content", contextBlock));
         }
@@ -123,11 +123,11 @@ public class OpenRouterServices implements IOpenRouterService {
     }
 
     @Override
-    public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format, String conversationId, ComplainantIdentity identity) {
+    public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format, String conversationId, ComplainantIdentity identity, String cityId) {
         int inputLength = complaint != null ? complaint.length() : 0;
         boolean identityProvided = identity != null && identity.isPartiallyProvided();
         logger.info(() -> "redactComplaint() called — conversationId=" + conversationId
-                + " inputLength=" + inputLength + " format=" + format + " identityProvided=" + identityProvided);
+                + " inputLength=" + inputLength + " format=" + format + " identityProvided=" + identityProvided + " city=" + cityId);
 
         Optional<OpenRouterResponseDto> validationError = validateRedactInput(complaint);
         if (validationError.isPresent()) {
@@ -138,7 +138,7 @@ public class OpenRouterServices implements IOpenRouterService {
 
         List<Map<String, Object>> messages = new ArrayList<>();
         messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage()));
-        String contextBlock = promptBuilder.buildProcedureContextBlock(complaint);
+        String contextBlock = promptBuilder.buildProcedureContextBlock(complaint, cityId);
         if (contextBlock != null) {
             messages.add(Map.of("role", "system", "content", contextBlock));
         }

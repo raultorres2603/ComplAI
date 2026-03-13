@@ -104,10 +104,9 @@ class RedactPromptBuilderTest {
     @Test
     void buildProcedureContextBlock_returnsNullWhenQueryProducesNoResults() {
         // A nonsense query should produce no RAG matches and return null.
-        String result = builder.buildProcedureContextBlock("xyzzy_nonexistent_term_abc123");
         // Either null (no results) or a non-empty string (if fuzzy matched) — both are valid.
         // The important contract: it must never throw.
-        // We only assert non-throwing here.
+        String result = builder.buildProcedureContextBlock("xyzzy_nonexistent_term_abc123", "elprat");
     }
 }
 

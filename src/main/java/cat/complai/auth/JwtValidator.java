@@ -124,7 +124,12 @@ public class JwtValidator {
                 return JwtValidationResult.failure("Token is missing the subject claim (sub)");
             }
 
-            return JwtValidationResult.success(subject);
+            String city = claims.get("city", String.class);
+            if (city == null || city.isBlank()) {
+                return JwtValidationResult.failure("Token is missing the city claim");
+            }
+
+            return JwtValidationResult.success(subject, city);
 
         } catch (ExpiredJwtException e) {
             return JwtValidationResult.failure("Token has expired");

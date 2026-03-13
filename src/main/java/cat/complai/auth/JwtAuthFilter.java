@@ -6,6 +6,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ServerFilter;
@@ -37,6 +38,9 @@ public class JwtAuthFilter {
 
     private static final Logger logger = Logger.getLogger(JwtAuthFilter.class.getName());
 
+    /** Request attribute key that downstream controllers read to determine the caller's city. */
+    public static final String CITY_ATTRIBUTE = "city";
+
     private final JwtValidator jwtValidator;
 
     @Inject
@@ -51,7 +55,7 @@ public class JwtAuthFilter {
      */
     @RequestFilter
     @Nullable
-    public MutableHttpResponse<?> filter(HttpRequest<?> request) {
+    public MutableHttpResponse<?> filter(MutableHttpRequest<?> request) {
         if (isExcluded(request)) {
             return null;
         }
@@ -64,6 +68,10 @@ public class JwtAuthFilter {
                     + " path=" + request.getPath() + " reason=" + result.failureReason());
             return unauthorizedResponse(result.failureReason());
         }
+
+        // Propagate the city claim downstream so controllers can load the correct
+        // procedures context without re-parsing the token.
+        request.setAttribute(CITY_ATTRIBUTE, result.city());
 
         return null;
     }

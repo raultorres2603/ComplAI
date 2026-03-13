@@ -86,7 +86,7 @@ class JwtAuthFilterTest {
     @Test
     void validToken_returnsNull() {
         MutableHttpRequest<?> request = HttpRequest.POST("/complai/ask", "{}")
-                .header("Authorization", "Bearer " + buildToken("citizen-app", ISSUER, futureDate(30)));
+                .header("Authorization", "Bearer " + buildTokenWithCity("citizen-app", ISSUER, futureDate(30), "testcity"));
         assertNull(filter.filter(request), "Valid token must pass through (return null)");
     }
 
@@ -130,6 +130,40 @@ class JwtAuthFilterTest {
         assertEquals(401, response.getStatus().getCode());
     }
 
+    // --- City attribute propagation ---
+
+    @Test
+    void validTokenWithCityClaim_setsCityAttributeOnRequest() {
+        String token = buildTokenWithCity("citizen-app", ISSUER, futureDate(30), "somecity");
+        MutableHttpRequest<?> request = HttpRequest.POST("/complai/ask", "{}")
+                .header("Authorization", "Bearer " + token);
+
+        assertNull(filter.filter(request));
+
+        String city = request.getAttribute(JwtAuthFilter.CITY_ATTRIBUTE, String.class).orElse(null);
+        assertEquals("somecity", city);
+    }
+
+    @Test
+    void validTokenWithoutCityClaim_isRejectedWith401() {
+        // Token without city claim — city is now required.
+        MutableHttpRequest<?> request = HttpRequest.POST("/complai/ask", "{}")
+                .header("Authorization", "Bearer " + buildToken("citizen-app", ISSUER, futureDate(30)));
+
+        MutableHttpResponse<?> response = filter.filter(request);
+
+        assertNotNull(response, "Filter must reject the request when city claim is absent");
+        assertEquals(401, response.getStatus().getCode());
+    }
+
+    @Test
+    void excludedPaths_doNotSetCityAttribute() {
+        MutableHttpRequest<?> request = HttpRequest.GET("/health");
+        assertNull(filter.filter(request));
+        // No city attribute set — excluded paths don't go through JWT validation.
+        assertFalse(request.getAttribute(JwtAuthFilter.CITY_ATTRIBUTE, String.class).isPresent());
+    }
+
     // --- Helpers ---
 
     private String buildToken(String subject, String issuer, Date expiry) {
@@ -138,6 +172,17 @@ class JwtAuthFilterTest {
                 .issuer(issuer)
                 .issuedAt(new Date())
                 .expiration(expiry)
+                .signWith(key)
+                .compact();
+    }
+
+    private String buildTokenWithCity(String subject, String issuer, Date expiry, String city) {
+        return Jwts.builder()
+                .subject(subject)
+                .issuer(issuer)
+                .issuedAt(new Date())
+                .expiration(expiry)
+                .claim("city", city)
                 .signWith(key)
                 .compact();
     }

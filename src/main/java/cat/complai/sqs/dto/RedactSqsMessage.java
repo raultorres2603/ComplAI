@@ -26,7 +26,10 @@ public record RedactSqsMessage(
         // without any coordination at upload time.
         String s3Key,
         // Optional: included for traceability and future conversation-history lookup.
-        String conversationId
+        String conversationId,
+        // City identifier from the caller's JWT, used by the worker to load the correct
+        // procedures context. Required — messages without a cityId are rejected by the worker.
+        String cityId
 ) {
     @JsonCreator
     public static RedactSqsMessage fromJson(
@@ -35,9 +38,9 @@ public record RedactSqsMessage(
             @JsonProperty("requesterSurname")  String requesterSurname,
             @JsonProperty("requesterIdNumber") String requesterIdNumber,
             @JsonProperty("s3Key")             String s3Key,
-            @JsonProperty("conversationId")    String conversationId) {
+            @JsonProperty("conversationId")    String conversationId,
+            @JsonProperty("cityId")            String cityId) {
         return new RedactSqsMessage(complaintText, requesterName, requesterSurname,
-                requesterIdNumber, s3Key, conversationId);
+                requesterIdNumber, s3Key, conversationId, cityId);
     }
 }
-

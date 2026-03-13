@@ -1,0 +1,33 @@
+{
+  "cityId": "elprat",
+  "cityName": "El Prat de Llobregat",
+  "baseUrl": "https://tramits.pratespais.com/Ciutadania/TramitsTemes.aspx",
+  "s3Region": "eu-west-1",
+  "crawl": {
+    "categoryLinkSelector": "div.LlistaTemes.LlistatMenu ul.llistat a[href]",
+    "detailLinkSelector": "a[href*='DetallTramit.aspx']",
+    "detailLinkExcludePattern": "Tramitar=True"
+  },
+  "fields": {
+    "title": {
+      "selector": "span.iconesTramit, span.titolTramit",
+      "multiple": false
+    },
+    "description": {
+      "selector": ".introduccio",
+      "multiple": false
+    },
+    "requirements": {
+      "selector": ".introduccio ul",
+      "multiple": true
+    },
+    "steps": {
+      "selector": ".block, .blockFirst",
+      "multiple": false
+    }
+  },
+  "skip": {
+    "whenTitleEmptyOrEquals": ["Portal de Tràmits"]
+  }
+}
+

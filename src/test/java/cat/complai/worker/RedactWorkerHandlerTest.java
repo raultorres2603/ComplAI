@@ -80,7 +80,7 @@ class RedactWorkerHandlerTest {
         ComplaintLetterGenerator generator = new ComplaintLetterGenerator(PROMPT_BUILDER, wrapper, uploader, 30);
         RedactSqsMessage message = new RedactSqsMessage(
                 "Noise from the airport", "Joan", "Garcia", "12345678A",
-                "complaints/abc/1700000000-complaint.pdf", null);
+                "complaints/abc/1700000000-complaint.pdf", null, "elprat");
 
         generator.generate(message);
 
@@ -100,7 +100,7 @@ class RedactWorkerHandlerTest {
         ComplaintLetterGenerator generator = new ComplaintLetterGenerator(PROMPT_BUILDER, wrapper, uploader, 30);
         RedactSqsMessage message = new RedactSqsMessage(
                 "Noise from the airport", "Joan", "Garcia", "12345678A",
-                "complaints/abc/1700000000-complaint.pdf", null);
+                "complaints/abc/1700000000-complaint.pdf", null, "elprat");
 
         assertThrows(Exception.class, () -> generator.generate(message),
                 "generator.generate() must throw when the AI returns an error");
@@ -115,7 +115,7 @@ class RedactWorkerHandlerTest {
         ComplaintLetterGenerator generator = new ComplaintLetterGenerator(PROMPT_BUILDER, wrapper, uploader, 30);
         RedactSqsMessage message = new RedactSqsMessage(
                 "Noise from the airport", "Joan", "Garcia", "12345678A",
-                "complaints/xyz/1700000001-complaint.pdf", null);
+                "complaints/xyz/1700000001-complaint.pdf", null, "elprat");
 
         assertThrows(Exception.class, () -> generator.generate(message));
         assertNull(uploader.uploadedBytes.get());
@@ -130,7 +130,7 @@ class RedactWorkerHandlerTest {
         ComplaintLetterGenerator generator = new ComplaintLetterGenerator(PROMPT_BUILDER, wrapper, uploader, 30);
         RedactSqsMessage message = new RedactSqsMessage(
                 "Pothole on Carrer Major", "Joan", "Garcia", "12345678A",
-                "complaints/def/1700000002-complaint.pdf", null);
+                "complaints/def/1700000002-complaint.pdf", null, "elprat");
 
         generator.generate(message); // must not throw
 
@@ -181,8 +181,8 @@ class RedactWorkerHandlerTest {
             }
         };
 
-        RedactSqsMessage msg1 = new RedactSqsMessage("Bad complaint", "A", "B", "C", "complaints/fail/1-complaint.pdf", null);
-        RedactSqsMessage msg2 = new RedactSqsMessage("Good complaint", "X", "Y", "Z", "complaints/ok/2-complaint.pdf", null);
+        RedactSqsMessage msg1 = new RedactSqsMessage("Bad complaint", "A", "B", "C", "complaints/fail/1-complaint.pdf", null, "elprat");
+        RedactSqsMessage msg2 = new RedactSqsMessage("Good complaint", "X", "Y", "Z", "complaints/ok/2-complaint.pdf", null, "elprat");
         SQSEvent.SQSMessage record1 = new SQSEvent.SQSMessage();
         record1.setMessageId("fail-001");
         record1.setBody(MAPPER.writeValueAsString(msg1));

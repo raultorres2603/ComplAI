@@ -103,7 +103,7 @@ public class OpenRouterServicesTest {
         OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
 
         String input = "Is there a recycling center in El Prat de Llobregat?";
-        OpenRouterResponseDto out = svc.ask(input, null);
+        OpenRouterResponseDto out = svc.ask(input, null, "testcity");
         assertTrue(out.isSuccess());
         assertEquals("Hello from El Prat AI", out.getMessage());
         assertNull(out.getError());
@@ -115,7 +115,7 @@ public class OpenRouterServicesTest {
         OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
 
         String input = "How to contact the Ajuntament of El Prat? [UPSTREAM]";
-        OpenRouterResponseDto out = svc.ask(input, null);
+        OpenRouterResponseDto out = svc.ask(input, null, "testcity");
         assertFalse(out.isSuccess());
         assertEquals("Upstream error", out.getError());
     }
@@ -126,7 +126,7 @@ public class OpenRouterServicesTest {
         OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
 
         String input = "What is the capital of France? [REFUSE]";
-        OpenRouterResponseDto out = svc.ask(input, null);
+        OpenRouterResponseDto out = svc.ask(input, null, "testcity");
         assertFalse(out.isSuccess());
         assertEquals("Request is not about El Prat de Llobregat.", out.getError());
     }
@@ -136,19 +136,18 @@ public class OpenRouterServicesTest {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
         OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
 
-        OpenRouterResponseDto out = svc.redactComplaint("   ", OutputFormat.JSON, null, null);
+        OpenRouterResponseDto out = svc.redactComplaint("   ", OutputFormat.JSON, null, null, "testcity");
         assertFalse(out.isSuccess());
         assertEquals("Complaint must not be empty.", out.getError());
     }
 
     @Test
     void redact_anonymousRequest_english_rejectsWithValidation() {
-        // The service must reject anonymous complaints immediately without calling the AI.
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
         OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
 
         OpenRouterResponseDto out = svc.redactComplaint(
-                "Noise from the airport. I want to remain anonymous.", OutputFormat.JSON, null, null);
+                "Noise from the airport. I want to remain anonymous.", OutputFormat.JSON, null, null, "testcity");
         assertFalse(out.isSuccess());
         assertEquals(OpenRouterErrorCode.VALIDATION, out.getErrorCode());
         assertTrue(out.getError().contains("Anonymous"), "Error must mention anonymous complaints");
@@ -160,7 +159,7 @@ public class OpenRouterServicesTest {
         OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
 
         OpenRouterResponseDto out = svc.redactComplaint(
-                "Ruido del aeropuerto. Quiero que sea anónimo.", OutputFormat.JSON, null, null);
+                "Ruido del aeropuerto. Quiero que sea anónimo.", OutputFormat.JSON, null, null, "testcity");
         assertFalse(out.isSuccess());
         assertEquals(OpenRouterErrorCode.VALIDATION, out.getErrorCode());
     }
@@ -171,20 +170,18 @@ public class OpenRouterServicesTest {
         OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
 
         OpenRouterResponseDto out = svc.redactComplaint(
-                "Soroll de l'aeroport. Vull ser anònim.", OutputFormat.JSON, null, null);
+                "Soroll de l'aeroport. Vull ser anònim.", OutputFormat.JSON, null, null, "testcity");
         assertFalse(out.isSuccess());
         assertEquals(OpenRouterErrorCode.VALIDATION, out.getErrorCode());
     }
 
     @Test
     void redact_missingIdentity_aiAsksForIt_returns200WithQuestion() {
-        // When identity is absent, the service must instruct the AI to ask the user for
-        // the missing fields, and return the AI's question as a 200 success to the client.
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
         OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
 
         OpenRouterResponseDto out = svc.redactComplaint(
-                "Noise from the airport [ASKS_IDENTITY]", OutputFormat.JSON, null, null);
+                "Noise from the airport [ASKS_IDENTITY]", OutputFormat.JSON, null, null, "testcity");
         assertTrue(out.isSuccess(), "Service must return success so the client can show the AI's question");
         assertNotNull(out.getMessage());
         assertTrue(out.getMessage().contains("first name"), "AI response must ask for the missing identity fields");
@@ -193,14 +190,12 @@ public class OpenRouterServicesTest {
 
     @Test
     void redact_completeIdentity_returnsLetterAsText() {
-        // The sync service path never produces PDF bytes — PDFs are generated by the async worker.
-        // With a complete identity the service returns the letter body as text.
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
         OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
 
         ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
         OpenRouterResponseDto out = svc.redactComplaint(
-                "Noise from the airport [IDENTITY_LETTER]", OutputFormat.PDF, null, identity);
+                "Noise from the airport [IDENTITY_LETTER]", OutputFormat.PDF, null, identity, "testcity");
         assertTrue(out.isSuccess());
         assertNull(out.getPdfData(), "Service must never produce PDF bytes — PDFs are always async");
         assertNotNull(out.getMessage(), "Letter body must be returned as text");
@@ -209,14 +204,12 @@ public class OpenRouterServicesTest {
 
     @Test
     void redact_partialIdentity_aiAsksForMissingFields() {
-        // A partially-filled identity (e.g. name only, no surname or ID) is treated as
-        // missing — the AI must be asked to collect the remaining fields.
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
         OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
 
         ComplainantIdentity partial = new ComplainantIdentity("Joan", null, null);
         OpenRouterResponseDto out = svc.redactComplaint(
-                "Noise from the airport [ASKS_IDENTITY]", OutputFormat.JSON, null, partial);
+                "Noise from the airport [ASKS_IDENTITY]", OutputFormat.JSON, null, partial, "testcity");
         assertTrue(out.isSuccess());
         assertNotNull(out.getMessage());
         assertNull(out.getPdfData());
@@ -224,12 +217,11 @@ public class OpenRouterServicesTest {
 
     @Test
     void redact_pdfRequested_returnsLetterAsText() {
-        // The sync service path never produces PDF bytes regardless of requested format.
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
         OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
 
         ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
-        OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [HEADER]", OutputFormat.PDF, null, identity);
+        OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [HEADER]", OutputFormat.PDF, null, identity, "testcity");
         assertTrue(out.isSuccess());
         assertNull(out.getPdfData(), "Service must never produce PDF bytes — PDFs are always async");
         assertNotNull(out.getMessage(), "Letter body must be returned as text");
@@ -242,7 +234,7 @@ public class OpenRouterServicesTest {
 
         String aiMessage = "Dear Ajuntament,\n\nI am writing to complain about...\n\nSincerely,\nResident";
         ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
-        OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [NOHEADER]", OutputFormat.AUTO, null, identity);
+        OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [NOHEADER]", OutputFormat.AUTO, null, identity, "testcity");
 
         assertTrue(out.isSuccess(), "Missing header with AUTO must not fail the request");
         assertEquals(aiMessage, out.getMessage(), "Raw AI message must be returned as-is");
@@ -256,7 +248,7 @@ public class OpenRouterServicesTest {
 
         String aiMessage = "Dear Ajuntament,\n\nI am writing to complain about...\n\nSincerely,\nResident";
         ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
-        OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [NOHEADER]", OutputFormat.JSON, null, identity);
+        OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [NOHEADER]", OutputFormat.JSON, null, identity, "testcity");
 
         assertTrue(out.isSuccess(), "Missing header with JSON must not fail the request");
         assertEquals(aiMessage, out.getMessage());
@@ -264,14 +256,12 @@ public class OpenRouterServicesTest {
 
     @Test
     void redact_missingJsonHeader_withPdfFormat_returnsRawTextGracefully() {
-        // When the client explicitly asked for PDF but the AI omits the JSON header,
-        // the service returns the raw AI message as text. PDF generation is async-only.
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
         OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
 
         String aiMessage = "Dear Ajuntament,\n\nI am writing to complain about...\n\nSincerely,\nResident";
         ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
-        OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [NOHEADER]", OutputFormat.PDF, null, identity);
+        OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [NOHEADER]", OutputFormat.PDF, null, identity, "testcity");
 
         assertTrue(out.isSuccess(), "Missing header with explicit PDF format must still succeed");
         assertNull(out.getPdfData(), "Service must never produce PDF bytes — PDFs are always async");
@@ -280,12 +270,11 @@ public class OpenRouterServicesTest {
 
     @Test
     void redact_auto_returnsLetterAsText_whenAiReturnsFormalLetter() {
-        // The sync service path always returns text regardless of format hint in the AI response.
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
         OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
 
         ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
-        OpenRouterResponseDto out = svc.redactComplaint("Some long complaint text [HEADER_LONG]", OutputFormat.AUTO, null, identity);
+        OpenRouterResponseDto out = svc.redactComplaint("Some long complaint text [HEADER_LONG]", OutputFormat.AUTO, null, identity, "testcity");
         assertTrue(out.isSuccess(), "Service should report success");
         assertNull(out.getPdfData(), "Service must never produce PDF bytes — PDFs are always async");
         assertNotNull(out.getMessage(), "Letter body must be returned as text");
@@ -295,7 +284,7 @@ public class OpenRouterServicesTest {
     void ask_tooLong_rejects() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
         OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
-        OpenRouterResponseDto out = svc.ask("a".repeat(5001), null);
+        OpenRouterResponseDto out = svc.ask("a".repeat(5001), null, "testcity");
         assertFalse(out.isSuccess());
         assertEquals(OpenRouterErrorCode.VALIDATION, out.getErrorCode());
         assertTrue(out.getError().contains("maximum allowed length"));
@@ -305,7 +294,7 @@ public class OpenRouterServicesTest {
     void redactComplaint_tooLong_rejects() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
         OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
-        OpenRouterResponseDto out = svc.redactComplaint("b".repeat(5001), OutputFormat.JSON, null, null);
+        OpenRouterResponseDto out = svc.redactComplaint("b".repeat(5001), OutputFormat.JSON, null, null, "testcity");
         assertFalse(out.isSuccess());
         assertEquals(OpenRouterErrorCode.VALIDATION, out.getErrorCode());
         assertTrue(out.getError().contains("maximum allowed length"));
@@ -313,14 +302,13 @@ public class OpenRouterServicesTest {
 
     @Test
     void redact_pdfRequested_unicodeCatalanCharacters() {
-        // Unicode characters must survive the AI response parsing and be returned as text.
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
         OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
         String catalanText = "Això és una prova amb ç, à, ü, ·l, ñ, and œ.";
         String aiResponse = "{\"format\": \"pdf\"}\n\n" + catalanText;
         wrapper.overrideNextResponse(aiResponse);
         ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
-        OpenRouterResponseDto out = svc.redactComplaint("Prova unicode català [HEADER]", OutputFormat.PDF, null, identity);
+        OpenRouterResponseDto out = svc.redactComplaint("Prova unicode català [HEADER]", OutputFormat.PDF, null, identity, "testcity");
         assertTrue(out.isSuccess());
         assertNull(out.getPdfData(), "Service must never produce PDF bytes — PDFs are always async");
         assertNotNull(out.getMessage(), "Letter body with Unicode characters must be returned as text");
@@ -335,7 +323,7 @@ public class OpenRouterServicesTest {
         OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
 
         ComplainantIdentity identity = new ComplainantIdentity("Raul", "Torres", "12345678A");
-        svc.redactComplaint("Fix the street", OutputFormat.PDF, null, identity);
+        svc.redactComplaint("Fix the street", OutputFormat.PDF, null, identity, "testcity");
 
         assertNotNull(wrapper.lastMessages, "Messages must be captured");
         String prompt = (String) wrapper.lastMessages.getLast().get("content");
@@ -348,13 +336,11 @@ public class OpenRouterServicesTest {
 
     @Test
     void redact_incompleteIdentity_aiResponseReturnedAsText() {
-        // When identity is null, the AI's response (even if it looks like a letter) is returned
-        // as text. The sync path never produces PDF bytes.
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
         OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
 
         OpenRouterResponseDto out = svc.redactComplaint(
-                "My name is Raul Torres, ID 49872354C. [SMART_EXTRACT]", OutputFormat.PDF, null, null);
+                "My name is Raul Torres, ID 49872354C. [SMART_EXTRACT]", OutputFormat.PDF, null, null, "testcity");
 
         assertTrue(out.isSuccess());
         assertNull(out.getPdfData(), "Service must never produce PDF bytes — PDFs are always async");
