@@ -30,9 +30,8 @@ ComplAI is a **Java 21 Micronaut application** designed to run as **AWS Lambda f
 - **Audit Logging:** `cat.complai.openrouter.helpers.AuditLogger` — writes one structured JSON log line per request (`ts`, `endpoint`, `requestHash`, `errorCode`, `latencyMs`, `outputFormat`, `language`). Never logs raw text or AI responses. CloudWatch metric filters in CDK/SAM parse this format.
 - **Language Detection:** `cat.complai.openrouter.helpers.LanguageDetector` — stateless heuristic that returns `"CA"`, `"ES"`, or `"EN"` using signal-counting (Catalan markers checked first; `ñ` and Spanish stop-words second; English is the fallback). Call via `LanguageDetector.detect(text)`. Used by `OpenRouterController` to populate the `language` audit log field and to localise the `202 Accepted` response `message`. Default for null/blank input is `"CA"` (El Prat residents are predominantly Catalan speakers).
 - **Operator Tools (not deployed endpoints):**
-    - `cat.complai.auth.TokenGenerator` — CLI that mints HS256 JWT tokens. Run with `java -cp complai-all.jar cat.complai.auth.TokenGenerator <subject> <expiry-days>`. Requires `JWT_SECRET` env var.
+    - `cat.complai.auth.TokenGenerator` — CLI that mints HS256 JWT tokens. Run with `java -cp complai-all.jar cat.complai.auth.TokenGenerator <subject> <expiry-days> <city>`. Requires `JWT_SECRET` env var.
     - `cat.complai.scrapper.ProcedureScraper` — CLI that crawls a city's procedure website and uploads `procedures-<cityId>.json` to S3. City-specific crawl behaviour (base URL, CSS selectors, skip rules) is driven by `src/main/resources/scrapers/procedures-mapping-<cityId>.json`. Requires `PROCEDURES_BUCKET` env var. Trigger via the `scrape-upload-procedures.yml` GitHub Actions workflow or run standalone. Not part of the Lambda boot path.
-    - `cat.complai.scrapper.PratEspaisScraper` — **deprecated**, delegates to `ProcedureScraper` with `cityId=elprat`. Will be removed in a future release.
     - `cat.complai.scrapper.ProcedureIndexLoader` — downloads `procedures-<cityId>.json` from S3 to a temp file. **No longer invoked in the Lambda boot path** — `ProcedureRagHelper` now handles S3 loading internally via `getProceduresInputStream()`. Retained as a standalone utility.
 - **Infrastructure:** AWS CDK (`cdk/`) defines the infrastructure in three stacks. AWS SAM (`sam/`) is used for local emulation.
 
@@ -82,7 +81,7 @@ The `pdfUrl` in the `202` response is a pre-signed S3 GET URL (24h expiry) gener
   JWT_SECRET=$(openssl rand -base64 32) \
   java -cp build/libs/complai-all.jar cat.complai.auth.TokenGenerator citizen-app 30 elprat
   ```
-  The third argument is the city identifier — it becomes the `city` claim in the token. Tokens minted without a city (two-argument form) default to `elprat` at validation time for backwards compatibility.
+  The third argument is the city identifier — it becomes the `city` claim in the token. The `city` argument is required; omitting it exits with an error. `JwtValidator` rejects tokens that lack the `city` claim with `401`.
 - **Refresh procedures for a city:**
   ```bash
   PROCEDURES_BUCKET=complai-procedures-development \
@@ -101,6 +100,8 @@ The `pdfUrl` in the `202` response is a pre-signed S3 GET URL (24h expiry) gener
     - `ComplAIStorageStack-<env>` — S3 buckets
     - `ComplAIQueueStack-<env>` — SQS redact queue + DLQ
     - `ComplAILambdaStack-<env>` — both Lambda functions, IAM roles, log groups
+- **CI/CD:** `.github/workflows/deploy.yml` — triggered automatically on PRs (deploys to `development`) and manually via `workflow_dispatch` (choose environment and branch). Production deploys require master branch; a guard job enforces this. Uses GitHub Environments for secret isolation.
+- **Automatic releases:** `.github/workflows/release.yml` — on every push to master, reads `version` from `build.gradle`, compares to the latest `vX.Y.Z` tag, and creates a GitHub Release + tag when the version is new and greater. No manual step required.
 
 ## 3. Project Conventions & Patterns
 
@@ -113,6 +114,7 @@ The `pdfUrl` in the `202` response is a pre-signed S3 GET URL (24h expiry) gener
 - **OutputFormat:** `cat.complai.openrouter.dto.OutputFormat` enum (`JSON | PDF | AUTO`). `OutputFormat.fromString()` returns `null` for unrecognised values (intentional sentinel — the controller rejects them with 400). `isSupportedClientFormat(f)` validates at the HTTP boundary.
 - **ComplainantIdentity:** `cat.complai.openrouter.dto.ComplainantIdentity` record. Use `isComplete()` to gate the async path and `isPartiallyProvided()` to distinguish "nothing provided" from "partial". Never pass raw name/surname/id strings through service boundaries — always use this record.
 - **Pending complaint cache:** `OpenRouterServices` keeps a `pendingComplaintCache` (Caffeine, 30-min TTL) keyed by `conversationId`. It stores the original complaint text when identity is incomplete on the first turn so it can be resumed when the user provides identity on a follow-up turn.
+- **Conversation history cache:** `OpenRouterServices` also keeps a `conversationCache` (Caffeine, 30-min TTL, `maximumSize(10_000)`). Per-conversation history is capped at `MAX_HISTORY_TURNS = 10` turns before the oldest entries are dropped. Do not assume unbounded history.
 - **Security:**
     - **JWT:** Requests must have a valid Bearer token (HS256). Validated by `JwtAuthFilter`.
     - **Exclusions:** `GET /` and `GET /health` bypass JWT validation — this is explicit in `JwtAuthFilter.isExcluded()`, not in configuration.
@@ -123,7 +125,7 @@ The `pdfUrl` in the `202` response is a pre-signed S3 GET URL (24h expiry) gener
 - **Input Length Validation:** All user input is limited to 5000 characters (`complai.input.max-length-chars` in `application.properties`). Inputs exceeding this limit are rejected at the service boundary with a validation error.
 - **HTTP Retry Policy:** `HttpWrapper` retries on `429` (rate-limited) and `5xx` responses only, up to `OPENROUTER_MAX_RETRIES` times (default 3). `4xx` responses other than `429` and network exceptions are **never retried**. The retry count is configurable; a value of `1` means no retry.
 - **JWT activation guard:** Both `JwtAuthFilter` and `JwtValidator` carry `@Requires(property = "jwt.secret")`. They do not load in the worker Lambda (which has no `JWT_SECRET`). Do not add JWT logic to code paths shared by both Lambdas without this guard.
-- **JWT required claims:** `JwtValidator` enforces `iss` = `"complai"` (hardcoded in `JwtValidator.EXPECTED_ISSUER`), `exp` (tokens without an expiry are rejected), and `sub`. Tokens missing any of these are rejected with `401`. Never change `EXPECTED_ISSUER` without minting new tokens for all consumers.
+- **JWT required claims:** `JwtValidator` enforces `iss` = `"complai"` (hardcoded in `JwtValidator.EXPECTED_ISSUER`), `exp` (tokens without an expiry are rejected), `sub`, and `city`. Tokens missing any of these are rejected with `401`. Never change `EXPECTED_ISSUER` without minting new tokens for all consumers.
 
 ## 4. Key Files & Directories
 
@@ -138,17 +140,17 @@ The `pdfUrl` in the `202` response is a pre-signed S3 GET URL (24h expiry) gener
 - `src/main/java/cat/complai/openrouter/helpers/ProcedureRagHelper.java`: Per-city Lucene index builder. Takes a `cityId` constructor parameter.
 - `src/main/java/cat/complai/openrouter/helpers/ProcedureRagHelperRegistry.java`: `@Singleton` lazy cache of `ProcedureRagHelper` instances keyed by cityId. Initialises a new helper on first request per city, then reuses it.
 - `src/main/java/cat/complai/http/HttpWrapper.java`: OpenRouter HTTP client (`@Singleton`).
-- `src/main/java/cat/complai/home/HealthController.java`: `GET /health` — no JWT required.
+- `src/main/java/cat/complai/home/HealthController.java`: `GET /health` — no JWT required. `HealthDto` and `HealthService` are inner classes defined in this file.
 - `src/main/java/cat/complai/auth/JwtAuthFilter.java`: JWT filter; explicit exclusion list for `/` and `/health`.
+- `src/main/java/cat/complai/auth/JwtValidationResult.java`: `record` returned by `JwtValidator.validate()`. Carries `valid`, `subject`, `city`, and `failureReason`. The `city` field is always populated on success (never null).
 - `src/main/java/cat/complai/auth/TokenGenerator.java`: Offline CLI to mint JWT tokens.
 - `src/main/java/cat/complai/sqs/SqsComplaintPublisher.java`: Publishes `RedactSqsMessage` to SQS.
 - `src/main/java/cat/complai/sqs/dto/RedactSqsMessage.java`: SQS message contract between API Lambda and worker Lambda.
 - `src/main/java/cat/complai/worker/RedactWorkerHandler.java`: SQS-triggered worker Lambda entry point.
 - `src/main/java/cat/complai/worker/ComplaintLetterGenerator.java`: AI-call + PDF-render orchestration for the worker.
 - `src/main/java/cat/complai/s3/S3PdfUploader.java`: Uploads PDFs to S3 and generates pre-signed GET URLs.
-- `src/main/java/cat/complai/pratespais/ProcedureScraper.java`: Generic city procedures scraper — reads `scrapers/procedures-mapping-<cityId>.json`, produces `procedures-<cityId>.json`, uploads to S3.
-- `src/main/java/cat/complai/pratespais/PratEspaisScraper.java`: **Deprecated** — delegates to `ProcedureScraper` with `cityId=elprat`. Will be removed in a future release.
-- `src/main/java/cat/complai/pratespais/ProcedureIndexLoader.java`: Downloads `procedures-<cityId>.json` from S3 at Lambda start.
+- `src/main/java/cat/complai/scrapper/ProcedureScraper.java`: Generic city procedures scraper — reads `scrapers/procedures-mapping-<cityId>.json`, produces `procedures-<cityId>.json`, uploads to S3.
+- `src/main/java/cat/complai/scrapper/ProcedureIndexLoader.java`: Downloads `procedures-<cityId>.json` from S3 at Lambda start.
 - `cdk/deployment-environment.ts`: Shared `DeploymentEnvironment` type (`'development' | 'production'`).
 - `cdk/storage-stack.ts`: S3 bucket definitions (procedures + complaints).
 - `cdk/queue-stack.ts`: SQS queue + DLQ definitions.
@@ -157,6 +159,8 @@ The `pdfUrl` in the `202` response is a pre-signed S3 GET URL (24h expiry) gener
 - `sam/docker-compose.yml`: LocalStack services (S3 + SQS) for local development.
 - `sam/sqs_worker_poller.py`: Polls local SQS and invokes `ComplAIRedactorFunction` via `sam local invoke`. Started by `start-local.sh`.
 - `sam/localstack-init/init.sh`: Creates local S3 buckets and SQS queues on first LocalStack startup.
+- `.github/workflows/deploy.yml`: CI/CD pipeline. Triggers automatically on PRs (deploys to `development`) and manually (`workflow_dispatch`) for both environments. A guard job blocks production deploys from non-master branches.
+- `.github/workflows/release.yml`: Automatic release creator. On every push to master, reads `version` from `build.gradle` and creates a GitHub Release + tag when the version is new and greater than the latest tag.
 - `.github/workflows/scrape-upload-procedures.yml`: GitHub Actions workflow for manually triggering a city scrape. Inputs: `city` (e.g. `elprat`) and `environment` (`development` or `production`).
 
 ## 5. External Integrations
@@ -174,7 +178,7 @@ The `pdfUrl` in the `202` response is a pre-signed S3 GET URL (24h expiry) gener
 | Variable | Used by | Description |
 |---|---|---|
 | `OPENROUTER_API_KEY` | Both Lambdas | OpenRouter authentication key |
-| `OPENROUTER_MODEL` | Both Lambdas | Model identifier (e.g. `google/gemma-3-27b-it:free`) |
+| `OPENROUTER_MODEL` | Both Lambdas | Model identifier (e.g. `stepfun/step-3.5-flash:free`) |
 | `OPENROUTER_REQUEST_TIMEOUT_SECONDS` | Both Lambdas | Per-request HTTP timeout |
 | `OPENROUTER_OVERALL_TIMEOUT_SECONDS` | Both Lambdas | Total operation timeout |
 | `OPENROUTER_MAX_RETRIES` | Both Lambdas | Max retries for `429`/`5xx` responses (default `3`; set to `1` to disable retries) |
