@@ -548,7 +548,7 @@ cd sam
 | API key exposure | Passed as CloudFormation `noEcho` parameter; injected as Lambda env var; never committed to source |
 | **JWT Bearer authentication** | All `POST` endpoints require a valid `Authorization: Bearer <token>` header. `GET /` and `GET /health` are excluded (monitoring). Enforced by `JwtAuthFilter` before the controller is reached. |
 | **JWT secret strength** | `JwtValidator` enforces ≥ 256 bits (32 bytes) at startup — the application fails immediately if the secret is absent or too weak, with no silent degradation to an insecure state. |
-| **JWT claims enforced** | `exp` (token must have expiry), `sub` (must have subject), `iss` (must be `"complai"`). Tokens missing any of these are rejected with `401`. |
+| **JWT claims enforced** | `exp` (token must have expiry), `sub` (must have subject), `iss` (must be `"complai"`), `city` (must be a non-blank city identifier). Tokens missing any of these are rejected with `401`. |
 | Input injection | All user text is passed to the AI as a `content` string in a structured `messages` array — never interpolated into raw JSON strings that could alter the API call structure |
 | Off-topic abuse | System prompt + programmatic refusal detection scope all AI responses to El Prat |
 | Input length abuse | All user input is limited to 5,000 characters (`complai.input.max-length-chars`). Inputs exceeding the limit are rejected at the service boundary with `400 VALIDATION` before any AI call is made |
@@ -571,7 +571,7 @@ Authorization: Bearer <token>
 - `GET /` and `GET /health` are public and do **not** require authentication.
 - The filter is enforced by `JwtAuthFilter` before the controller is reached.
 - Tokens must be signed with the environment's `JWT_SECRET` (HS256, ≥32 bytes, base64-encoded).
-- Required claims: `exp` (expiry), `sub` (subject), `iss` (must be `complai`).
+- Required claims: `exp` (expiry), `sub` (subject), `iss` (must be `complai`), `city` (non-blank city identifier).
 - Invalid, missing, or expired tokens result in `401 Unauthorized` with error code `6 (UNAUTHORIZED)`.
 - The filter is tested in both integration and E2E tests. See [Testing Strategy](#14-testing-strategy).
 
@@ -584,7 +584,7 @@ Tokens are minted offline using the `TokenGenerator` CLI utility bundled in the 
 openssl rand -base64 32
 
 # Mint a token valid for 30 days:
-JWT_SECRET=<base64-secret> java -cp build/libs/complai-all.jar cat.complai.auth.TokenGenerator citizen-app 30
+JWT_SECRET=<base64-secret> java -cp build/libs/complai-all.jar cat.complai.auth.TokenGenerator citizen-app 30 elprat
 
 # Pass the token in every API request:
 curl -X POST https://<lambda-url>/complai/ask \
