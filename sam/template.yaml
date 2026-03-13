@@ -173,7 +173,6 @@ Resources:
         Variables:
           OPENROUTER_API_KEY: !Ref OpenRouterApiKey
           PROCEDURES_BUCKET: !Ref ProceduresBucket
-          PROCEDURES_KEY: procedures.json
           PROCEDURES_REGION: !Ref LambdaRegion
           AWS_ENDPOINT_URL: "http://host.docker.internal:4566"
           OPENROUTER_REQUEST_TIMEOUT_SECONDS: "60"
@@ -215,7 +214,6 @@ Resources:
           COMPLAINTS_BUCKET: !Ref ComplaintsBucket
           COMPLAINTS_REGION: !Ref LambdaRegion
           PROCEDURES_BUCKET: !Ref ProceduresBucket
-          PROCEDURES_KEY: procedures.json
           PROCEDURES_REGION: !Ref LambdaRegion
           AWS_ENDPOINT_URL: "http://host.docker.internal:4566"
       Events:
