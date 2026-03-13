@@ -46,22 +46,33 @@ public class RedactWorkerHandler extends MicronautRequestHandler<SQSEvent, SQSBa
 
     @Override
     public SQSBatchResponse execute(SQSEvent event) {
+        int recordCount = event.getRecords() != null ? event.getRecords().size() : 0;
+        logger.info(() -> "RedactWorkerHandler — received SQS batch recordCount=" + recordCount);
+
         ComplaintLetterGenerator generator = new ComplaintLetterGenerator(
                 promptBuilder, httpWrapper, s3PdfUploader, overallTimeoutSeconds);
 
         List<SQSBatchResponse.BatchItemFailure> failures = new ArrayList<>();
 
         for (SQSEvent.SQSMessage record : event.getRecords()) {
+            String messageId = record.getMessageId();
             try {
                 RedactSqsMessage message = mapper.readValue(record.getBody(), RedactSqsMessage.class);
+                logger.info(() -> "RedactWorkerHandler — processing record messageId=" + messageId
+                        + " s3Key=" + message.s3Key() + " conversationId=" + message.conversationId());
                 generator.generate(message);
+                logger.info(() -> "RedactWorkerHandler — record completed successfully messageId=" + messageId
+                        + " s3Key=" + message.s3Key());
             } catch (Exception e) {
-                logger.log(Level.SEVERE, "Failed to process SQS record " + record.getMessageId(), e);
+                logger.log(Level.SEVERE, "RedactWorkerHandler — record failed messageId=" + messageId, e);
                 failures.add(SQSBatchResponse.BatchItemFailure.builder()
-                        .withItemIdentifier(record.getMessageId())
+                        .withItemIdentifier(messageId)
                         .build());
             }
         }
+
+        logger.info(() -> "RedactWorkerHandler — batch complete recordCount=" + recordCount
+                + " successCount=" + (recordCount - failures.size()) + " failureCount=" + failures.size());
 
         return SQSBatchResponse.builder()
                 .withBatchItemFailures(failures)

@@ -80,7 +80,8 @@ public class HttpWrapper {
     }
 
     public CompletableFuture<HttpDto> postToOpenRouterAsync(String userPrompt) {
-        logger.fine(() -> "postToOpenRouterAsync called; prompt length=" + (userPrompt == null ? 0 : userPrompt.length()));
+        int promptLength = userPrompt == null ? 0 : userPrompt.length();
+        logger.fine(() -> "postToOpenRouterAsync (single-turn) — promptLength=" + promptLength + " model=" + openRouterModel);
         try {
             // Friendlier, town-tone system message for civilian users from El Prat de Llobregat.
             String systemMessage = """
@@ -101,17 +102,20 @@ public class HttpWrapper {
             );
             String requestBody = mapper.writeValueAsString(payload);
 
-            logger.fine(() -> "postToOpenRouterAsync: request body prepared; payload size=" + requestBody.length());
-            logger.finer(() -> "postToOpenRouterAsync: request snippet=" + (userPrompt.length() > 200 ? userPrompt.substring(0, 200) + "..." : userPrompt));
+            logger.fine(() -> "postToOpenRouterAsync — request body prepared payloadSize=" + requestBody.length()
+                    + " model=" + openRouterModel);
+            logger.finer(() -> "postToOpenRouterAsync — prompt snippet: "
+                    + (userPrompt.length() > 200 ? userPrompt.substring(0, 200) + "..." : userPrompt));
 
             String authValue = resolveAuthHeader();
             if (authValue == null) {
-                logger.warning("Missing OPENROUTER_API_KEY");
+                logger.warning("postToOpenRouterAsync — cannot proceed: OPENROUTER_API_KEY is not configured");
                 return CompletableFuture.completedFuture(new HttpDto(null, null, "POST", "Missing OPENROUTER_API_KEY"));
             }
 
             HttpRequest request = buildHttpRequest(requestBody, authValue);
-            logger.fine(() -> "Sending request to OpenRouter URL: " + openRouterUrl);
+            logger.fine(() -> "postToOpenRouterAsync — sending POST to " + openRouterUrl
+                    + " timeoutSeconds=" + requestTimeoutSeconds + " maxRetries=" + maxRetries);
             return sendWithRetry(request, maxRetries);
 
         } catch (Exception e) {
@@ -121,7 +125,8 @@ public class HttpWrapper {
     }
 
     public CompletableFuture<HttpDto> postToOpenRouterAsync(List<Map<String, Object>> messages) {
-        logger.fine(() -> "postToOpenRouterAsync (multi-turn) called; messages count=" + (messages == null ? 0 : messages.size()));
+        int messageCount = messages == null ? 0 : messages.size();
+        logger.fine(() -> "postToOpenRouterAsync (multi-turn) — messageCount=" + messageCount + " model=" + openRouterModel);
         try {
             Map<String, Object> payload = Map.of(
                     "model", openRouterModel,
@@ -131,12 +136,14 @@ public class HttpWrapper {
 
             String authValue = resolveAuthHeader();
             if (authValue == null) {
-                logger.warning("Missing OPENROUTER_API_KEY");
+                logger.warning("postToOpenRouterAsync (multi-turn) — cannot proceed: OPENROUTER_API_KEY is not configured");
                 return CompletableFuture.completedFuture(new HttpDto(null, null, "POST", "Missing OPENROUTER_API_KEY"));
             }
 
             HttpRequest request = buildHttpRequest(requestBody, authValue);
-            logger.fine(() -> "Sending request to OpenRouter URL: " + openRouterUrl);
+            logger.fine(() -> "postToOpenRouterAsync (multi-turn) — sending POST to " + openRouterUrl
+                    + " payloadSize=" + requestBody.length()
+                    + " timeoutSeconds=" + requestTimeoutSeconds + " maxRetries=" + maxRetries);
             return sendWithRetry(request, maxRetries);
 
         } catch (Exception e) {
@@ -153,32 +160,41 @@ public class HttpWrapper {
      * are unlikely to self-heal within the same request lifecycle.</p>
      */
     private CompletableFuture<HttpDto> sendWithRetry(HttpRequest request, int attemptsLeft) {
+        int attemptNumber = maxRetries - attemptsLeft + 1;
         return httpClient.sendAsync(request, BodyHandlers.ofString())
                 .thenCompose(response -> {
                     int status = response.statusCode();
                     String body = response.body();
-                    logger.fine(() -> "Received response from OpenRouter: status=" + status
-                            + " bodyLength=" + (body == null ? 0 : body.length())
-                            + " attemptsLeft=" + attemptsLeft);
+                    int bodyLength = body == null ? 0 : body.length();
+                    logger.fine(() -> "OpenRouter response — httpStatus=" + status
+                            + " bodyLength=" + bodyLength
+                            + " attempt=" + attemptNumber + "/" + maxRetries
+                            + " url=" + openRouterUrl);
 
                     if (status >= 500 && attemptsLeft > 1) {
-                        logger.warning(() -> "OpenRouter returned " + status
-                                + "; retrying (" + (attemptsLeft - 1) + " attempt(s) left)");
+                        logger.warning(() -> "OpenRouter server error — httpStatus=" + status
+                                + " retrying attempt=" + (attemptNumber + 1) + "/" + maxRetries
+                                + " url=" + openRouterUrl);
                         return sendWithRetry(request, attemptsLeft - 1);
                     }
 
                     if (status >= 200 && status < 300) {
                         String extracted = extractTextFromOpenRouterResponse(body, mapper);
-                        logger.fine(() -> "Extracted message length=" + (extracted == null ? 0 : extracted.length()));
+                        logger.fine(() -> "OpenRouter success — httpStatus=" + status
+                                + " extractedLength=" + (extracted == null ? 0 : extracted.length())
+                                + " attempt=" + attemptNumber + "/" + maxRetries);
                         return CompletableFuture.completedFuture(new HttpDto(extracted, status, "POST", null));
                     }
 
-                    logger.warning(() -> "OpenRouter returned non-2xx status: " + status);
+                    logger.warning(() -> "OpenRouter non-2xx response — httpStatus=" + status
+                            + " attempt=" + attemptNumber + "/" + maxRetries
+                            + " url=" + openRouterUrl);
                     return CompletableFuture.completedFuture(
                             new HttpDto(body, status, "POST", String.format("OpenRouter non-2xx response: %d", status)));
                 })
                 .exceptionally(ex -> {
-                    logger.log(Level.SEVERE, "Exception when calling OpenRouter", ex);
+                    logger.log(Level.SEVERE, "OpenRouter request failed — attempt=" + attemptNumber + "/" + maxRetries
+                            + " url=" + openRouterUrl + " error=" + ex.getMessage(), ex);
                     return new HttpDto(null, null, "POST", ex.getMessage());
                 });
     }

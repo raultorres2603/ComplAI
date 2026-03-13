@@ -67,14 +67,18 @@ public class SqsComplaintPublisher {
         }
         try {
             String body = mapper.writeValueAsString(message);
-            logger.fine(() -> "Publishing SQS message to " + queueUrl + "; s3Key=" + message.s3Key());
+            logger.info(() -> "SQS publish starting — queueUrl=" + queueUrl
+                    + " s3Key=" + message.s3Key() + " conversationId=" + message.conversationId());
             sqsClient.sendMessage(SendMessageRequest.builder()
                     .queueUrl(queueUrl)
                     .messageBody(body)
                     .build());
-            logger.fine(() -> "SQS message published; s3Key=" + message.s3Key());
+            logger.info(() -> "SQS publish completed — queueUrl=" + queueUrl
+                    + " s3Key=" + message.s3Key() + " conversationId=" + message.conversationId());
         } catch (Exception e) {
-            logger.log(Level.SEVERE, "Failed to publish SQS message", e);
+            logger.log(Level.SEVERE, "SQS publish failed — queueUrl=" + queueUrl
+                    + " s3Key=" + message.s3Key() + " conversationId=" + message.conversationId()
+                    + " error=" + e.getMessage(), e);
             throw new RuntimeException("SQS publish failed: " + e.getMessage(), e);
         }
     }

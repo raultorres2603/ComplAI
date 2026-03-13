@@ -14,7 +14,7 @@ public class HomeController {
 
     @Get()
     public HttpResponse<HomeDto> index() {
-        logger.info("Accessed home page");
+        logger.fine("GET / — serving home page");
         HomeDto homeDto = new HomeDto("Welcome to the Complai Home Page!");
         return HttpResponse.ok(homeDto);
     }

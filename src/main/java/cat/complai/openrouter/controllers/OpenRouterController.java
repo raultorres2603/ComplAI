@@ -49,20 +49,27 @@ public class OpenRouterController {
 
     @Post("/ask")
     public HttpResponse<OpenRouterPublicDto> ask(@Body AskRequest request) {
-        logger.info("POST /openrouter/ask called");
+        String conversationId = request != null ? request.getConversationId() : null;
+        int inputLength = request != null && request.getText() != null ? request.getText().length() : 0;
+        logger.info(() -> "POST /complai/ask received — conversationId=" + conversationId + " inputLength=" + inputLength);
         long start = System.currentTimeMillis();
         try {
             OpenRouterResponseDto dto = service.ask(request.getText(), request.getConversationId());
             long latency = System.currentTimeMillis() - start;
             AuditLogger.log("/complai/ask", AuditLogger.hashText(request.getText()),
                     dto != null ? dto.getErrorCode().getCode() : -1, latency, null, null);
-            return errorToHttpResponse(dto, "ask");
+            MutableHttpResponse<OpenRouterPublicDto> response = errorToHttpResponse(dto, "ask");
+            logger.info(() -> "POST /complai/ask completed — httpStatus=" + response.status().getCode()
+                    + " errorCode=" + (dto != null ? dto.getErrorCode() : "null")
+                    + " latencyMs=" + latency + " conversationId=" + conversationId);
+            return response;
         } catch (Exception e) {
             long latency = System.currentTimeMillis() - start;
             AuditLogger.log("/complai/ask",
                     AuditLogger.hashText(request != null ? request.getText() : null),
                     OpenRouterErrorCode.INTERNAL.getCode(), latency, null, null);
-            logger.log(Level.SEVERE, "ask: unexpected exception", e);
+            logger.log(Level.SEVERE, "POST /complai/ask failed — httpStatus=500"
+                    + " latencyMs=" + latency + " conversationId=" + conversationId, e);
             OpenRouterPublicDto err = new OpenRouterPublicDto(false, null, e.getMessage(), OpenRouterErrorCode.INTERNAL.getCode());
             return HttpResponse.serverError(err);
         }
@@ -71,18 +78,23 @@ public class OpenRouterController {
     @Post("/redact")
     @Produces({MediaType.APPLICATION_PDF, MediaType.APPLICATION_JSON})
     public HttpResponse<?> redact(@Body RedactRequest request) {
-        logger.info("POST /openrouter/redact called");
+        String conversationId = request != null ? request.getConversationId() : null;
+        int inputLength = request != null && request.getText() != null ? request.getText().length() : 0;
+        OutputFormat requestedFormat = request != null ? request.getFormat() : null;
+        logger.info(() -> "POST /complai/redact received — conversationId=" + conversationId
+                + " inputLength=" + inputLength + " format=" + requestedFormat);
         long start = System.currentTimeMillis();
         try {
             String text           = request != null ? request.getText() : null;
             OutputFormat format   = request == null ? OutputFormat.AUTO : request.getFormat();
-            String conversationId = request == null ? null : request.getConversationId();
             ComplainantIdentity identity = request != null ? request.getComplainantIdentity() : null;
 
             if (!OutputFormat.isSupportedClientFormat(format)) {
                 long latency = System.currentTimeMillis() - start;
                 AuditLogger.log("/complai/redact", AuditLogger.hashText(text),
                         OpenRouterErrorCode.VALIDATION.getCode(), latency, format != null ? format.name() : null, null);
+                logger.info(() -> "POST /complai/redact rejected — httpStatus=400 reason=unsupportedFormat"
+                        + " format=" + format + " latencyMs=" + latency + " conversationId=" + conversationId);
                 OpenRouterPublicDto err = new OpenRouterPublicDto(false, null,
                         "Unsupported format. Only 'pdf', 'json', or 'auto' are accepted. Documents are always produced as PDF.",
                         OpenRouterErrorCode.VALIDATION.getCode());
@@ -106,7 +118,13 @@ public class OpenRouterController {
                     dto != null ? dto.getErrorCode().getCode() : -1, latency,
                     format != null ? format.name() : null, null);
 
-            return errorToHttpResponse(dto, "redact");
+            HttpResponse<?> response = errorToHttpResponse(dto, "redact");
+            logger.info(() -> "POST /complai/redact completed (sync) — httpStatus="
+                    + (response instanceof MutableHttpResponse<?> mr ? mr.status().getCode() : "?")
+                    + " errorCode=" + (dto != null ? dto.getErrorCode() : "null")
+                    + " latencyMs=" + latency + " conversationId=" + conversationId
+                    + " identityComplete=" + identityComplete);
+            return response;
 
         } catch (Exception e) {
             long latency = System.currentTimeMillis() - start;
@@ -114,7 +132,8 @@ public class OpenRouterController {
                     AuditLogger.hashText(request != null ? request.getText() : null),
                     OpenRouterErrorCode.INTERNAL.getCode(), latency,
                     request != null && request.getFormat() != null ? request.getFormat().name() : null, null);
-            logger.log(Level.SEVERE, "redact: unexpected exception", e);
+            logger.log(Level.SEVERE, "POST /complai/redact failed — httpStatus=500"
+                    + " latencyMs=" + latency + " conversationId=" + conversationId, e);
             OpenRouterPublicDto err = new OpenRouterPublicDto(false, null, e.getMessage(), OpenRouterErrorCode.INTERNAL.getCode());
             return HttpResponse.serverError(err).contentType(MediaType.APPLICATION_JSON);
         }
@@ -146,7 +165,8 @@ public class OpenRouterController {
         try {
             pdfUrl = s3PdfUploader.generatePresignedGetUrl(s3Key);
         } catch (Exception e) {
-            logger.log(Level.SEVERE, "redact: failed to generate pre-signed S3 URL", e);
+            logger.log(Level.SEVERE, "POST /complai/redact — httpStatus=500 reason=presignedUrlFailed"
+                    + " s3Key=" + s3Key + " conversationId=" + conversationId, e);
             OpenRouterPublicDto err = new OpenRouterPublicDto(false, null,
                     "Failed to prepare complaint storage URL.", OpenRouterErrorCode.INTERNAL.getCode());
             return HttpResponse.serverError(err).contentType(MediaType.APPLICATION_JSON);
@@ -158,7 +178,8 @@ public class OpenRouterController {
         try {
             sqsPublisher.publish(sqsMessage);
         } catch (Exception e) {
-            logger.log(Level.SEVERE, "redact: failed to publish to SQS", e);
+            logger.log(Level.SEVERE, "POST /complai/redact — httpStatus=500 reason=sqsPublishFailed"
+                    + " s3Key=" + s3Key + " conversationId=" + conversationId, e);
             OpenRouterPublicDto err = new OpenRouterPublicDto(false, null,
                     "Failed to queue complaint generation. Please try again.",
                     OpenRouterErrorCode.INTERNAL.getCode());
@@ -169,6 +190,10 @@ public class OpenRouterController {
         String detectedLanguage = LanguageDetector.detect(text);
         AuditLogger.log("/complai/redact", AuditLogger.hashText(text),
                 OpenRouterErrorCode.NONE.getCode(), latency, format != null ? format.name() : null, detectedLanguage);
+
+        logger.info(() -> "POST /complai/redact completed (async) — httpStatus=202"
+                + " s3Key=" + s3Key + " latencyMs=" + latency
+                + " conversationId=" + conversationId + " language=" + detectedLanguage);
 
         String acceptedMessage = switch (detectedLanguage) {
             case "CA" -> "La vostra carta de reclamació s'està generant. Estarà disponible d'aquí a pocs minuts a l'adreça de sota.";
@@ -216,23 +241,24 @@ public class OpenRouterController {
 
         MutableHttpResponse<OpenRouterPublicDto> response = switch (errorCode) {
             case VALIDATION -> {
-                logger.fine(operation + ": bad request - " + dto.getError());
+                logger.fine(() -> operation + ": httpStatus=400 errorCode=VALIDATION — " + dto.getError());
                 yield HttpResponse.badRequest(publicDto);
             }
             case REFUSAL -> {
-                logger.info(operation + ": request out of scope for El Prat");
+                logger.info(() -> operation + ": httpStatus=422 errorCode=REFUSAL — request out of scope for El Prat");
                 yield HttpResponse.status(HttpStatus.UNPROCESSABLE_ENTITY).body(publicDto);
             }
             case TIMEOUT -> {
-                logger.warning(operation + ": AI service timed out");
+                logger.warning(() -> operation + ": httpStatus=504 errorCode=TIMEOUT — AI service timed out");
                 yield HttpResponse.status(HttpStatus.GATEWAY_TIMEOUT).body(publicDto);
             }
             case UPSTREAM -> {
-                logger.log(Level.WARNING, "{0}: upstream AI error: {1}", new Object[]{operation, dto.getError()});
+                logger.warning(() -> operation + ": httpStatus=502 errorCode=UPSTREAM — " + dto.getError());
                 yield HttpResponse.status(HttpStatus.BAD_GATEWAY).body(publicDto);
             }
             default -> {
-                logger.log(Level.WARNING, "{0}: unexpected error: {1}", new Object[]{operation, dto != null ? dto.getError() : "null dto"});
+                logger.warning(() -> operation + ": httpStatus=500 errorCode=" + errorCode
+                        + " — " + (dto != null ? dto.getError() : "null dto"));
                 yield HttpResponse.serverError(publicDto);
             }
         };

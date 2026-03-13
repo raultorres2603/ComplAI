@@ -60,7 +60,8 @@ public class JwtAuthFilter {
         JwtValidationResult result = jwtValidator.validate(authHeader);
 
         if (!result.valid()) {
-            logger.fine("JWT rejected for " + request.getPath() + ": " + result.failureReason());
+            logger.warning(() -> "JWT rejected — httpStatus=401 method=" + request.getMethod()
+                    + " path=" + request.getPath() + " reason=" + result.failureReason());
             return unauthorizedResponse(result.failureReason());
         }
 

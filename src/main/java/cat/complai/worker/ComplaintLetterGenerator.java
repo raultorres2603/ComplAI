@@ -52,23 +52,39 @@ class ComplaintLetterGenerator {
      *                   retries the message
      */
     void generate(RedactSqsMessage message) throws Exception {
-        logger.info("Generating complaint letter for s3Key=" + message.s3Key());
+        long start = System.currentTimeMillis();
+        logger.info(() -> "ComplaintLetterGenerator — starting s3Key=" + message.s3Key()
+                + " conversationId=" + message.conversationId()
+                + " complaintLength=" + (message.complaintText() != null ? message.complaintText().length() : 0));
 
         ComplainantIdentity identity = new ComplainantIdentity(
                 message.requesterName(), message.requesterSurname(), message.requesterIdNumber());
 
         List<Map<String, Object>> aiMessages = buildAiMessages(message.complaintText(), identity);
+        logger.fine(() -> "ComplaintLetterGenerator — AI prompt built messageCount=" + aiMessages.size()
+                + " s3Key=" + message.s3Key());
 
         HttpDto aiResult = httpWrapper.postToOpenRouterAsync(aiMessages)
                 .get(overallTimeoutSeconds, TimeUnit.SECONDS);
+
+        logger.info(() -> "ComplaintLetterGenerator — AI responded httpStatus=" + (aiResult != null ? aiResult.statusCode() : "null")
+                + " hasMessage=" + (aiResult != null && aiResult.message() != null && !aiResult.message().isBlank())
+                + " hasError=" + (aiResult != null && aiResult.error() != null && !aiResult.error().isBlank())
+                + " s3Key=" + message.s3Key());
 
         validateAiResult(aiResult, message.s3Key());
 
         String letterBody = extractLetterBody(aiResult.message(), message.s3Key());
         byte[] pdfBytes   = PdfGenerator.generatePdf(letterBody);
 
+        logger.fine(() -> "ComplaintLetterGenerator — PDF generated pdfSizeBytes=" + pdfBytes.length
+                + " letterBodyLength=" + letterBody.length() + " s3Key=" + message.s3Key());
+
         s3PdfUploader.upload(message.s3Key(), pdfBytes);
-        logger.info("PDF uploaded successfully for s3Key=" + message.s3Key());
+
+        long latencyMs = System.currentTimeMillis() - start;
+        logger.info(() -> "ComplaintLetterGenerator — completed successfully s3Key=" + message.s3Key()
+                + " pdfSizeBytes=" + pdfBytes.length + " totalLatencyMs=" + latencyMs);
     }
 
     // -------------------------------------------------------------------------
