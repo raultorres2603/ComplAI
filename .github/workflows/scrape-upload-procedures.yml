@@ -63,4 +63,4 @@ jobs:
           PROCEDURES_BUCKET: complai-procedures-${{ inputs.environment }}
         run: |
           java -cp build/libs/complai-all.jar \
-            cat.complai.pratespais.ProcedureScraper "${{ inputs.city }}"
+            cat.complai.scrapper.ProcedureScraper "${{ inputs.city }}"
