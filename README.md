@@ -2,6 +2,8 @@
 
 © 2026 Raúl Torres Alarcón. All rights reserved.
 
+LinkedIn: [My profile](https://www.linkedin.com/in/raultorresalarcon/)
+
 Last version: [![GitHub Release](https://img.shields.io/github/v/release/raultorres2603/ComplAI)](https://github.com/raultorres2603/ComplAI/releases/latest)
 
 > **Gall Potablava** is an AI assistant for the residents of El Prat de Llobregat (Catalonia, Spain).
