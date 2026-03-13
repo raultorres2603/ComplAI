@@ -126,7 +126,7 @@ public class OpenRouterServicesTest {
         OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
 
         String input = "What is the capital of France? [REFUSE]";
-        OpenRouterResponseDto out = svc.ask(input, null, "testcity");
+        OpenRouterResponseDto out = svc.ask(input, null, "elprat");
         assertFalse(out.isSuccess());
         assertEquals("Request is not about El Prat de Llobregat.", out.getError());
     }

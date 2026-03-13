@@ -1,6 +1,8 @@
 {
   "cityId": "elprat",
   "cityName": "El Prat de Llobregat",
+  "officialSources": ["https://www.elprat.cat/", "https://www.pratespais.com/"],
+  "newsSources": ["https://www.instagram.com/elprataldia/"],
   "baseUrl": "https://tramits.pratespais.com/Ciutadania/TramitsTemes.aspx",
   "s3Region": "eu-west-1",
   "crawl": {

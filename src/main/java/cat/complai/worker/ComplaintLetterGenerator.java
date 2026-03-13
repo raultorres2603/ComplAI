@@ -101,14 +101,14 @@ class ComplaintLetterGenerator {
 
     private List<Map<String, Object>> buildAiMessages(String complaintText, ComplainantIdentity identity, String cityId) {
         List<Map<String, Object>> messages = new ArrayList<>();
-        messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage()));
+        messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage(cityId)));
 
         String contextBlock = promptBuilder.buildProcedureContextBlock(complaintText, cityId);
         if (contextBlock != null) {
             messages.add(Map.of("role", "system", "content", contextBlock));
         }
 
-        String userPrompt = promptBuilder.buildRedactPromptWithIdentity(complaintText, identity);
+        String userPrompt = promptBuilder.buildRedactPromptWithIdentity(complaintText, identity, cityId);
         messages.add(Map.of("role", "user", "content", userPrompt));
         return messages;
     }

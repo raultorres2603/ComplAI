@@ -1,14 +1,20 @@
 package cat.complai.openrouter.helpers;
 
 import cat.complai.openrouter.dto.ComplainantIdentity;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
+import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.StringJoiner;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -25,16 +31,22 @@ import java.util.logging.Logger;
 public class RedactPromptBuilder {
 
     private static final Logger logger = Logger.getLogger(RedactPromptBuilder.class.getName());
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final String MAPPING_RESOURCE_PATTERN = "/scrapers/procedures-mapping-%s.json";
 
-    // Official and independent sources kept here so only this class needs updating
-    // if URLs ever change.
-    private static final List<String> OFFICIAL_SOURCES = List.of(
-            "https://www.elprat.cat/",
-            "https://www.pratespais.com/"
-    );
-    private static final List<String> INDEPENDENT_SOURCES = List.of(
-            "https://www.instagram.com/elprataldia/"
-    );
+    // Cached per city — classpath reads are cheap but there is no reason to repeat them.
+    private static final ConcurrentHashMap<String, CityConfig> CITY_CONFIG_CACHE = new ConcurrentHashMap<>();
+
+    /**
+     * Holds the city-specific display name and optional source URLs used in the system prompt.
+     * Loaded once per city from the scraper mapping JSON on the classpath.
+     */
+    record CityConfig(String cityName, List<String> officialSources, List<String> newsSources) {
+        /** Fallback used when no mapping file exists for a given cityId. */
+        static CityConfig fallback(String cityId) {
+            return new CityConfig(cityId, Collections.emptyList(), Collections.emptyList());
+        }
+    }
 
     private final ProcedureRagHelperRegistry ragRegistry;
 
@@ -51,33 +63,107 @@ public class RedactPromptBuilder {
         this(new ProcedureRagHelperRegistry());
     }
 
+    // -------------------------------------------------------------------------
+    // City config resolution
+    // -------------------------------------------------------------------------
+
     /**
-     * Returns the multilingual system message that defines the assistant persona,
-     * scope, and source references.
+     * Returns the display name for the given cityId.
+     * Reads from the scraper mapping JSON on first access; caches the result.
+     * Falls back to the cityId itself when no mapping file is present.
+     *
+     * <p>Public so that service classes in other packages (e.g. {@code OpenRouterServices})
+     * can resolve the city name for log messages and error responses without depending on
+     * the internal {@code CityConfig} type.
      */
-    public String getSystemMessage() {
-        String officialCat = formatSources(OFFICIAL_SOURCES, " i ", " i ");
-        String officialEs  = formatSources(OFFICIAL_SOURCES, " y ", " y ");
-        String officialEn  = formatSources(OFFICIAL_SOURCES, " and ", " and ");
-        String indepCat    = formatSources(INDEPENDENT_SOURCES, ", ", "");
-        String indepEs     = formatSources(INDEPENDENT_SOURCES, ", ", "");
-        String indepEn     = formatSources(INDEPENDENT_SOURCES, ", ", "");
+    public static String resolveCityDisplayName(String cityId) {
+        return resolveCityConfig(cityId).cityName();
+    }
+
+    /**
+     * Returns the city config for the given cityId, loading it on first access.
+     * Falls back to a minimal config (cityId as display name, no source URLs) when
+     * the mapping file is absent so the prompt builder never throws.
+     */
+    // Package-private for testing.
+    static CityConfig resolveCityConfig(String cityId) {
+        return CITY_CONFIG_CACHE.computeIfAbsent(cityId, RedactPromptBuilder::loadCityConfig);
+    }
+
+    private static CityConfig loadCityConfig(String cityId) {
+        String resourcePath = String.format(MAPPING_RESOURCE_PATTERN, cityId);
+        try (InputStream is = RedactPromptBuilder.class.getResourceAsStream(resourcePath)) {
+            if (is == null) {
+                logger.fine(() -> "No mapping file found for city='" + cityId
+                        + "'; using cityId as display name with no source URLs");
+                return CityConfig.fallback(cityId);
+            }
+            JsonNode root = MAPPER.readTree(is);
+
+            String cityName = root.path("cityName").asText(cityId);
+
+            List<String> officialSources = readStringList(root, "officialSources");
+            List<String> newsSources = readStringList(root, "newsSources");
+
+            logger.fine(() -> "Loaded CityConfig for city='" + cityId + "' displayName='" + cityName + "'");
+            return new CityConfig(cityName, officialSources, newsSources);
+        } catch (Exception e) {
+            logger.log(Level.WARNING,
+                    "Failed to load city config for city='" + cityId + "'; using fallback: " + e.getMessage(), e);
+            return CityConfig.fallback(cityId);
+        }
+    }
+
+    private static List<String> readStringList(JsonNode root, String fieldName) {
+        JsonNode node = root.path(fieldName);
+        if (!node.isArray()) return Collections.emptyList();
+        List<String> result = new ArrayList<>();
+        for (JsonNode item : node) {
+            String value = item.asText(null);
+            if (value != null && !value.isBlank()) result.add(value);
+        }
+        return Collections.unmodifiableList(result);
+    }
+
+    // -------------------------------------------------------------------------
+    // Prompt construction
+    // -------------------------------------------------------------------------
+
+    /**
+     * Returns the multilingual system message scoped to the given city.
+     * The AI is instructed to only answer questions about that city and to draft
+     * letters addressed to its City Hall.
+     */
+    public String getSystemMessage(String cityId) {
+        CityConfig cfg = resolveCityConfig(cityId);
+        String cityName = cfg.cityName();
+
+        String officialCat = formatSources(cfg.officialSources(), " i ", " i ");
+        String officialEs  = formatSources(cfg.officialSources(), " y ", " y ");
+        String officialEn  = formatSources(cfg.officialSources(), " and ", " and ");
+        String indepCat    = formatSources(cfg.newsSources(), ", ", "");
+        String indepEs     = formatSources(cfg.newsSources(), ", ", "");
+        String indepEn     = formatSources(cfg.newsSources(), ", ", "");
+
         return String.format("""
-                Ets un assistent que es diu Gall Potablava, amable i proper per als veïns d'El Prat de Llobregat. Ajudes a redactar cartes i queixes clares i civils adreçades a l'Ajuntament i ofereixes informació pràctica i local d'El Prat. Mantén les respostes curtes, respectuoses i fàcils de llegir, com un veí que vol ajudar. Si la consulta no és sobre El Prat de Llobregat, digues-ho educadament i explica que no pots ajudar amb aquesta petició; també pots suggerir que facin una pregunta sobre assumptes locals.
+                Ets un assistent que es diu Gall Potablava, amable i proper per als veïns de %s. Ajudes a redactar cartes i queixes clares i civils adreçades a l'Ajuntament i ofereixes informació pràctica i local de %s. Mantén les respostes curtes, respectuoses i fàcils de llegir, com un veí que vol ajudar. Si la consulta no és sobre %s, digues-ho educadament i explica que no pots ajudar amb aquesta petició; també pots suggerir que facin una pregunta sobre assumptes locals.
 
 Pàgines oficials d'informació: %s
 Font independent de notícies locals: %s
 
-En español: Eres un asistente que se llama Gall Potablava amable y cercano para los vecinos de El Prat de Llobregat. Ayuda a redactar cartes i queixes dirigides al Ayuntamiento i ofereix informació pràctica i local. Mantén las respuestas cortas y fáciles de entender. Si la consulta no trata sobre El Prat, dilo educadamente y sugiere que pregunten sobre asuntos locales.
+En español: Eres un asistente que se llama Gall Potablava amable y cercano para los vecinos de %s. Ayuda a redactar cartas y quejas dirigidas al Ayuntamiento y ofrece información práctica y local. Mantén las respuestas cortas y fáciles de entender. Si la consulta no trata sobre %s, dilo educadamente y sugiere que pregunten sobre asuntos locales.
 
 Páginas oficiales de información: %s
 Fuente independiente de noticias locales: %s
 
-In English (support): You are a friendly local assistant named Gall Potablava for residents of El Prat de Llobregat. Help draft clear, civil letters to the City Hall and provide practical local information. Keep answers short and easy to read. If the request is not about El Prat de Llobregat, politely say you can't help with that request.
+In English (support): You are a friendly local assistant named Gall Potablava for residents of %s. Help draft clear, civil letters to the City Hall and provide practical local information. Keep answers short and easy to read. If the request is not about %s, politely say you can't help with that request.
 
 Official information sources: %s
 Independent local news source: %s
-""", officialCat, indepCat, officialEs, indepEs, officialEn, indepEn);
+""",
+                cityName, cityName, cityName, officialCat, indepCat,
+                cityName, cityName, officialEs, indepEs,
+                cityName, cityName, officialEn, indepEn);
     }
 
     /**
@@ -96,8 +182,10 @@ Independent local news source: %s
         }
         List<ProcedureRagHelper.Procedure> matches = helper.search(query);
         if (matches.isEmpty()) return null;
+
+        String cityName = resolveCityConfig(cityId).cityName();
         StringBuilder sb = new StringBuilder();
-        sb.append("CONTEXT FROM PRAT ESPAIS PROCEDURES:\n\n");
+        sb.append("CONTEXT FROM MUNICIPAL PROCEDURES:\n\n");
         for (ProcedureRagHelper.Procedure p : matches) {
             sb.append("---\n");
             sb.append("**").append(p.title).append("**\n");
@@ -119,7 +207,8 @@ Independent local news source: %s
             }
             sb.append("---\n\n");
         }
-        sb.append("Use this context to answer the user's question. If the context is relevant, cite the procedure name and provide the source link. If the context does not help, answer based on your general knowledge about El Prat.");
+        sb.append("Use this context to answer the user's question. If the context is relevant, cite the procedure name and provide the source link. If the context does not help, answer based on your general knowledge about ")
+          .append(cityName).append(".");
         return sb.toString();
     }
 
@@ -134,7 +223,8 @@ Independent local news source: %s
      * anywhere in the complaint text, and silently omit them otherwise — never use
      * a placeholder.
      */
-    public String buildRedactPromptWithIdentity(String complaint, ComplainantIdentity identity) {
+    public String buildRedactPromptWithIdentity(String complaint, ComplainantIdentity identity, String cityId) {
+        String cityName = resolveCityConfig(cityId).cityName();
         String today = LocalDate.now().format(DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", Locale.forLanguageTag("ca")));
         return String.format(
                 """
@@ -143,7 +233,7 @@ Independent local news source: %s
                         The header must be exactly: {"format": "pdf"}
                         After that JSON header, leave one blank line, then write the letter body.
 
-                        Task: Write a formal complaint letter addressed to the Ajuntament d'El Prat de Llobregat.
+                        Task: Write a formal complaint letter addressed to the Ajuntament de %s.
 
                         Rules you MUST follow — no exceptions:
                         1. Use specifically this date: "%s". Do NOT use placeholders like [Data] or [Date].
@@ -155,15 +245,17 @@ Independent local news source: %s
                         4. NEVER invent data. NEVER use bracket placeholders like [address], [phone], [your data here], or anything similar. If a field is not provided, leave it out completely.
                         5. Do NOT ask any follow-up questions. Do NOT add "What do you think?", "Would you like to add anything?", notes, suggestions or tips after the letter. The letter is final as-is.
                         6. Write a complete, ready-to-submit letter.
-                        7. If the complaint is not about El Prat de Llobregat, politely say you can't help.
+                        7. If the complaint is not about %s, politely say you can't help.
                         8. Output the letter body as PLAIN TEXT. Do NOT use Markdown formatting (like **, __, #).
 
                         Complaint text (may contain optional contact details to include):
                         %s""",
+                cityName,
                 today,
                 identity.name().trim(),
                 identity.surname().trim(),
                 identity.idNumber().trim(),
+                cityName,
                 complaint.trim()
         );
     }
@@ -174,7 +266,8 @@ Independent local news source: %s
      * surname, ID). Address, phone and other contact details are optional and must never
      * be requested.
      */
-    public String buildRedactPromptRequestingIdentity(String complaint, ComplainantIdentity partialIdentity) {
+    public String buildRedactPromptRequestingIdentity(String complaint, ComplainantIdentity partialIdentity, String cityId) {
+        String cityName = resolveCityConfig(cityId).cityName();
         StringBuilder missing = new StringBuilder();
         boolean hasName    = partialIdentity != null && partialIdentity.name()     != null && !partialIdentity.name().isBlank();
         boolean hasSurname = partialIdentity != null && partialIdentity.surname()  != null && !partialIdentity.surname().isBlank();
@@ -188,7 +281,7 @@ Independent local news source: %s
 
         return String.format(
                 """
-                        The user wants to draft a formal complaint addressed to the Ajuntament of El Prat de Llobregat.
+                        The user wants to draft a formal complaint addressed to the Ajuntament de %s.
 
                         Current status: Missing mandatory identity fields.
 
@@ -218,6 +311,7 @@ Independent local news source: %s
 
                         Complaint text:
                         %s""",
+                cityName,
                 missing.toString().trim(),
                 today,
                 missing.toString().trim(),

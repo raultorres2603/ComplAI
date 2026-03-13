@@ -97,7 +97,7 @@ public class OpenRouterServices implements IOpenRouterService {
         }
 
         List<Map<String, Object>> messages = new ArrayList<>();
-        messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage()));
+        messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage(cityId)));
         String contextBlock = promptBuilder.buildProcedureContextBlock(question, cityId);
         if (contextBlock != null) {
             messages.add(Map.of("role", "system", "content", contextBlock));
@@ -114,7 +114,7 @@ public class OpenRouterServices implements IOpenRouterService {
 
         logger.fine(() -> "ask() messages prepared — messageCount=" + messages.size()
                 + " conversationId=" + conversationId);
-        OpenRouterResponseDto response = callOpenRouterAndExtract(messages);
+        OpenRouterResponseDto response = callOpenRouterAndExtract(messages, cityId);
 
         if (conversationId != null && !conversationId.isBlank() && response.getMessage() != null) {
             updateConversationHistory(conversationId, question, response.getMessage());
@@ -137,7 +137,7 @@ public class OpenRouterServices implements IOpenRouterService {
         }
 
         List<Map<String, Object>> messages = new ArrayList<>();
-        messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage()));
+        messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage(cityId)));
         String contextBlock = promptBuilder.buildProcedureContextBlock(complaint, cityId);
         if (contextBlock != null) {
             messages.add(Map.of("role", "system", "content", contextBlock));
@@ -174,20 +174,20 @@ public class OpenRouterServices implements IOpenRouterService {
             String complaintForPrompt = (originalComplaint != null)
                     ? originalComplaint + "\n\n" + complaint
                     : complaint;
-            userPrompt = promptBuilder.buildRedactPromptWithIdentity(complaintForPrompt, identity);
+            userPrompt = promptBuilder.buildRedactPromptWithIdentity(complaintForPrompt, identity, cityId);
         } else {
             if (conversationId != null && !conversationId.isBlank()) {
                 pendingComplaintCache.put(conversationId, complaint);
                 logger.fine(() -> "redactComplaint() saved complaint for identity follow-up — conversationId=" + conversationId);
             }
-            userPrompt = promptBuilder.buildRedactPromptRequestingIdentity(complaint, identity);
+            userPrompt = promptBuilder.buildRedactPromptRequestingIdentity(complaint, identity, cityId);
         }
 
         messages.add(Map.of("role", "user", "content", userPrompt));
 
         logger.fine(() -> "redactComplaint() messages prepared — messageCount=" + messages.size()
                 + " identityComplete=" + identityComplete + " conversationId=" + conversationId);
-        OpenRouterResponseDto aiDto = callOpenRouterAndExtract(messages);
+        OpenRouterResponseDto aiDto = callOpenRouterAndExtract(messages, cityId);
 
         // Propagate any non-success result immediately.
         if (aiDto.getErrorCode() != OpenRouterErrorCode.NONE) {
@@ -267,19 +267,21 @@ public class OpenRouterServices implements IOpenRouterService {
 
 
     /**
-     * Detect whether the assistant explicitly refused because the request is not about El Prat.
-     * This uses a small set of phrase checks that mirror the system prompt instruction.
+     * Detect whether the assistant explicitly refused because the request is not about the
+     * given city. Generic refusal phrases are city-agnostic and detected first; a secondary
+     * check looks for the city name paired with scope-limiting words.
      */
-    private boolean aiRefusedAsNotAboutElPrat(String aiMessage) {
+    private boolean aiRefusedAsOffTopic(String aiMessage, String cityId) {
         if (aiMessage == null) return false;
-        // Normalize common quotes/apostrophes for more reliable matching
-        String normalized = aiMessage.replace('’', '\'').replace('‘', '\'').replace('“', '"').replace('”', '"');
+        // Normalize typographic quotes/apostrophes for reliable matching.
+        String normalized = aiMessage
+                .replace('\u2018', '\'').replace('\u2019', '\'')
+                .replace('\u201c', '"').replace('\u201d', '"');
         String lower = normalized.toLowerCase(Locale.ROOT).trim();
-        // Remove punctuation for more robust matching (fix regex)
         String lowerNoPunct = lower.replaceAll("[.,;:!?()\\[\\]{}-]", " ").replaceAll("\\s+", " ").trim();
 
-        // Common refusal patterns in English, Spanish and Catalan
-        String[] refusalPhrases = new String[] {
+        // Generic refusal patterns (city-agnostic).
+        String[] refusalPhrases = {
                 "can't help with",
                 "cannot help with",
                 "can't help",
@@ -306,15 +308,6 @@ public class OpenRouterServices implements IOpenRouterService {
                 "lo siento, no puedo",
                 "no puedo",
                 "no puc",
-                "no puc ajudar",
-                // Add more variants
-                "not about el prat",
-                "only answer about el prat",
-                "only questions about el prat",
-                "solo puedo responder sobre el prat",
-                "només puc respondre sobre el prat",
-                "solamente puedo responder sobre el prat",
-                "solament puc respondre sobre el prat"
         };
 
         for (String p : refusalPhrases) {
@@ -325,15 +318,18 @@ public class OpenRouterServices implements IOpenRouterService {
             }
         }
 
-        // Also check for explicit mention that the model can only answer about El Prat
-        if (lower.contains("el prat") && (lower.contains("only") || lower.contains("solament") || lower.contains("solo") || lower.contains("only about"))) {
-            logger.fine("Refusal detected by El Prat + only/solament/solo/only about");
+        // City-specific secondary check: the AI mentioned the city name alongside scope-limiting language.
+        String cityNameLower = RedactPromptBuilder.resolveCityDisplayName(cityId).toLowerCase(Locale.ROOT);
+        if (lower.contains(cityNameLower)
+                && (lower.contains("only") || lower.contains("solament") || lower.contains("solo") || lower.contains("only about"))) {
+            logger.fine("Refusal detected: city name '" + cityNameLower + "' + scope-limiting word");
             return true;
         }
+
         return false;
     }
 
-    private OpenRouterResponseDto callOpenRouterAndExtract(List<Map<String, Object>> messages) {
+    private OpenRouterResponseDto callOpenRouterAndExtract(List<Map<String, Object>> messages, String cityId) {
         logger.fine(() -> "callOpenRouterAndExtract — sending " + messages.size() + " messages to OpenRouter");
         try {
             CompletableFuture<HttpDto> future = httpWrapper.postToOpenRouterAsync(messages);
@@ -351,9 +347,13 @@ public class OpenRouterServices implements IOpenRouterService {
                 return new OpenRouterResponseDto(false, dto.message(), dto.error(), dto.statusCode(), OpenRouterErrorCode.UPSTREAM);
             }
             if (dto.message() != null && !dto.message().isBlank()) {
-                if (aiRefusedAsNotAboutElPrat(dto.message())) {
-                    logger.info(() -> "callOpenRouterAndExtract — AI refused (not about El Prat) httpStatus=" + dto.statusCode());
-                    return new OpenRouterResponseDto(false, dto.message(), "Request is not about El Prat de Llobregat.", dto.statusCode(), OpenRouterErrorCode.REFUSAL);
+                if (aiRefusedAsOffTopic(dto.message(), cityId)) {
+                    String cityName = RedactPromptBuilder.resolveCityDisplayName(cityId);
+                    logger.info(() -> "callOpenRouterAndExtract — AI refused (off-topic for city=" + cityId
+                            + ") httpStatus=" + dto.statusCode());
+                    return new OpenRouterResponseDto(false, dto.message(),
+                            "Request is not about " + cityName + ".",
+                            dto.statusCode(), OpenRouterErrorCode.REFUSAL);
                 }
                 logger.fine(() -> "callOpenRouterAndExtract — AI responded successfully httpStatus=" + dto.statusCode()
                         + " responseLength=" + dto.message().length());
