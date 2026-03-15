@@ -11,8 +11,10 @@ import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.search.*;
 import org.apache.lucene.store.ByteBuffersDirectory;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -65,23 +67,36 @@ public class ProcedureRagHelper {
     }
 
     private InputStream getProceduresInputStream() throws IOException {
-        String bucket = System.getenv(ENV_PROCEDURES_BUCKET);
-        String region = System.getenv(ENV_PROCEDURES_REGION);
+        String bucket     = System.getenv(ENV_PROCEDURES_BUCKET);
+        String region     = System.getenv(ENV_PROCEDURES_REGION);
+        String endpointUrl = System.getenv("AWS_ENDPOINT_URL");
         // The S3 key is always derived from the cityId — no env var override.
         // This ensures multi-city requests each load the correct file.
         String s3Key = "procedures-" + cityId + ".json";
+
         if (bucket != null && region != null) {
-            try (software.amazon.awssdk.services.s3.S3Client s3 = software.amazon.awssdk.services.s3.S3Client.builder()
-                    .region(software.amazon.awssdk.regions.Region.of(region))
-                    .credentialsProvider(software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider.create())
-                    .build()) {
+            software.amazon.awssdk.services.s3.S3ClientBuilder clientBuilder =
+                    software.amazon.awssdk.services.s3.S3Client.builder()
+                            .region(software.amazon.awssdk.regions.Region.of(region))
+                            .credentialsProvider(software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider.create());
+
+            if (endpointUrl != null && !endpointUrl.isBlank()) {
+                clientBuilder.endpointOverride(URI.create(endpointUrl));
+            }
+
+            try (software.amazon.awssdk.services.s3.S3Client s3 = clientBuilder.build()) {
                 software.amazon.awssdk.services.s3.model.GetObjectRequest req =
                         software.amazon.awssdk.services.s3.model.GetObjectRequest.builder()
                                 .bucket(bucket)
                                 .key(s3Key)
                                 .build();
                 logger.info(() -> "Loading procedures from S3 — bucket=" + bucket + " key=" + s3Key + " region=" + region);
-                return s3.getObject(req);
+                // getObjectAsBytes() reads all bytes into memory before the S3Client
+                // (and its underlying HTTP connection) is closed by try-with-resources.
+                // Using getObject() would return a stream backed by the HTTP connection,
+                // which is closed by the time the caller tries to read it — a silent data loss.
+                byte[] procedureBytes = s3.getObjectAsBytes(req).asByteArray();
+                return new ByteArrayInputStream(procedureBytes);
             } catch (Exception e) {
                 logger.log(Level.WARNING, "Failed to load procedures from S3 — bucket=" + bucket
                         + " key=" + s3Key + " region=" + region + " error=" + e.getMessage()

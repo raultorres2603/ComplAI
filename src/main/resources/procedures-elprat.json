@@ -1,40 +1,478 @@
 {
-  "generatedAt": "2026-03-04T10:00:00Z",
-  "sourceUrl": "https://tramits.pratespais.com/Ciutadania/",
+  "generatedAt": "2026-03-15T11:04:56.336947021Z",
+  "sourceUrl": "https://tramits.pratespais.com/Ciutadania/TramitsTemes.aspx",
   "procedures": [
     {
-      "procedureId": "empadronament",
-      "title": "Empadronament",
-      "description": "L'empadronament és la inscripció al padró municipal d'habitants d'El Prat de Llobregat.",
-      "requirements": "DNI, NIE o passaport original. Contracte de lloguer o escriptura de propietat. Certificat de convivència (si escau).",
-      "steps": "1. Recopilar la documentació. 2. Anar a l'Oficina d'Atenció Ciutadana o fer-ho en línia.",
-      "fees": "Gratuït.",
-      "office": "Oficina d'Atenció Ciutadana, Pl. de la Vila, 1",
-      "deadlines": "Resolució immediata.",
-      "url": "https://tramits.pratespais.com/Ciutadania/Empadronament"
+      "procedureId": "03ae6d4a-0281-3770-ba7f-a96cb24ab2a6",
+      "title": "Ajuts d'Especial Urgència per a l'Habitatge",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? Persones físiques residents a Catalunya, amb uns ingressos de la unitat de convivència que no superin els límits establerts i que es trobin en risc d’exclusió social residencial, per alguna de les modalitats esmentades. Requisits a complir • L'import de les quotes d'amortització del préstec hipotecari o del lloguer que ha de pagar la persona sol·licitant de la prestació no pot superar els 800 euros. • Quantia màxima de la prestació: 4.500€, excepte per les Prestacions per atendre situacions de pèrdua de l'habitatge, on l’import s’estableix en el 60 % de la renda anual de l’habitatge, amb un límit màxim de 3.600€ anuals per habitatge. • Acreditar la urgència i l'especial necessitat de la unitat de convivència de la persona sol·licitant mitjançant l'aportació d'un informe socioeconòmic dels serveis socials. Excepte en el supòsit de persones sol·licitants d'una prestació per al pagament del deute de rendes del lloguer, derivat de l'impacte econòmic i social de la covid-19. • Destinar l'habitatge a residència habitual i permanent de la persona sol·licitant. • No tenir, ni la persona sol·licitant ni cap altre membre de la unitat de convivència, cap habitatge en propietat o en usdefruit, llevat que no en disposi de l'ús i gaudi per causa de separació o de divorci o per qualsevol causa aliena a la seva voluntat. • Tenir uns ingressos de la unitat de convivència de la persona sol·licitant no superiors a 2 vegades l'indicador de renda de suficiència de Catalunya (IRSC) ponderat, en el cas de persones que viuen soles; no superiors a2,5 vegades l'IRSC ponderat si es tracta d'unitats de convivència de dos membres o més. La resta de requisits específics, depenent de cadascuna de les modalitats de prestacions d'especial urgència, poden consultar-se a la RESOLUCIÓ TES/126/2021, de 15 de gener Quan es pot sol·licitar? Aquest tràmit es podrà sol·licitar en qualsevol moment Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació: Tramitació telemàtica: a la seu electrònica de l’Agència de l’Habitatge de Catalunya Tramitació presencial: a Prat Espais, preferiblement s'atendrà amb cita prèvia.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTramit=10"
     },
     {
-      "procedureId": "ajuda-lloguer",
-      "title": "Ajuda al Lloguer",
-      "description": "Subvenció per ajudar a pagar el lloguer de l'habitatge habitual.",
-      "requirements": "Contracte de lloguer vigent. Ingressos familiars dins dels límits establerts.",
-      "steps": "1. Omplir la sol·licitud. 2. Presentar la documentació a l'Ajuntament.",
-      "fees": "Gratuït.",
-      "office": "Oficina d'Atenció Ciutadana, Pl. de la Vila, 1",
-      "deadlines": "Termini de resolució: 3 mesos.",
-      "url": "https://tramits.pratespais.com/Ciutadania/AjudaLloguer"
+      "procedureId": "3bb58f48-1122-3116-be08-89487abc9e13",
+      "title": "Aportació dels rebuts lloguer per a persones amb BO JOVE FAVORABLE 2025",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? Persones físiques que siguin beneficiàries del BO JOVE 2025 Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació Tramitació telemàtica: A la seu electrònica de l’Agència de l’Habitatge de Catalunya (a sota ⬇ hi ha unes instruccions de com fer-ho) Al portal de tràmits de Prat Espais, seguint les instruccions d’aquest tràmit. Tramitació presencial: a Prat Espais, s’atendrà preferiblement amb cita prèvia.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTramit=24"
     },
     {
-      "procedureId": "llicencia-obres",
-      "title": "Llicència d'Obres Menors",
-      "description": "Permís necessari per fer obres de reforma o manteniment a l'habitatge.",
-      "requirements": "Projecte tècnic (si escau). Pressupost de l'obra. DNI del sol·licitant.",
-      "steps": "1. Presentar la sol·licitud. 2. Aportar la documentació requerida.",
-      "fees": "Segons ordenança fiscal.",
-      "office": "Oficina d'Atenció Ciutadana, Pl. de la Vila, 1",
-      "deadlines": "Resolució en 1 mes.",
-      "url": "https://tramits.pratespais.com/Ciutadania/LlicenciaObres"
+      "procedureId": "c92d601d-1722-3f5d-899f-2cfadd6e5ede",
+      "title": "Autorització de lloguer d'un habitatge protegit o amb ajuts a l'adquisició",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? Persones propietàries que volen llogar llur habitatge protegit. Requisits Els titulars d'habitatges protegits els han de destinar al seu domicili habitual i permanent, només de forma excepcional poden sol·licitar a l'Agència l'autorització per a poder llogar-los, acreditant documentalment els motius. Es considera que un habitatge no es destina a domicili habitual i permanent si els titulars de l'obligació estan tres mesos seguits a l'any sense ocupar-lo i no hi ha una causa que ho justifiqui. Condicions en que s’autoritza el lloguer: les condicions constaran en la resolució d'autorització de lloguer emesa per l'Agència de l'Habitatge de Catalunya Quan es pot sol·licitar? Aquest tràmit es podrà sol·licitar en qualsevol moment. Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació Tramitació telemàtica: A la seu electrònica de l’Agència de l’Habitatge de Catalunya Tramitació presencial: a Prat Espais, s’atendrà preferiblement amb cita prèvia.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTramit=15"
+    },
+    {
+      "procedureId": "29f99db2-6090-3ba3-a876-6f50a36853e9",
+      "title": "Autorització de venda d'habitatges de promoció pública",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? Els titulars d'habitatges de protecció oficial de promoció pública. Requisits En cas de venda, els titulars d'aquests habitatges poden sol·licitar el canvi de règim d’habitatge de protecció oficial de promoció pública a habitatge amb protecció oficial de règim general, sempre que: • Des del certificat final d'obres dels habitatges o de la seva adquisició hagin transcorregut un mínim de 15 anys. • Que aquest canvi de qualificació compti amb la conformitat de l'Ajuntament on s'ubiqui l'habitatge, i del promotor de l’actuació. Quan es pot sol·licitar? Han d'haver passat 15 anys des del certificat final d'obres de l'habitatge o des del document de compravenda. Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació Tramitació telemàtica: A la seu electrònica de l’Agència de l’Habitatge de Catalunya Tramitació presencial: a Prat Espais, s’atendrà preferiblement amb cita prèvia.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTramit=14"
+    },
+    {
+      "procedureId": "6d7124fd-d29e-33dc-a98b-69b35e14cb2f",
+      "title": "Cèdula d’habitabilitat de segona ocupació",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? La pot sol·licitar la persona propietària de l'habitatge, el llogater, o una persona representant degudament autoritzada. Quan es pot sol·licitar? Aquest tràmit es podrà sol·licitar en qualsevol moment. Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació Tramitació telemàtica: a la seu electrònica de l’Agència de l’Habitatge de Catalunya Trobarà més informació respecte a la tramitació de cèdules d'habitabilitat a la pàgina web de l'Agència de l'Habitatge de Catalunya.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTramit=18"
+    },
+    {
+      "procedureId": "6e3b0141-4dae-39d9-b0b0-0dc6103fec98",
+      "title": "Duplicat de la cèdula d'habitabilitat",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? La pot sol·licitar la persona propietària de l'habitatge, el llogater, o una persona representant degudament autoritzada. Quan es pot sol·licitar? Aquest tràmit es podrà sol·licitar en qualsevol moment. Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació: Tramitació telemàtica: a la seu electrònica de l’Agència de l’Habitatge de Catalunya Tramitació presencial: a Prat Espais, s’atendrà preferiblment amb cita prèvia. Trobarà més informació respecte a la tramitació de cèdules d'habitabilitat a la pàgina web de l'Agència de l'Habitatge de Catalunya.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTramit=19"
+    },
+    {
+      "procedureId": "c52e131d-2fef-3689-b8ed-2213b3f436ce",
+      "title": "Informació sobre un habitatge protegit",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? Propietaris d’un habitatge protegit amb alguna tipologia de protecció oficial que el vulguin vendre, llogar o cedir-ne l’ús. També la pot sol·licitar qualsevol persona física o jurídica que tingui interès a obtenir la informació de les condicions de transmissió d’un habitatge protegit concret. Requisits Cal presentar la sol·licitud amb temps suficient abans d’efectuar la transmissió de l’habitatge. És imprescindible facilitar el número d’expedient de la protecció oficial. Quan es pot sol·licitar? Aquest tràmit es podrà sol·licitar en qualsevol moment. Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació: Tramitació telemàtica: a la seu electrònica de l’Agència de l’Habitatge de Catalunya Tramitació presencial: a Prat Espais, s’atendrà preferiblement amb cita prèvia.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTramit=13"
+    },
+    {
+      "procedureId": "928a0c10-a655-35c2-8c8d-8df35c8eb285",
+      "title": "Inscripció en el Registre de Sol·licitants d’Habitatge amb Protecció Oficial",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui pot sol·licitar-ho? Persones físiques o unitats de convivència que estiguin empadronades al Prat de Llobregat. Requisits a complir: a) Ser major d’edat o estar emancipat. b) Tenir necessitat d’habitatge. c) Residir en un municipi de Catalunya; la residència s’acredita mitjançant l’empadronament en un municipi de Catalunya i és exigible, com a mínim, a la persona sol·licitant de la inscripció. d) Complir el límit d’ingressos màxims i mínims que estableix la normativa dels habitatges amb protecció oficial per a les persones adjudicatàries d’aquests habitatges. e) No trobar-se en les circumstàncies d’exclusió previstes. f) No trobar-se incapacitat per obligar-se contractualment. Quan es pot sol·licitar? Aquest tràmit es podrà sol·licitar en qualsevol moment Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació Tramitació telemàtica: Omplir la sol·licitud a través d'aquest tràmit i adjuntar la documentació necessària. Tramitació presencial: a Prat Espais, s’atendrà preferiblement amb cita prèvia. El dia de la cita haureu d'aportar tota la documentació necessària.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTramit=21"
+    },
+    {
+      "procedureId": "41ac4c11-b6a4-3413-9e9c-f662e6832e9b",
+      "title": "ITE, inspecció tècnica de l’edifici",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? Estan obligats a sol·licitar el certificat d'aptitud els propietaris dels edificis unifamiliars o plurifamiliars, on existeixi l'ús d'habitatge, sens perjudici que puguin contenir també altres usos diferents del residencial. No estan obligats els titulars d'edificis unifamiliars en què la seva edificació principal estigui separada 1,5 m o més de la via púbica, zones d'ús públic o finques adjacents. Requisits La ITE és obligatòria en els següents supòsits: • Si ho determina el programa d'inspeccions tècniques obligatòries. • Si ho determinen els programes o les ordenances locals • Si l'edifici o habitatges de l'edifici s'han d'acollir a ajuts públics per al foment de la rehabilitació Queden exclosos els edificis sobre els quals s'hagi iniciat l'expedient de declaració de ruïna. Qui és el responsable d'encarregar la ITE L'obligació de sotmetre els edificis d'habitatges a la inspecció tècnica correspon a la propietat. En el cas d'edificis en règim de propietat horitzontal, aquesta obligació correspon a la comunitat de propietaris. Les persones propietàries i els ocupants han de facilitar l'accés als habitatges i altres entitats en el moment de la inspecció, amb la finalitat de possibilitar la inspecció de l'edifici. El cost econòmic derivat de la inspecció tècnica és a càrrec de les persones propietàries de l'edifici. El fet de no disposar de la ITE en els supòsits en què sigui exigible pot comportar la imposició de multes coercitives i de sancions a les persones responsables segons el que preveu la Llei 18/2007, del dret a l'habitatge. Quan es pot sol·licitar? Aquest tràmit es podrà sol·licitar en qualsevol moment. Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació Tramitació telemàtica: a la seu electrònica de l’Agència de l’Habitatge de Catalunya",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTramit=17"
+    },
+    {
+      "procedureId": "098a0c71-c13b-3872-92de-7bcbe8e504d3",
+      "title": "Renovació inscripció registre de sol·licitants d’habitatge amb Protecció Oficial",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui pot sol·licitar-ho? Persones inscrites al registre de Sol·licitants d’HPO Quan es pot sol·licitar? Si la inscripció al registre està a punt de caducar, cal que inicieu el procés de renovació Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació Tramitació telemàtica: a la seu electrònica de Prat Espais, en aquest mateix tràmit. Tramitació presencial: a Prat Espais, s’atendrà preferiblement amb cita prèvia.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTramit=28"
+    },
+    {
+      "procedureId": "fc750f4f-bd51-3319-b057-8e6d95cdbf70",
+      "title": "Renovació sol·licitud aparcaments",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? La persona sol·licitant de la sol·licitud anterior. Requisits a complir Trobar-se en plena capacitat d'obrar Quan es pot sol·licitar? Una setmana abans que arribi la data de caducitat de la sol·licitud anterior. Quin cost hi té? Els preus establerts i aprovats es poden consultar a https://www.pratespais.com/ca/aparcament clicant sobre la plaça del plànol. Vigència de la sol·licitud *Les sol·licituds tenen vigència de dos anys a comptar de la data de registre de la renovació*",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTramit=30"
+    },
+    {
+      "procedureId": "e9687091-2f66-34cb-bf8f-7844949d65ef",
+      "title": "Renovació sol·licitud borsa d'habitatge de lloguer",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui pot sol·licitar-ho? Persones inscrites a la Borsa de lloguer social Quan es pot sol·licitar? Abans que caduqui la inscripció a la borsa de lloguer social Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació Tramitació telemàtica: a la seu electrònica de Prat Espais, en aquest mateix tràmit. Tramitació presencial: a Prat Espais, per a dur a terme el tràmit només s’atendrà amb cita prèvia.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTramit=29"
+    },
+    {
+      "procedureId": "d6e3261d-dc8d-320c-9c91-f77dcffde292",
+      "title": "Sol·licitud a l’Ajuntament del Prat de Llobregat de la voluntat d’exercir dret de tanteig i retracte",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "Un habitatge promogut per organismes públics sota el règim de protecció oficial. Un terreny sense edificar, ja sigui solars o parcel·les en qualsevol classe de sòl, així com els terrenys edificats en qualsevol classe de sòl amb ús residencial que no esgotin el sostre legalment establert pel planejament vigent. Un terreny amb edificacions ruïnoses o totalment desocupades. Un habitatge situat en una àrea declarada com de rehabilitació i conservació. Un habitatge o edifici provinents d’execucions hipotecàries o de procediments de compensació o pagament de deute amb garantia hipotecària. Un habitatge buit sotmès a l’Impost sobre els habitatges buits, regulat a la Llei 14/2015, del 21 de juliol. Es desconeix l’afectació del dret de tanteig i retracte sobre la transmissió declarada.",
+      "steps": "Tramitació Qui ho pot sol·licitar? Titular de la propietat Serveis de notaria i registre Representació de la propietat (persona jurídica). En aquest cas, serà obligatori presentar autorització de representació complimentada, així com els DNI de la/les persona/es interessada/es i DNI de la persona autoritzada. Quan es pot sol·licitar? Aquest tràmit es podrà sol·licitar en qualsevol moment Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació Tramitació telemàtica: a la seu electrònica de Prat Espais, en aquest mateix tràmit. Tramitació presencial: a Prat Espais, per a dur a terme el tràmit només s’atendrà amb cita prèvia.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTramit=27"
+    },
+    {
+      "procedureId": "6f64ad12-7a4f-3276-ab31-88048b2039b2",
+      "title": "Sol·licitud aparcament",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "Aparcament Sant Jordi / Ribera Baixa: Modalitat lloguer Aparcament Avinguda Verge Montserrat / Av. Remolar: Modalitat lloguer Aparcament Cèntric: Modalitat lloguer, abonament i rotació Aparcament Plaça Blanes: Modalitat lloguer i abonament Aparcament Plaça Catalunya: Modalitat lloguer i abonament Aparcament MONTSERRAT: Modalitat lloguer i abonament. Aparcament MARINA: Modalitat lloguer, abonament i rotació\nAparcament provisional de vehicles industrials (Camions)",
+      "steps": "Tramitació Qui ho pot sol·licitar? Qualsevol persona Requisits a complir Trobar-se en plena capacitat d’obrar Quan es pot sol·licitar? Durant tot l’any Quin cost té? Els preus establerts i aprovats es poden consultar a https://www.pratespais.com/ca/aparcamiento clicant sobre la plaça del plànol. Vigència de la sol·licitud **Les sol·licituds tenen vigència d'1 any a comptar des de la data de registre d'entrada**",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTramit=5"
+    },
+    {
+      "procedureId": "654d352e-6628-3414-97d7-0d3c84915ac5",
+      "title": "Sol·licitud borsa d'habitatge de lloguer",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? Persones físiques empadronades al municipi. Requisits a complir • Tenir plena capacitat per ser titular del lloguer. • Cap membre de la unitat de convivència pot ser propietari d’un altre habitatge a Catalunya. • Els ingressos ponderats de la unitat de convivència han de ser inferiors a 4 vegades l’IRSC. • Disposar d’uns ingressos corrents que permetin accedir i fer front al lloguer. Els ingressos ponderats de la unitat de convivència han de ser superiors a 1 vegada l’IRSC. • No haver renunciat en el darrer any a una assignació adequada sense motiu justificat. • No haver patit un desnonament en el darrer anys per causes imputables al llogater, tant de parc públic com privat. • Acreditar qualsevol altre informació o situació complementària, com si forma part d’un col·lectiu específic o d’una demanda prioritària per especial urgència. Quan es pot sol·licitar? Aquest tràmit es podrà sol·licitar en qualsevol moment Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació Tramitació telemàtica: a la seu electrònica de Prat Espais, en aquest mateix tràmit. Tramitació presencial: a Prat Espais, s’atendrà preferiblement amb cita prèvia.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTramit=11"
+    },
+    {
+      "procedureId": "3c4230cb-2ad6-3b70-a1ad-647f65627ab6",
+      "title": "Sol·licitud d'accés a la informació pública",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui el pot demanar La persona física, major de 16 anys, a títol individual o en nom i representació de qualsevol persona jurídica que estigui legalment constituïda. D’acord amb la disposició addicional primera de la Llei 19/2014, l’accés dels interessats als documents dels procediments administratius en tràmit es regeix pel que determina la legislació sobre règim jurídic i procediment administratiu. En el cas de les matèries que tenen establert un règim d’accés especial, aquest accés és regulat per llur normativa específica i, amb caràcter supletori, per la Llei 19/2014. Canals de tramitació Per mitjans electrònics o de manera presencial. Període de l’any en què es pot demanar Es pot demanar en qualsevol moment. Termini de la sol∙licitud En qualsevol moment. Requisits previs A. Identificació del sol∙licitant. B. Concreció de la informació que se sol∙licita. C. Adreça de contacte, preferentment electrònica, a efectes de comunicacions. D. Si pertoca, la modalitat que prefereixi per accedir a la informació sol∙licitada. Format de la documentació demanada La documentació sol·licitada pot ser demanada en format reutilitzable. Aquesta reutilització de la informació pública és lliure i no està subjecta a restriccions, excepte en els casos en què, mitjançant normativa, s’exigeixi una llicència específica, per protegir altres drets o béns jurídics, o quan es requereixi una sol·licitud prèvia de l’interessat. Obligacions bàsiques en la reutilització No alterar el contingut de la informació. No desnaturalitzar-ne el sentit original. Citar la font de la informació. Indicar la data de l’última actualització Responsabilitats i garanties La persona o entitat que reutilitza la informació ho fa sota responsabilitat seva, i els usos i conseqüències recauen exclusivament en aquest reutilitzador tal com s’indica a l’article 17 de la Llei 19/2014, del 29 de desembre de transparència, accés a la informació pública i bon govern. Preu L’accés a la informació pública és gratuït. No obstant això, l’expedició de còpies i la transposició a formats diferents de l’original poden restar subjectes a una contraprestació econòmica establerta, si s’escau, segons la corresponent ordenança fiscal. Mitjans de pagament Els establerts per la normativa reguladora.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTramit=31"
+    },
+    {
+      "procedureId": "012bd14f-4990-39c4-9fc9-3cdf1d516880",
+      "title": "Sol·licitud de baixa de plaça de lloguer o abonament d’aparcament",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "Lloguer: S’haurà de comunicar la voluntat de rescindir el contracte amb un mes d’antelació. Abonament: s’haurà de comunicar la voluntat de rescindir el contracte amb un mínim de set (7) dies d’antelació.",
+      "steps": "Tramitació Qui ho pot sol·licitar? Qualsevol persona usuària i amb contracte de l’aparcament. Requisits a complir Trobar-se en plena capacitat d’obrar Quan es pot sol·licitar? Durant tot l’any Quin cost té? Servei gratuït",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTramit=7"
+    },
+    {
+      "procedureId": "87f43102-55c1-3965-b14b-775d3143c4e5",
+      "title": "Sol·licitud de canvi de dades bancàries",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? Qualsevol persona usuària que mantinguin una relació contractual amb Prat Espais, ja sigui d’aparcament o d’habitatge. Requisits a complir Trobar-se en plena capacitat d’obrar Quan es pot sol·licitar? Durant tot l’any Quin cost té? Servei gratuït",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTramit=8"
+    },
+    {
+      "procedureId": "6d6cae21-99fe-3390-8f6a-49bdccba244e",
+      "title": "Sol·licitud de visats per la venda d'habitatges amb protecció oficial",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? Totes les persones que vulguin vendre un habitatge amb protecció oficial. Requisits • Les persones adquirents han d'estar inscrites al Registre de Sol·licitants d'Habitatges amb Protecció Oficial. • Els ingressos familiars ponderats de les persones adquirents: • No poden ser inferiors al 5% del preu d'adquisició de l'habitatge. • No poden superar els ingressos establerts a la normativa a l'empara de la qual van ser qualificats els habitatges (veure taules d'ingressos). • Les persones adquirents no poden ser titulars: • del ple domini o d'un dret real d'ús i gaudi sobre algun altre habitatge protegit. • d'un habitatge lliure quan el valor d'aquest habitatge, calculat d'acord amb la normativa de l'Impost Sobre Transmissions Patrimonials, superi el 40% del preu total de l'habitatge adquirit, o el 60% quan es tracti de persones majors de 65 anys; dones víctimes de la violència de gènere; víctimes del terrorisme; famílies nombroses; famílies monoparentals; persones dependents o amb discapacitat oficialment reconeguda i les famílies que les tinguin al seu càrrec; persones separades o divorciades al corrent del pagament de la pensió alimentària i/o compensatòria. Quan es pot sol·licitar? Aquest tràmit es podrà sol·licitar en qualsevol moment. Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació: Tramitació telemàtica: a la seu electrònica de l’Agència de l’Habitatge de Catalunya",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTramit=16"
+    },
+    {
+      "procedureId": "c39022d0-ccdd-3f4f-a149-114d9c9cb145",
+      "title": "Sol·licitud del distintiu de resident / enganxina platja (ZONA VERDA)",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "Que la persona sol·licitant sigui titular d'un vehicle que tributi a l'Ajuntament del Prat en concepte d'IVTM. Que es trobi al corrent de pagament de l'Impost sobre vehicles de tracció mecànica, salvat que s'acrediti que gaudeix d'algun benefici fiscal. Si es tracta de persones jurídiques, que el conductor habitual sigui resident al Prat. Només s’acceptarà un vehicle per conductor.",
+      "steps": "Tramitació Qui pot sol·licitar-ho? Persones físiques o jurídiques. Requisits a complir: Que la persona sol·licitant sigui titular d'un vehicle que tributi a l'Ajuntament del Prat en concepte d'IVTM. Que es trobi al corrent de pagament de l'Impost sobre vehicles de tracció mecànica, salvat que s'acrediti que gaudeix d'algun benefici fiscal. Si es tracta de persones jurídiques, que el conductor habitual sigui resident al Prat. Només s’acceptarà un vehicle per conductor. Quan es pot sol·licitar? Aquest tràmit es podrà sol·licitar durant tot l'any. Quant es triga en emetre el distintiu? Un cop rebuda la documentació, si tot és correcte, el distintiu s'emetrà durant els 2 dies hàbils següents. L'enviament a domicili pot trigar entre 5 i 10 dies. Quin cost té? No hi ha taxes associades per les persones que compleixen amb els requisits esmentats. D'altra banda, s'estableix un abonament de temporada per a les persones empadronades al municipi amb un import de 25 euros respecte dels vehicles que no estan en tributació en aquesta ciutat per l'impost sobre vehicles de tracció mecànica i dels que són conductors habituals en virtut d'un contracte de rènting, leasing o situacions anàlogues. En aquests casos el pagament s'efectua amb targeta bancària en el moment de la recollida a les nostres oficines. Validesa del distintiu de resident El distintiu té validesa durant l'any natural.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTramit=25"
+    },
+    {
+      "procedureId": "dd9a1b51-9852-37b1-825b-bc6ce4865615",
+      "title": "Sol·licitud genèrica / Instància",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? Qualsevol persona Requisits a complir: Trobar-se en plena capacitat d’obrar Quan es pot sol·licitar? Durant tot l’any Quin cost té? Cost gratuït",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTramit=1"
+    },
+    {
+      "procedureId": "68d92989-8152-3bac-85a7-c6e7581787e5",
+      "title": "Sol·licitud vals descompte 1 h",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? Comerços o negocis Requisits a complir: Trobar-se en plena capacitat d’obrar Quan es pot sol·licitar? Durant tot l’any Quin cost té? 40 € el paquet de 50 unitats.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTramit=32"
+    },
+    {
+      "procedureId": "9eee67f2-0c38-3d10-abd1-f3cc2956ade1",
+      "title": "Renovació sol·licitud aparcaments",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? La persona sol·licitant de la sol·licitud anterior. Requisits a complir Trobar-se en plena capacitat d'obrar Quan es pot sol·licitar? Una setmana abans que arribi la data de caducitat de la sol·licitud anterior. Quin cost hi té? Els preus establerts i aprovats es poden consultar a https://www.pratespais.com/ca/aparcament clicant sobre la plaça del plànol. Vigència de la sol·licitud *Les sol·licituds tenen vigència de dos anys a comptar de la data de registre de la renovació*",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=3&IdTramit=30&IdTema=3"
+    },
+    {
+      "procedureId": "bc0986a5-8eea-30bd-b703-11d4cf87db93",
+      "title": "Sol·licitud aparcament",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "Aparcament Sant Jordi / Ribera Baixa: Modalitat lloguer Aparcament Avinguda Verge Montserrat / Av. Remolar: Modalitat lloguer Aparcament Cèntric: Modalitat lloguer, abonament i rotació Aparcament Plaça Blanes: Modalitat lloguer i abonament Aparcament Plaça Catalunya: Modalitat lloguer i abonament Aparcament MONTSERRAT: Modalitat lloguer i abonament. Aparcament MARINA: Modalitat lloguer, abonament i rotació\nAparcament provisional de vehicles industrials (Camions)",
+      "steps": "Tramitació Qui ho pot sol·licitar? Qualsevol persona Requisits a complir Trobar-se en plena capacitat d’obrar Quan es pot sol·licitar? Durant tot l’any Quin cost té? Els preus establerts i aprovats es poden consultar a https://www.pratespais.com/ca/aparcamiento clicant sobre la plaça del plànol. Vigència de la sol·licitud **Les sol·licituds tenen vigència d'1 any a comptar des de la data de registre d'entrada**",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=3&IdTramit=5&IdTema=3"
+    },
+    {
+      "procedureId": "fcdd2404-3ef2-3662-b7b2-d08eae5bf9e8",
+      "title": "Sol·licitud d'accés a la informació pública",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui el pot demanar La persona física, major de 16 anys, a títol individual o en nom i representació de qualsevol persona jurídica que estigui legalment constituïda. D’acord amb la disposició addicional primera de la Llei 19/2014, l’accés dels interessats als documents dels procediments administratius en tràmit es regeix pel que determina la legislació sobre règim jurídic i procediment administratiu. En el cas de les matèries que tenen establert un règim d’accés especial, aquest accés és regulat per llur normativa específica i, amb caràcter supletori, per la Llei 19/2014. Canals de tramitació Per mitjans electrònics o de manera presencial. Període de l’any en què es pot demanar Es pot demanar en qualsevol moment. Termini de la sol∙licitud En qualsevol moment. Requisits previs A. Identificació del sol∙licitant. B. Concreció de la informació que se sol∙licita. C. Adreça de contacte, preferentment electrònica, a efectes de comunicacions. D. Si pertoca, la modalitat que prefereixi per accedir a la informació sol∙licitada. Format de la documentació demanada La documentació sol·licitada pot ser demanada en format reutilitzable. Aquesta reutilització de la informació pública és lliure i no està subjecta a restriccions, excepte en els casos en què, mitjançant normativa, s’exigeixi una llicència específica, per protegir altres drets o béns jurídics, o quan es requereixi una sol·licitud prèvia de l’interessat. Obligacions bàsiques en la reutilització No alterar el contingut de la informació. No desnaturalitzar-ne el sentit original. Citar la font de la informació. Indicar la data de l’última actualització Responsabilitats i garanties La persona o entitat que reutilitza la informació ho fa sota responsabilitat seva, i els usos i conseqüències recauen exclusivament en aquest reutilitzador tal com s’indica a l’article 17 de la Llei 19/2014, del 29 de desembre de transparència, accés a la informació pública i bon govern. Preu L’accés a la informació pública és gratuït. No obstant això, l’expedició de còpies i la transposició a formats diferents de l’original poden restar subjectes a una contraprestació econòmica establerta, si s’escau, segons la corresponent ordenança fiscal. Mitjans de pagament Els establerts per la normativa reguladora.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=3&IdTramit=31&IdTema=3"
+    },
+    {
+      "procedureId": "c5a7ffe0-5fed-30ed-8270-78e4527a5038",
+      "title": "Sol·licitud de baixa de plaça de lloguer o abonament d’aparcament",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "Lloguer: S’haurà de comunicar la voluntat de rescindir el contracte amb un mes d’antelació. Abonament: s’haurà de comunicar la voluntat de rescindir el contracte amb un mínim de set (7) dies d’antelació.",
+      "steps": "Tramitació Qui ho pot sol·licitar? Qualsevol persona usuària i amb contracte de l’aparcament. Requisits a complir Trobar-se en plena capacitat d’obrar Quan es pot sol·licitar? Durant tot l’any Quin cost té? Servei gratuït",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=3&IdTramit=7&IdTema=3"
+    },
+    {
+      "procedureId": "2c7d3d3d-a99c-3bb4-b150-21c6873129e5",
+      "title": "Sol·licitud de canvi de dades bancàries",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? Qualsevol persona usuària que mantinguin una relació contractual amb Prat Espais, ja sigui d’aparcament o d’habitatge. Requisits a complir Trobar-se en plena capacitat d’obrar Quan es pot sol·licitar? Durant tot l’any Quin cost té? Servei gratuït",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=3&IdTramit=8&IdTema=3"
+    },
+    {
+      "procedureId": "dc2ca7e7-f3c7-3024-9ac8-84cd8be47ce5",
+      "title": "Sol·licitud del distintiu de resident / enganxina platja (ZONA VERDA)",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "Que la persona sol·licitant sigui titular d'un vehicle que tributi a l'Ajuntament del Prat en concepte d'IVTM. Que es trobi al corrent de pagament de l'Impost sobre vehicles de tracció mecànica, salvat que s'acrediti que gaudeix d'algun benefici fiscal. Si es tracta de persones jurídiques, que el conductor habitual sigui resident al Prat. Només s’acceptarà un vehicle per conductor.",
+      "steps": "Tramitació Qui pot sol·licitar-ho? Persones físiques o jurídiques. Requisits a complir: Que la persona sol·licitant sigui titular d'un vehicle que tributi a l'Ajuntament del Prat en concepte d'IVTM. Que es trobi al corrent de pagament de l'Impost sobre vehicles de tracció mecànica, salvat que s'acrediti que gaudeix d'algun benefici fiscal. Si es tracta de persones jurídiques, que el conductor habitual sigui resident al Prat. Només s’acceptarà un vehicle per conductor. Quan es pot sol·licitar? Aquest tràmit es podrà sol·licitar durant tot l'any. Quant es triga en emetre el distintiu? Un cop rebuda la documentació, si tot és correcte, el distintiu s'emetrà durant els 2 dies hàbils següents. L'enviament a domicili pot trigar entre 5 i 10 dies. Quin cost té? No hi ha taxes associades per les persones que compleixen amb els requisits esmentats. D'altra banda, s'estableix un abonament de temporada per a les persones empadronades al municipi amb un import de 25 euros respecte dels vehicles que no estan en tributació en aquesta ciutat per l'impost sobre vehicles de tracció mecànica i dels que són conductors habituals en virtut d'un contracte de rènting, leasing o situacions anàlogues. En aquests casos el pagament s'efectua amb targeta bancària en el moment de la recollida a les nostres oficines. Validesa del distintiu de resident El distintiu té validesa durant l'any natural.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=3&IdTramit=25&IdTema=3"
+    },
+    {
+      "procedureId": "287f4363-b206-35c6-aa52-9f396c14a542",
+      "title": "Sol·licitud vals descompte 1 h",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? Comerços o negocis Requisits a complir: Trobar-se en plena capacitat d’obrar Quan es pot sol·licitar? Durant tot l’any Quin cost té? 40 € el paquet de 50 unitats.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=3&IdTramit=32&IdTema=3"
+    },
+    {
+      "procedureId": "14d23e56-1a81-30ba-93a2-06e129d12b9a",
+      "title": "Aportació dels rebuts lloguer per a persones amb BO JOVE FAVORABLE 2025",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? Persones físiques que siguin beneficiàries del BO JOVE 2025 Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació Tramitació telemàtica: A la seu electrònica de l’Agència de l’Habitatge de Catalunya (a sota ⬇ hi ha unes instruccions de com fer-ho) Al portal de tràmits de Prat Espais, seguint les instruccions d’aquest tràmit. Tramitació presencial: a Prat Espais, s’atendrà preferiblement amb cita prèvia.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=1&IdTramit=24&IdTema=1"
+    },
+    {
+      "procedureId": "1388c507-6706-360a-aecb-0ee5d354ac96",
+      "title": "Inscripció en el Registre de Sol·licitants d’Habitatge amb Protecció Oficial",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui pot sol·licitar-ho? Persones físiques o unitats de convivència que estiguin empadronades al Prat de Llobregat. Requisits a complir: a) Ser major d’edat o estar emancipat. b) Tenir necessitat d’habitatge. c) Residir en un municipi de Catalunya; la residència s’acredita mitjançant l’empadronament en un municipi de Catalunya i és exigible, com a mínim, a la persona sol·licitant de la inscripció. d) Complir el límit d’ingressos màxims i mínims que estableix la normativa dels habitatges amb protecció oficial per a les persones adjudicatàries d’aquests habitatges. e) No trobar-se en les circumstàncies d’exclusió previstes. f) No trobar-se incapacitat per obligar-se contractualment. Quan es pot sol·licitar? Aquest tràmit es podrà sol·licitar en qualsevol moment Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació Tramitació telemàtica: Omplir la sol·licitud a través d'aquest tràmit i adjuntar la documentació necessària. Tramitació presencial: a Prat Espais, s’atendrà preferiblement amb cita prèvia. El dia de la cita haureu d'aportar tota la documentació necessària.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=1&IdTramit=21&IdTema=1"
+    },
+    {
+      "procedureId": "340cb6d9-b974-3177-9ede-2f0e896b04a3",
+      "title": "Renovació inscripció registre de sol·licitants d’habitatge amb Protecció Oficial",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui pot sol·licitar-ho? Persones inscrites al registre de Sol·licitants d’HPO Quan es pot sol·licitar? Si la inscripció al registre està a punt de caducar, cal que inicieu el procés de renovació Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació Tramitació telemàtica: a la seu electrònica de Prat Espais, en aquest mateix tràmit. Tramitació presencial: a Prat Espais, s’atendrà preferiblement amb cita prèvia.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=1&IdTramit=28&IdTema=1"
+    },
+    {
+      "procedureId": "56c29730-9bfa-37f4-afd7-c01b73eed0cc",
+      "title": "Renovació sol·licitud aparcaments",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? La persona sol·licitant de la sol·licitud anterior. Requisits a complir Trobar-se en plena capacitat d'obrar Quan es pot sol·licitar? Una setmana abans que arribi la data de caducitat de la sol·licitud anterior. Quin cost hi té? Els preus establerts i aprovats es poden consultar a https://www.pratespais.com/ca/aparcament clicant sobre la plaça del plànol. Vigència de la sol·licitud *Les sol·licituds tenen vigència de dos anys a comptar de la data de registre de la renovació*",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=1&IdTramit=30&IdTema=1"
+    },
+    {
+      "procedureId": "8ea72b5e-f61f-33ec-beee-9c380c9e0deb",
+      "title": "Renovació sol·licitud borsa d'habitatge de lloguer",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui pot sol·licitar-ho? Persones inscrites a la Borsa de lloguer social Quan es pot sol·licitar? Abans que caduqui la inscripció a la borsa de lloguer social Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació Tramitació telemàtica: a la seu electrònica de Prat Espais, en aquest mateix tràmit. Tramitació presencial: a Prat Espais, per a dur a terme el tràmit només s’atendrà amb cita prèvia.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=1&IdTramit=29&IdTema=1"
+    },
+    {
+      "procedureId": "86cfbb2f-3834-3ed2-b3e5-251c184494c2",
+      "title": "Sol·licitud a l’Ajuntament del Prat de Llobregat de la voluntat d’exercir dret de tanteig i retracte",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "Un habitatge promogut per organismes públics sota el règim de protecció oficial. Un terreny sense edificar, ja sigui solars o parcel·les en qualsevol classe de sòl, així com els terrenys edificats en qualsevol classe de sòl amb ús residencial que no esgotin el sostre legalment establert pel planejament vigent. Un terreny amb edificacions ruïnoses o totalment desocupades. Un habitatge situat en una àrea declarada com de rehabilitació i conservació. Un habitatge o edifici provinents d’execucions hipotecàries o de procediments de compensació o pagament de deute amb garantia hipotecària. Un habitatge buit sotmès a l’Impost sobre els habitatges buits, regulat a la Llei 14/2015, del 21 de juliol. Es desconeix l’afectació del dret de tanteig i retracte sobre la transmissió declarada.",
+      "steps": "Tramitació Qui ho pot sol·licitar? Titular de la propietat Serveis de notaria i registre Representació de la propietat (persona jurídica). En aquest cas, serà obligatori presentar autorització de representació complimentada, així com els DNI de la/les persona/es interessada/es i DNI de la persona autoritzada. Quan es pot sol·licitar? Aquest tràmit es podrà sol·licitar en qualsevol moment Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació Tramitació telemàtica: a la seu electrònica de Prat Espais, en aquest mateix tràmit. Tramitació presencial: a Prat Espais, per a dur a terme el tràmit només s’atendrà amb cita prèvia.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=1&IdTramit=27&IdTema=1"
+    },
+    {
+      "procedureId": "dde71fe3-f3db-3492-b595-294fc50ed03d",
+      "title": "Sol·licitud aparcament",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "Aparcament Sant Jordi / Ribera Baixa: Modalitat lloguer Aparcament Avinguda Verge Montserrat / Av. Remolar: Modalitat lloguer Aparcament Cèntric: Modalitat lloguer, abonament i rotació Aparcament Plaça Blanes: Modalitat lloguer i abonament Aparcament Plaça Catalunya: Modalitat lloguer i abonament Aparcament MONTSERRAT: Modalitat lloguer i abonament. Aparcament MARINA: Modalitat lloguer, abonament i rotació\nAparcament provisional de vehicles industrials (Camions)",
+      "steps": "Tramitació Qui ho pot sol·licitar? Qualsevol persona Requisits a complir Trobar-se en plena capacitat d’obrar Quan es pot sol·licitar? Durant tot l’any Quin cost té? Els preus establerts i aprovats es poden consultar a https://www.pratespais.com/ca/aparcamiento clicant sobre la plaça del plànol. Vigència de la sol·licitud **Les sol·licituds tenen vigència d'1 any a comptar des de la data de registre d'entrada**",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=1&IdTramit=5&IdTema=1"
+    },
+    {
+      "procedureId": "f93b7687-3c88-3659-a753-a2466ec61f99",
+      "title": "Sol·licitud borsa d'habitatge de lloguer",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? Persones físiques empadronades al municipi. Requisits a complir • Tenir plena capacitat per ser titular del lloguer. • Cap membre de la unitat de convivència pot ser propietari d’un altre habitatge a Catalunya. • Els ingressos ponderats de la unitat de convivència han de ser inferiors a 4 vegades l’IRSC. • Disposar d’uns ingressos corrents que permetin accedir i fer front al lloguer. Els ingressos ponderats de la unitat de convivència han de ser superiors a 1 vegada l’IRSC. • No haver renunciat en el darrer any a una assignació adequada sense motiu justificat. • No haver patit un desnonament en el darrer anys per causes imputables al llogater, tant de parc públic com privat. • Acreditar qualsevol altre informació o situació complementària, com si forma part d’un col·lectiu específic o d’una demanda prioritària per especial urgència. Quan es pot sol·licitar? Aquest tràmit es podrà sol·licitar en qualsevol moment Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació Tramitació telemàtica: a la seu electrònica de Prat Espais, en aquest mateix tràmit. Tramitació presencial: a Prat Espais, s’atendrà preferiblement amb cita prèvia.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=1&IdTramit=11&IdTema=1"
+    },
+    {
+      "procedureId": "7fd97b9d-7d12-37c6-a32e-6497f2c61e67",
+      "title": "Sol·licitud d'accés a la informació pública",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui el pot demanar La persona física, major de 16 anys, a títol individual o en nom i representació de qualsevol persona jurídica que estigui legalment constituïda. D’acord amb la disposició addicional primera de la Llei 19/2014, l’accés dels interessats als documents dels procediments administratius en tràmit es regeix pel que determina la legislació sobre règim jurídic i procediment administratiu. En el cas de les matèries que tenen establert un règim d’accés especial, aquest accés és regulat per llur normativa específica i, amb caràcter supletori, per la Llei 19/2014. Canals de tramitació Per mitjans electrònics o de manera presencial. Període de l’any en què es pot demanar Es pot demanar en qualsevol moment. Termini de la sol∙licitud En qualsevol moment. Requisits previs A. Identificació del sol∙licitant. B. Concreció de la informació que se sol∙licita. C. Adreça de contacte, preferentment electrònica, a efectes de comunicacions. D. Si pertoca, la modalitat que prefereixi per accedir a la informació sol∙licitada. Format de la documentació demanada La documentació sol·licitada pot ser demanada en format reutilitzable. Aquesta reutilització de la informació pública és lliure i no està subjecta a restriccions, excepte en els casos en què, mitjançant normativa, s’exigeixi una llicència específica, per protegir altres drets o béns jurídics, o quan es requereixi una sol·licitud prèvia de l’interessat. Obligacions bàsiques en la reutilització No alterar el contingut de la informació. No desnaturalitzar-ne el sentit original. Citar la font de la informació. Indicar la data de l’última actualització Responsabilitats i garanties La persona o entitat que reutilitza la informació ho fa sota responsabilitat seva, i els usos i conseqüències recauen exclusivament en aquest reutilitzador tal com s’indica a l’article 17 de la Llei 19/2014, del 29 de desembre de transparència, accés a la informació pública i bon govern. Preu L’accés a la informació pública és gratuït. No obstant això, l’expedició de còpies i la transposició a formats diferents de l’original poden restar subjectes a una contraprestació econòmica establerta, si s’escau, segons la corresponent ordenança fiscal. Mitjans de pagament Els establerts per la normativa reguladora.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=1&IdTramit=31&IdTema=1"
+    },
+    {
+      "procedureId": "9db4c4bf-a2b8-35be-9f47-699ad1023eca",
+      "title": "Sol·licitud de baixa de plaça de lloguer o abonament d’aparcament",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "Lloguer: S’haurà de comunicar la voluntat de rescindir el contracte amb un mes d’antelació. Abonament: s’haurà de comunicar la voluntat de rescindir el contracte amb un mínim de set (7) dies d’antelació.",
+      "steps": "Tramitació Qui ho pot sol·licitar? Qualsevol persona usuària i amb contracte de l’aparcament. Requisits a complir Trobar-se en plena capacitat d’obrar Quan es pot sol·licitar? Durant tot l’any Quin cost té? Servei gratuït",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=1&IdTramit=7&IdTema=1"
+    },
+    {
+      "procedureId": "a45c1fe2-3078-3761-85f3-b4b5d49fc40f",
+      "title": "Sol·licitud de canvi de dades bancàries",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? Qualsevol persona usuària que mantinguin una relació contractual amb Prat Espais, ja sigui d’aparcament o d’habitatge. Requisits a complir Trobar-se en plena capacitat d’obrar Quan es pot sol·licitar? Durant tot l’any Quin cost té? Servei gratuït",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=1&IdTramit=8&IdTema=1"
+    },
+    {
+      "procedureId": "65cb6cfe-06f5-392b-98af-a0a349ae0c52",
+      "title": "Sol·licitud del distintiu de resident / enganxina platja (ZONA VERDA)",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "Que la persona sol·licitant sigui titular d'un vehicle que tributi a l'Ajuntament del Prat en concepte d'IVTM. Que es trobi al corrent de pagament de l'Impost sobre vehicles de tracció mecànica, salvat que s'acrediti que gaudeix d'algun benefici fiscal. Si es tracta de persones jurídiques, que el conductor habitual sigui resident al Prat. Només s’acceptarà un vehicle per conductor.",
+      "steps": "Tramitació Qui pot sol·licitar-ho? Persones físiques o jurídiques. Requisits a complir: Que la persona sol·licitant sigui titular d'un vehicle que tributi a l'Ajuntament del Prat en concepte d'IVTM. Que es trobi al corrent de pagament de l'Impost sobre vehicles de tracció mecànica, salvat que s'acrediti que gaudeix d'algun benefici fiscal. Si es tracta de persones jurídiques, que el conductor habitual sigui resident al Prat. Només s’acceptarà un vehicle per conductor. Quan es pot sol·licitar? Aquest tràmit es podrà sol·licitar durant tot l'any. Quant es triga en emetre el distintiu? Un cop rebuda la documentació, si tot és correcte, el distintiu s'emetrà durant els 2 dies hàbils següents. L'enviament a domicili pot trigar entre 5 i 10 dies. Quin cost té? No hi ha taxes associades per les persones que compleixen amb els requisits esmentats. D'altra banda, s'estableix un abonament de temporada per a les persones empadronades al municipi amb un import de 25 euros respecte dels vehicles que no estan en tributació en aquesta ciutat per l'impost sobre vehicles de tracció mecànica i dels que són conductors habituals en virtut d'un contracte de rènting, leasing o situacions anàlogues. En aquests casos el pagament s'efectua amb targeta bancària en el moment de la recollida a les nostres oficines. Validesa del distintiu de resident El distintiu té validesa durant l'any natural.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=1&IdTramit=25&IdTema=1"
+    },
+    {
+      "procedureId": "f3caccb2-401e-379b-af40-a1a332540747",
+      "title": "Sol·licitud genèrica / Instància",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? Qualsevol persona Requisits a complir: Trobar-se en plena capacitat d’obrar Quan es pot sol·licitar? Durant tot l’any Quin cost té? Cost gratuït",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=1&IdTramit=1&IdTema=1"
+    },
+    {
+      "procedureId": "7e6c3581-8d0f-3cdc-a1de-c231f38d19d4",
+      "title": "Sol·licitud vals descompte 1 h",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? Comerços o negocis Requisits a complir: Trobar-se en plena capacitat d’obrar Quan es pot sol·licitar? Durant tot l’any Quin cost té? 40 € el paquet de 50 unitats.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=1&IdTramit=32&IdTema=1"
+    },
+    {
+      "procedureId": "1aab5340-9d49-3b75-bc98-463e5c876118",
+      "title": "Ajuts d'Especial Urgència per a l'Habitatge",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? Persones físiques residents a Catalunya, amb uns ingressos de la unitat de convivència que no superin els límits establerts i que es trobin en risc d’exclusió social residencial, per alguna de les modalitats esmentades. Requisits a complir • L'import de les quotes d'amortització del préstec hipotecari o del lloguer que ha de pagar la persona sol·licitant de la prestació no pot superar els 800 euros. • Quantia màxima de la prestació: 4.500€, excepte per les Prestacions per atendre situacions de pèrdua de l'habitatge, on l’import s’estableix en el 60 % de la renda anual de l’habitatge, amb un límit màxim de 3.600€ anuals per habitatge. • Acreditar la urgència i l'especial necessitat de la unitat de convivència de la persona sol·licitant mitjançant l'aportació d'un informe socioeconòmic dels serveis socials. Excepte en el supòsit de persones sol·licitants d'una prestació per al pagament del deute de rendes del lloguer, derivat de l'impacte econòmic i social de la covid-19. • Destinar l'habitatge a residència habitual i permanent de la persona sol·licitant. • No tenir, ni la persona sol·licitant ni cap altre membre de la unitat de convivència, cap habitatge en propietat o en usdefruit, llevat que no en disposi de l'ús i gaudi per causa de separació o de divorci o per qualsevol causa aliena a la seva voluntat. • Tenir uns ingressos de la unitat de convivència de la persona sol·licitant no superiors a 2 vegades l'indicador de renda de suficiència de Catalunya (IRSC) ponderat, en el cas de persones que viuen soles; no superiors a2,5 vegades l'IRSC ponderat si es tracta d'unitats de convivència de dos membres o més. La resta de requisits específics, depenent de cadascuna de les modalitats de prestacions d'especial urgència, poden consultar-se a la RESOLUCIÓ TES/126/2021, de 15 de gener Quan es pot sol·licitar? Aquest tràmit es podrà sol·licitar en qualsevol moment Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació: Tramitació telemàtica: a la seu electrònica de l’Agència de l’Habitatge de Catalunya Tramitació presencial: a Prat Espais, preferiblement s'atendrà amb cita prèvia.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=2&IdTramit=10&IdTema=2"
+    },
+    {
+      "procedureId": "50dc3668-46c8-3af2-afbb-e787c230fe3f",
+      "title": "Aportació dels rebuts lloguer per a persones amb BO JOVE FAVORABLE 2025",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? Persones físiques que siguin beneficiàries del BO JOVE 2025 Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació Tramitació telemàtica: A la seu electrònica de l’Agència de l’Habitatge de Catalunya (a sota ⬇ hi ha unes instruccions de com fer-ho) Al portal de tràmits de Prat Espais, seguint les instruccions d’aquest tràmit. Tramitació presencial: a Prat Espais, s’atendrà preferiblement amb cita prèvia.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=2&IdTramit=24&IdTema=2"
+    },
+    {
+      "procedureId": "a65c43c3-6824-30e9-8308-2c83d2685d4c",
+      "title": "Autorització de lloguer d'un habitatge protegit o amb ajuts a l'adquisició",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? Persones propietàries que volen llogar llur habitatge protegit. Requisits Els titulars d'habitatges protegits els han de destinar al seu domicili habitual i permanent, només de forma excepcional poden sol·licitar a l'Agència l'autorització per a poder llogar-los, acreditant documentalment els motius. Es considera que un habitatge no es destina a domicili habitual i permanent si els titulars de l'obligació estan tres mesos seguits a l'any sense ocupar-lo i no hi ha una causa que ho justifiqui. Condicions en que s’autoritza el lloguer: les condicions constaran en la resolució d'autorització de lloguer emesa per l'Agència de l'Habitatge de Catalunya Quan es pot sol·licitar? Aquest tràmit es podrà sol·licitar en qualsevol moment. Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació Tramitació telemàtica: A la seu electrònica de l’Agència de l’Habitatge de Catalunya Tramitació presencial: a Prat Espais, s’atendrà preferiblement amb cita prèvia.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=2&IdTramit=15&IdTema=2"
+    },
+    {
+      "procedureId": "91f11e5c-5242-362b-bf46-a76ad9c7b25b",
+      "title": "Autorització de venda d'habitatges de promoció pública",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? Els titulars d'habitatges de protecció oficial de promoció pública. Requisits En cas de venda, els titulars d'aquests habitatges poden sol·licitar el canvi de règim d’habitatge de protecció oficial de promoció pública a habitatge amb protecció oficial de règim general, sempre que: • Des del certificat final d'obres dels habitatges o de la seva adquisició hagin transcorregut un mínim de 15 anys. • Que aquest canvi de qualificació compti amb la conformitat de l'Ajuntament on s'ubiqui l'habitatge, i del promotor de l’actuació. Quan es pot sol·licitar? Han d'haver passat 15 anys des del certificat final d'obres de l'habitatge o des del document de compravenda. Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació Tramitació telemàtica: A la seu electrònica de l’Agència de l’Habitatge de Catalunya Tramitació presencial: a Prat Espais, s’atendrà preferiblement amb cita prèvia.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=2&IdTramit=14&IdTema=2"
+    },
+    {
+      "procedureId": "f18dfac4-06e1-3889-ad1d-48798c21f89b",
+      "title": "Cèdula d’habitabilitat de segona ocupació",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? La pot sol·licitar la persona propietària de l'habitatge, el llogater, o una persona representant degudament autoritzada. Quan es pot sol·licitar? Aquest tràmit es podrà sol·licitar en qualsevol moment. Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació Tramitació telemàtica: a la seu electrònica de l’Agència de l’Habitatge de Catalunya Trobarà més informació respecte a la tramitació de cèdules d'habitabilitat a la pàgina web de l'Agència de l'Habitatge de Catalunya.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=2&IdTramit=18&IdTema=2"
+    },
+    {
+      "procedureId": "50558f6b-5371-3ac7-ac9e-c3d4503e585e",
+      "title": "Duplicat de la cèdula d'habitabilitat",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? La pot sol·licitar la persona propietària de l'habitatge, el llogater, o una persona representant degudament autoritzada. Quan es pot sol·licitar? Aquest tràmit es podrà sol·licitar en qualsevol moment. Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació: Tramitació telemàtica: a la seu electrònica de l’Agència de l’Habitatge de Catalunya Tramitació presencial: a Prat Espais, s’atendrà preferiblment amb cita prèvia. Trobarà més informació respecte a la tramitació de cèdules d'habitabilitat a la pàgina web de l'Agència de l'Habitatge de Catalunya.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=2&IdTramit=19&IdTema=2"
+    },
+    {
+      "procedureId": "af49d49b-170c-3c54-bf38-d54e49f16989",
+      "title": "Informació sobre un habitatge protegit",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? Propietaris d’un habitatge protegit amb alguna tipologia de protecció oficial que el vulguin vendre, llogar o cedir-ne l’ús. També la pot sol·licitar qualsevol persona física o jurídica que tingui interès a obtenir la informació de les condicions de transmissió d’un habitatge protegit concret. Requisits Cal presentar la sol·licitud amb temps suficient abans d’efectuar la transmissió de l’habitatge. És imprescindible facilitar el número d’expedient de la protecció oficial. Quan es pot sol·licitar? Aquest tràmit es podrà sol·licitar en qualsevol moment. Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació: Tramitació telemàtica: a la seu electrònica de l’Agència de l’Habitatge de Catalunya Tramitació presencial: a Prat Espais, s’atendrà preferiblement amb cita prèvia.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=2&IdTramit=13&IdTema=2"
+    },
+    {
+      "procedureId": "77eef613-3934-389c-8be7-8cadaac3c320",
+      "title": "Inscripció en el Registre de Sol·licitants d’Habitatge amb Protecció Oficial",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui pot sol·licitar-ho? Persones físiques o unitats de convivència que estiguin empadronades al Prat de Llobregat. Requisits a complir: a) Ser major d’edat o estar emancipat. b) Tenir necessitat d’habitatge. c) Residir en un municipi de Catalunya; la residència s’acredita mitjançant l’empadronament en un municipi de Catalunya i és exigible, com a mínim, a la persona sol·licitant de la inscripció. d) Complir el límit d’ingressos màxims i mínims que estableix la normativa dels habitatges amb protecció oficial per a les persones adjudicatàries d’aquests habitatges. e) No trobar-se en les circumstàncies d’exclusió previstes. f) No trobar-se incapacitat per obligar-se contractualment. Quan es pot sol·licitar? Aquest tràmit es podrà sol·licitar en qualsevol moment Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació Tramitació telemàtica: Omplir la sol·licitud a través d'aquest tràmit i adjuntar la documentació necessària. Tramitació presencial: a Prat Espais, s’atendrà preferiblement amb cita prèvia. El dia de la cita haureu d'aportar tota la documentació necessària.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=2&IdTramit=21&IdTema=2"
+    },
+    {
+      "procedureId": "3b81e9d5-c35a-39ec-b55a-a767eabb60d7",
+      "title": "ITE, inspecció tècnica de l’edifici",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? Estan obligats a sol·licitar el certificat d'aptitud els propietaris dels edificis unifamiliars o plurifamiliars, on existeixi l'ús d'habitatge, sens perjudici que puguin contenir també altres usos diferents del residencial. No estan obligats els titulars d'edificis unifamiliars en què la seva edificació principal estigui separada 1,5 m o més de la via púbica, zones d'ús públic o finques adjacents. Requisits La ITE és obligatòria en els següents supòsits: • Si ho determina el programa d'inspeccions tècniques obligatòries. • Si ho determinen els programes o les ordenances locals • Si l'edifici o habitatges de l'edifici s'han d'acollir a ajuts públics per al foment de la rehabilitació Queden exclosos els edificis sobre els quals s'hagi iniciat l'expedient de declaració de ruïna. Qui és el responsable d'encarregar la ITE L'obligació de sotmetre els edificis d'habitatges a la inspecció tècnica correspon a la propietat. En el cas d'edificis en règim de propietat horitzontal, aquesta obligació correspon a la comunitat de propietaris. Les persones propietàries i els ocupants han de facilitar l'accés als habitatges i altres entitats en el moment de la inspecció, amb la finalitat de possibilitar la inspecció de l'edifici. El cost econòmic derivat de la inspecció tècnica és a càrrec de les persones propietàries de l'edifici. El fet de no disposar de la ITE en els supòsits en què sigui exigible pot comportar la imposició de multes coercitives i de sancions a les persones responsables segons el que preveu la Llei 18/2007, del dret a l'habitatge. Quan es pot sol·licitar? Aquest tràmit es podrà sol·licitar en qualsevol moment. Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació Tramitació telemàtica: a la seu electrònica de l’Agència de l’Habitatge de Catalunya",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=2&IdTramit=17&IdTema=2"
+    },
+    {
+      "procedureId": "661e475b-14bb-31eb-9410-2a320c7956ce",
+      "title": "Renovació inscripció registre de sol·licitants d’habitatge amb Protecció Oficial",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui pot sol·licitar-ho? Persones inscrites al registre de Sol·licitants d’HPO Quan es pot sol·licitar? Si la inscripció al registre està a punt de caducar, cal que inicieu el procés de renovació Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació Tramitació telemàtica: a la seu electrònica de Prat Espais, en aquest mateix tràmit. Tramitació presencial: a Prat Espais, s’atendrà preferiblement amb cita prèvia.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=2&IdTramit=28&IdTema=2"
+    },
+    {
+      "procedureId": "1af26238-c83c-3f45-8f7d-e9a563b8086a",
+      "title": "Renovació sol·licitud borsa d'habitatge de lloguer",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui pot sol·licitar-ho? Persones inscrites a la Borsa de lloguer social Quan es pot sol·licitar? Abans que caduqui la inscripció a la borsa de lloguer social Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació Tramitació telemàtica: a la seu electrònica de Prat Espais, en aquest mateix tràmit. Tramitació presencial: a Prat Espais, per a dur a terme el tràmit només s’atendrà amb cita prèvia.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=2&IdTramit=29&IdTema=2"
+    },
+    {
+      "procedureId": "8609e4cf-3417-3423-a014-86890eaa0131",
+      "title": "Sol·licitud a l’Ajuntament del Prat de Llobregat de la voluntat d’exercir dret de tanteig i retracte",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "Un habitatge promogut per organismes públics sota el règim de protecció oficial. Un terreny sense edificar, ja sigui solars o parcel·les en qualsevol classe de sòl, així com els terrenys edificats en qualsevol classe de sòl amb ús residencial que no esgotin el sostre legalment establert pel planejament vigent. Un terreny amb edificacions ruïnoses o totalment desocupades. Un habitatge situat en una àrea declarada com de rehabilitació i conservació. Un habitatge o edifici provinents d’execucions hipotecàries o de procediments de compensació o pagament de deute amb garantia hipotecària. Un habitatge buit sotmès a l’Impost sobre els habitatges buits, regulat a la Llei 14/2015, del 21 de juliol. Es desconeix l’afectació del dret de tanteig i retracte sobre la transmissió declarada.",
+      "steps": "Tramitació Qui ho pot sol·licitar? Titular de la propietat Serveis de notaria i registre Representació de la propietat (persona jurídica). En aquest cas, serà obligatori presentar autorització de representació complimentada, així com els DNI de la/les persona/es interessada/es i DNI de la persona autoritzada. Quan es pot sol·licitar? Aquest tràmit es podrà sol·licitar en qualsevol moment Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació Tramitació telemàtica: a la seu electrònica de Prat Espais, en aquest mateix tràmit. Tramitació presencial: a Prat Espais, per a dur a terme el tràmit només s’atendrà amb cita prèvia.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=2&IdTramit=27&IdTema=2"
+    },
+    {
+      "procedureId": "e7b1f0f3-fc8a-3fba-a7c1-d1654e2c5c6b",
+      "title": "Sol·licitud borsa d'habitatge de lloguer",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? Persones físiques empadronades al municipi. Requisits a complir • Tenir plena capacitat per ser titular del lloguer. • Cap membre de la unitat de convivència pot ser propietari d’un altre habitatge a Catalunya. • Els ingressos ponderats de la unitat de convivència han de ser inferiors a 4 vegades l’IRSC. • Disposar d’uns ingressos corrents que permetin accedir i fer front al lloguer. Els ingressos ponderats de la unitat de convivència han de ser superiors a 1 vegada l’IRSC. • No haver renunciat en el darrer any a una assignació adequada sense motiu justificat. • No haver patit un desnonament en el darrer anys per causes imputables al llogater, tant de parc públic com privat. • Acreditar qualsevol altre informació o situació complementària, com si forma part d’un col·lectiu específic o d’una demanda prioritària per especial urgència. Quan es pot sol·licitar? Aquest tràmit es podrà sol·licitar en qualsevol moment Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació Tramitació telemàtica: a la seu electrònica de Prat Espais, en aquest mateix tràmit. Tramitació presencial: a Prat Espais, s’atendrà preferiblement amb cita prèvia.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=2&IdTramit=11&IdTema=2"
+    },
+    {
+      "procedureId": "4d396587-bccb-3d85-bb20-78902999943a",
+      "title": "Sol·licitud d'accés a la informació pública",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui el pot demanar La persona física, major de 16 anys, a títol individual o en nom i representació de qualsevol persona jurídica que estigui legalment constituïda. D’acord amb la disposició addicional primera de la Llei 19/2014, l’accés dels interessats als documents dels procediments administratius en tràmit es regeix pel que determina la legislació sobre règim jurídic i procediment administratiu. En el cas de les matèries que tenen establert un règim d’accés especial, aquest accés és regulat per llur normativa específica i, amb caràcter supletori, per la Llei 19/2014. Canals de tramitació Per mitjans electrònics o de manera presencial. Període de l’any en què es pot demanar Es pot demanar en qualsevol moment. Termini de la sol∙licitud En qualsevol moment. Requisits previs A. Identificació del sol∙licitant. B. Concreció de la informació que se sol∙licita. C. Adreça de contacte, preferentment electrònica, a efectes de comunicacions. D. Si pertoca, la modalitat que prefereixi per accedir a la informació sol∙licitada. Format de la documentació demanada La documentació sol·licitada pot ser demanada en format reutilitzable. Aquesta reutilització de la informació pública és lliure i no està subjecta a restriccions, excepte en els casos en què, mitjançant normativa, s’exigeixi una llicència específica, per protegir altres drets o béns jurídics, o quan es requereixi una sol·licitud prèvia de l’interessat. Obligacions bàsiques en la reutilització No alterar el contingut de la informació. No desnaturalitzar-ne el sentit original. Citar la font de la informació. Indicar la data de l’última actualització Responsabilitats i garanties La persona o entitat que reutilitza la informació ho fa sota responsabilitat seva, i els usos i conseqüències recauen exclusivament en aquest reutilitzador tal com s’indica a l’article 17 de la Llei 19/2014, del 29 de desembre de transparència, accés a la informació pública i bon govern. Preu L’accés a la informació pública és gratuït. No obstant això, l’expedició de còpies i la transposició a formats diferents de l’original poden restar subjectes a una contraprestació econòmica establerta, si s’escau, segons la corresponent ordenança fiscal. Mitjans de pagament Els establerts per la normativa reguladora.",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=2&IdTramit=31&IdTema=2"
+    },
+    {
+      "procedureId": "9de519fa-4cfe-39e5-9ba6-63ff33a5473e",
+      "title": "Sol·licitud de canvi de dades bancàries",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? Qualsevol persona usuària que mantinguin una relació contractual amb Prat Espais, ja sigui d’aparcament o d’habitatge. Requisits a complir Trobar-se en plena capacitat d’obrar Quan es pot sol·licitar? Durant tot l’any Quin cost té? Servei gratuït",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=2&IdTramit=8&IdTema=2"
+    },
+    {
+      "procedureId": "38094786-6550-3a97-92fc-6299b32caf85",
+      "title": "Sol·licitud de visats per la venda d'habitatges amb protecció oficial",
+      "description": "Acrediteu-vos com a usuari per a accedir a la carpeta",
+      "requirements": "",
+      "steps": "Tramitació Qui ho pot sol·licitar? Totes les persones que vulguin vendre un habitatge amb protecció oficial. Requisits • Les persones adquirents han d'estar inscrites al Registre de Sol·licitants d'Habitatges amb Protecció Oficial. • Els ingressos familiars ponderats de les persones adquirents: • No poden ser inferiors al 5% del preu d'adquisició de l'habitatge. • No poden superar els ingressos establerts a la normativa a l'empara de la qual van ser qualificats els habitatges (veure taules d'ingressos). • Les persones adquirents no poden ser titulars: • del ple domini o d'un dret real d'ús i gaudi sobre algun altre habitatge protegit. • d'un habitatge lliure quan el valor d'aquest habitatge, calculat d'acord amb la normativa de l'Impost Sobre Transmissions Patrimonials, superi el 40% del preu total de l'habitatge adquirit, o el 60% quan es tracti de persones majors de 65 anys; dones víctimes de la violència de gènere; víctimes del terrorisme; famílies nombroses; famílies monoparentals; persones dependents o amb discapacitat oficialment reconeguda i les famílies que les tinguin al seu càrrec; persones separades o divorciades al corrent del pagament de la pensió alimentària i/o compensatòria. Quan es pot sol·licitar? Aquest tràmit es podrà sol·licitar en qualsevol moment. Quin cost té? No hi ha taxes associades a aquest tràmit Formes de tramitació: Tramitació telemàtica: a la seu electrònica de l’Agència de l’Habitatge de Catalunya",
+      "url": "https://tramits.pratespais.com/Ciutadania/DetallTramit.aspx?IdTema=2&IdTramit=16&IdTema=2"
     }
   ]
 }
-
