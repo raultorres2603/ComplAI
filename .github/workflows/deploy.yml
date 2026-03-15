@@ -233,20 +233,6 @@ jobs:
           npm -v
           echo "CDK (global) version:" && npx cdk --version || true
 
-      # Bootstrap the CDK toolkit stack (creates the cdk-hnb659fds-assets-* bucket,
-      # IAM roles, and SSM parameters that every subsequent cdk deploy depends on).
-      # This step is idempotent — when the account is already bootstrapped at the
-      # current CDK version it exits in seconds with no changes. Running it here
-      # means a accidentally-deleted bootstrap bucket never blocks a deploy.
-      - name: Bootstrap CDK toolkit
-        run: |
-          cd cdk
-          # --force redeploys the CDKToolkit CloudFormation stack unconditionally.
-          # Without it, CDK reports "no changes" even when the S3 bucket has been
-          # manually deleted (CloudFormation tracks the resource as present until
-          # it is forced to reconcile). --force makes this step self-healing.
-          npx cdk bootstrap "aws://134267836527/${{ vars.PROCEDURES_REGION }}" --force
-
       # Deploy StorageStack first so the complai-deployments-<env> bucket exists
       # before we try to upload the JAR. This step is idempotent — on subsequent
       # deploys CloudFormation detects no drift and exits in seconds.
