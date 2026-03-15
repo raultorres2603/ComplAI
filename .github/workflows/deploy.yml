@@ -253,13 +253,14 @@ jobs:
         env:
           TARGET_ENV: ${{ steps.target.outputs.environment }}
         run: |
-          CANDIDATE=$(ls build/libs/*-all.jar 2>/dev/null | head -n1)
-          if [ -z "$CANDIDATE" ]; then
-            CANDIDATE=$(ls -S build/libs/*.jar 2>/dev/null | head -n1)
+          # Bash glob expansion — no dependency on PATH-resolved 'ls' or 'head'.
+          CANDIDATE=""
+          for f in build/libs/*-all.jar; do [[ -f "$f" ]] && CANDIDATE="$f" && break; done
+          if [[ -z "$CANDIDATE" ]]; then
+            for f in build/libs/*.jar; do [[ -f "$f" ]] && CANDIDATE="$f" && break; done
           fi
-          if [ -z "$CANDIDATE" ] || [ ! -f "$CANDIDATE" ]; then
+          if [[ -z "$CANDIDATE" ]]; then
             echo "ERROR: No usable JAR found in build/libs." >&2
-            ls -la build/libs || true
             exit 1
           fi
           JAR_KEY="complai-all-${GITHUB_SHA::8}.jar"
@@ -340,16 +341,31 @@ jobs:
 
       - name: Generate JWT token for Bruno E2E
         run: |
-          export JWT_SECRET="${{ secrets.JWT_SECRET }}"
-          
-          # Use the downloaded shadow jar instead of building it again
-          CANDIDATE=$(ls build/libs/*-all.jar 2>/dev/null | head -n1)
-          if [ -z "$CANDIDATE" ]; then
-            CANDIDATE=$(ls -S build/libs/*.jar 2>/dev/null | head -n1)
+          # Use $JAVA_HOME/bin/java and bash built-ins exclusively.
+          # If a GitHub Environment Variable named PATH is accidentally present it
+          # will shadow the system $PATH for every step in the job, making 'java',
+          # 'head', 'tail', and 'ls' all unfindable. Bypassing PATH lookup entirely
+          # avoids that whole class of failure.
+
+          # Bash glob expansion — no 'ls' or 'head' needed.
+          CANDIDATE=""
+          for f in build/libs/*-all.jar; do [[ -f "$f" ]] && CANDIDATE="$f" && break; done
+          if [[ -z "$CANDIDATE" ]]; then
+            for f in build/libs/*.jar; do [[ -f "$f" ]] && CANDIDATE="$f" && break; done
           fi
-          
-          TOKEN=$(JWT_SECRET="$JWT_SECRET" java -cp "$CANDIDATE" cat.complai.auth.TokenGenerator e2e-development 1 elprat 2>/dev/null | tail -1)
-          echo "jwtToken=$TOKEN" >> $GITHUB_ENV
+          if [[ -z "$CANDIDATE" ]]; then
+            echo "ERROR: No JAR found in build/libs." >&2
+            exit 1
+          fi
+
+          # Read the last non-empty output line without relying on 'tail'.
+          TOKEN=""
+          while IFS= read -r line; do
+            [[ -n "$line" ]] && TOKEN="$line"
+          done < <(JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+                   "$JAVA_HOME/bin/java" -cp "$CANDIDATE" \
+                   cat.complai.auth.TokenGenerator e2e-development 1 elprat 2>/dev/null)
+          echo "jwtToken=$TOKEN" >> "$GITHUB_ENV"
 
       - name: Run Bruno E2E tests (development)
         working-directory: ./E2E-ComplAI
@@ -359,8 +375,10 @@ jobs:
           # be injected at runtime — it is never stored in the .bru file.
           # We use COMPLAI_BASE_URL as the env var name to avoid shadowing the
           # system $PATH variable, then map it to the Bruno variable name 'path'
-          # via --env-var.
-          COMPLAI_BASE_URL: ${{ secrets.PATH }}
+          # via --env-var. The GitHub secret must be named COMPLAI_BASE_URL
+          # (not PATH — a secret named PATH would not auto-inject, but a GitHub
+          # Environment *variable* named PATH would shadow $PATH for the whole job).
+          COMPLAI_BASE_URL: ${{ secrets.COMPLAI_BASE_URL }}
         run: >
           bru run . -r --env Development
           --env-var jwtToken="$jwtToken"
