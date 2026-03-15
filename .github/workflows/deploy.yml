@@ -328,7 +328,15 @@ jobs:
           path: build/libs
 
       - name: Install Bruno CLI
-        run: npm install -g @usebruno/cli
+        # npm spawns postinstall scripts via a bare 'sh' name, which fails on this
+        # runner when PATH lookup doesn't resolve it. Setting script-shell to the
+        # explicit path fixes the spawn ENOENT error regardless of which package
+        # triggers a postinstall. The version is pinned because older Bruno CLI
+        # releases pulled in protobufjs (which has its own postinstall) while
+        # 3.1.3+ does not.
+        run: |
+          npm config set script-shell /bin/sh
+          npm install -g @usebruno/cli@3.1.3
 
       - name: Generate JWT token for Bruno E2E
         run: |
