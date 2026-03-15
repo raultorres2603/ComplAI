@@ -94,13 +94,27 @@ public class RedactRequest {
 
     /**
      * Assembles the identity record from the individual fields.
-     * Returns null only when all three fields are absent — callers must handle the missing-identity
-     * case by instructing the AI to request the information from the user.
+     * Blank or whitespace-only strings are treated as absent (normalized to null) so that
+     * the rest of the system never has to defend against blank field values.
+     * Returns null when all three fields are absent or blank.
      */
     public ComplainantIdentity getComplainantIdentity() {
-        if (requesterName == null && requesterSurname == null && requesterIdNumber == null) {
+        String normalizedName     = normalize(requesterName);
+        String normalizedSurname  = normalize(requesterSurname);
+        String normalizedId       = normalize(requesterIdNumber);
+
+        if (normalizedName == null && normalizedSurname == null && normalizedId == null) {
             return null;
         }
-        return new ComplainantIdentity(requesterName, requesterSurname, requesterIdNumber);
+        return new ComplainantIdentity(normalizedName, normalizedSurname, normalizedId);
+    }
+
+    /**
+     * Returns the trimmed value, or null if the value is null or blank.
+     * Centralises the blank-to-null normalisation for all identity fields.
+     */
+    private static String normalize(String value) {
+        if (value == null || value.isBlank()) return null;
+        return value.trim();
     }
 }
