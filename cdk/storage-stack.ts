@@ -60,7 +60,7 @@ export class StorageStack extends cdk.Stack {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       encryption: s3.BucketEncryption.S3_MANAGED,
       versioned: false,
-      lifecycleRules: [{ expiration: cdk.Duration.days(1) }],
+      lifecycleRules: [{ expiration: cdk.Duration.days(30) }],
     });
 
     new cdk.CfnOutput(this, 'ComplAIProceduresBucketName', {
