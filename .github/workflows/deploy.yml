@@ -347,8 +347,17 @@ jobs:
         working-directory: ./E2E-ComplAI
         env:
           jwtToken: ${{ env.jwtToken }}
+          # path is a vars:secret in Development.bru so Bruno CLI requires it to
+          # be injected at runtime — it is never stored in the .bru file.
+          # We use COMPLAI_BASE_URL as the env var name to avoid shadowing the
+          # system $PATH variable, then map it to the Bruno variable name 'path'
+          # via --env-var.
+          COMPLAI_BASE_URL: ${{ secrets.PATH }}
         run: >
-          bru run . -r --env Development --env-var jwtToken="$jwtToken" --reporter-json report/results.json
+          bru run . -r --env Development
+          --env-var jwtToken="$jwtToken"
+          --env-var path="$COMPLAI_BASE_URL"
+          --reporter-json report/results.json
         continue-on-error: true
 
       - name: Upload Bruno E2E JSON report
