@@ -233,37 +233,54 @@ jobs:
           npm -v
           echo "CDK (global) version:" && npx cdk --version || true
 
-      - name: Deploy with AWS CDK
+      # Deploy StorageStack first so the complai-deployments-<env> bucket exists
+      # before we try to upload the JAR. This step is idempotent — on subsequent
+      # deploys CloudFormation detects no drift and exits in seconds.
+      - name: Deploy storage stack
         env:
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
           TARGET_ENV: ${{ steps.target.outputs.environment }}
         run: |
-          # Resolve the shadow JAR. Prefer *-all.jar (shadowJar output).
+          cd cdk
+          npx cdk deploy "ComplAIStorageStack-${TARGET_ENV}" \
+            --require-approval never
+
+      # Upload the fat JAR to the deployments bucket with a key that includes the
+      # short git SHA. The unique key is what tells CloudFormation "code changed,
+      # update the Lambda function" — without it, a same-key re-upload would be
+      # invisible to CloudFormation and the Lambda would not be updated.
+      - name: Upload JAR to deployments bucket
+        env:
+          TARGET_ENV: ${{ steps.target.outputs.environment }}
+        run: |
           CANDIDATE=$(ls build/libs/*-all.jar 2>/dev/null | head -n1)
           if [ -z "$CANDIDATE" ]; then
             CANDIDATE=$(ls -S build/libs/*.jar 2>/dev/null | head -n1)
           fi
-
           if [ -z "$CANDIDATE" ] || [ ! -f "$CANDIDATE" ]; then
             echo "ERROR: No usable JAR found in build/libs." >&2
             ls -la build/libs || true
             exit 1
           fi
+          JAR_KEY="complai-all-${GITHUB_SHA::8}.jar"
+          aws s3 cp "$CANDIDATE" "s3://complai-deployments-${TARGET_ENV}/${JAR_KEY}"
+          echo "Uploaded $(basename "$CANDIDATE") → s3://complai-deployments-${TARGET_ENV}/${JAR_KEY}"
+          # Make the key available to the CDK deploy step via the job environment.
+          echo "DEPLOYMENT_JAR_KEY=${JAR_KEY}" >> "$GITHUB_ENV"
 
-          echo "Using JAR: $CANDIDATE"
-          echo "Target CDK stack: ComplAILambdaStack-${TARGET_ENV}"
-
-          export JAR_PATH="$CANDIDATE"
+      # Deploy only the Lambda stack. The JAR is already in S3; CDK reads it
+      # via Code.fromBucket() — nothing is staged to the CDK bootstrap bucket.
+      - name: Deploy Lambda stack
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          TARGET_ENV: ${{ steps.target.outputs.environment }}
+          # DEPLOYMENT_JAR_KEY was written to $GITHUB_ENV in the previous step and
+          # is automatically injected here as a shell variable.
+        run: |
           cd cdk
-          # Deploy only the stack for the target environment. The CDK app defines one
-          # stack per environment; deploying by explicit name ensures the other stack
-          # is never touched.
           npx cdk deploy "ComplAILambdaStack-${TARGET_ENV}" \
             --require-approval never \
-            -c jarPath="$JAR_PATH" \
-            -c environment="$TARGET_ENV" \
             --outputs-file "../cdk-outputs-${TARGET_ENV}.json"
 
       - name: Upload CDK outputs

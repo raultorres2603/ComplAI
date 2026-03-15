@@ -37,6 +37,7 @@ for (const environment of environments) {
     environment,
     proceduresBucket: storageStack.proceduresBucket,
     complaintsBucket: storageStack.complaintsBucket,
+    deploymentsBucket: storageStack.deploymentsBucket,
     redactQueue: queueStack.redactQueue,
     env: awsEnv,
   });

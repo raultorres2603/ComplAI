@@ -20,6 +20,10 @@ export interface LambdaStackProps extends cdk.StackProps {
   // IAM grants and inject bucket names into Lambda environment variables.
   readonly proceduresBucket: s3.IBucket;
   readonly complaintsBucket: s3.IBucket;
+  // Bucket that holds the compiled fat JARs. CI uploads the JAR here before
+  // running cdk deploy, and this stack references it with Code.fromBucket().
+  // This keeps the CDK bootstrap staging bucket free of large JAR objects.
+  readonly deploymentsBucket: s3.IBucket;
   // Queue owned by QueueStack — passed in for IAM grants, env vars, and the
   // SQS event source mapping on the worker Lambda.
   readonly redactQueue: sqs.IQueue;
@@ -29,7 +33,7 @@ export class LambdaStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: LambdaStackProps) {
     super(scope, id, props);
 
-    const { environment, proceduresBucket, complaintsBucket, redactQueue } = props;
+    const { environment, proceduresBucket, complaintsBucket, deploymentsBucket, redactQueue } = props;
 
     // Create a custom IAM role for Lambda with least privilege.
     // The logical ID includes the environment so both stacks can live in the same account.
@@ -41,26 +45,44 @@ export class LambdaStack extends cdk.Stack {
     // Attach AWS managed policy for basic Lambda logging
     lambdaRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'));
 
-    // Minimal JAR selection:
-    // 1) If CI sets JAR_PATH (or CDK context 'jarPath'), use it.
-    // 2) Otherwise require a '*-all.jar' (shadowJar) in build/libs and use the first one found.
-    // This keeps behavior explicit and avoids brittle heuristics.
-    const explicit = process.env.JAR_PATH || this.node.tryGetContext?.('jarPath');
-    let jarPath: string | undefined;
-    if (explicit) {
-      const candidate = path.isAbsolute(explicit) ? explicit : path.resolve(__dirname, '..', '..', explicit);
-      if (!fs.existsSync(candidate)) throw new Error(`Configured JAR_PATH does not exist: ${candidate}`);
-      jarPath = candidate;
+    // --- Lambda code source ------------------------------------------------
+    // CI path: the GitHub Actions workflow uploads the fat JAR to the
+    // deployments bucket before calling `cdk deploy`, then sets
+    // DEPLOYMENT_JAR_KEY to the S3 key (e.g. complai-all-<git-sha>.jar).
+    // Code.fromBucket does NOT stage anything to the CDK bootstrap bucket,
+    // so the cdk-hnb659fds-assets-* bucket never receives the JAR.
+    //
+    // Local dev path: no DEPLOYMENT_JAR_KEY → fall back to Code.fromAsset,
+    // which stages via the bootstrap bucket.  This keeps the local workflow
+    // unchanged and avoids requiring developers to pre-upload the JAR.
+    // -----------------------------------------------------------------------
+    let code: lambda.Code;
+    const deploymentJarKey = process.env.DEPLOYMENT_JAR_KEY ?? this.node.tryGetContext('jarS3Key');
+    if (deploymentJarKey) {
+      code = lambda.Code.fromBucket(deploymentsBucket, deploymentJarKey);
     } else {
-      const libsDir = path.resolve(__dirname, '..', '..', 'build', 'libs');
-      if (!fs.existsSync(libsDir)) throw new Error(`Expected build/libs not found at ${libsDir}. Run './gradlew clean shadowJar'.`);
-      const jars = fs.readdirSync(libsDir).filter((f: string) => f.endsWith('.jar'));
-      if (jars.length === 0) throw new Error(`No JARs found in ${libsDir}. Run './gradlew clean shadowJar'.`);
-      const allJar = jars.find((f: string) => f.includes('-all.jar') || f.endsWith('-all.jar'));
-      if (!allJar) throw new Error(`No '*-all.jar' found in ${libsDir}. Set JAR_PATH env to the produced jar or produce a shadow JAR.`);
-      jarPath = path.join(libsDir, allJar);
+      // Minimal JAR selection:
+      // 1) If CI sets JAR_PATH (or CDK context 'jarPath'), use it.
+      // 2) Otherwise require a '*-all.jar' (shadowJar) in build/libs and use the first one found.
+      // This keeps behavior explicit and avoids brittle heuristics.
+      const explicit = process.env.JAR_PATH || this.node.tryGetContext?.('jarPath');
+      let jarPath: string | undefined;
+      if (explicit) {
+        const candidate = path.isAbsolute(explicit) ? explicit : path.resolve(__dirname, '..', '..', explicit);
+        if (!fs.existsSync(candidate)) throw new Error(`Configured JAR_PATH does not exist: ${candidate}`);
+        jarPath = candidate;
+      } else {
+        const libsDir = path.resolve(__dirname, '..', '..', 'build', 'libs');
+        if (!fs.existsSync(libsDir)) throw new Error(`Expected build/libs not found at ${libsDir}. Run './gradlew clean shadowJar'.`);
+        const jars = fs.readdirSync(libsDir).filter((f: string) => f.endsWith('.jar'));
+        if (jars.length === 0) throw new Error(`No JARs found in ${libsDir}. Run './gradlew clean shadowJar'.`);
+        const allJar = jars.find((f: string) => f.includes('-all.jar') || f.endsWith('-all.jar'));
+        if (!allJar) throw new Error(`No '*-all.jar' found in ${libsDir}. Set JAR_PATH env to the produced jar or produce a shadow JAR.`);
+        jarPath = path.join(libsDir, allJar);
+      }
+      if (!jarPath || !fs.existsSync(jarPath)) throw new Error(`Unable to determine JAR path. Computed: ${jarPath}`);
+      code = lambda.Code.fromAsset(jarPath);
     }
-    if (!jarPath || !fs.existsSync(jarPath)) throw new Error(`Unable to determine JAR path. Computed: ${jarPath}`);
 
     // Explicit log group so we control retention and can attach metric filters.
     // Lambda would create a log group automatically, but that gives us no control
@@ -91,7 +113,7 @@ export class LambdaStack extends cdk.Stack {
       // This handler expects the APIGateway V2 payload (HTTP API) which matches
       // our CDK HttpApi integration.
       handler: 'io.micronaut.function.aws.proxy.payload2.APIGatewayV2HTTPEventFunction::handleRequest',
-      code: lambda.Code.fromAsset(jarPath),
+      code,
       memorySize: 768,
       timeout: cdk.Duration.seconds(60),
       // Wire the OpenRouter API key (from CFN parameter) into the Lambda environment.
@@ -104,7 +126,7 @@ export class LambdaStack extends cdk.Stack {
         OPENROUTER_MAX_RETRIES: process.env.OPENROUTER_MAX_RETRIES || '3',
         PROCEDURES_BUCKET: proceduresBucket.bucketName,
         PROCEDURES_REGION: this.region,
-        OPENROUTER_MODEL: process.env.OPENROUTER_MODEL || 'stepfun/step-3.5-flash:free',
+        OPENROUTER_MODEL: process.env.OPENROUTER_MODEL || 'openrouter/free',
         JWT_SECRET: process.env.JWT_SECRET || '',
         // Async redact flow: queue URL for publishing + bucket details for pre-signed URLs.
         REDACT_QUEUE_URL: redactQueue.queueUrl,
@@ -155,7 +177,7 @@ export class LambdaStack extends cdk.Stack {
       runtime: lambda.Runtime.JAVA_21,
       // Same shadow JAR, different handler class — no separate build needed.
       handler: 'cat.complai.worker.RedactWorkerHandler::handleRequest',
-      code: lambda.Code.fromAsset(jarPath),
+      code,
       memorySize: 768,
       // Must be ≤ SQS visibility timeout (90s). Lambda extends visibility automatically
       // while running, so using the same duration is the safest choice here.
@@ -165,7 +187,7 @@ export class LambdaStack extends cdk.Stack {
         OPENROUTER_REQUEST_TIMEOUT_SECONDS: process.env.OPENROUTER_REQUEST_TIMEOUT_SECONDS || '60',
         OPENROUTER_OVERALL_TIMEOUT_SECONDS: process.env.OPENROUTER_OVERALL_TIMEOUT_SECONDS || '60',
         OPENROUTER_MAX_RETRIES: process.env.OPENROUTER_MAX_RETRIES || '3',
-        OPENROUTER_MODEL: process.env.OPENROUTER_MODEL || 'stepfun/step-3.5-flash:free',
+        OPENROUTER_MODEL: process.env.OPENROUTER_MODEL || 'openrouter/free',
         COMPLAINTS_BUCKET: complaintsBucket.bucketName,
         COMPLAINTS_REGION: this.region,
         PROCEDURES_BUCKET: proceduresBucket.bucketName,
