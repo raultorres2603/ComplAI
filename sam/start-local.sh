@@ -136,6 +136,7 @@ sam local start-api \
   --template "${SCRIPT_DIR}/template.yaml" \
   --env-vars "${SCRIPT_DIR}/env.json" \
   --warm-containers LAZY \
+  --cors '*' \
   --host 127.0.0.1 \
   --port 3000 &
 SAM_API_PID=$!
