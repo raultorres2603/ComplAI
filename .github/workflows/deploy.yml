@@ -233,9 +233,40 @@ jobs:
           npm -v
           echo "CDK (global) version:" && npx cdk --version || true
 
-      # Deploy StorageStack first so the complai-deployments-<env> bucket exists
-      # before we try to upload the JAR. This step is idempotent — on subsequent
-      # deploys CloudFormation detects no drift and exits in seconds.
+      # Step 1 — Deploy LambdaStack with --exclusively (no dependencies) BEFORE
+      # touching StorageStack or QueueStack.
+      #
+      # LambdaStack used to hold Fn::ImportValue cross-stack references to
+      # StorageStack bucket exports. Those imports have been replaced with
+      # fromBucketName (literal ARN strings), but the live stack in AWS may still
+      # carry the old imports from a previous deploy. CloudFormation refuses to
+      # delete an export while any stack imports it, so deploying StorageStack
+      # first would fail with "Cannot delete export … as it is in use".
+      #
+      # By deploying LambdaStack first (--exclusively skips its addDependency
+      # declared dependencies so only LambdaStack's template is updated), the old
+      # imports are dropped from the live stack before we touch either source stack.
+      # On subsequent runs this step is a fast no-op if the template hasn't changed.
+      #
+      # DEPLOYMENT_JAR_KEY is intentionally NOT set here: the Lambda code itself is
+      # not updated in this pass (no JAR has been uploaded yet). CDK will detect no
+      # code change for the Lambda function and skip it. The sole purpose of this
+      # step is to flush stale Fn::ImportValue entries from the live stack.
+      - name: Drop stale cross-stack imports from Lambda stack
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          TARGET_ENV: ${{ steps.target.outputs.environment }}
+        run: |
+          cd cdk
+          npx cdk deploy "ComplAILambdaStack-${TARGET_ENV}" \
+            --exclusively \
+            --require-approval never
+
+      # Step 2 — StorageStack is now safe to update: no live stack imports its
+      # exports any more. Also ensures the complai-deployments-<env> bucket exists
+      # before we upload the JAR in the next step.
       - name: Deploy storage stack
         env:
           TARGET_ENV: ${{ steps.target.outputs.environment }}
@@ -244,10 +275,10 @@ jobs:
           npx cdk deploy "ComplAIStorageStack-${TARGET_ENV}" \
             --require-approval never
 
-      # Upload the fat JAR to the deployments bucket with a key that includes the
-      # short git SHA. The unique key is what tells CloudFormation "code changed,
-      # update the Lambda function" — without it, a same-key re-upload would be
-      # invisible to CloudFormation and the Lambda would not be updated.
+      # Step 3 — Upload the fat JAR to the deployments bucket with a key that
+      # includes the short git SHA. The unique key is what tells CloudFormation
+      # "code changed, update the Lambda function" — without it, a same-key
+      # re-upload would be invisible to CloudFormation.
       - name: Upload JAR to deployments bucket
         env:
           TARGET_ENV: ${{ steps.target.outputs.environment }}
@@ -264,11 +295,13 @@ jobs:
           JAR_KEY="complai-all-${GITHUB_SHA::8}.jar"
           aws s3 cp "$CANDIDATE" "s3://complai-deployments-${TARGET_ENV}/${JAR_KEY}"
           echo "Uploaded $(basename "$CANDIDATE") → s3://complai-deployments-${TARGET_ENV}/${JAR_KEY}"
-          # Make the key available to the CDK deploy step via the job environment.
+          # Make the key available to the CDK deploy steps via the job environment.
           echo "DEPLOYMENT_JAR_KEY=${JAR_KEY}" >> "$GITHUB_ENV"
 
-      # Deploy only the Lambda stack. The JAR is already in S3; CDK reads it
-      # via Code.fromBucket() — nothing is staged to the CDK bootstrap bucket.
+      # Step 4 — Full Lambda stack deploy: picks up the new JAR from S3 and also
+      # deploys QueueStack first (via addDependency). StorageStack is a no-op here
+      # (already deployed in step 2). No --exclusively so dependency order is
+      # respected for any QueueStack changes.
       - name: Deploy Lambda stack
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
