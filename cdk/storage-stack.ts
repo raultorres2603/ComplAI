@@ -11,6 +11,11 @@ export class StorageStack extends cdk.Stack {
   // Exposed so the LambdaStack can wire IAM grants and inject bucket names.
   readonly proceduresBucket: s3.Bucket;
   readonly complaintsBucket: s3.Bucket;
+  // Stores the compiled fat JARs used by both Lambda functions.
+  // Keeping deployment artifacts here lets CI upload the JAR once and reference
+  // it with Code.fromBucket(), which means the CDK bootstrap bucket never
+  // receives the JAR and does not accumulate large, stale objects.
+  readonly deploymentsBucket: s3.Bucket;
 
   constructor(scope: Construct, id: string, props: StorageStackProps) {
     super(scope, id, props);
@@ -42,6 +47,22 @@ export class StorageStack extends cdk.Stack {
       lifecycleRules: [{ expiration: cdk.Duration.days(30) }],
     });
 
+    // Compiled fat JARs — written by CI once per build, read by CloudFormation
+    // during Lambda deployment (Code.fromBucket).  Keeping these here instead of
+    // relying on the CDK bootstrap staging bucket (cdk-hnb659fds-assets-*) means
+    // we own the lifecycle and the bootstrap bucket never accumulates large JARs.
+    // 30-day expiry is generous: a deploy is complete within minutes; old JARs
+    // beyond 30 days are never needed again.
+    this.deploymentsBucket = new s3.Bucket(this, `ComplAIDeploymentsBucket-${environment}`, {
+      bucketName: `complai-deployments-${environment}`,
+      // Always RETAIN — losing this bucket mid-deploy would break rollbacks.
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      versioned: false,
+      lifecycleRules: [{ expiration: cdk.Duration.days(30) }],
+    });
+
     new cdk.CfnOutput(this, 'ComplAIProceduresBucketName', {
       value: this.proceduresBucket.bucketName,
       description: `S3 bucket for procedures corpus (${environment})`,
@@ -50,6 +71,11 @@ export class StorageStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'ComplAIComplaintsBucketName', {
       value: this.complaintsBucket.bucketName,
       description: `S3 bucket for generated complaint PDFs (${environment})`,
+    });
+
+    new cdk.CfnOutput(this, 'ComplAIDeploymentsBucketName', {
+      value: this.deploymentsBucket.bucketName,
+      description: `S3 bucket for fat JAR deployments (${environment})`,
     });
   }
 }

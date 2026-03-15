@@ -233,37 +233,58 @@ jobs:
           npm -v
           echo "CDK (global) version:" && npx cdk --version || true
 
-      - name: Deploy with AWS CDK
+      # Deploy StorageStack first so the complai-deployments-<env> bucket exists
+      # before we try to upload the JAR. StorageStack no longer exports any values
+      # imported by LambdaStack (buckets are resolved via fromBucketName inside
+      # LambdaStack), so StorageStack can be updated freely at any time.
+      - name: Deploy storage stack
+        env:
+          TARGET_ENV: ${{ steps.target.outputs.environment }}
+        run: |
+          cd cdk
+          npx cdk deploy "ComplAIStorageStack-${TARGET_ENV}" \
+            --require-approval never
+
+      # Upload the fat JAR to the deployments bucket with a key that includes the
+      # short git SHA. The unique key is what tells CloudFormation "code changed,
+      # update the Lambda function" — without it, a same-key re-upload would be
+      # invisible to CloudFormation and the Lambda would not be updated.
+      - name: Upload JAR to deployments bucket
+        env:
+          TARGET_ENV: ${{ steps.target.outputs.environment }}
+        run: |
+          # Bash glob expansion — no dependency on PATH-resolved 'ls' or 'head'.
+          CANDIDATE=""
+          for f in build/libs/*-all.jar; do [[ -f "$f" ]] && CANDIDATE="$f" && break; done
+          if [[ -z "$CANDIDATE" ]]; then
+            for f in build/libs/*.jar; do [[ -f "$f" ]] && CANDIDATE="$f" && break; done
+          fi
+          if [[ -z "$CANDIDATE" ]]; then
+            echo "ERROR: No usable JAR found in build/libs." >&2
+            exit 1
+          fi
+          JAR_KEY="complai-all-${GITHUB_SHA::8}.jar"
+          aws s3 cp "$CANDIDATE" "s3://complai-deployments-${TARGET_ENV}/${JAR_KEY}"
+          echo "Uploaded $(basename "$CANDIDATE") → s3://complai-deployments-${TARGET_ENV}/${JAR_KEY}"
+          # Make the key available to the CDK deploy step via the job environment.
+          echo "DEPLOYMENT_JAR_KEY=${JAR_KEY}" >> "$GITHUB_ENV"
+
+      # Deploy the Lambda stack. CDK CLI respects addDependency and deploys
+      # QueueStack first if it has pending changes. StorageStack is a no-op here
+      # (already deployed above). The JAR is read from S3 via Code.fromBucket()
+      # using DEPLOYMENT_JAR_KEY — nothing is staged to the CDK bootstrap bucket.
+      - name: Deploy Lambda stack
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           TARGET_ENV: ${{ steps.target.outputs.environment }}
+          # DEPLOYMENT_JAR_KEY was written to $GITHUB_ENV in the previous step and
+          # is automatically injected here as a shell variable.
         run: |
-          # Resolve the shadow JAR. Prefer *-all.jar (shadowJar output).
-          CANDIDATE=$(ls build/libs/*-all.jar 2>/dev/null | head -n1)
-          if [ -z "$CANDIDATE" ]; then
-            CANDIDATE=$(ls -S build/libs/*.jar 2>/dev/null | head -n1)
-          fi
-
-          if [ -z "$CANDIDATE" ] || [ ! -f "$CANDIDATE" ]; then
-            echo "ERROR: No usable JAR found in build/libs." >&2
-            ls -la build/libs || true
-            exit 1
-          fi
-
-          echo "Using JAR: $CANDIDATE"
-          echo "Target CDK stack: ComplAILambdaStack-${TARGET_ENV}"
-
-          export JAR_PATH="$CANDIDATE"
           cd cdk
-          # Deploy only the stack for the target environment. The CDK app defines one
-          # stack per environment; deploying by explicit name ensures the other stack
-          # is never touched.
           npx cdk deploy "ComplAILambdaStack-${TARGET_ENV}" \
             --require-approval never \
-            -c jarPath="$JAR_PATH" \
-            -c environment="$TARGET_ENV" \
             --outputs-file "../cdk-outputs-${TARGET_ENV}.json"
 
       - name: Upload CDK outputs
@@ -308,27 +329,61 @@ jobs:
           path: build/libs
 
       - name: Install Bruno CLI
-        run: npm install -g @usebruno/cli
+        # npm spawns postinstall scripts via a bare 'sh' name, which fails on this
+        # runner when PATH lookup doesn't resolve it. Setting script-shell to the
+        # explicit path fixes the spawn ENOENT error regardless of which package
+        # triggers a postinstall. The version is pinned because older Bruno CLI
+        # releases pulled in protobufjs (which has its own postinstall) while
+        # 3.1.3+ does not.
+        run: |
+          npm config set script-shell /bin/sh
+          npm install -g @usebruno/cli@3.1.3
 
       - name: Generate JWT token for Bruno E2E
         run: |
-          export JWT_SECRET="${{ secrets.JWT_SECRET }}"
-          
-          # Use the downloaded shadow jar instead of building it again
-          CANDIDATE=$(ls build/libs/*-all.jar 2>/dev/null | head -n1)
-          if [ -z "$CANDIDATE" ]; then
-            CANDIDATE=$(ls -S build/libs/*.jar 2>/dev/null | head -n1)
+          # Use $JAVA_HOME/bin/java and bash built-ins exclusively.
+          # If a GitHub Environment Variable named PATH is accidentally present it
+          # will shadow the system $PATH for every step in the job, making 'java',
+          # 'head', 'tail', and 'ls' all unfindable. Bypassing PATH lookup entirely
+          # avoids that whole class of failure.
+
+          # Bash glob expansion — no 'ls' or 'head' needed.
+          CANDIDATE=""
+          for f in build/libs/*-all.jar; do [[ -f "$f" ]] && CANDIDATE="$f" && break; done
+          if [[ -z "$CANDIDATE" ]]; then
+            for f in build/libs/*.jar; do [[ -f "$f" ]] && CANDIDATE="$f" && break; done
           fi
-          
-          TOKEN=$(JWT_SECRET="$JWT_SECRET" java -cp "$CANDIDATE" cat.complai.auth.TokenGenerator e2e-development 1 elprat 2>/dev/null | tail -1)
-          echo "jwtToken=$TOKEN" >> $GITHUB_ENV
+          if [[ -z "$CANDIDATE" ]]; then
+            echo "ERROR: No JAR found in build/libs." >&2
+            exit 1
+          fi
+
+          # Read the last non-empty output line without relying on 'tail'.
+          TOKEN=""
+          while IFS= read -r line; do
+            [[ -n "$line" ]] && TOKEN="$line"
+          done < <(JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+                   "$JAVA_HOME/bin/java" -cp "$CANDIDATE" \
+                   cat.complai.auth.TokenGenerator e2e-development 1 elprat 2>/dev/null)
+          echo "jwtToken=$TOKEN" >> "$GITHUB_ENV"
 
       - name: Run Bruno E2E tests (development)
         working-directory: ./E2E-ComplAI
         env:
           jwtToken: ${{ env.jwtToken }}
+          # path is a vars:secret in Development.bru so Bruno CLI requires it to
+          # be injected at runtime — it is never stored in the .bru file.
+          # We use COMPLAI_BASE_URL as the env var name to avoid shadowing the
+          # system $PATH variable, then map it to the Bruno variable name 'path'
+          # via --env-var. The GitHub secret must be named COMPLAI_BASE_URL
+          # (not PATH — a secret named PATH would not auto-inject, but a GitHub
+          # Environment *variable* named PATH would shadow $PATH for the whole job).
+          COMPLAI_BASE_URL: ${{ secrets.COMPLAI_BASE_URL }}
         run: >
-          bru run . -r --env Development --env-var jwtToken="$jwtToken" --reporter-json report/results.json
+          bru run . -r --env Development
+          --env-var jwtToken="$jwtToken"
+          --env-var path="$COMPLAI_BASE_URL"
+          --reporter-json report/results.json
         continue-on-error: true
 
       - name: Upload Bruno E2E JSON report
