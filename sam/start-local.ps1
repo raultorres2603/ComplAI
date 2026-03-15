@@ -94,6 +94,5 @@ sam local start-api `
     --template "$ScriptDir\template.yaml" `
     --env-vars "$ScriptDir\env.json" `
     --warm-containers EAGER `
-    --cors '*' `
     --host 127.0.0.1 `
     --port 3000
