@@ -16,16 +16,14 @@ export interface LambdaStackProps extends cdk.StackProps {
   // name collisions, and so it is immediately obvious in the console which
   // resource belongs to which environment.
   readonly environment: DeploymentEnvironment;
-  // Storage resources owned by StorageStack — passed in so this stack can wire
-  // IAM grants and inject bucket names into Lambda environment variables.
-  readonly proceduresBucket: s3.IBucket;
-  readonly complaintsBucket: s3.IBucket;
-  // Bucket that holds the compiled fat JARs. CI uploads the JAR here before
-  // running cdk deploy, and this stack references it with Code.fromBucket().
-  // This keeps the CDK bootstrap staging bucket free of large JAR objects.
-  readonly deploymentsBucket: s3.IBucket;
-  // Queue owned by QueueStack — passed in for IAM grants, env vars, and the
-  // SQS event source mapping on the worker Lambda.
+  // The SQS redact queue. Passed as a prop (rather than constructed internally
+  // via fromQueueArn) because SqsEventSource derives the EventSourceMapping
+  // construct ID from Names.nodeUniqueId(queue.node), which hashes the full
+  // construct path. If the path changes, CloudFormation gets a new logical ID
+  // and tries to CREATE the new mapping before deleting the old one, producing
+  // a 409 conflict. The queue is therefore created in bin/cdk.ts under a
+  // construct path that mirrors the original QueueStack path so the hash — and
+  // the EventSourceMapping logical ID — remains stable.
   readonly redactQueue: sqs.IQueue;
 }
 
@@ -33,7 +31,29 @@ export class LambdaStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: LambdaStackProps) {
     super(scope, id, props);
 
-    const { environment, proceduresBucket, complaintsBucket, deploymentsBucket, redactQueue } = props;
+    const { environment, redactQueue } = props;
+
+    // Reconstruct cross-stack bucket references from their deterministic names
+    // rather than accepting CDK construct objects as props. Passing construct
+    // objects would cause CDK to generate CloudFormation Fn::Export /
+    // Fn::ImportValue references whose export names are tied to logical ID
+    // hashes. If a hash ever changes (CDK upgrade, construct rename) CloudFormation
+    // refuses to delete the old export while LambdaStack still imports it.
+    //
+    // fromBucketName resolves to literal strings at synthesis time — no
+    // cross-stack CFN dependency is generated. Deployment order is enforced by
+    // the explicit addDependency() calls in bin/cdk.ts.
+    //
+    // The SQS queue is handled differently: see LambdaStackProps.redactQueue.
+    const proceduresBucket = s3.Bucket.fromBucketName(
+      this, `ProceduresBucketRef-${environment}`, `complai-procedures-${environment}`
+    );
+    const complaintsBucket = s3.Bucket.fromBucketName(
+      this, `ComplaintsBucketRef-${environment}`, `complai-complaints-${environment}`
+    );
+    const deploymentsBucket = s3.Bucket.fromBucketName(
+      this, `DeploymentsBucketRef-${environment}`, `complai-deployments-${environment}`
+    );
 
     // Create a custom IAM role for Lambda with least privilege.
     // The logical ID includes the environment so both stacks can live in the same account.

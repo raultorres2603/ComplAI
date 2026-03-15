@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
+import { Construct } from 'constructs';
 import { DeploymentEnvironment } from '../deployment-environment';
 import { StorageStack } from '../storage-stack';
 import { QueueStack } from '../queue-stack';
@@ -30,14 +31,23 @@ for (const environment of environments) {
     env: awsEnv,
   });
 
-  // LambdaStack depends on both storage and queue stacks. CDK tracks cross-stack
-  // references automatically and generates CloudFormation Exports/Imports, but
-  // the explicit addDependency calls make the deployment order unambiguous.
+  // LambdaStack no longer receives bucket construct objects from StorageStack.
+  // Buckets are resolved inside LambdaStack via fromBucketName, which produces
+  // literal ARN strings at synthesis time and generates no Fn::ImportValue
+  // cross-stack references. This means StorageStack can be updated freely
+  // without CloudFormation blocking on "export still in use" errors.
+  //
+  // The SQS queue is still passed as a construct reference from QueueStack.
+  // This keeps a QueueStack → LambdaStack Fn::ImportValue reference, but that
+  // is intentional: SqsEventSource derives the EventSourceMapping logical ID
+  // from Names.nodeUniqueId(queue.node), which hashes the queue's full construct
+  // path. Passing the queue directly preserves that path — and therefore the
+  // EventSourceMapping logical ID — avoiding a create-before-delete 409 conflict.
+  // If the queue's logical ID in QueueStack ever needs to change, deploy
+  // LambdaStack first (with --exclusively) to drop the import before updating
+  // QueueStack, the same technique used for the StorageStack migration.
   const lambdaStack = new LambdaStack(app, `ComplAILambdaStack-${environment}`, {
     environment,
-    proceduresBucket: storageStack.proceduresBucket,
-    complaintsBucket: storageStack.complaintsBucket,
-    deploymentsBucket: storageStack.deploymentsBucket,
     redactQueue: queueStack.redactQueue,
     env: awsEnv,
   });
