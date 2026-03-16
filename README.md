@@ -178,7 +178,7 @@ ComplAI follows a strict **layered architecture** with clear boundaries at every
                                 │ Bearer token auth
 ┌───────────────────────────────▼──────────────────────────────────┐
 │                    OpenRouter API                                │
-│               model: stepfun/step-3.5-flash:free (default)      │
+│              model: configurable via OPENROUTER_MODEL env var    │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -281,11 +281,28 @@ Client polls the pdfUrl — returns 403/404 while the worker is running,
 
 ### `GET /`
 
-Health check and welcome endpoint.
+Welcome endpoint.
 
 **Response `200 OK`:**
 ```json
 { "message": "Welcome to the Complai Home Page!" }
+```
+
+---
+
+### `GET /health`
+
+Liveness check. No JWT required.
+
+**Response `200 OK`:**
+```json
+{
+  "status": "UP",
+  "version": "...",
+  "checks": {
+    "openRouterApiKeyConfigured": true
+  }
+}
 ```
 
 ---
@@ -386,7 +403,7 @@ The `message` field is localised (Catalan / Spanish / English) based on the dete
 | `1` | `VALIDATION` | `400` | Bad request (empty text, unsupported format) |
 | `2` | `REFUSAL` | `422` | AI refused: question not about El Prat |
 | `3` | `UPSTREAM` | `502` | OpenRouter returned an error or unexpected response |
-| `4` | `TIMEOUT` | `504` | OpenRouter call timed out (>30 seconds) |
+| `4` | `TIMEOUT` | `504` | OpenRouter call timed out (configurable via `OPENROUTER_OVERALL_TIMEOUT_SECONDS`, default 60 s) |
 | `5` | `INTERNAL` | `500` | Unexpected server-side error |
 | `6` | `UNAUTHORIZED` | `401` | Missing, expired, or invalid JWT Bearer token |
 
@@ -504,7 +521,7 @@ Three independent CDK stacks are deployed per environment via **AWS CDK** (TypeS
 
 | Stack | Purpose |
 |-------|---------|
-| `ComplAIStorageStack-<env>` | S3 buckets: `complai-procedures-<env>` (RAG data) and `complai-complaints-<env>` (generated PDFs) |
+| `ComplAIStorageStack-<env>` | S3 buckets: `complai-procedures-<env>` (RAG data), `complai-complaints-<env>` (generated PDFs), `complai-deployments-<env>` (fat JARs for CI/CD deployments) |
 | `ComplAIQueueStack-<env>` | SQS redact queue + DLQ (`complai-redact-<env>`, `complai-redact-dlq-<env>`) |
 | `ComplAILambdaStack-<env>` | Both Lambda functions, IAM roles, CloudWatch log groups, metric filters |
 
@@ -556,7 +573,7 @@ cd sam
 | Off-topic abuse | System prompt + programmatic refusal detection scope all AI responses to El Prat |
 | Input length abuse | All user input is limited to 5,000 characters (`complai.input.max-length-chars`). Inputs exceeding the limit are rejected at the service boundary with `400 VALIDATION` before any AI call is made |
 | IAM privilege | API Lambda role: `AWSLambdaBasicExecutionRole` + SQS send + S3 read. Worker Lambda role: `AWSLambdaBasicExecutionRole` + SQS consume + S3 write (complaints bucket only) |
-| Secrets in logs | The API key and JWT secret are never logged. Refusal messages and AI text are logged at fine/info level only |
+| Secrets in logs | The API key and JWT secret are never logged. Raw input text and AI responses are never logged — `AuditLogger` writes only metadata (endpoint, request hash, error code, latency, format, language) |
 | Unsupported format values | Rejected at controller boundary (`400 VALIDATION`) before touching the service |
 
 ---
@@ -576,7 +593,6 @@ Authorization: Bearer <token>
 - Tokens must be signed with the environment's `JWT_SECRET` (HS256, ≥32 bytes, base64-encoded).
 - Required claims: `exp` (expiry), `sub` (subject), `iss` (must be `complai`), `city` (non-blank city identifier).
 - Invalid, missing, or expired tokens result in `401 Unauthorized` with error code `6 (UNAUTHORIZED)`.
-- The filter is tested in both integration and E2E tests. See [Testing Strategy](#14-testing-strategy).
 
 ### Minting JWT Tokens
 
@@ -628,34 +644,33 @@ ComplAI now supports strong citizen identity verification using official OIDC-ba
 - **How it works:**
   1. The frontend authenticates the user with the OIDC IdP (Cl@ve, VALId, idCat, etc.) and obtains an OIDC ID token.
   2. The frontend sends this token in the `X-Identity-Token` HTTP header when calling `POST /complai/redact`.
-  3. The backend verifies the token’s signature and claims using the configured OIDC environment variables.
-  4. If valid, the backend extracts the citizen’s identity from the token and overrides any self-reported fields.
-  5. If the token is missing, invalid, or expired, the request is rejected with a `401 Unauthorized` error.
+  3. The backend verifies the token's signature and claims using the per-city OIDC configuration in `src/main/resources/oidc/oidc-mapping.json` (bundled in the JAR). The city is resolved from the validated ComplAI Bearer JWT `city` claim.
+  4. If valid, the backend extracts the citizen's identity from the token and overrides any self-reported body fields.
+  5. If the `X-Identity-Token` header is **absent**, the request falls back to self-reported body fields (`requesterName`, `requesterSurname`, `requesterIdNumber`) as normal — existing consumers are unaffected.
+  6. If the header is **present but the token is invalid or expired**, the request is rejected with `401 Unauthorized`.
 
 - **Environment Variables (API Lambda only):**
 
-  | Variable                    | Required | Secret? | Description                                                      |
-  |-----------------------------|----------|---------|------------------------------------------------------------------|
-  | `IDENTITY_VERIFICATION_ENABLED` | Yes      | No      | Feature flag to enable OIDC identity verification                |
-  | `OIDC_ISSUER_URL`           | Yes      | No      | OIDC issuer URL (e.g. https://identitats.aoc.cat)                |
-  | `OIDC_JWKS_URI`             | Yes      | No      | JWKS endpoint for public keys                                    |
-  | `OIDC_AUDIENCE`             | Yes      | No*     | Client ID registered with the IdP                                |
-  | `OIDC_NIF_CLAIM`            | No       | No      | Claim name for NIF/NIE (default: `sub`)                          |
+  | Variable                        | Required | Description                                       |
+  |---------------------------------|----------|---------------------------------------------------|
+  | `IDENTITY_VERIFICATION_ENABLED` | Yes      | Feature flag to enable OIDC identity verification |
 
-  *Client ID is not a secret, but do not publish it widely.
+  Per-city OIDC configuration (issuer, JWKS URI, audience, NIF claim) is loaded from
+  `src/main/resources/oidc/oidc-mapping.json` bundled in the JAR — no `OIDC_*` environment
+  variables are needed or read.
 
 - **Operational Checklist:**
   1. Obtain OIDC IdP details (issuer, JWKS URI, audience/client ID, NIF claim) from your IdP admin or documentation.
-  2. Set the above environment variables on the API Lambda (not the worker Lambda).
+  2. Add (or verify) the city's entry in `src/main/resources/oidc/oidc-mapping.json` and redeploy. Set `IDENTITY_VERIFICATION_ENABLED=true` on the API Lambda — this is the only environment variable required.
   3. Coordinate with the frontend to ensure it authenticates users and sends the OIDC token in the `X-Identity-Token` header.
   4. Test end-to-end with real tokens before enabling in production. Start with `IDENTITY_VERIFICATION_ENABLED=false` (dark launch), then flip to `true` when ready.
-  5. Monitor logs for errors (e.g., JWKS endpoint unreachable, key rotation issues). Lambda will fail fast if misconfigured.
-  6. No backend code changes are needed; all logic is feature-flagged and fully tested.
+  5. Monitor logs for errors (e.g., JWKS endpoint unreachable, key rotation issues). Lambda will fail fast at startup if misconfigured.
+  6. For an existing city, no code changes are needed once the entry is in `oidc-mapping.json`. To onboard a new city, add an entry to `oidc-mapping.json` and redeploy.
 
 - **Security Notes:**
   - The backend never generates OIDC tokens; it only verifies tokens issued by the IdP.
-  - All identity data used in complaint letters is extracted from the verified token.
-  - If the OIDC token is missing or invalid, the request is rejected. No fallback to self-reported identity is allowed when verification is enabled.
+  - When the `X-Identity-Token` header is present, all identity data used in complaint letters is extracted from the verified token — self-reported body fields are ignored.
+  - When the header is absent, the request proceeds with self-reported identity (or the AI asks for missing fields if the identity is incomplete).
   - No OIDC secrets (such as client secrets) are stored or required for this flow.
 
 - **Relationship to JWT Bearer Authentication:**
