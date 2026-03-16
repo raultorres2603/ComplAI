@@ -169,7 +169,7 @@ public class OidcIdentityTokenValidator {
 
     private static Map<String, OidcConfig> loadMapping() {
         try (InputStream is = OidcIdentityTokenValidator.class.getClassLoader()
-                .getResourceAsStream("oidc-mapping.json")) {
+                .getResourceAsStream("oidc/oidc-mapping.json")) {
             if (is == null) {
                 throw new IllegalStateException("oidc-mapping.json not found on classpath");
             }
