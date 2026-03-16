@@ -651,21 +651,18 @@ ComplAI now supports strong citizen identity verification using official OIDC-ba
 
 - **Environment Variables (API Lambda only):**
 
-  | Variable                        | Required | Description                                       |
-  |---------------------------------|----------|---------------------------------------------------|
-  | `IDENTITY_VERIFICATION_ENABLED` | Yes      | Feature flag to enable OIDC identity verification |
-
-  Per-city OIDC configuration (issuer, JWKS URI, audience, NIF claim) is loaded from
-  `src/main/resources/oidc/oidc-mapping.json` bundled in the JAR — no `OIDC_*` environment
-  variables are needed or read.
+  None beyond the standard set. Per-city OIDC configuration — including whether
+  verification is active — is controlled entirely by the `"enabled"` flag in
+  `src/main/resources/oidc/oidc-mapping.json` bundled in the JAR. No `IDENTITY_VERIFICATION_ENABLED`
+  or `OIDC_*` environment variables are needed or read.
 
 - **Operational Checklist:**
   1. Obtain OIDC IdP details (issuer, JWKS URI, audience/client ID, NIF claim) from your IdP admin or documentation.
-  2. Add (or verify) the city's entry in `src/main/resources/oidc/oidc-mapping.json` and redeploy. Set `IDENTITY_VERIFICATION_ENABLED=true` on the API Lambda — this is the only environment variable required.
+  2. Add (or verify) the city's entry in `src/main/resources/oidc/oidc-mapping.json`. Set `"enabled": true` to activate, `"enabled": false` to prepare the config without activating it yet. Redeploy.
   3. Coordinate with the frontend to ensure it authenticates users and sends the OIDC token in the `X-Identity-Token` header.
-  4. Test end-to-end with real tokens before enabling in production. Start with `IDENTITY_VERIFICATION_ENABLED=false` (dark launch), then flip to `true` when ready.
-  5. Monitor logs for errors (e.g., JWKS endpoint unreachable, key rotation issues). Lambda will fail fast at startup if misconfigured.
-  6. For an existing city, no code changes are needed once the entry is in `oidc-mapping.json`. To onboard a new city, add an entry to `oidc-mapping.json` and redeploy.
+  4. Test end-to-end with real tokens before enabling in production. Start with `"enabled": false` (dark launch — bean loads but skips this city), then flip to `true` and redeploy when ready.
+  5. Monitor logs for errors (e.g., JWKS endpoint unreachable, key rotation issues). Lambda will fail fast at startup if a city has `"enabled": true` but its JWKS endpoint is unreachable.
+  6. To onboard a new city, add an entry to `oidc-mapping.json` with `"enabled": true` and redeploy. To disable a city without removing its config, set `"enabled": false`.
 
 - **Security Notes:**
   - The backend never generates OIDC tokens; it only verifies tokens issued by the IdP.

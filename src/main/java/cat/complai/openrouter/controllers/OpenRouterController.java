@@ -42,8 +42,8 @@ public class OpenRouterController {
     private final IOpenRouterService service;
     private final SqsComplaintPublisher sqsPublisher;
     private final S3PdfUploader s3PdfUploader;
-    // Null when IDENTITY_VERIFICATION_ENABLED is absent/false — the bean does not load,
-    // and Micronaut injects null for @Nullable constructor parameters with missing beans.
+    // Null when jwt.secret is not configured (worker Lambda). When non-null, individual
+    // cities may still have verification disabled — check isEnabledForCity() before use.
     private final OidcIdentityTokenValidator identityTokenValidator;
     private final Logger logger = Logger.getLogger(OpenRouterController.class.getName());
 
@@ -67,7 +67,12 @@ public class OpenRouterController {
         logger.info(() -> "POST /complai/ask received — conversationId=" + conversationId + " inputLength=" + inputLength + " city=" + cityId);
         long start = System.currentTimeMillis();
         try {
-            OpenRouterResponseDto dto = service.ask(request.getText(), request.getConversationId(), cityId);
+            OpenRouterResponseDto dto;
+            if (request != null) {
+                dto = service.ask(request.getText(), request.getConversationId(), cityId);
+            } else {
+                dto = null;
+            }
             long latency = System.currentTimeMillis() - start;
             AuditLogger.log("/complai/ask", AuditLogger.hashText(request.getText()),
                     dto != null ? dto.getErrorCode().getCode() : -1, latency, null, null);
@@ -116,16 +121,14 @@ public class OpenRouterController {
                 return HttpResponse.badRequest(err).contentType(MediaType.APPLICATION_JSON);
             }
 
-            // When IDENTITY_VERIFICATION_ENABLED=true the validator bean is present.
-            // If the caller includes an X-Identity-Token header, validate it and use the
-            // IdP-verified identity instead of the self-reported body fields. This prevents
-            // the AI from asking for missing identity in a multi-turn loop, and ensures the
-            // PDF contains a cryptographically-verified NIF/NIE rather than user-supplied data.
+            // When OIDC is enabled for this city (via oidc-mapping.json), validate the
+            // X-Identity-Token header if provided. The verified IdP identity overrides
+            // any self-reported body fields, ensuring the PDF carries a cryptographically
+            // verified NIF/NIE rather than user-supplied data.
             //
-            // If the header is present but the feature is disabled (validator == null), we
-            // ignore it silently — this allows the frontend to roll out before the backend
-            // flag is enabled without causing errors.
-            if (identityTokenValidator != null) {
+            // If the header is absent the request proceeds with self-reported identity
+            // (or the AI asks for it). If the header is present but invalid, we return 401.
+            if (identityTokenValidator != null && identityTokenValidator.isEnabledForCity(cityId)) {
                 String rawIdentityToken = httpRequest.getHeaders().get("X-Identity-Token");
                 if (rawIdentityToken != null && !rawIdentityToken.isBlank()) {
                     try {

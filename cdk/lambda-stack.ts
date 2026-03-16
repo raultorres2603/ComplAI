@@ -153,9 +153,9 @@ export class LambdaStack extends cdk.Stack {
         COMPLAINTS_BUCKET: complaintsBucket.bucketName,
         COMPLAINTS_REGION: this.region,
         // OIDC identity verification. Per-city config (issuer, JWKS URI, audience, NIF claim)
-        // is bundled in oidc-mapping.json — no OIDC_* env vars needed.
-        // The worker Lambda does not receive this — it never handles HTTP requests.
-        IDENTITY_VERIFICATION_ENABLED: process.env.IDENTITY_VERIFICATION_ENABLED || 'false',
+        // is bundled in oidc-mapping.json — enabled per city, no env var needed.
+        // The worker Lambda does not receive JWT_SECRET and therefore never loads the
+        // OidcIdentityTokenValidator bean.
       },
       role: lambdaRole,
       logGroup: logGroup,

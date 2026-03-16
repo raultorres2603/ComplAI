@@ -31,18 +31,23 @@ import java.util.logging.Logger;
  * {@code POST /complai/redact} requests, then extracts the citizen's verified identity.
  *
  * <p>OIDC configuration (issuer, JWKS URI, audience, NIF claim) is loaded per city from
- * {@code oidc-mapping.json} on the classpath. The city identifier is taken from the
- * already-validated ComplAI Bearer JWT ({@code city} claim), which {@link JwtAuthFilter}
- * sets as a request attribute before the controller is reached. This keeps the OIDC config
- * lookup independent of the unverified OIDC token itself.
+ * {@code oidc/oidc-mapping.json} on the classpath. Whether verification is active for a
+ * city is controlled by the {@code "enabled"} flag on each entry — no global environment
+ * variable is required. Cities with {@code "enabled": false} are skipped at startup: their
+ * JWKS endpoint is never fetched and {@link #isEnabledForCity(String)} returns {@code false}.
  *
- * <p>This bean only loads when {@code IDENTITY_VERIFICATION_ENABLED=true} is set in the
- * environment (maps to {@code identity.verification.enabled} via Micronaut relaxed binding).
- * When the flag is off the bean is absent and the controller's {@code @Nullable} injection
- * point receives {@code null} — the entire feature is inactive with no code-path changes.
+ * <p>The city identifier is taken from the already-validated ComplAI Bearer JWT
+ * ({@code city} claim), which {@link JwtAuthFilter} sets as a request attribute before the
+ * controller is reached. This keeps the OIDC config lookup independent of the unverified
+ * OIDC token itself.
  *
- * <p>JWKS endpoints for all configured cities are fetched at bean initialisation time.
- * If any endpoint is unreachable the application fails fast — a partially-configured
+ * <p>This bean only loads when {@code jwt.secret} is configured — i.e. only on the API
+ * Lambda. The SQS worker Lambda never handles HTTP requests and therefore never needs this
+ * bean. If no cities have {@code "enabled": true}, the bean loads but is inert: no JWKS
+ * fetch is performed and {@link #isEnabledForCity(String)} always returns {@code false}.
+ *
+ * <p>JWKS endpoints for enabled cities are fetched at bean initialisation time. If any
+ * enabled city's endpoint is unreachable the application fails fast — a partially-configured
  * multi-city setup must not start in a silently degraded state.
  *
  * <p>Key rotation: warm Lambda instances cache each city's JwkSet for their lifetime. A
@@ -52,7 +57,9 @@ import java.util.logging.Logger;
  *
  * <p>All failures are wrapped in {@link IdentityTokenValidationException}.
  */
-@Requires(property = "identity.verification.enabled", value = "true")
+// Guard mirrors JwtAuthFilter / JwtValidator: only load on the API Lambda (jwt.secret present).
+// The worker Lambda has no JWT_SECRET and must never attempt a JWKS fetch at startup.
+@Requires(property = "jwt.secret")
 @Singleton
 public class OidcIdentityTokenValidator {
 
@@ -75,6 +82,10 @@ public class OidcIdentityTokenValidator {
         for (Map.Entry<String, OidcConfig> entry : mapping.entrySet()) {
             String cityId = entry.getKey();
             OidcConfig config = entry.getValue();
+            if (!config.enabled()) {
+                logger.info("OidcIdentityTokenValidator — city=" + cityId + " is disabled in oidc-mapping.json, skipping JWKS fetch");
+                continue;
+            }
             // fetchAndParseJwks throws IllegalStateException if the endpoint is unreachable,
             // which propagates out of the constructor and prevents the bean from being created.
             JwkSet jwkSet = fetchAndParseJwks(config.jwksUri());
@@ -96,6 +107,18 @@ public class OidcIdentityTokenValidator {
      */
     protected OidcIdentityTokenValidator(String testCityId, JwtParser parser, String nifClaim) {
         this.cityContexts = Map.of(testCityId, new CityValidationContext(parser, nifClaim));
+    }
+
+    /**
+     * Returns {@code true} if OIDC identity verification is enabled for {@code cityId}
+     * (i.e. the city has {@code "enabled": true} in {@code oidc-mapping.json}).
+     *
+     * <p>The controller calls this before reading the {@code X-Identity-Token} header to
+     * decide whether to attempt validation for the caller's city. Cities that are disabled
+     * fall through to self-reported body fields, identical to the no-validator path.
+     */
+    public boolean isEnabledForCity(String cityId) {
+        return cityId != null && cityContexts.containsKey(cityId);
     }
 
     /**
@@ -121,9 +144,10 @@ public class OidcIdentityTokenValidator {
 
         CityValidationContext ctx = cityContexts.get(cityId);
         if (ctx == null) {
+            // Reached only if validate() is called without checking isEnabledForCity() first.
             throw new IdentityTokenValidationException(
-                    "OIDC is not configured for city: " + cityId
-                            + ". Add an entry to oidc-mapping.json.");
+                    "OIDC identity verification is not enabled for city: " + cityId
+                            + ". Set \"enabled\": true in oidc-mapping.json.");
         }
 
         try {

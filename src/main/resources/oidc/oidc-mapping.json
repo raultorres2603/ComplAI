@@ -1,11 +1,13 @@
 {
   "elprat": {
+    "enabled": false,
     "issuer": "https://identitats.aoc.cat",
     "jwks_uri": "https://identitats.aoc.cat/jwks",
     "audience": "prat-espais",
     "nif_claim": "sub"
   },
   "barcelona": {
+    "enabled": false,
     "issuer": "https://oidc.barcelona.cat",
     "jwks_uri": "https://oidc.barcelona.cat/jwks",
     "audience": "barcelona-app",

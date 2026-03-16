@@ -21,15 +21,6 @@ Parameters:
   JwtSecret:
     Type: String
     Description: Base64-encoded HS256 JWT secret (min 32 bytes). Generate with openssl rand -base64 32.
-  IdentityVerificationEnabled:
-    Type: String
-    Default: "false"
-    AllowedValues:
-      - "true"
-      - "false"
-    Description: Set to "true" to enable OIDC identity token validation on POST /complai/redact.
-      Per-city OIDC configuration (issuer, JWKS URI, audience, NIF claim) is loaded at
-      startup from oidc-mapping.json bundled in the JAR. No additional OIDC_* env vars needed.
 Conditions:
   IsProduction: !Equals [!Ref Environment, production]
 
@@ -191,9 +182,6 @@ Resources:
           REDACT_QUEUE_URL: !Ref RedactQueue
           COMPLAINTS_BUCKET: !Ref ComplaintsBucket
           COMPLAINTS_REGION: !Ref LambdaRegion
-          # OIDC identity verification — per-city config is bundled in oidc-mapping.json.
-          # No OIDC_* env vars needed. Set IDENTITY_VERIFICATION_ENABLED=true to activate.
-          IDENTITY_VERIFICATION_ENABLED: !Ref IdentityVerificationEnabled
       Events:
         ProxyRoot:
           Type: HttpApi
