@@ -270,6 +270,21 @@ Independent local news source: %s
         String today = LocalDate.now().format(DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", Locale.forLanguageTag("ca")));
         return String.format(
                 """
+                        PRE-CHECK (evaluate first, before anything else):
+                        Determine whether the text below actually describes a complaint, problem, or issue \
+                        the user wants to formally raise with the Ajuntament de %s.
+
+                        IF the text is NOT a complaint (e.g. it is a question, greeting, general inquiry, \
+                        praise, content about another municipality, or any text that does not describe a \
+                        problem to complain about):
+                           -> Respond politely in the same language the user is using.
+                           -> Explain that this service is exclusively for drafting formal complaint letters \
+                        to the Ajuntament de %s.
+                           -> Invite them to describe the problem or issue they want to complain about.
+                           -> Do NOT output the JSON header. Do NOT write a letter.
+
+                        IF the text IS a complaint, continue with the instructions below:
+
                         IMPORTANT: Your response MUST start with a single-line JSON header on line 1.
                         No text, no markdown, no explanation before it.
                         The header must be exactly: {"format": "pdf"}
@@ -292,12 +307,14 @@ Independent local news source: %s
 
                         Complaint text (may contain optional contact details to include):
                         %s""",
-                cityName,
+                cityName,   // PRE-CHECK first mention
+                cityName,   // PRE-CHECK second mention
+                cityName,   // Task: addressed to the Ajuntament de ...
                 today,
                 identity.name().trim(),
                 identity.surname().trim(),
                 identity.idNumber().trim(),
-                cityName,
+                cityName,   // Rule 7: if not about this city
                 complaint.trim()
         );
     }
@@ -323,16 +340,25 @@ Independent local news source: %s
 
         return String.format(
                 """
-                        The user wants to draft a formal complaint addressed to the Ajuntament de %s.
+                        The user sent a message to a service that drafts formal complaint letters addressed to the Ajuntament de %s.
 
                         Current status: Missing mandatory identity fields.
 
                         YOUR TASK:
-                        1. Analyze the complaint text below.
-                        2. Check if the user has provided the following missing fields in the text:
-                        %s
+                        First, determine which scenario applies to the user's message:
 
-                        SCENARIO A: The text DOES contain ALL the missing fields (e.g. they wrote "My name is John Doe, ID 12345").
+                        SCENARIO 0: The message is NOT a complaint or issue about %s.
+                           This includes: greetings, general questions, inquiries about services, praise, \
+                        content about other municipalities, or any text that does not describe a problem \
+                        the user wants to formally complain about.
+                           -> ACTION: Respond politely in the same language the user is using.
+                           -> Explain that this service is exclusively for drafting formal complaint letters to the Ajuntament de %s.
+                           -> Invite them to describe the problem or issue they want to complain about.
+                           -> Do NOT output the JSON header. Do NOT ask for identity.
+
+                        SCENARIO A (only if the message IS a complaint): The text DOES contain ALL the missing fields (e.g. they wrote "My name is John Doe, ID 12345").
+                           Missing fields to check:
+                           %s
                            -> ACTION: Extract the identity and DRAFT THE LETTER immediately.
                            -> You MUST start with the JSON header on line 1: {"format": "pdf"}
                            -> Follow these drafting rules:
@@ -343,16 +369,18 @@ Independent local news source: %s
                               5. COMPLAINT BODY: Write a clear, formal complaint based on the user's text.
                               6. Output the letter body as PLAIN TEXT after the JSON header.
 
-                        SCENARIO B: The text DOES NOT contain all missing fields.
+                        SCENARIO B (only if the message IS a complaint): The text DOES NOT contain all missing fields.
+                           Missing fields to request:
+                           %s
                            -> ACTION: Ask the user politely for the missing information.
                            -> Do NOT draft the letter yet.
                            -> Do NOT output the JSON header.
-                           -> Simply ask for:
-                           %s
                            -> Respond in the same language the user is using.
 
-                        Complaint text:
+                        User message:
                         %s""",
+                cityName,
+                cityName,
                 cityName,
                 missing.toString().trim(),
                 today,
