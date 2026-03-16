@@ -33,6 +33,7 @@ ComplAI is a **Java 21 Micronaut application** designed to run as **AWS Lambda f
     - `cat.complai.auth.TokenGenerator` — CLI that mints HS256 JWT tokens. Run with `java -cp complai-all.jar cat.complai.auth.TokenGenerator <subject> <expiry-days> <city>`. Requires `JWT_SECRET` env var.
     - `cat.complai.scrapper.ProcedureScraper` — CLI that crawls a city's procedure website and uploads `procedures-<cityId>.json` to S3. City-specific crawl behaviour (base URL, CSS selectors, skip rules) is driven by `src/main/resources/scrapers/procedures-mapping-<cityId>.json`. Requires `PROCEDURES_BUCKET` env var. Trigger via the `scrape-upload-procedures.yml` GitHub Actions workflow or run standalone. Not part of the Lambda boot path.
     - `cat.complai.scrapper.ProcedureIndexLoader` — downloads `procedures-<cityId>.json` from S3 to a temp file. **No longer invoked in the Lambda boot path** — `ProcedureRagHelper` now handles S3 loading internally via `getProceduresInputStream()`. Retained as a standalone utility.
+    - `cat.complai.auth.OidcIdentityTokenValidator` — validates OIDC ID tokens from the `X-Identity-Token` header on `/complai/redact` when `IDENTITY_VERIFICATION_ENABLED=true`. Loads only when enabled; fetches JWKS at startup and fails fast if unreachable. Overrides self-reported identity fields with verified claims. See "Key Files & Directories" and "Environment Variables" for details.
 - **Infrastructure:** AWS CDK (`cdk/`) defines the infrastructure in three stacks. AWS SAM (`sam/`) is used for local emulation.
 
 ### Key Data Flows
@@ -151,6 +152,7 @@ The `pdfUrl` in the `202` response is a pre-signed S3 GET URL (24h expiry) gener
 - `src/main/java/cat/complai/s3/S3PdfUploader.java`: Uploads PDFs to S3 and generates pre-signed GET URLs.
 - `src/main/java/cat/complai/scrapper/ProcedureScraper.java`: Generic city procedures scraper — reads `scrapers/procedures-mapping-<cityId>.json`, produces `procedures-<cityId>.json`, uploads to S3.
 - `src/main/java/cat/complai/scrapper/ProcedureIndexLoader.java`: Downloads `procedures-<cityId>.json` from S3 at Lambda start.
+- `src/main/java/cat/complai/auth/OidcIdentityTokenValidator.java`: OIDC ID token validator for `/complai/redact` (see OIDC section). Loads only when `IDENTITY_VERIFICATION_ENABLED=true`; fetches JWKS at startup and fails fast if unreachable. Overrides self-reported identity fields with verified claims. See "Key Files & Directories" and "Environment Variables" for details.
 - `cdk/deployment-environment.ts`: Shared `DeploymentEnvironment` type (`'development' | 'production'`).
 - `cdk/storage-stack.ts`: S3 bucket definitions (procedures + complaints).
 - `cdk/queue-stack.ts`: SQS queue + DLQ definitions.
@@ -189,6 +191,11 @@ The `pdfUrl` in the `202` response is a pre-signed S3 GET URL (24h expiry) gener
 | `COMPLAINTS_BUCKET` | Both Lambdas | S3 bucket name where generated PDFs are stored |
 | `COMPLAINTS_REGION` | Both Lambdas | AWS region of the complaints bucket |
 | `AWS_ENDPOINT_URL` | Both Lambdas | Optional LocalStack endpoint override for S3 and SQS. Leave empty (or unset) in production. |
+| `IDENTITY_VERIFICATION_ENABLED` | API Lambda | Enables OIDC identity verification for `/complai/redact` (feature flag; default false) |
+| `OIDC_ISSUER_URL` | API Lambda | OIDC issuer URL (e.g. https://identitats.aoc.cat) |
+| `OIDC_JWKS_URI` | API Lambda | JWKS endpoint for OIDC token signature validation |
+| `OIDC_AUDIENCE` | API Lambda | OIDC audience/client ID (registered with IdP) |
+| `OIDC_NIF_CLAIM` | API Lambda | JWT claim name for NIF/NIE (default: `sub`) |
 
 ## 7. API Endpoints
 
@@ -198,6 +205,8 @@ The `pdfUrl` in the `202` response is a pre-signed S3 GET URL (24h expiry) gener
 | `/health` | GET | — | `200` `HealthDto` (`status`, `version`, `checks`) | No JWT required |
 | `/complai/ask` | POST | `{ text, conversationId }` | `200` `OpenRouterPublicDto` | Always synchronous |
 | `/complai/redact` | POST | `{ text, format, conversationId, requesterName?, requesterSurname?, requesterIdNumber? }` | `202` `RedactAcceptedDto` **or** `200` JSON/PDF | 202 when identity complete + format≠json; 200 otherwise |
+
+**OIDC identity verification:** When `IDENTITY_VERIFICATION_ENABLED=true`, the API expects an OIDC ID token in the `X-Identity-Token` header. If present and valid, the backend extracts the citizen's identity from the token and overrides any self-reported fields. If the token is missing or invalid, the request is rejected with `401 Unauthorized`. This applies only to `/complai/redact`.
 
 ### `202 Accepted` — Async PDF Queued
 
@@ -225,3 +234,4 @@ The `message` field is localised by `LanguageDetector.detect(text)` — it is re
 - **UNAUTHORIZED errorCode:** `OpenRouterErrorCode.UNAUTHORIZED(6)` is set by `JwtAuthFilter` before the controller runs. The controller's `errorToHttpResponse` switch has no case for it by design — do not add one.
 - **JWT issuer:** `JwtValidator` enforces `iss` = `"complai"` (hardcoded in `EXPECTED_ISSUER`). Tokens from other issuers are rejected with `401` even if the signature is valid. `TokenGenerator` always sets this issuer — do not bypass it.
 - **Audit log field names are load-bearing:** `AuditLogger` writes `errorCode`, `latencyMs`, and `endpoint` as JSON field names. CloudWatch metric filters in both CDK (`lambda-stack.ts`) and SAM (`template.yaml`) match these exact names. Renaming them will silently break all CloudWatch metrics.
+- **OIDC JWKS fetch failures:** If the OIDC JWKS endpoint is unreachable at startup, the application fails fast and does not start. Key rotation by the IdP requires a Lambda cold start (redeploy) to pick up new keys. If a new token's `kid` is not found, a warning is logged and the request is rejected until redeploy.
