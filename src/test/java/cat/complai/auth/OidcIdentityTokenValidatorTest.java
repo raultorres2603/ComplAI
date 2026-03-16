@@ -18,14 +18,16 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Unit tests for {@link OidcIdentityTokenValidator}.
  *
- * The DI-managed constructor fetches a live JWKS endpoint and is not exercised here.
- * Instead, the package-visible constructor receives a pre-built {@link JwtParser} backed
- * by a locally-generated RSA key pair, so tests are fast, hermetic, and deterministic.
+ * The DI-managed constructor fetches live JWKS endpoints and is not exercised here.
+ * Instead, the protected test constructor receives a city identifier, a pre-built
+ * {@link JwtParser} backed by a locally-generated RSA key pair, and the NIF claim name,
+ * so tests are fast, hermetic, and deterministic.
  */
 class OidcIdentityTokenValidatorTest {
 
-    private static final String ISSUER   = "https://test-issuer.example.com";
-    private static final String AUDIENCE = "test-client-id";
+    private static final String ISSUER    = "https://test-issuer.example.com";
+    private static final String AUDIENCE  = "test-client-id";
+    private static final String TEST_CITY = "elprat";
 
     private static PrivateKey privateKey;
     private static OidcIdentityTokenValidator validator;
@@ -45,7 +47,7 @@ class OidcIdentityTokenValidatorTest {
                 .build();
 
         // "sub" is the default nifClaim — matches what VALId typically puts the NIF in.
-        validator = new OidcIdentityTokenValidator(parser, "sub");
+        validator = new OidcIdentityTokenValidator(TEST_CITY, parser, "sub");
     }
 
     // -------------------------------------------------------------------------
@@ -60,7 +62,7 @@ class OidcIdentityTokenValidatorTest {
                 .claim("family_name", "Torres")
                 .expiration(oneHourFromNow()));
 
-        VerifiedCitizenIdentity identity = validator.validate(token);
+        VerifiedCitizenIdentity identity = validator.validate(token, TEST_CITY);
 
         assertEquals("Joan", identity.name());
         assertEquals("Torres", identity.surname());
@@ -75,7 +77,7 @@ class OidcIdentityTokenValidatorTest {
                 .claim("family_name", " Torres ")
                 .expiration(oneHourFromNow()));
 
-        VerifiedCitizenIdentity identity = validator.validate(token);
+        VerifiedCitizenIdentity identity = validator.validate(token, TEST_CITY);
 
         assertEquals("Joan", identity.name());
         assertEquals("Torres", identity.surname());
@@ -95,7 +97,7 @@ class OidcIdentityTokenValidatorTest {
                 .expiration(Date.from(Instant.now().minus(1, ChronoUnit.HOURS))));
 
         IdentityTokenValidationException ex =
-                assertThrows(IdentityTokenValidationException.class, () -> validator.validate(token));
+                assertThrows(IdentityTokenValidationException.class, () -> validator.validate(token, TEST_CITY));
 
         assertTrue(ex.getMessage().toLowerCase().contains("expired"),
                 "Exception message should mention expiry, got: " + ex.getMessage());
@@ -112,7 +114,7 @@ class OidcIdentityTokenValidatorTest {
         );
 
         IdentityTokenValidationException ex =
-                assertThrows(IdentityTokenValidationException.class, () -> validator.validate(token));
+                assertThrows(IdentityTokenValidationException.class, () -> validator.validate(token, TEST_CITY));
 
         assertTrue(ex.getMessage().toLowerCase().contains("exp"),
                 "Exception message should mention missing exp, got: " + ex.getMessage());
@@ -135,7 +137,7 @@ class OidcIdentityTokenValidatorTest {
                 .signWith(privateKey)
                 .compact();
 
-        assertThrows(IdentityTokenValidationException.class, () -> validator.validate(token));
+        assertThrows(IdentityTokenValidationException.class, () -> validator.validate(token, TEST_CITY));
     }
 
     @Test
@@ -150,7 +152,7 @@ class OidcIdentityTokenValidatorTest {
                 .signWith(privateKey)
                 .compact();
 
-        assertThrows(IdentityTokenValidationException.class, () -> validator.validate(token));
+        assertThrows(IdentityTokenValidationException.class, () -> validator.validate(token, TEST_CITY));
     }
 
     // -------------------------------------------------------------------------
@@ -166,7 +168,7 @@ class OidcIdentityTokenValidatorTest {
                 .expiration(oneHourFromNow()));
 
         IdentityTokenValidationException ex =
-                assertThrows(IdentityTokenValidationException.class, () -> validator.validate(token));
+                assertThrows(IdentityTokenValidationException.class, () -> validator.validate(token, TEST_CITY));
         assertTrue(ex.getMessage().contains("given_name"));
     }
 
@@ -179,7 +181,7 @@ class OidcIdentityTokenValidatorTest {
                 .expiration(oneHourFromNow()));
 
         IdentityTokenValidationException ex =
-                assertThrows(IdentityTokenValidationException.class, () -> validator.validate(token));
+                assertThrows(IdentityTokenValidationException.class, () -> validator.validate(token, TEST_CITY));
         assertTrue(ex.getMessage().contains("family_name"));
     }
 
@@ -196,7 +198,7 @@ class OidcIdentityTokenValidatorTest {
                 .signWith(privateKey)
                 .compact();
 
-        assertThrows(IdentityTokenValidationException.class, () -> validator.validate(token));
+        assertThrows(IdentityTokenValidationException.class, () -> validator.validate(token, TEST_CITY));
     }
 
     // -------------------------------------------------------------------------
@@ -205,12 +207,40 @@ class OidcIdentityTokenValidatorTest {
 
     @Test
     void validate_nullToken_throws() {
-        assertThrows(IdentityTokenValidationException.class, () -> validator.validate(null));
+        assertThrows(IdentityTokenValidationException.class, () -> validator.validate(null, TEST_CITY));
     }
 
     @Test
     void validate_blankToken_throws() {
-        assertThrows(IdentityTokenValidationException.class, () -> validator.validate("   "));
+        assertThrows(IdentityTokenValidationException.class, () -> validator.validate("   ", TEST_CITY));
+    }
+
+    @Test
+    void validate_unknownCity_throws() {
+        // A city not present in the validator's config must be rejected explicitly.
+        String token = buildToken(b -> b
+                .subject("12345678A")
+                .claim("given_name", "Joan")
+                .claim("family_name", "Torres")
+                .expiration(oneHourFromNow()));
+
+        IdentityTokenValidationException ex =
+                assertThrows(IdentityTokenValidationException.class,
+                        () -> validator.validate(token, "unknowncity"));
+        assertTrue(ex.getMessage().contains("unknowncity"),
+                "Exception message should name the unknown city, got: " + ex.getMessage());
+    }
+
+    @Test
+    void validate_blankCityId_throws() {
+        String token = buildToken(b -> b
+                .subject("12345678A")
+                .claim("given_name", "Joan")
+                .claim("family_name", "Torres")
+                .expiration(oneHourFromNow()));
+
+        assertThrows(IdentityTokenValidationException.class,
+                () -> validator.validate(token, "  "));
     }
 
     // -------------------------------------------------------------------------
@@ -231,7 +261,7 @@ class OidcIdentityTokenValidatorTest {
                 .build();
 
         OidcIdentityTokenValidator customValidator =
-                new OidcIdentityTokenValidator(customParser, "document_number");
+                new OidcIdentityTokenValidator(TEST_CITY, customParser, "document_number");
 
         String token = Jwts.builder()
                 .issuer(ISSUER)
@@ -244,7 +274,7 @@ class OidcIdentityTokenValidatorTest {
                 .signWith(kp.getPrivate())
                 .compact();
 
-        VerifiedCitizenIdentity identity = customValidator.validate(token);
+        VerifiedCitizenIdentity identity = customValidator.validate(token, TEST_CITY);
 
         assertEquals("12345678A", identity.nif());
         assertEquals("Joan", identity.name());
