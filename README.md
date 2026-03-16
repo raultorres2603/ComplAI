@@ -26,6 +26,7 @@ Last version: [![GitHub Release](https://img.shields.io/github/v/release/raultor
 10. [Infrastructure](#10-infrastructure)
 11. [Security](#11-security)
 12. [JWT Bearer Authentication](#12-jwt-bearer-authentication)
+13. [OIDC Identity Verification (Cl@ve, VALId, idCat, etc.)](#13-oidc-identity-verification-clave-valid-idcat-etc)
 ---
 
 ## 1. What Is This Project?
@@ -605,3 +606,60 @@ curl -X POST https://<lambda-url>/complai/ask \
 | `OPENROUTER_API_KEY`  | Yes      | Bearer token for the OpenRouter API              |
 | `openrouter.url`      | No       | Override the OpenRouter endpoint (default: `https://openrouter.ai/api/v1/chat/completions`) |
 
+---
+
+## 13. OIDC Identity Verification (Cl@ve, VALId, idCat, etc.)
+
+### Non-Technical Overview
+
+ComplAI now supports strong citizen identity verification using official OIDC-based providers such as Cl@ve, VALId, or idCat. When enabled, this ensures that complaint letters are cryptographically linked to the real identity of the citizen, as verified by the government’s digital identity system. This is required for certain official complaint flows (Option C).
+
+- **What changes for users?**
+  - When submitting a complaint, users are redirected to authenticate with their chosen identity provider (e.g., Cl@ve, VALId, idCat).
+  - After successful authentication, the system automatically fills in their name, surname, and ID number in the complaint letter. Self-reported identity fields are ignored.
+  - This provides a higher level of trust and legal validity for submitted complaints.
+
+- **What changes for operators?**
+  - No manual identity checks are needed for OIDC-verified complaints.
+  - All identity data is extracted from the signed OIDC token, not from user input.
+
+### Technical Details
+
+- **How it works:**
+  1. The frontend authenticates the user with the OIDC IdP (Cl@ve, VALId, idCat, etc.) and obtains an OIDC ID token.
+  2. The frontend sends this token in the `X-Identity-Token` HTTP header when calling `POST /complai/redact`.
+  3. The backend verifies the token’s signature and claims using the configured OIDC environment variables.
+  4. If valid, the backend extracts the citizen’s identity from the token and overrides any self-reported fields.
+  5. If the token is missing, invalid, or expired, the request is rejected with a `401 Unauthorized` error.
+
+- **Environment Variables (API Lambda only):**
+
+  | Variable                    | Required | Secret? | Description                                                      |
+  |-----------------------------|----------|---------|------------------------------------------------------------------|
+  | `IDENTITY_VERIFICATION_ENABLED` | Yes      | No      | Feature flag to enable OIDC identity verification                |
+  | `OIDC_ISSUER_URL`           | Yes      | No      | OIDC issuer URL (e.g. https://identitats.aoc.cat)                |
+  | `OIDC_JWKS_URI`             | Yes      | No      | JWKS endpoint for public keys                                    |
+  | `OIDC_AUDIENCE`             | Yes      | No*     | Client ID registered with the IdP                                |
+  | `OIDC_NIF_CLAIM`            | No       | No      | Claim name for NIF/NIE (default: `sub`)                          |
+
+  *Client ID is not a secret, but do not publish it widely.
+
+- **Operational Checklist:**
+  1. Obtain OIDC IdP details (issuer, JWKS URI, audience/client ID, NIF claim) from your IdP admin or documentation.
+  2. Set the above environment variables on the API Lambda (not the worker Lambda).
+  3. Coordinate with the frontend to ensure it authenticates users and sends the OIDC token in the `X-Identity-Token` header.
+  4. Test end-to-end with real tokens before enabling in production. Start with `IDENTITY_VERIFICATION_ENABLED=false` (dark launch), then flip to `true` when ready.
+  5. Monitor logs for errors (e.g., JWKS endpoint unreachable, key rotation issues). Lambda will fail fast if misconfigured.
+  6. No backend code changes are needed; all logic is feature-flagged and fully tested.
+
+- **Security Notes:**
+  - The backend never generates OIDC tokens; it only verifies tokens issued by the IdP.
+  - All identity data used in complaint letters is extracted from the verified token.
+  - If the OIDC token is missing or invalid, the request is rejected. No fallback to self-reported identity is allowed when verification is enabled.
+  - No OIDC secrets (such as client secrets) are stored or required for this flow.
+
+- **Relationship to JWT Bearer Authentication:**
+  - The standard `Authorization: Bearer <token>` JWT is still required for all POST endpoints (API access control).
+  - The OIDC token in `X-Identity-Token` is an additional, independent layer for verified citizen identity on `/complai/redact`.
+
+---
