@@ -14,7 +14,11 @@ import cat.complai.openrouter.helpers.AuditLogger;
 import cat.complai.s3.S3PdfUploader;
 import cat.complai.sqs.SqsComplaintPublisher;
 import cat.complai.sqs.dto.RedactSqsMessage;
+import cat.complai.auth.IdentityTokenValidationException;
 import cat.complai.auth.JwtAuthFilter;
+import cat.complai.auth.OidcIdentityTokenValidator;
+import cat.complai.auth.VerifiedCitizenIdentity;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -38,15 +42,20 @@ public class OpenRouterController {
     private final IOpenRouterService service;
     private final SqsComplaintPublisher sqsPublisher;
     private final S3PdfUploader s3PdfUploader;
+    // Null when IDENTITY_VERIFICATION_ENABLED is absent/false — the bean does not load,
+    // and Micronaut injects null for @Nullable constructor parameters with missing beans.
+    private final OidcIdentityTokenValidator identityTokenValidator;
     private final Logger logger = Logger.getLogger(OpenRouterController.class.getName());
 
     @Inject
     public OpenRouterController(IOpenRouterService service,
                                 SqsComplaintPublisher sqsPublisher,
-                                S3PdfUploader s3PdfUploader) {
-        this.service       = service;
-        this.sqsPublisher  = sqsPublisher;
-        this.s3PdfUploader = s3PdfUploader;
+                                S3PdfUploader s3PdfUploader,
+                                @Nullable OidcIdentityTokenValidator identityTokenValidator) {
+        this.service                  = service;
+        this.sqsPublisher             = sqsPublisher;
+        this.s3PdfUploader            = s3PdfUploader;
+        this.identityTokenValidator   = identityTokenValidator;
     }
 
     @Post("/ask")
@@ -105,6 +114,39 @@ public class OpenRouterController {
                         "Unsupported format. Only 'pdf', 'json', or 'auto' are accepted. Documents are always produced as PDF.",
                         OpenRouterErrorCode.VALIDATION.getCode());
                 return HttpResponse.badRequest(err).contentType(MediaType.APPLICATION_JSON);
+            }
+
+            // When IDENTITY_VERIFICATION_ENABLED=true the validator bean is present.
+            // If the caller includes an X-Identity-Token header, validate it and use the
+            // IdP-verified identity instead of the self-reported body fields. This prevents
+            // the AI from asking for missing identity in a multi-turn loop, and ensures the
+            // PDF contains a cryptographically-verified NIF/NIE rather than user-supplied data.
+            //
+            // If the header is present but the feature is disabled (validator == null), we
+            // ignore it silently — this allows the frontend to roll out before the backend
+            // flag is enabled without causing errors.
+            if (identityTokenValidator != null) {
+                String rawIdentityToken = httpRequest.getHeaders().get("X-Identity-Token");
+                if (rawIdentityToken != null && !rawIdentityToken.isBlank()) {
+                    try {
+                        VerifiedCitizenIdentity verified = identityTokenValidator.validate(rawIdentityToken);
+                        identity = new ComplainantIdentity(
+                                verified.name(), verified.surname(), verified.nif());
+                    } catch (IdentityTokenValidationException e) {
+                        long latency = System.currentTimeMillis() - start;
+                        AuditLogger.log("/complai/redact", AuditLogger.hashText(text),
+                                OpenRouterErrorCode.UNAUTHORIZED.getCode(), latency,
+                                format != null ? format.name() : null, null);
+                        logger.warning(() -> "POST /complai/redact rejected — httpStatus=401"
+                                + " reason=invalidIdentityToken: " + e.getMessage()
+                                + " conversationId=" + conversationId);
+                        OpenRouterPublicDto err = new OpenRouterPublicDto(false, null,
+                                "Identity token is invalid. Please re-authenticate.",
+                                OpenRouterErrorCode.UNAUTHORIZED.getCode());
+                        return HttpResponse.unauthorized().body(err)
+                                .contentType(MediaType.APPLICATION_JSON);
+                    }
+                }
             }
 
             boolean identityComplete = identity != null && identity.isComplete();
