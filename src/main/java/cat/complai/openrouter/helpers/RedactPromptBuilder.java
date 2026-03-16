@@ -13,7 +13,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
-import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -150,10 +149,10 @@ public class RedactPromptBuilder {
 
 Les teves respostes es mostraran en una aplicació web. OBLIGATORI: usa EXCLUSIVAMENT format HTML. Mai Markdown.
 FORMAT PROHIBIT (no usar mai): **negreta**, __subratllat__, - llista amb guió, * llista amb asterisc, [text](URL).
-FORMAT OBLIGATORI: <strong>negreta</strong>, <ul><li>element de llista</li></ul>, <a href="URL">text</a>, <p>paràgraf</p>.
+FORMAT OBLIGATORI: <strong>negreta</strong>, <ul><li>element de llista</li></ul>, <a href="URL" target="_blank" rel="noopener noreferrer">text</a>, <p>paràgraf</p>.
 URLS: NO inventes mai cap URL. Únicament pots usar URLs que apareguin explícitament al context proporcionat. Si un tràmit no té URL al context, cita'l pel nom sense cap enllaç.
 - Dóna respostes detallades i completes. No tallies la informació si és rellevant per a l'usuari.
-- Quan hi hagi tràmits o procediments municipals relacionats amb la consulta, cita'ls pel nom i, si el context en proporciona un URL, inclou l'enllaç directe. Per exemple: <a href="https://tramits.pratespais.com/Ciutadania/Empadronament">Empadronament</a>.
+        - Quan hi hagi tràmits o procediments municipals relacionats amb la consulta, cita'ls pel nom i, si el context en proporciona un URL, inclou l'enllaç directe. Per exemple: <a href="https://tramits.pratespais.com/Ciutadania/Empadronament" target="_blank" rel="noopener noreferrer">Empadronament</a>.
 - Estructura la resposta de manera clara: primer l'explicació, després els passos o requisits si escau, i finalment els enllaços útils.
 - Sigues respectuós i proper, com un veí que vol ajudar de debò.
 - Si la consulta no és sobre %s, digues-ho educadament i suggereix que facin una pregunta sobre assumptes locals.
@@ -165,10 +164,10 @@ En español: Eres un asistente que se llama Gall Potablava, amable y cercano par
 
 Las respuestas se mostrarán en una aplicación web. OBLIGATORIO: usa EXCLUSIVAMENTE formato HTML. Nunca Markdown.
 FORMATO PROHIBIDO (no usar nunca): **negrita**, __subrayado__, - lista con guión, * lista con asterisco, [texto](URL).
-FORMATO OBLIGATORIO: <strong>negrita</strong>, <ul><li>elemento de lista</li></ul>, <a href="URL">texto</a>, <p>párrafo</p>.
+FORMATO OBLIGATORIO: <strong>negrita</strong>, <ul><li>elemento de lista</li></ul>, <a href="URL" target="_blank" rel="noopener noreferrer">texto</a>, <p>párrafo</p>.
 URLS: NUNCA inventes una URL. Solo puedes usar URLs que aparezcan explícitamente en el contexto proporcionado. Si un trámite no tiene URL en el contexto, cítalo por su nombre sin ningún enlace.
 - Da respuestas detalladas y completas. No cortes la información si es relevante para el usuario.
-- Cuando haya trámites o procedimientos municipales relacionados con la consulta, cítalos por su nombre e incluye el enlace directo solo si el contexto lo proporciona.
+        - Cuando haya trámites o procedimientos municipales relacionados con la consulta, cítalos por su nombre e incluye el enlace directo solo si el contexto lo proporciona. Por ejemplo: <a href="https://tramits.pratespais.com/Ciutadania/Empadronament" target="_blank" rel="noopener noreferrer">Empadronament</a>.
 - Estructura la respuesta con claridad: primero la explicación, luego los pasos o requisitos si procede, y finalmente los enlaces útiles.
 - Sé respetuoso y cercano.
 - Si la consulta no trata sobre %s, dilo educadamente y sugiere que pregunten sobre asuntos locales.
@@ -180,7 +179,7 @@ In English (support): You are a friendly local assistant named Gall Potablava fo
 
 Responses will be displayed in a web app. IMPORTANT: use ONLY HTML formatting. Never Markdown.
 FORBIDDEN (never use): **bold**, __underline__, - bullet with dash, * bullet with asterisk, [text](URL).
-REQUIRED: <strong>bold</strong>, <ul><li>list item</li></ul>, <a href="URL">link text</a>, <p>paragraph</p>.
+REQUIRED: <strong>bold</strong>, <ul><li>list item</li></ul>, <a href="URL" target="_blank" rel="noopener noreferrer">link text</a>, <p>paragraph</p>.
 URLS: NEVER invent a URL. Only use URLs that appear explicitly in the provided context. If a procedure has no URL in the context, mention its name only — do not add any link.
 - Give detailed, complete answers. Do not truncate information that is relevant to the user.
 - When there are municipal procedures or forms related to the query, name them and include the direct link only if the context provides one.
@@ -219,9 +218,10 @@ Independent local news source: %s
         for (ProcedureRagHelper.Procedure p : matches) {
             sb.append("---\n");
             sb.append("**").append(p.title).append("**\n");
-            // Correct Markdown link syntax — no space between ] and (
+            // Prefer HTML anchor tags in the RAG context and ensure they open in a new tab
             if (p.url != null && !p.url.isBlank()) {
-                sb.append("[Més informació / Más información / More information](").append(p.url).append(")\n\n");
+                sb.append("<a href=\"").append(p.url)
+                        .append("\" target=\"_blank\" rel=\"noopener noreferrer\">Més informació / Más información / More information</a>\n\n");
             }
             if (!p.description.isBlank()) sb.append(p.description).append("\n\n");
             if (!p.requirements.isBlank()) {
@@ -245,7 +245,7 @@ Independent local news source: %s
         sb.append("""
                 INSTRUCTIONS FOR USING THE ABOVE CONTEXT:
                 - Answer the user's question using the procedure information provided above.
-                - For each procedure, include its link as an HTML anchor tag <a href="...">...</a> ONLY if a URL is explicitly listed for it above. If no URL is listed, mention the procedure name as plain text — never add a link.
+                - For each procedure, include its link as an HTML anchor tag <a href="..." target="_blank" rel="noopener noreferrer">...</a> ONLY if a URL is explicitly listed for it above. If no URL is listed, mention the procedure name as plain text — never add a link.
                 - NEVER construct, guess, or invent any URL. A fabricated link is worse than no link.
                 - Present requirements and steps as HTML lists using <ul> and <li> tags.
                 - If the context does not cover the question, answer based on your general knowledge about \
@@ -366,11 +366,14 @@ Independent local news source: %s
     // -------------------------------------------------------------------------
 
     private static String formatSources(List<String> sources, String sep, String lastSep) {
-        if (sources.isEmpty()) return "";
-        if (sources.size() == 1) return sources.getFirst();
-        StringJoiner joiner = new StringJoiner(sep);
-        for (int i = 0; i < sources.size() - 1; i++) joiner.add(sources.get(i));
-        return joiner + lastSep + sources.getLast();
+        if (sources == null || sources.isEmpty()) return "";
+        if (sources.size() == 1) return sources.get(0);
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < sources.size(); i++) {
+            if (i > 0) sb.append(i == sources.size() - 1 ? lastSep : sep);
+            sb.append(sources.get(i));
+        }
+        return sb.toString();
     }
 }
 
