@@ -152,14 +152,10 @@ export class LambdaStack extends cdk.Stack {
         REDACT_QUEUE_URL: redactQueue.queueUrl,
         COMPLAINTS_BUCKET: complaintsBucket.bucketName,
         COMPLAINTS_REGION: this.region,
-        // OIDC identity verification (Option C). Disabled by default — set
-        // IDENTITY_VERIFICATION_ENABLED=true and the three OIDC_* vars to enable.
-        // The worker Lambda does not receive these — it never handles HTTP requests.
+        // OIDC identity verification. Per-city config (issuer, JWKS URI, audience, NIF claim)
+        // is bundled in oidc-mapping.json — no OIDC_* env vars needed.
+        // The worker Lambda does not receive this — it never handles HTTP requests.
         IDENTITY_VERIFICATION_ENABLED: process.env.IDENTITY_VERIFICATION_ENABLED || 'false',
-        OIDC_ISSUER_URL: process.env.OIDC_ISSUER_URL || '',
-        OIDC_JWKS_URI: process.env.OIDC_JWKS_URI || '',
-        OIDC_AUDIENCE: process.env.OIDC_AUDIENCE || '',
-        OIDC_NIF_CLAIM: process.env.OIDC_NIF_CLAIM || 'sub',
       },
       role: lambdaRole,
       logGroup: logGroup,

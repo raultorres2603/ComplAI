@@ -28,23 +28,8 @@ Parameters:
       - "true"
       - "false"
     Description: Set to "true" to enable OIDC identity token validation on POST /complai/redact.
-  OidcIssuerUrl:
-    Type: String
-    Default: ""
-    Description: Expected "iss" claim in the OIDC ID token (e.g. https://identitats.aoc.cat). Required when IdentityVerificationEnabled=true.
-  OidcJwksUri:
-    Type: String
-    Default: ""
-    Description: JWKS endpoint for OIDC token signature validation. Required when IdentityVerificationEnabled=true.
-  OidcAudience:
-    Type: String
-    Default: ""
-    Description: Expected "aud" claim — the VALId/IdP client ID registered for this application. Required when IdentityVerificationEnabled=true.
-  OidcNifClaim:
-    Type: String
-    Default: "sub"
-    Description: JWT claim name that contains the citizen NIF/NIE. Defaults to "sub" (VALId convention).
-
+      Per-city OIDC configuration (issuer, JWKS URI, audience, NIF claim) is loaded at
+      startup from oidc-mapping.json bundled in the JAR. No additional OIDC_* env vars needed.
 Conditions:
   IsProduction: !Equals [!Ref Environment, production]
 
@@ -206,12 +191,9 @@ Resources:
           REDACT_QUEUE_URL: !Ref RedactQueue
           COMPLAINTS_BUCKET: !Ref ComplaintsBucket
           COMPLAINTS_REGION: !Ref LambdaRegion
-          # OIDC identity verification — disabled by default, safe to ignore locally unless testing Option C.
+          # OIDC identity verification — per-city config is bundled in oidc-mapping.json.
+          # No OIDC_* env vars needed. Set IDENTITY_VERIFICATION_ENABLED=true to activate.
           IDENTITY_VERIFICATION_ENABLED: !Ref IdentityVerificationEnabled
-          OIDC_ISSUER_URL: !Ref OidcIssuerUrl
-          OIDC_JWKS_URI: !Ref OidcJwksUri
-          OIDC_AUDIENCE: !Ref OidcAudience
-          OIDC_NIF_CLAIM: !Ref OidcNifClaim
       Events:
         ProxyRoot:
           Type: HttpApi

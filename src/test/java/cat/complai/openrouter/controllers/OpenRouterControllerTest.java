@@ -299,10 +299,10 @@ public class OpenRouterControllerTest {
 
     /** Validator stub that always returns the supplied verified identity. */
     static OidcIdentityTokenValidator validatorThatReturns(VerifiedCitizenIdentity identity) {
-        // Use the package-visible test constructor — no DI, no JWKS fetch.
-        return new OidcIdentityTokenValidator(null, "sub") {
+        // Use the protected test constructor — no DI, no JWKS fetch.
+        return new OidcIdentityTokenValidator("test", null, "sub") {
             @Override
-            public VerifiedCitizenIdentity validate(String token) {
+            public VerifiedCitizenIdentity validate(String token, String cityId) {
                 return identity;
             }
         };
@@ -310,9 +310,9 @@ public class OpenRouterControllerTest {
 
     /** Validator stub that always throws the supplied exception. */
     static OidcIdentityTokenValidator validatorThatThrows(String reason) {
-        return new OidcIdentityTokenValidator(null, "sub") {
+        return new OidcIdentityTokenValidator("test", null, "sub") {
             @Override
-            public VerifiedCitizenIdentity validate(String token) {
+            public VerifiedCitizenIdentity validate(String token, String cityId) {
                 throw new IdentityTokenValidationException(reason);
             }
         };

@@ -129,7 +129,7 @@ public class OpenRouterController {
                 String rawIdentityToken = httpRequest.getHeaders().get("X-Identity-Token");
                 if (rawIdentityToken != null && !rawIdentityToken.isBlank()) {
                     try {
-                        VerifiedCitizenIdentity verified = identityTokenValidator.validate(rawIdentityToken);
+                        VerifiedCitizenIdentity verified = identityTokenValidator.validate(rawIdentityToken, cityId);
                         identity = new ComplainantIdentity(
                                 verified.name(), verified.surname(), verified.nif());
                     } catch (IdentityTokenValidationException e) {
