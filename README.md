@@ -147,7 +147,7 @@ ComplAI follows a strict **layered architecture** with clear boundaries at every
 │  │ Controller layer  (OpenRouterController, HomeController)   │  │
 │  │  • HTTP boundary: deserialise request, validate format     │  │
 │  │  • Maps typed error codes → HTTP status codes              │  │
-│  │  • Returns JSON or PDF binary                              │  │
+│  │  • Returns JSON (PDFs are async only)                              │  │
 │  └───────────────────────────┬────────────────────────────────┘  │
 │                              │ calls                              │
 │  ┌───────────────────────────▼────────────────────────────────┐  │
