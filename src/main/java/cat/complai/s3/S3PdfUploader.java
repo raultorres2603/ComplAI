@@ -1,6 +1,7 @@
 package cat.complai.s3;
 
 import io.micronaut.context.annotation.Value;
+import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
 import jakarta.inject.Inject;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -104,6 +105,30 @@ public class S3PdfUploader {
             logger.log(Level.SEVERE, "S3 upload failed — bucket=" + bucketName + " key=" + key
                     + " sizeBytes=" + pdfBytes.length + " error=" + e.getMessage(), e);
             throw new RuntimeException("S3 upload failed for key '" + key + "': " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Closes the S3Client and S3Presigner when the bean is destroyed.
+     * Prevents resource leaks in warm Lambda invocations.
+     */
+    @PreDestroy
+    public void close() {
+        try {
+            if (s3Client != null) {
+                s3Client.close();
+                logger.info("S3Client closed");
+            }
+        } catch (Exception e) {
+            logger.log(Level.WARNING, "Failed to close S3Client", e);
+        }
+        try {
+            if (s3Presigner != null) {
+                s3Presigner.close();
+                logger.info("S3Presigner closed");
+            }
+        } catch (Exception e) {
+            logger.log(Level.WARNING, "Failed to close S3Presigner", e);
         }
     }
 }

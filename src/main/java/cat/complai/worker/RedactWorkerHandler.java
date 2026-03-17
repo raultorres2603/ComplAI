@@ -54,6 +54,13 @@ public class RedactWorkerHandler extends MicronautRequestHandler<SQSEvent, SQSBa
 
         List<SQSBatchResponse.BatchItemFailure> failures = new ArrayList<>();
 
+        if (event.getRecords() == null || event.getRecords().isEmpty()) {
+            logger.info("RedactWorkerHandler — empty or null batch, returning empty response");
+            return SQSBatchResponse.builder()
+                    .withBatchItemFailures(failures)
+                    .build();
+        }
+
         for (SQSEvent.SQSMessage record : event.getRecords()) {
             String messageId = record.getMessageId();
             try {

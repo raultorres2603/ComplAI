@@ -94,7 +94,7 @@ public class OpenRouterController {
     }
 
     @Post("/redact")
-    @Produces({MediaType.APPLICATION_PDF, MediaType.APPLICATION_JSON})
+    @Produces({MediaType.APPLICATION_JSON})
     public HttpResponse<?> redact(@Body RedactRequest request, HttpRequest<?> httpRequest) {
         String cityId = httpRequest.getAttribute(JwtAuthFilter.CITY_ATTRIBUTE, String.class)
                 .orElseThrow(() -> new IllegalStateException("city attribute missing from request — JWT filter should have set it"));
