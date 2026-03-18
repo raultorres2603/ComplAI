@@ -179,6 +179,20 @@ public class OpenRouterServicesTest {
     }
 
     @Test
+    void ask_greeting_noSourcesIncluded() {
+        ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder(), wrapper.ragRegistry);
+        wrapper.overrideFakeProcedures(List.of()); // No procedure matches for greeting
+        wrapper.overrideNextResponse("Hello! How can I help you today?");
+
+        OpenRouterResponseDto out = svc.ask("Hello", null, "testcity");
+        assertTrue(out.isSuccess());
+        assertEquals("Hello! How can I help you today?", out.getMessage());
+        assertNotNull(out.getSources());
+        assertTrue(out.getSources().isEmpty(), "Greetings should not include sources");
+    }
+
+    @Test
     void ask_wrapperError_surfacesError() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
         OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder(), wrapper.ragRegistry);

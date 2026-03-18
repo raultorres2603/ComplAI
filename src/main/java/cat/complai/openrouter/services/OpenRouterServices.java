@@ -140,8 +140,8 @@ public class OpenRouterServices implements IOpenRouterService {
                 + " conversationId=" + conversationId);
         OpenRouterResponseDto response = callOpenRouterAndExtract(messages, cityId);
 
-        // Attach sources from procedure context (de-duped, ordered by relevance)
-        if (response.isSuccess()) {
+        // Attach sources from procedure context only when there are actual sources (de-duped, ordered by relevance)
+        if (response.isSuccess() && !procCtx.getSources().isEmpty()) {
             response = new OpenRouterResponseDto(
                     response.isSuccess(),
                     response.getMessage(),
