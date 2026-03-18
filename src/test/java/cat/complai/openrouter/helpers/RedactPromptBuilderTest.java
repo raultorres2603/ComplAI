@@ -111,6 +111,14 @@ class RedactPromptBuilderTest {
     }
 
     @Test
+    void getSystemMessage_containsNoHardcodedExampleUrls() {
+        String msg = builder.getSystemMessage("elprat");
+        // The system message should not contain hardcoded example URLs that don't exist in procedures
+        assertFalse(msg.contains("https://tramits.pratespais.com/Ciutadania/Empadronament"), 
+                  "System message must not contain hardcoded Empadronament URL example");
+    }
+
+    @Test
     void buildProcedureContextBlock_returnsNullWhenQueryProducesNoResults() {
         // A nonsense query should produce no RAG matches and return null.
         // Either null (no results) or a non-empty string (if fuzzy matched) — both are valid.
