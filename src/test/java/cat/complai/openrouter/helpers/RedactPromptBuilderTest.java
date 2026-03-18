@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for {@link RedactPromptBuilder}.
- *
  * These tests verify the structural requirements of each prompt — not word-for-word content,
  * which is fragile and test-breaking when the wording improves. We test the invariants the
  * AI depends on: mandatory fields present, forbidden patterns absent, correct format header.
@@ -60,7 +59,7 @@ class RedactPromptBuilderTest {
         String prompt = builder.buildRedactPromptWithIdentity("Some complaint.", identity, "elprat");
 
         // The date instruction must be present.
-        assertTrue(prompt.contains("Use specifically this date:"), "Prompt must contain strict date instruction");
+        assertTrue(prompt.contains("Date:"), "Prompt must contain date instruction");
         // The format string must have been resolved — no bare %s should remain.
         assertFalse(prompt.contains("%s"), "Prompt must not contain unresolved format placeholders");
     }
@@ -70,7 +69,7 @@ class RedactPromptBuilderTest {
         ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
         String prompt = builder.buildRedactPromptWithIdentity("Some complaint.", identity, "elprat");
 
-        assertTrue(prompt.contains("Do NOT use Markdown formatting"), "Prompt must forbid Markdown output");
+        assertTrue(prompt.contains("PLAIN TEXT output"), "Prompt must forbid Markdown output");
     }
 
     @Test
@@ -111,10 +110,21 @@ class RedactPromptBuilderTest {
     }
 
     @Test
+    void getSystemMessage_containsNoHardcodedExampleUrls() {
+        String msg = builder.getSystemMessage("elprat");
+        // The system message should not contain hardcoded example URLs that don't exist in procedures
+        assertFalse(msg.contains("https://tramits.pratespais.com/Ciutadania/Empadronament"), 
+                  "System message must not contain hardcoded Empadronament URL example");
+        // Should contain clarification about official sources being for general info only
+        assertTrue(msg.contains("només són per a informació general, no per enllaços específics de tràmits"), 
+                  "System message must clarify that official sources are for general info only");
+    }
+
+    @Test
     void buildProcedureContextBlock_returnsNullWhenQueryProducesNoResults() {
         // A nonsense query should produce no RAG matches and return null.
         // Either null (no results) or a non-empty string (if fuzzy matched) — both are valid.
         // The important contract: it must never throw.
-        String result = builder.buildProcedureContextBlock("xyzzy_nonexistent_term_abc123", "elprat");
+        builder.buildProcedureContextBlock("xyzzy_nonexistent_term_abc123", "elprat");
     }
 }

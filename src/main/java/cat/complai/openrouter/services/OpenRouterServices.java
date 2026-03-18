@@ -1,11 +1,14 @@
 package cat.complai.openrouter.services;
 
+import cat.complai.openrouter.helpers.ProcedureRagHelper;
 import cat.complai.openrouter.interfaces.IOpenRouterService;
 import cat.complai.openrouter.dto.OpenRouterResponseDto;
 import cat.complai.openrouter.dto.OpenRouterErrorCode;
+import cat.complai.openrouter.dto.Source;
 import cat.complai.http.HttpWrapper;
 import cat.complai.http.dto.HttpDto;
 import cat.complai.openrouter.helpers.RedactPromptBuilder;
+import cat.complai.openrouter.helpers.ProcedureRagHelperRegistry;
 import jakarta.inject.Singleton;
 import jakarta.inject.Inject;
 import com.github.benmanes.caffeine.cache.Cache;
@@ -24,6 +27,7 @@ import java.util.*;
 import cat.complai.openrouter.dto.ComplainantIdentity;
 import cat.complai.openrouter.dto.OutputFormat;
 import cat.complai.openrouter.helpers.AiParsed;
+import java.util.LinkedHashSet;
 
 @Singleton
 public class OpenRouterServices implements IOpenRouterService {
@@ -38,6 +42,23 @@ public class OpenRouterServices implements IOpenRouterService {
     private final Cache<String, String> pendingComplaintCache;
     private final int maxInputLength;
     private final int overallTimeoutSeconds;
+    private final ProcedureRagHelperRegistry ragRegistry;
+
+    /**
+     * Result type for procedure context extraction: context block string and the list of source URLs.
+     */
+    public static class ProcedureContextResult {
+        private final String contextBlock;
+        private final List<Source> sources;
+
+        public ProcedureContextResult(String contextBlock, List<Source> sources) {
+            this.contextBlock = contextBlock;
+            this.sources = sources == null ? List.of() : Collections.unmodifiableList(new ArrayList<>(sources));
+        }
+
+        public String getContextBlock() { return contextBlock; }
+        public List<Source> getSources() { return sources; }
+    }
 
     public record MessageEntry(String role, String content) {}
 
@@ -45,9 +66,11 @@ public class OpenRouterServices implements IOpenRouterService {
     public OpenRouterServices(HttpWrapper httpWrapper,
                               @Value("${complai.input.max-length-chars:5000}") int maxInputLength,
                               @Value("${OPENROUTER_OVERALL_TIMEOUT_SECONDS:60}") int overallTimeoutSeconds,
-                              RedactPromptBuilder promptBuilder) {
+                              RedactPromptBuilder promptBuilder,
+                              ProcedureRagHelperRegistry ragRegistry) {
         this.httpWrapper    = Objects.requireNonNull(httpWrapper, "httpWrapper");
         this.promptBuilder  = Objects.requireNonNull(promptBuilder, "promptBuilder");
+        this.ragRegistry   = Objects.requireNonNull(ragRegistry, "ragRegistry");
         this.conversationCache = Caffeine.newBuilder()
                 .expireAfterWrite(30, TimeUnit.MINUTES)
                 .maximumSize(10000)
@@ -98,9 +121,15 @@ public class OpenRouterServices implements IOpenRouterService {
 
         List<Map<String, Object>> messages = new ArrayList<>();
         messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage(cityId)));
-        String contextBlock = promptBuilder.buildProcedureContextBlock(question, cityId);
-        if (contextBlock != null) {
-            messages.add(Map.of("role", "system", "content", contextBlock));
+        
+        // Only do expensive RAG search if question likely needs procedure information
+        // This avoids unnecessary index lookups for conversational queries
+        ProcedureContextResult procCtx = null;
+        if (questionNeedsProcedureContext(question, cityId)) {
+            procCtx = buildProcedureContextResult(question, cityId);
+            if (procCtx.getContextBlock() != null) {
+                messages.add(Map.of("role", "system", "content", procCtx.getContextBlock()));
+            }
         }
         if (conversationId != null && !conversationId.isBlank()) {
             List<MessageEntry> history = conversationCache.getIfPresent(conversationId);
@@ -115,6 +144,19 @@ public class OpenRouterServices implements IOpenRouterService {
         logger.fine(() -> "ask() messages prepared — messageCount=" + messages.size()
                 + " conversationId=" + conversationId);
         OpenRouterResponseDto response = callOpenRouterAndExtract(messages, cityId);
+
+        // Attach sources from procedure context only when there are actual sources (de-duped, ordered by relevance)
+        if (response.isSuccess() && procCtx != null && !procCtx.getSources().isEmpty()) {
+            response = new OpenRouterResponseDto(
+                    response.isSuccess(),
+                    response.getMessage(),
+                    response.getError(),
+                    response.getStatusCode(),
+                    response.getErrorCode(),
+                    response.getPdfData(),
+                    deDuplicateAndOrderSources(procCtx.getSources())
+            );
+        }
 
         if (conversationId != null && !conversationId.isBlank() && response.getMessage() != null) {
             updateConversationHistory(conversationId, question, response.getMessage());
@@ -138,9 +180,16 @@ public class OpenRouterServices implements IOpenRouterService {
 
         List<Map<String, Object>> messages = new ArrayList<>();
         messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage(cityId)));
-        String contextBlock = promptBuilder.buildProcedureContextBlock(complaint, cityId);
-        if (contextBlock != null) {
-            messages.add(Map.of("role", "system", "content", contextBlock));
+        
+        // Only add procedure context if we have complete identity (ready to draft)
+        // Skip RAG search during identity collection to improve latency
+        String contextBlock;
+        boolean hasCompleteIdentity = identity != null && identity.isComplete();
+        if (hasCompleteIdentity) {
+            contextBlock = promptBuilder.buildProcedureContextBlock(complaint, cityId);
+            if (contextBlock != null) {
+                messages.add(Map.of("role", "system", "content", contextBlock));
+            }
         }
         if (conversationId != null && !conversationId.isBlank()) {
             List<MessageEntry> history = conversationCache.getIfPresent(conversationId);
@@ -155,7 +204,7 @@ public class OpenRouterServices implements IOpenRouterService {
         // When identity is incomplete, the AI is instructed to ask for the missing fields first.
         // The caller is expected to collect the AI's question, present it to the user, and
         // re-submit with the full identity in a subsequent request.
-        final String userPrompt;
+        String userPrompt = "";
         final boolean identityComplete = identity != null && identity.isComplete();
         if (identityComplete) {
             // On the second turn the user's message contains the identity data they typed (e.g.
@@ -174,10 +223,14 @@ public class OpenRouterServices implements IOpenRouterService {
             String complaintForPrompt = (originalComplaint != null)
                     ? originalComplaint + "\n\n" + complaint
                     : complaint;
-            userPrompt = promptBuilder.buildRedactPromptWithIdentity(complaintForPrompt, identity, cityId);
+            if (complaintForPrompt != null) {
+                userPrompt = promptBuilder.buildRedactPromptWithIdentity(complaintForPrompt, identity, cityId);
+            }
         } else {
             if (conversationId != null && !conversationId.isBlank()) {
-                pendingComplaintCache.put(conversationId, complaint);
+                if (complaint != null) {
+                    pendingComplaintCache.put(conversationId, complaint);
+                }
                 logger.fine(() -> "redactComplaint() saved complaint for identity follow-up — conversationId=" + conversationId);
             }
             userPrompt = promptBuilder.buildRedactPromptRequestingIdentity(complaint, identity, cityId);
@@ -226,14 +279,13 @@ public class OpenRouterServices implements IOpenRouterService {
      * Detects whether the user's message explicitly asks for the complaint to be anonymous.
      * The Ajuntament does not accept anonymous complaints, so we reject these early and clearly
      * rather than letting the AI draft an unusable letter.
-     *
      * The check is intentionally conservative: we only match phrases where the user clearly states
      * they want anonymity, not every mention of the word "anonymous".
      */
     private boolean requestsAnonymity(String text) {
         if (text == null) return false;
         String lower = text.toLowerCase(Locale.ROOT)
-                .replace("\u2018", "'").replace("\u2019", "'")
+                .replace("‘", "'").replace("’", "'")
                 .replaceAll("[.,;:!?()\\[\\]{}-]", " ")
                 .replaceAll("\\s+", " ")
                 .trim();
@@ -275,8 +327,8 @@ public class OpenRouterServices implements IOpenRouterService {
         if (aiMessage == null) return false;
         // Normalize typographic quotes/apostrophes for reliable matching.
         String normalized = aiMessage
-                .replace('\u2018', '\'').replace('\u2019', '\'')
-                .replace('\u201c', '"').replace('\u201d', '"');
+                .replace('‘', '\'').replace('’', '\'')
+                .replace('“', '"').replace('”', '"');
         String lower = normalized.toLowerCase(Locale.ROOT).trim();
         String lowerNoPunct = lower.replaceAll("[.,;:!?()\\[\\]{}-]", " ").replaceAll("\\s+", " ").trim();
 
@@ -383,6 +435,84 @@ public class OpenRouterServices implements IOpenRouterService {
             history = history.subList(history.size() - MAX_HISTORY_TURNS * 2, history.size());
         }
         conversationCache.put(conversationId, history);
+    }
+
+    /**
+     * Determines if a question likely needs procedure/municipal information.
+     * This avoids expensive RAG searches for conversational queries.
+     * Checks against actual procedure titles for more accurate detection.
+     */
+    private boolean questionNeedsProcedureContext(String question, String cityId) {
+        if (question == null || question.isBlank()) return false;
+        
+        String lower = question.toLowerCase();
+        
+        // First, check against actual procedure titles for this city (most accurate)
+        try {
+            ProcedureRagHelper helper = ragRegistry.getForCity(cityId);
+            List<ProcedureRagHelper.Procedure> procedures = helper.getAllProcedures();
+            for (ProcedureRagHelper.Procedure proc : procedures) {
+                if (lower.contains(proc.title.toLowerCase())) {
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            // Fallback to keyword detection if procedure loading fails
+            logger.fine(() -> "Failed to load procedures for title checking: " + e.getMessage());
+        }
+        
+        // Keywords that indicate user wants procedural/municipal information
+        String[] proceduralKeywords = {
+            "how to", "how do i", "what is the process", "procedure", "tramit", "tràmit",
+            "requirement", "requirements", "document", "documents", "apply", "application",
+            "form", "forms", "permit", "license", "request", "complaint", "claim",
+            "where can i", "how can i", "steps", "step by step", "process",
+            "recycling", "waste", "garbage", "trash", "center", "collection"
+        };
+        
+        for (String keyword : proceduralKeywords) {
+            if (lower.contains(keyword)) {
+                return true;
+            }
+        }
+        
+        // Questions about specific municipal services
+        return lower.contains("ajuntament") || lower.contains("city hall") ||
+                lower.contains("municipal") || lower.contains("council");
+    }
+
+    private ProcedureContextResult buildProcedureContextResult(String query, String cityId) {
+        try {
+            ProcedureRagHelper helper = ragRegistry.getForCity(cityId);
+            List<ProcedureRagHelper.Procedure> matches = helper.search(query);
+            if (matches.isEmpty()) {
+                return new ProcedureContextResult(null, List.of());
+            }
+            List<Source> sources = matches.stream()
+                    .map(p -> new Source(p.url, p.title))
+                    .filter(source -> source.getUrl() != null && !source.getUrl().isBlank())
+                    .toList();
+            String contextBlock = promptBuilder.buildProcedureContextBlockFromMatches(matches, cityId);
+            return new ProcedureContextResult(contextBlock, sources);
+        } catch (Exception e) {
+            logger.log(Level.WARNING, "Failed to build procedure context result for city=" + cityId
+                    + "; returning empty context: " + e.getMessage(), e);
+            return new ProcedureContextResult(null, List.of());
+        }
+    }
+
+    /**
+     * De-duplicates sources by URL and preserves order: first occurrence wins, stable ordering.
+     */
+    private List<Source> deDuplicateAndOrderSources(List<Source> sources) {
+        LinkedHashSet<String> seenUrls = new LinkedHashSet<>();
+        List<Source> deduped = new ArrayList<>();
+        for (Source source : sources) {
+            if (seenUrls.add(source.getUrl())) {
+                deduped.add(source);
+            }
+        }
+        return List.copyOf(deduped);
     }
 }
 

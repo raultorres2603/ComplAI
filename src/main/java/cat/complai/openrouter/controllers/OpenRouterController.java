@@ -31,6 +31,7 @@ import io.micronaut.http.annotation.Produces;
 import jakarta.inject.Inject;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.logging.Level;
@@ -88,7 +89,7 @@ public class OpenRouterController {
                     OpenRouterErrorCode.INTERNAL.getCode(), latency, null, null);
             logger.log(Level.SEVERE, "POST /complai/ask failed — httpStatus=500"
                     + " latencyMs=" + latency + " conversationId=" + conversationId, e);
-            OpenRouterPublicDto err = new OpenRouterPublicDto(false, null, e.getMessage(), OpenRouterErrorCode.INTERNAL.getCode());
+            OpenRouterPublicDto err = new OpenRouterPublicDto(false, null, e.getMessage(), OpenRouterErrorCode.INTERNAL.getCode(), List.of());
             return HttpResponse.serverError(err);
         }
     }
@@ -117,7 +118,7 @@ public class OpenRouterController {
                         + " format=" + format + " latencyMs=" + latency + " conversationId=" + conversationId);
                 OpenRouterPublicDto err = new OpenRouterPublicDto(false, null,
                         "Unsupported format. Only 'pdf', 'json', or 'auto' are accepted. Documents are always produced as PDF.",
-                        OpenRouterErrorCode.VALIDATION.getCode());
+                        OpenRouterErrorCode.VALIDATION.getCode(), List.of());
                 return HttpResponse.badRequest(err).contentType(MediaType.APPLICATION_JSON);
             }
 
@@ -145,7 +146,7 @@ public class OpenRouterController {
                                 + " conversationId=" + conversationId);
                         OpenRouterPublicDto err = new OpenRouterPublicDto(false, null,
                                 "Identity token is invalid. Please re-authenticate.",
-                                OpenRouterErrorCode.UNAUTHORIZED.getCode());
+                                OpenRouterErrorCode.UNAUTHORIZED.getCode(), List.of());
                         return HttpResponse.unauthorized().body(err)
                                 .contentType(MediaType.APPLICATION_JSON);
                     }
@@ -180,7 +181,7 @@ public class OpenRouterController {
                     request != null && request.getFormat() != null ? request.getFormat().name() : null, null);
             logger.log(Level.SEVERE, "POST /complai/redact failed — httpStatus=500"
                     + " latencyMs=" + latency + " conversationId=" + conversationId, e);
-            OpenRouterPublicDto err = new OpenRouterPublicDto(false, null, e.getMessage(), OpenRouterErrorCode.INTERNAL.getCode());
+            OpenRouterPublicDto err = new OpenRouterPublicDto(false, null, e.getMessage(), OpenRouterErrorCode.INTERNAL.getCode(), List.of());
             return HttpResponse.serverError(err).contentType(MediaType.APPLICATION_JSON);
         }
     }
@@ -214,7 +215,7 @@ public class OpenRouterController {
             logger.log(Level.SEVERE, "POST /complai/redact — httpStatus=500 reason=presignedUrlFailed"
                     + " s3Key=" + s3Key + " conversationId=" + conversationId, e);
             OpenRouterPublicDto err = new OpenRouterPublicDto(false, null,
-                    "Failed to prepare complaint storage URL.", OpenRouterErrorCode.INTERNAL.getCode());
+                    "Failed to prepare complaint storage URL.", OpenRouterErrorCode.INTERNAL.getCode(), List.of());
             return HttpResponse.serverError(err).contentType(MediaType.APPLICATION_JSON);
         }
 
@@ -228,7 +229,7 @@ public class OpenRouterController {
                     + " s3Key=" + s3Key + " conversationId=" + conversationId, e);
             OpenRouterPublicDto err = new OpenRouterPublicDto(false, null,
                     "Failed to queue complaint generation. Please try again.",
-                    OpenRouterErrorCode.INTERNAL.getCode());
+                    OpenRouterErrorCode.INTERNAL.getCode(), List.of());
             return HttpResponse.serverError(err).contentType(MediaType.APPLICATION_JSON);
         }
 

@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -54,7 +55,7 @@ public class HttpWrapper {
         this.mapper = new ObjectMapper();
         this.headers = Map.of();
         this.requestTimeoutSeconds = 60; // default fallback
-        this.openRouterModel = "arcee-ai/trinity-large-preview:free";
+        this.openRouterModel = "openrouter/free";
         this.maxRetries = 3;
     }
 
@@ -62,7 +63,7 @@ public class HttpWrapper {
     public HttpWrapper(@Value("${openrouter.url:https://openrouter.ai/api/v1/chat/completions}") String openRouterUrl,
                        @Value("${OPENROUTER_API_KEY:}") String openRouterApiKey,
                        @Value("${OPENROUTER_REQUEST_TIMEOUT_SECONDS:60}") int requestTimeoutSeconds,
-                       @Value("${OPENROUTER_MODEL:google/gemini-2.0-flash-lite-preview-02-05:free}") String openRouterModel,
+                       @Value("${OPENROUTER_MODEL:openrouter/free}") String openRouterModel,
                        @Value("${OPENROUTER_MAX_RETRIES:3}") int maxRetries) {
         this.openRouterUrl = normalizeOpenRouterUrl(openRouterUrl);
         this.httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
@@ -178,10 +179,17 @@ public class HttpWrapper {
 
                     if ((status == 429 || status >= 500) && attemptsLeft > 1) {
                         String reason = status == 429 ? "rate-limited" : "server error";
+                        long baseDelayMs = 250L;
+                        long expDelayMs = baseDelayMs * (1L << Math.min(attemptNumber - 1, 3));
+                        long jitterMs = ThreadLocalRandom.current().nextLong(0, 150);
+                        long delayMs = Math.min(2000L, expDelayMs + jitterMs);
                         logger.warning(() -> "OpenRouter " + reason + " — httpStatus=" + status
                                 + " retrying attempt=" + (attemptNumber + 1) + "/" + maxRetries
+                                + " backoffMs=" + delayMs
                                 + " url=" + openRouterUrl);
-                        return sendWithRetry(request, attemptsLeft - 1);
+                        return CompletableFuture
+                                .runAsync(() -> {}, CompletableFuture.delayedExecutor(delayMs, java.util.concurrent.TimeUnit.MILLISECONDS))
+                                .thenCompose(ignored -> sendWithRetry(request, attemptsLeft - 1));
                     }
 
                     if (status >= 200 && status < 300) {

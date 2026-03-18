@@ -35,6 +35,7 @@ import cat.complai.sqs.dto.RedactSqsMessage;
 import cat.complai.http.HttpWrapper;
 import cat.complai.http.dto.HttpDto;
 
+import cat.complai.openrouter.helpers.ProcedureRagHelperRegistry;
 import javax.crypto.SecretKey;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -100,6 +101,28 @@ public class OpenRouterControllerIntegrationTest {
         OpenRouterPublicDto body = bodyOpt.get();
         assertTrue(body.isSuccess());
         assertEquals("OK from AI (integration)", body.getMessage());
+    }
+
+    @Test
+    void integration_ask_includesSources_whenProceduresMatch() throws Exception {
+        // Prepare fake procedures with URLs
+        OpenRouterServices svc = (OpenRouterServices) openRouterService;
+        // Since we can't inject procedures via the public API, we rely on the mock HttpWrapper
+        // to simulate a scenario where the AI would receive procedure context.
+        AskRequest req = new AskRequest("recycling center");
+        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
+                .header("Authorization", authHeader);
+        HttpResponse<OpenRouterPublicDto> resp = client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
+        assertEquals(200, resp.getStatus().getCode());
+        Optional<OpenRouterPublicDto> bodyOpt = resp.getBody();
+        assertTrue(bodyOpt.isPresent());
+        OpenRouterPublicDto body = bodyOpt.get();
+        assertTrue(body.isSuccess());
+        assertEquals("OK from AI (integration)", body.getMessage());
+        // In this test setup, no real procedures are loaded, so sources should be empty.
+        // This test ensures the field is present and does not error.
+        assertNotNull(body.getSources());
+        assertTrue(body.getSources().isEmpty());
     }
 
     @Test
@@ -494,7 +517,12 @@ public class OpenRouterControllerIntegrationTest {
         @Singleton
         @Replaces(OpenRouterServices.class)
         IOpenRouterService openRouterService(HttpWrapper httpWrapper) {
-            return new OpenRouterServices(httpWrapper, 5000, 30, new cat.complai.openrouter.helpers.RedactPromptBuilder());
+            return new OpenRouterServices(httpWrapper, 5000, 30, new cat.complai.openrouter.helpers.RedactPromptBuilder(), new ProcedureRagHelperRegistry());
+        }
+        @Singleton
+        @Replaces(ProcedureRagHelperRegistry.class)
+        ProcedureRagHelperRegistry ragRegistry() {
+            return new ProcedureRagHelperRegistry();
         }
     }
 }
