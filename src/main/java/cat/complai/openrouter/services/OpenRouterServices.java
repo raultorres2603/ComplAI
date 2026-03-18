@@ -436,7 +436,7 @@ public class OpenRouterServices implements IOpenRouterService {
                     .map(p -> new Source(p.url, p.title))
                     .filter(source -> source.getUrl() != null && !source.getUrl().isBlank())
                     .toList();
-            String contextBlock = promptBuilder.buildProcedureContextBlock(query, cityId);
+            String contextBlock = promptBuilder.buildProcedureContextBlockFromMatches(matches, cityId);
             return new ProcedureContextResult(contextBlock, sources);
         } catch (Exception e) {
             logger.log(Level.WARNING, "Failed to build procedure context result for city=" + cityId

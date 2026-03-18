@@ -210,7 +210,11 @@ Independent local news source: %s
             return null;
         }
         List<ProcedureRagHelper.Procedure> matches = helper.search(query);
-        if (matches.isEmpty()) return null;
+        return buildProcedureContextBlockFromMatches(matches, cityId);
+    }
+
+    public String buildProcedureContextBlockFromMatches(List<ProcedureRagHelper.Procedure> matches, String cityId) {
+        if (matches == null || matches.isEmpty()) return null;
 
         String cityName = resolveCityConfig(cityId).cityName();
         StringBuilder sb = new StringBuilder();
@@ -243,12 +247,12 @@ Independent local news source: %s
         // Explicit instruction: the AI must use the context and include the links.
         // "May be relevant" language was too weak — the AI ignored the links.
         sb.append("""
-                INSTRUCTIONS FOR USING THE ABOVE CONTEXT:
-                - Answer the user's question using the procedure information provided above.
-                - For each procedure, include its link as an HTML anchor tag <a href="..." target="_blank" rel="noopener noreferrer">...</a> ONLY if a URL is explicitly listed for it above. If no URL is listed, mention the procedure name as plain text — never add a link.
-                - NEVER construct, guess, or invent any URL. A fabricated link is worse than no link.
-                - Present requirements and steps as HTML lists using <ul> and <li> tags.
-                - If the context does not cover the question, answer based on your general knowledge about \
+                INSTRUCTIONS:
+                - Use the procedure information above to answer the question.
+                - Include HTML links ONLY if URL is explicitly provided above.
+                - NEVER invent URLs. Use plain text names if no URL exists.
+                - Format requirements/steps as HTML lists (<ul><li>).
+                - If context doesn't cover the question, use general knowledge about \
                 """)
           .append(cityName).append(", but do not invent procedure links.");
         return sb.toString();
@@ -270,43 +274,32 @@ Independent local news source: %s
         String today = LocalDate.now().format(DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", Locale.forLanguageTag("ca")));
         return String.format(
                 """
-                        PRE-CHECK (evaluate first, before anything else):
-                        Determine whether the text below actually describes a complaint, problem, or issue \
-                        the user wants to formally raise with the Ajuntament de %s.
+                        PRE-CHECK: Is this a complaint for Ajuntament de %s?
 
-                        IF the text is NOT a complaint (e.g. it is a question, greeting, general inquiry, \
-                        praise, content about another municipality, or any text that does not describe a \
-                        problem to complain about):
-                           -> Respond politely in the same language the user is using.
-                           -> Explain that this service is exclusively for drafting formal complaint letters \
-                        to the Ajuntament de %s.
-                           -> Invite them to describe the problem or issue they want to complain about.
-                           -> Do NOT output the JSON header. Do NOT write a letter.
+                        IF NOT (question, greeting, other municipality, etc.):
+                        -> Respond politely in user's language.
+                        -> Explain this service is only for formal complaint letters to Ajuntament de %s.
+                        -> Invite them to describe their complaint.
+                        -> NO JSON header, NO letter.
 
-                        IF the text IS a complaint, continue with the instructions below:
+                        IF YES, continue:
 
-                        IMPORTANT: Your response MUST start with a single-line JSON header on line 1.
-                        No text, no markdown, no explanation before it.
-                        The header must be exactly: {"format": "pdf"}
-                        After that JSON header, leave one blank line, then write the letter body.
+                        JSON HEADER (line 1): {"format": "pdf"}
+                        Then blank line, then letter.
 
-                        Task: Write a formal complaint letter addressed to the Ajuntament de %s.
+                        TASK: Write formal complaint letter to Ajuntament de %s.
 
-                        Rules you MUST follow — no exceptions:
-                        1. Use specifically this date: "%s". Do NOT use placeholders like [Data] or [Date].
-                        2. Mandatory complainant data — always include these in the letter header and signature:
-                           - Full name: %s %s
-                           - ID/DNI/NIF: %s
-                        3. Optional complainant data — include ONLY if the user mentioned them in the complaint text below. If they are not mentioned, omit them entirely:
-                           - Address, phone number, email, or any other contact detail.
-                        4. NEVER invent data. NEVER use bracket placeholders like [address], [phone], [your data here], or anything similar. If a field is not provided, leave it out completely.
-                        5. Do NOT ask any follow-up questions. Do NOT add "What do you think?", "Would you like to add anything?", notes, suggestions or tips after the letter. The letter is final as-is.
-                        6. Write a complete, ready-to-submit letter.
-                        7. If the complaint is not about %s, politely say you can't help.
-                        8. Output the letter body as PLAIN TEXT. Do NOT use Markdown formatting (like **, __, #).
+                        RULES:
+                        1. Date: "%s" (no placeholders)
+                        2. Always include: %s %s, ID: %s
+                        3. Optional: address/phone/email ONLY if mentioned
+                        4. NEVER invent data or use placeholders
+                        5. NO follow-up questions or extra comments
+                        6. Complete, ready-to-submit letter
+                        7. If not about %s, politely decline
+                        8. PLAIN TEXT output (no Markdown)
 
-                        Complaint text (may contain optional contact details to include):
-                        %s""",
+                        Complaint: %s""",
                 cityName,   // PRE-CHECK first mention
                 cityName,   // PRE-CHECK second mention
                 cityName,   // Task: addressed to the Ajuntament de ...
@@ -340,45 +333,31 @@ Independent local news source: %s
 
         return String.format(
                 """
-                        The user sent a message to a service that drafts formal complaint letters addressed to the Ajuntament de %s.
+                        Service: Formal complaint letters for Ajuntament de %s.
+                        Status: Missing mandatory identity fields.
 
-                        Current status: Missing mandatory identity fields.
+                        TASK: Determine scenario:
 
-                        YOUR TASK:
-                        First, determine which scenario applies to the user's message:
+                        SCENARIO 0: NOT a complaint about %s (greeting, question, other municipality, etc.)
+                        -> Respond politely in user's language
+                        -> Explain service is only for complaint letters to Ajuntament de %s
+                        -> Invite them to describe their complaint
+                        -> NO JSON header, NO identity request
 
-                        SCENARIO 0: The message is NOT a complaint or issue about %s.
-                           This includes: greetings, general questions, inquiries about services, praise, \
-                        content about other municipalities, or any text that does not describe a problem \
-                        the user wants to formally complain about.
-                           -> ACTION: Respond politely in the same language the user is using.
-                           -> Explain that this service is exclusively for drafting formal complaint letters to the Ajuntament de %s.
-                           -> Invite them to describe the problem or issue they want to complain about.
-                           -> Do NOT output the JSON header. Do NOT ask for identity.
+                        SCENARIO A: IS complaint AND contains all missing fields (e.g. "My name is John Doe, ID 12345")
+                        Missing: %s
+                        -> ACTION: Extract identity and DRAFT LETTER immediately
+                        -> JSON header: {"format": "pdf"}
+                        -> Rules: Date "%s", include name/ID, address/phone ONLY if mentioned, NO placeholders, NO follow-ups
+                        -> Plain text letter body after JSON header
 
-                        SCENARIO A (only if the message IS a complaint): The text DOES contain ALL the missing fields (e.g. they wrote "My name is John Doe, ID 12345").
-                           Missing fields to check:
-                           %s
-                           -> ACTION: Extract the identity and DRAFT THE LETTER immediately.
-                           -> You MUST start with the JSON header on line 1: {"format": "pdf"}
-                           -> Follow these drafting rules:
-                              1. Use date: "%s".
-                              2. Include the extracted Full Name and ID/DNI/NIF in the header and signature.
-                              3. Include address/phone ONLY if mentioned.
-                              4. NO placeholders. NO follow-up questions.
-                              5. COMPLAINT BODY: Write a clear, formal complaint based on the user's text.
-                              6. Output the letter body as PLAIN TEXT after the JSON header.
+                        SCENARIO B: IS complaint BUT missing fields
+                        Missing: %s
+                        -> ACTION: Politely request missing information
+                        -> NO letter draft, NO JSON header
+                        -> Respond in user's language
 
-                        SCENARIO B (only if the message IS a complaint): The text DOES NOT contain all missing fields.
-                           Missing fields to request:
-                           %s
-                           -> ACTION: Ask the user politely for the missing information.
-                           -> Do NOT draft the letter yet.
-                           -> Do NOT output the JSON header.
-                           -> Respond in the same language the user is using.
-
-                        User message:
-                        %s""",
+                        User message: %s""",
                 cityName,
                 cityName,
                 cityName,
