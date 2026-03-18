@@ -6,12 +6,16 @@ import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpServer;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.env.Environment;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.Header;
+import io.micronaut.http.annotation.Post;
+import io.micronaut.http.client.annotation.Client;
+import io.micronaut.runtime.server.EmbeddedServer;
+import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
-import java.net.http.HttpClient;
-import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -40,8 +44,6 @@ public class HttpWrapperTest {
                 "micronaut.application.name", "complai-test"
         );
         try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST).build()) {
-            // register singletons before starting context so DI finds them
-            ctx.registerSingleton(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build());
             ctx.registerSingleton(new ObjectMapper());
             ctx.start();
             HttpWrapper httpWrapper = ctx.getBean(HttpWrapper.class);
@@ -77,7 +79,6 @@ public class HttpWrapperTest {
                 "OPENROUTER_API_KEY", "test-key"
         );
         try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST).build()) {
-            ctx.registerSingleton(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build());
             ctx.registerSingleton(new ObjectMapper());
             ctx.start();
             HttpWrapper wrapper = ctx.getBean(HttpWrapper.class);
@@ -114,7 +115,6 @@ public class HttpWrapperTest {
                 "OPENROUTER_API_KEY", "test-key"
         );
         try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST).build()) {
-            ctx.registerSingleton(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build());
             ctx.registerSingleton(new ObjectMapper());
             ctx.start();
             HttpWrapper wrapper = ctx.getBean(HttpWrapper.class);
@@ -155,7 +155,6 @@ public class HttpWrapperTest {
                 "OPENROUTER_API_KEY", "plain-token"
         );
         try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST).build()) {
-            ctx.registerSingleton(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build());
             ctx.registerSingleton(new ObjectMapper());
             ctx.start();
             HttpWrapper wrapper = ctx.getBean(HttpWrapper.class);
