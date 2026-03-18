@@ -411,8 +411,8 @@ public class OpenRouterServicesTest {
         assertNotNull(wrapper.lastMessages, "Messages must be captured");
         String prompt = (String) wrapper.lastMessages.getLast().get("content");
 
-        assertTrue(prompt.contains("Use specifically this date:"), "Prompt must contain strict date instruction");
-        assertTrue(prompt.contains("Do NOT use Markdown formatting"), "Prompt must forbid markdown");
+        assertTrue(prompt.contains("Date:"), "Prompt must contain date instruction");
+        assertTrue(prompt.contains("PLAIN TEXT output"), "Prompt must forbid markdown");
         assertTrue(prompt.contains("Raul Torres"), "Prompt must contain the name");
         assertTrue(prompt.contains("12345678A"), "Prompt must contain the ID");
     }

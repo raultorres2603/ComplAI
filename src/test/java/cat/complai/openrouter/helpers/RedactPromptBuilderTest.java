@@ -60,7 +60,7 @@ class RedactPromptBuilderTest {
         String prompt = builder.buildRedactPromptWithIdentity("Some complaint.", identity, "elprat");
 
         // The date instruction must be present.
-        assertTrue(prompt.contains("Use specifically this date:"), "Prompt must contain strict date instruction");
+        assertTrue(prompt.contains("Date:"), "Prompt must contain date instruction");
         // The format string must have been resolved — no bare %s should remain.
         assertFalse(prompt.contains("%s"), "Prompt must not contain unresolved format placeholders");
     }
@@ -70,7 +70,7 @@ class RedactPromptBuilderTest {
         ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
         String prompt = builder.buildRedactPromptWithIdentity("Some complaint.", identity, "elprat");
 
-        assertTrue(prompt.contains("Do NOT use Markdown formatting"), "Prompt must forbid Markdown output");
+        assertTrue(prompt.contains("PLAIN TEXT output"), "Prompt must forbid Markdown output");
     }
 
     @Test

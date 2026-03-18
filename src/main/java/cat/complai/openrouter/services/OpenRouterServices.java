@@ -122,9 +122,15 @@ public class OpenRouterServices implements IOpenRouterService {
 
         List<Map<String, Object>> messages = new ArrayList<>();
         messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage(cityId)));
-        ProcedureContextResult procCtx = buildProcedureContextResult(question, cityId);
-        if (procCtx.getContextBlock() != null) {
-            messages.add(Map.of("role", "system", "content", procCtx.getContextBlock()));
+        
+        // Only do expensive RAG search if question likely needs procedure information
+        // This avoids unnecessary index lookups for conversational queries
+        ProcedureContextResult procCtx = null;
+        if (questionNeedsProcedureContext(question)) {
+            procCtx = buildProcedureContextResult(question, cityId);
+            if (procCtx.getContextBlock() != null) {
+                messages.add(Map.of("role", "system", "content", procCtx.getContextBlock()));
+            }
         }
         if (conversationId != null && !conversationId.isBlank()) {
             List<MessageEntry> history = conversationCache.getIfPresent(conversationId);
@@ -141,7 +147,7 @@ public class OpenRouterServices implements IOpenRouterService {
         OpenRouterResponseDto response = callOpenRouterAndExtract(messages, cityId);
 
         // Attach sources from procedure context only when there are actual sources (de-duped, ordered by relevance)
-        if (response.isSuccess() && !procCtx.getSources().isEmpty()) {
+        if (response.isSuccess() && procCtx != null && !procCtx.getSources().isEmpty()) {
             response = new OpenRouterResponseDto(
                     response.isSuccess(),
                     response.getMessage(),
@@ -175,9 +181,16 @@ public class OpenRouterServices implements IOpenRouterService {
 
         List<Map<String, Object>> messages = new ArrayList<>();
         messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage(cityId)));
-        String contextBlock = promptBuilder.buildProcedureContextBlock(complaint, cityId);
-        if (contextBlock != null) {
-            messages.add(Map.of("role", "system", "content", contextBlock));
+        
+        // Only add procedure context if we have complete identity (ready to draft)
+        // Skip RAG search during identity collection to improve latency
+        String contextBlock = null;
+        boolean hasCompleteIdentity = identity != null && identity.isComplete();
+        if (hasCompleteIdentity) {
+            contextBlock = promptBuilder.buildProcedureContextBlock(complaint, cityId);
+            if (contextBlock != null) {
+                messages.add(Map.of("role", "system", "content", contextBlock));
+            }
         }
         if (conversationId != null && !conversationId.isBlank()) {
             List<MessageEntry> history = conversationCache.getIfPresent(conversationId);
@@ -425,6 +438,39 @@ public class OpenRouterServices implements IOpenRouterService {
     /**
      * Wraps {@link RedactPromptBuilder#buildProcedureContextBlock(String, String)} to also return the list of sources with URL and title.
      */
+    /**
+     * Determines if a question likely needs procedure/municipal information.
+     * This avoids expensive RAG searches for conversational queries.
+     */
+    private boolean questionNeedsProcedureContext(String question) {
+        if (question == null || question.isBlank()) return false;
+        
+        String lower = question.toLowerCase();
+        
+        // Keywords that indicate user wants procedural/municipal information
+        String[] proceduralKeywords = {
+            "how to", "how do i", "what is the process", "procedure", "tramit", "tràmit",
+            "requirement", "requirements", "document", "documents", "apply", "application",
+            "form", "forms", "permit", "license", "request", "complaint", "claim",
+            "where can i", "how can i", "steps", "step by step", "process",
+            "recycling", "waste", "garbage", "trash", "center", "collection"
+        };
+        
+        for (String keyword : proceduralKeywords) {
+            if (lower.contains(keyword)) {
+                return true;
+            }
+        }
+        
+        // Questions about specific municipal services
+        if (lower.contains("ajuntament") || lower.contains("city hall") || 
+            lower.contains("municipal") || lower.contains("council")) {
+            return true;
+        }
+        
+        return false;
+    }
+
     private ProcedureContextResult buildProcedureContextResult(String query, String cityId) {
         try {
             ProcedureRagHelper helper = ragRegistry.getForCity(cityId);
