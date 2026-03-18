@@ -152,6 +152,11 @@ export class LambdaStack extends cdk.Stack {
         REDACT_QUEUE_URL: redactQueue.queueUrl,
         COMPLAINTS_BUCKET: complaintsBucket.bucketName,
         COMPLAINTS_REGION: this.region,
+        // HTTP Client configuration for Micronaut (operational flexibility)
+        HTTP_CLIENT_CONNECT_TIMEOUT: process.env.HTTP_CLIENT_CONNECT_TIMEOUT || '10s',
+        HTTP_CLIENT_READ_TIMEOUT: process.env.HTTP_CLIENT_READ_TIMEOUT || '60s',
+        HTTP_CLIENT_MAX_CONNECTIONS: process.env.HTTP_CLIENT_MAX_CONNECTIONS || '20',
+        HTTP_CLIENT_LOG_LEVEL: process.env.HTTP_CLIENT_LOG_LEVEL || 'WARN',
         // OIDC identity verification. Per-city config (issuer, JWKS URI, audience, NIF claim)
         // is bundled in oidc-mapping.json — enabled per city, no env var needed.
         // The worker Lambda does not receive JWT_SECRET and therefore never loads the
@@ -216,6 +221,11 @@ export class LambdaStack extends cdk.Stack {
         COMPLAINTS_REGION: this.region,
         PROCEDURES_BUCKET: proceduresBucket.bucketName,
         PROCEDURES_REGION: this.region,
+        // HTTP Client configuration for Micronaut (operational flexibility)
+        HTTP_CLIENT_CONNECT_TIMEOUT: process.env.HTTP_CLIENT_CONNECT_TIMEOUT || '10s',
+        HTTP_CLIENT_READ_TIMEOUT: process.env.HTTP_CLIENT_READ_TIMEOUT || '60s',
+        HTTP_CLIENT_MAX_CONNECTIONS: process.env.HTTP_CLIENT_MAX_CONNECTIONS || '20',
+        HTTP_CLIENT_LOG_LEVEL: process.env.HTTP_CLIENT_LOG_LEVEL || 'WARN',
       },
       role: workerRole,
       logGroup: workerLogGroup,
