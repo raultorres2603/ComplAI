@@ -4,9 +4,13 @@ import cat.complai.http.HttpWrapper;
 import cat.complai.http.dto.HttpDto;
 import cat.complai.openrouter.dto.ComplainantIdentity;
 import cat.complai.openrouter.dto.OpenRouterResponseDto;
+import cat.complai.openrouter.dto.Source;
+import cat.complai.openrouter.helpers.ProcedureRagHelperRegistry;
 import cat.complai.openrouter.services.OpenRouterServices;
+import cat.complai.openrouter.helpers.ProcedureRagHelper;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -28,10 +32,29 @@ public class OpenRouterServicesTest {
     static class ScenarioFakeWrapper extends HttpWrapper {
         // Add a field to allow test to override the next response
         private String nextResponse = null;
+        private List<ProcedureRagHelper.Procedure> fakeProcedures = List.of();
+        private final ProcedureRagHelperRegistry ragRegistry = new ProcedureRagHelperRegistry() {
+            @Override
+            public ProcedureRagHelper getForCity(String cityId) {
+                try {
+                    return new ProcedureRagHelper(cityId) {
+                        @Override
+                        public List<ProcedureRagHelper.Procedure> search(String query) {
+                            return fakeProcedures;
+                        }
+                    };
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        };
         public List<Map<String, Object>> lastMessages;
 
         public void overrideNextResponse(String response) {
             this.nextResponse = response;
+        }
+        public void overrideFakeProcedures(List<ProcedureRagHelper.Procedure> fakeProcedures) {
+            this.fakeProcedures = fakeProcedures;
         }
         @Override
         public CompletableFuture<HttpDto> postToOpenRouterAsync(List<Map<String, Object>> messages) {
@@ -100,7 +123,7 @@ public class OpenRouterServicesTest {
     @Test
     void ask_happyPath_returnsAiMessage() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
-        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder(), wrapper.ragRegistry);
 
         String input = "Is there a recycling center in El Prat de Llobregat?";
         OpenRouterResponseDto out = svc.ask(input, null, "testcity");
@@ -110,9 +133,55 @@ public class OpenRouterServicesTest {
     }
 
     @Test
+    void ask_withProcedureMatches_includesSources() {
+        ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder(), wrapper.ragRegistry);
+        List<ProcedureRagHelper.Procedure> fakeProcs = List.of(
+                new ProcedureRagHelper.Procedure("p1", "Recycling", "Desc", "Req", "Steps", "https://example.com/recycling"),
+                new ProcedureRagHelper.Procedure("p2", "Waste", "Desc", "Req", "Steps", "https://example.com/waste")
+        );
+        wrapper.overrideFakeProcedures(fakeProcs);
+        wrapper.overrideNextResponse("Answer about recycling");
+
+        OpenRouterResponseDto out = svc.ask("recycling", null, "testcity");
+        assertTrue(out.isSuccess());
+        assertEquals("Answer about recycling", out.getMessage());
+        List<Source> sources = out.getSources();
+        assertEquals(2, sources.size());
+        
+        // Check sources by URL and title
+        boolean foundRecycling = false;
+        boolean foundWaste = false;
+        for (Source source : sources) {
+            if ("https://example.com/recycling".equals(source.getUrl()) && "Recycling".equals(source.getTitle())) {
+                foundRecycling = true;
+            }
+            if ("https://example.com/waste".equals(source.getUrl()) && "Waste".equals(source.getTitle())) {
+                foundWaste = true;
+            }
+        }
+        assertTrue(foundRecycling, "Recycling source should be present with correct URL and title");
+        assertTrue(foundWaste, "Waste source should be present with correct URL and title");
+    }
+
+    @Test
+    void ask_withoutProcedureMatches_sourcesEmpty() {
+        ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder(), wrapper.ragRegistry);
+        wrapper.overrideFakeProcedures(List.of());
+        wrapper.overrideNextResponse("Answer without sources");
+
+        OpenRouterResponseDto out = svc.ask("anything", null, "testcity");
+        assertTrue(out.isSuccess());
+        assertEquals("Answer without sources", out.getMessage());
+        assertNotNull(out.getSources());
+        assertTrue(out.getSources().isEmpty());
+    }
+
+    @Test
     void ask_wrapperError_surfacesError() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
-        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder(), wrapper.ragRegistry);
 
         String input = "How to contact the Ajuntament of El Prat? [UPSTREAM]";
         OpenRouterResponseDto out = svc.ask(input, null, "testcity");
@@ -123,7 +192,7 @@ public class OpenRouterServicesTest {
     @Test
     void ask_aiRefuses_whenNotAboutElPrat() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
-        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder(), wrapper.ragRegistry);
 
         String input = "What is the capital of France? [REFUSE]";
         OpenRouterResponseDto out = svc.ask(input, null, "elprat");
@@ -134,7 +203,7 @@ public class OpenRouterServicesTest {
     @Test
     void redact_emptyComplaint_rejects() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
-        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder(), wrapper.ragRegistry);
 
         OpenRouterResponseDto out = svc.redactComplaint("   ", OutputFormat.JSON, null, null, "testcity");
         assertFalse(out.isSuccess());
@@ -144,7 +213,7 @@ public class OpenRouterServicesTest {
     @Test
     void redact_anonymousRequest_english_rejectsWithValidation() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
-        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder(), wrapper.ragRegistry);
 
         OpenRouterResponseDto out = svc.redactComplaint(
                 "Noise from the airport. I want to remain anonymous.", OutputFormat.JSON, null, null, "testcity");
@@ -156,7 +225,7 @@ public class OpenRouterServicesTest {
     @Test
     void redact_anonymousRequest_spanish_rejectsWithValidation() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
-        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder(), wrapper.ragRegistry);
 
         OpenRouterResponseDto out = svc.redactComplaint(
                 "Ruido del aeropuerto. Quiero que sea anónimo.", OutputFormat.JSON, null, null, "testcity");
@@ -167,7 +236,7 @@ public class OpenRouterServicesTest {
     @Test
     void redact_anonymousRequest_catalan_rejectsWithValidation() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
-        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder(), wrapper.ragRegistry);
 
         OpenRouterResponseDto out = svc.redactComplaint(
                 "Soroll de l'aeroport. Vull ser anònim.", OutputFormat.JSON, null, null, "testcity");
@@ -178,7 +247,7 @@ public class OpenRouterServicesTest {
     @Test
     void redact_missingIdentity_aiAsksForIt_returns200WithQuestion() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
-        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder(), wrapper.ragRegistry);
 
         OpenRouterResponseDto out = svc.redactComplaint(
                 "Noise from the airport [ASKS_IDENTITY]", OutputFormat.JSON, null, null, "testcity");
@@ -191,7 +260,7 @@ public class OpenRouterServicesTest {
     @Test
     void redact_completeIdentity_returnsLetterAsText() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
-        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder(), wrapper.ragRegistry);
 
         ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
         OpenRouterResponseDto out = svc.redactComplaint(
@@ -205,7 +274,7 @@ public class OpenRouterServicesTest {
     @Test
     void redact_partialIdentity_aiAsksForMissingFields() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
-        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder(), wrapper.ragRegistry);
 
         ComplainantIdentity partial = new ComplainantIdentity("Joan", null, null);
         OpenRouterResponseDto out = svc.redactComplaint(
@@ -218,7 +287,7 @@ public class OpenRouterServicesTest {
     @Test
     void redact_pdfRequested_returnsLetterAsText() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
-        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder(), wrapper.ragRegistry);
 
         ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
         OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [HEADER]", OutputFormat.PDF, null, identity, "testcity");
@@ -230,7 +299,7 @@ public class OpenRouterServicesTest {
     @Test
     void redact_missingJsonHeader_withAutoFormat_fallsBackToJsonSuccess() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
-        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder(), wrapper.ragRegistry);
 
         String aiMessage = "Dear Ajuntament,\n\nI am writing to complain about...\n\nSincerely,\nResident";
         ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
@@ -244,7 +313,7 @@ public class OpenRouterServicesTest {
     @Test
     void redact_missingJsonHeader_withJsonFormat_fallsBackToJsonSuccess() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
-        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder(), wrapper.ragRegistry);
 
         String aiMessage = "Dear Ajuntament,\n\nI am writing to complain about...\n\nSincerely,\nResident";
         ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
@@ -257,7 +326,7 @@ public class OpenRouterServicesTest {
     @Test
     void redact_missingJsonHeader_withPdfFormat_returnsRawTextGracefully() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
-        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder(), wrapper.ragRegistry);
 
         String aiMessage = "Dear Ajuntament,\n\nI am writing to complain about...\n\nSincerely,\nResident";
         ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
@@ -271,7 +340,7 @@ public class OpenRouterServicesTest {
     @Test
     void redact_auto_returnsLetterAsText_whenAiReturnsFormalLetter() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
-        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder(), wrapper.ragRegistry);
 
         ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
         OpenRouterResponseDto out = svc.redactComplaint("Some long complaint text [HEADER_LONG]", OutputFormat.AUTO, null, identity, "testcity");
@@ -283,7 +352,7 @@ public class OpenRouterServicesTest {
     @Test
     void ask_tooLong_rejects() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
-        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder(), wrapper.ragRegistry);
         OpenRouterResponseDto out = svc.ask("a".repeat(5001), null, "testcity");
         assertFalse(out.isSuccess());
         assertEquals(OpenRouterErrorCode.VALIDATION, out.getErrorCode());
@@ -293,7 +362,7 @@ public class OpenRouterServicesTest {
     @Test
     void redactComplaint_tooLong_rejects() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
-        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder(), wrapper.ragRegistry);
         OpenRouterResponseDto out = svc.redactComplaint("b".repeat(5001), OutputFormat.JSON, null, null, "testcity");
         assertFalse(out.isSuccess());
         assertEquals(OpenRouterErrorCode.VALIDATION, out.getErrorCode());
@@ -303,7 +372,7 @@ public class OpenRouterServicesTest {
     @Test
     void redact_pdfRequested_unicodeCatalanCharacters() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
-        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder(), wrapper.ragRegistry);
         String catalanText = "Això és una prova amb ç, à, ü, ·l, ñ, and œ.";
         String aiResponse = "{\"format\": \"pdf\"}\n\n" + catalanText;
         wrapper.overrideNextResponse(aiResponse);
@@ -320,7 +389,7 @@ public class OpenRouterServicesTest {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
         // pre-load a fake response so the service call completes successfully
         wrapper.overrideNextResponse("{\"format\": \"pdf\"}\n\nLetter content...");
-        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder(), wrapper.ragRegistry);
 
         ComplainantIdentity identity = new ComplainantIdentity("Raul", "Torres", "12345678A");
         svc.redactComplaint("Fix the street", OutputFormat.PDF, null, identity, "testcity");
@@ -337,7 +406,7 @@ public class OpenRouterServicesTest {
     @Test
     void redact_incompleteIdentity_aiResponseReturnedAsText() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
-        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder());
+        OpenRouterServices svc = new OpenRouterServices(wrapper, 5000, 30, new RedactPromptBuilder(), wrapper.ragRegistry);
 
         OpenRouterResponseDto out = svc.redactComplaint(
                 "My name is Raul Torres, ID 49872354C. [SMART_EXTRACT]", OutputFormat.PDF, null, null, "testcity");

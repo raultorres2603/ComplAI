@@ -1,11 +1,15 @@
 package cat.complai.openrouter.services;
 
+import cat.complai.openrouter.helpers.ProcedureRagHelper;
 import cat.complai.openrouter.interfaces.IOpenRouterService;
 import cat.complai.openrouter.dto.OpenRouterResponseDto;
 import cat.complai.openrouter.dto.OpenRouterErrorCode;
+import cat.complai.openrouter.dto.Source;
 import cat.complai.http.HttpWrapper;
 import cat.complai.http.dto.HttpDto;
 import cat.complai.openrouter.helpers.RedactPromptBuilder;
+import cat.complai.openrouter.helpers.ProcedureRagHelper;
+import cat.complai.openrouter.helpers.ProcedureRagHelperRegistry;
 import jakarta.inject.Singleton;
 import jakarta.inject.Inject;
 import com.github.benmanes.caffeine.cache.Cache;
@@ -24,6 +28,7 @@ import java.util.*;
 import cat.complai.openrouter.dto.ComplainantIdentity;
 import cat.complai.openrouter.dto.OutputFormat;
 import cat.complai.openrouter.helpers.AiParsed;
+import java.util.LinkedHashSet;
 
 @Singleton
 public class OpenRouterServices implements IOpenRouterService {
@@ -38,6 +43,23 @@ public class OpenRouterServices implements IOpenRouterService {
     private final Cache<String, String> pendingComplaintCache;
     private final int maxInputLength;
     private final int overallTimeoutSeconds;
+    private final ProcedureRagHelperRegistry ragRegistry;
+
+    /**
+     * Result type for procedure context extraction: context block string and the list of source URLs.
+     */
+    public static class ProcedureContextResult {
+        private final String contextBlock;
+        private final List<Source> sources;
+
+        public ProcedureContextResult(String contextBlock, List<Source> sources) {
+            this.contextBlock = contextBlock;
+            this.sources = sources == null ? List.of() : Collections.unmodifiableList(new ArrayList<>(sources));
+        }
+
+        public String getContextBlock() { return contextBlock; }
+        public List<Source> getSources() { return sources; }
+    }
 
     public record MessageEntry(String role, String content) {}
 
@@ -45,9 +67,11 @@ public class OpenRouterServices implements IOpenRouterService {
     public OpenRouterServices(HttpWrapper httpWrapper,
                               @Value("${complai.input.max-length-chars:5000}") int maxInputLength,
                               @Value("${OPENROUTER_OVERALL_TIMEOUT_SECONDS:60}") int overallTimeoutSeconds,
-                              RedactPromptBuilder promptBuilder) {
+                              RedactPromptBuilder promptBuilder,
+                              ProcedureRagHelperRegistry ragRegistry) {
         this.httpWrapper    = Objects.requireNonNull(httpWrapper, "httpWrapper");
         this.promptBuilder  = Objects.requireNonNull(promptBuilder, "promptBuilder");
+        this.ragRegistry   = Objects.requireNonNull(ragRegistry, "ragRegistry");
         this.conversationCache = Caffeine.newBuilder()
                 .expireAfterWrite(30, TimeUnit.MINUTES)
                 .maximumSize(10000)
@@ -98,9 +122,9 @@ public class OpenRouterServices implements IOpenRouterService {
 
         List<Map<String, Object>> messages = new ArrayList<>();
         messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage(cityId)));
-        String contextBlock = promptBuilder.buildProcedureContextBlock(question, cityId);
-        if (contextBlock != null) {
-            messages.add(Map.of("role", "system", "content", contextBlock));
+        ProcedureContextResult procCtx = buildProcedureContextResult(question, cityId);
+        if (procCtx.getContextBlock() != null) {
+            messages.add(Map.of("role", "system", "content", procCtx.getContextBlock()));
         }
         if (conversationId != null && !conversationId.isBlank()) {
             List<MessageEntry> history = conversationCache.getIfPresent(conversationId);
@@ -115,6 +139,19 @@ public class OpenRouterServices implements IOpenRouterService {
         logger.fine(() -> "ask() messages prepared — messageCount=" + messages.size()
                 + " conversationId=" + conversationId);
         OpenRouterResponseDto response = callOpenRouterAndExtract(messages, cityId);
+
+        // Attach sources from procedure context (de-duped, ordered by relevance)
+        if (response.isSuccess()) {
+            response = new OpenRouterResponseDto(
+                    response.isSuccess(),
+                    response.getMessage(),
+                    response.getError(),
+                    response.getStatusCode(),
+                    response.getErrorCode(),
+                    response.getPdfData(),
+                    deDuplicateAndOrderSources(procCtx.getSources())
+            );
+        }
 
         if (conversationId != null && !conversationId.isBlank() && response.getMessage() != null) {
             updateConversationHistory(conversationId, question, response.getMessage());
@@ -383,6 +420,43 @@ public class OpenRouterServices implements IOpenRouterService {
             history = history.subList(history.size() - MAX_HISTORY_TURNS * 2, history.size());
         }
         conversationCache.put(conversationId, history);
+    }
+
+    /**
+     * Wraps {@link RedactPromptBuilder#buildProcedureContextBlock(String, String)} to also return the list of sources with URL and title.
+     */
+    private ProcedureContextResult buildProcedureContextResult(String query, String cityId) {
+        try {
+            ProcedureRagHelper helper = ragRegistry.getForCity(cityId);
+            List<ProcedureRagHelper.Procedure> matches = helper.search(query);
+            if (matches.isEmpty()) {
+                return new ProcedureContextResult(null, List.of());
+            }
+            List<Source> sources = matches.stream()
+                    .map(p -> new Source(p.url, p.title))
+                    .filter(source -> source.getUrl() != null && !source.getUrl().isBlank())
+                    .toList();
+            String contextBlock = promptBuilder.buildProcedureContextBlock(query, cityId);
+            return new ProcedureContextResult(contextBlock, sources);
+        } catch (Exception e) {
+            logger.log(Level.WARNING, "Failed to build procedure context result for city=" + cityId
+                    + "; returning empty context: " + e.getMessage(), e);
+            return new ProcedureContextResult(null, List.of());
+        }
+    }
+
+    /**
+     * De-duplicates sources by URL and preserves order: first occurrence wins, stable ordering.
+     */
+    private List<Source> deDuplicateAndOrderSources(List<Source> sources) {
+        LinkedHashSet<String> seenUrls = new LinkedHashSet<>();
+        List<Source> deduped = new ArrayList<>();
+        for (Source source : sources) {
+            if (seenUrls.add(source.getUrl())) {
+                deduped.add(source);
+            }
+        }
+        return List.copyOf(deduped);
     }
 }
 

@@ -1,0 +1,20 @@
+{
+  "procedures": [
+    {
+      "procedureId": "p1",
+      "title": "Recycling",
+      "description": "Desc",
+      "requirements": "Req",
+      "steps": "Steps",
+      "url": "https://example.com/recycling"
+    },
+    {
+      "procedureId": "p2", 
+      "title": "Waste",
+      "description": "Desc",
+      "requirements": "Req",
+      "steps": "Steps",
+      "url": "https://example.com/waste"
+    }
+  ]
+}
