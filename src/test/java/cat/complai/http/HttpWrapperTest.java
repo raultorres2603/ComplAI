@@ -6,12 +6,6 @@ import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpServer;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.env.Environment;
-import io.micronaut.http.annotation.Body;
-import io.micronaut.http.annotation.Header;
-import io.micronaut.http.annotation.Post;
-import io.micronaut.http.client.annotation.Client;
-import io.micronaut.runtime.server.EmbeddedServer;
-import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
 import java.io.OutputStream;
@@ -39,7 +33,7 @@ public class HttpWrapperTest {
         server.start();
 
         Map<String, Object> props = Map.of(
-                "openrouter.url", "http://localhost:" + server.getAddress().getPort() + "/api/v1/chat/completions",
+                "openrouter.url", "http://localhost:" + server.getAddress().getPort(),
                 "OPENROUTER_API_KEY", "test-key",
                 "micronaut.application.name", "complai-test"
         );
@@ -75,7 +69,7 @@ public class HttpWrapperTest {
         server.start();
 
         Map<String, Object> props = Map.of(
-                "openrouter.url", "http://localhost:" + server.getAddress().getPort() + "/api/v1/chat/completions",
+                "openrouter.url", "http://localhost:" + server.getAddress().getPort(),
                 "OPENROUTER_API_KEY", "test-key"
         );
         try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST).build()) {
@@ -111,7 +105,7 @@ public class HttpWrapperTest {
         server.start();
 
         Map<String, Object> props = Map.of(
-                "openrouter.url", "http://localhost:" + server.getAddress().getPort() + "/api/v1/chat/completions",
+                "openrouter.url", "http://localhost:" + server.getAddress().getPort(),
                 "OPENROUTER_API_KEY", "test-key"
         );
         try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST).build()) {
@@ -150,7 +144,7 @@ public class HttpWrapperTest {
         server.start();
 
         Map<String, Object> props = Map.of(
-                "openrouter.url", "http://localhost:" + server.getAddress().getPort() + "/api/v1/chat/completions",
+                "openrouter.url", "http://localhost:" + server.getAddress().getPort(),
                 // Put a plain token so wrapper prefixes Bearer
                 "OPENROUTER_API_KEY", "plain-token"
         );

@@ -6,7 +6,6 @@ import io.micronaut.http.annotation.Post;
 import io.micronaut.http.client.annotation.Client;
 import jakarta.inject.Singleton;
 
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -15,7 +14,7 @@ import java.util.Map;
  * configurable Micronaut client that provides better integration with
  * DI, metrics, pooling, and timeouts.
  */
-@Client("${openrouter.url:https://openrouter.ai/api/v1/chat/completions}")
+@Client("${openrouter.url:https://openrouter.ai}")
 @Singleton
 public interface OpenRouterClient {
 
@@ -28,25 +27,8 @@ public interface OpenRouterClient {
      * @param title The X-Title header for OpenRouter analytics
      * @return The response body as a String
      */
-    @Post
+    @Post("/api/v1/chat/completions")
     String chatCompletions(
-            @Body Map<String, Object> payload,
-            @Header("Authorization") String authorization,
-            @Header("HTTP-Referer") String referer,
-            @Header("X-Title") String title
-    );
-
-    /**
-     * Send a chat completion request to OpenRouter API with message list.
-     * 
-     * @param payload The request body as a Map (will be serialized to JSON)
-     * @param authorization The Bearer token authorization header
-     * @param referer The HTTP-Referer header for OpenRouter analytics
-     * @param title The X-Title header for OpenRouter analytics
-     * @return The response body as a String
-     */
-    @Post
-    String chatCompletionsWithMessages(
             @Body Map<String, Object> payload,
             @Header("Authorization") String authorization,
             @Header("HTTP-Referer") String referer,

@@ -57,13 +57,13 @@ public class HttpWrapper {
 
     @Inject
     public HttpWrapper(OpenRouterClient openRouterClient,
-                       @Value("${openrouter.url:https://openrouter.ai/api/v1/chat/completions}") String openRouterUrl,
+                       @Value("${openrouter.url:${OPENROUTER_URL:https://openrouter.ai}}") String openRouterUrl,
                        @Value("${OPENROUTER_API_KEY:}") String openRouterApiKey,
                        @Value("${OPENROUTER_REQUEST_TIMEOUT_SECONDS:60}") int requestTimeoutSeconds,
                        @Value("${OPENROUTER_MODEL:openrouter/free}") String openRouterModel,
                        @Value("${OPENROUTER_MAX_RETRIES:3}") int maxRetries) {
         this.openRouterClient = openRouterClient;
-        this.openRouterUrl = normalizeOpenRouterUrl(openRouterUrl);
+        this.openRouterUrl = normalizeOpenRouterBaseUrl(openRouterUrl);
         this.mapper = new ObjectMapper();
         this.requestTimeoutSeconds = (requestTimeoutSeconds > 0) ? requestTimeoutSeconds : 20; // fallback to 20s if invalid
         this.openRouterModel = openRouterModel;
@@ -297,6 +297,22 @@ public class HttpWrapper {
         } catch (IllegalArgumentException e) {
             logger.log(Level.WARNING, "Configured OpenRouter URL is malformed (original='" + original + "', normalized='" + url + "'), falling back to default URL", e);
             return DEFAULT_OPENROUTER_URL;
+        }
+    }
+
+    private String normalizeOpenRouterBaseUrl(String url) {
+        String normalized = normalizeOpenRouterUrl(url);
+        try {
+            URI uri = URI.create(normalized);
+            String scheme = uri.getScheme();
+            String host = uri.getHost();
+            int port = uri.getPort();
+            if (scheme == null || host == null) {
+                return "https://openrouter.ai";
+            }
+            return port > 0 ? (scheme + "://" + host + ":" + port) : (scheme + "://" + host);
+        } catch (Exception e) {
+            return "https://openrouter.ai";
         }
     }
 }
