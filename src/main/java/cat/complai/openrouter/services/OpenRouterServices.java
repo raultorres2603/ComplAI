@@ -126,7 +126,7 @@ public class OpenRouterServices implements IOpenRouterService {
         // Only do expensive RAG search if question likely needs procedure information
         // This avoids unnecessary index lookups for conversational queries
         ProcedureContextResult procCtx = null;
-        if (questionNeedsProcedureContext(question)) {
+        if (questionNeedsProcedureContext(question, cityId)) {
             procCtx = buildProcedureContextResult(question, cityId);
             if (procCtx.getContextBlock() != null) {
                 messages.add(Map.of("role", "system", "content", procCtx.getContextBlock()));
@@ -441,11 +441,26 @@ public class OpenRouterServices implements IOpenRouterService {
     /**
      * Determines if a question likely needs procedure/municipal information.
      * This avoids expensive RAG searches for conversational queries.
+     * Checks against actual procedure titles for more accurate detection.
      */
-    private boolean questionNeedsProcedureContext(String question) {
+    private boolean questionNeedsProcedureContext(String question, String cityId) {
         if (question == null || question.isBlank()) return false;
         
         String lower = question.toLowerCase();
+        
+        // First, check against actual procedure titles for this city (most accurate)
+        try {
+            ProcedureRagHelper helper = ragRegistry.getForCity(cityId);
+            List<ProcedureRagHelper.Procedure> procedures = helper.getAllProcedures();
+            for (ProcedureRagHelper.Procedure proc : procedures) {
+                if (lower.contains(proc.title.toLowerCase())) {
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            // Fallback to keyword detection if procedure loading fails
+            logger.fine(() -> "Failed to load procedures for title checking: " + e.getMessage());
+        }
         
         // Keywords that indicate user wants procedural/municipal information
         String[] proceduralKeywords = {

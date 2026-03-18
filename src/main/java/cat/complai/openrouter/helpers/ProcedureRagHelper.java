@@ -173,4 +173,12 @@ public class ProcedureRagHelper {
         }
         return results;
     }
+
+    /**
+     * Returns all loaded procedures for title-based filtering.
+     * Used by OpenRouterServices to optimize RAG searches.
+     */
+    public List<Procedure> getAllProcedures() {
+        return new ArrayList<>(procedures);
+    }
 }
