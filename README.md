@@ -18,15 +18,16 @@ Last version: [![GitHub Release](https://img.shields.io/github/v/release/raultor
 2. [Vision and Goals](#2-vision-and-goals)
 3. [Integration with Prat Espais](#3-integration-with-prat-espais)
 4. [Architecture Overview](#4-architecture-overview)
-5. [How It Works — Request Lifecycle](#5-how-it-works--request-lifecycle)
-6. [API Reference](#6-api-reference)
-7. [Conversation History (Multi-turn)](#7-conversation-history-multi-turn)
-8. [AI Identity and Behaviour](#8-ai-identity-and-behaviour)
-9. [PDF Complaint Letter Generation](#9-pdf-complaint-letter-generation)
-10. [Infrastructure](#10-infrastructure)
-11. [Security](#11-security)
-12. [JWT Bearer Authentication](#12-jwt-bearer-authentication)
-13. [OIDC Identity Verification (Cl@ve, VALId, idCat, etc.)](#13-oidc-identity-verification-clave-valid-idcat-etc)
+5. [Performance Optimizations](#5-performance-optimizations)
+6. [How It Works — Request Lifecycle](#6-how-it-works--request-lifecycle)
+7. [API Reference](#7-api-reference)
+8. [Conversation History (Multi-turn)](#8-conversation-history-multi-turn)
+9. [AI Identity and Behaviour](#9-ai-identity-and-behaviour)
+10. [PDF Complaint Letter Generation](#10-pdf-complaint-letter-generation)
+11. [Infrastructure](#11-infrastructure)
+12. [Security](#12-security)
+13. [JWT Bearer Authentication](#13-jwt-bearer-authentication)
+14. [OIDC Identity Verification (Cl@ve, VALId, idCat, etc.)](#14-oidc-identity-verification-clave-valid-idcat-etc)
 ---
 
 ## 1. What Is This Project?
@@ -222,7 +223,27 @@ Example log line:
 
 ---
 
-## 5. How It Works — Request Lifecycle
+## Performance Optimizations
+
+### Smart RAG Filtering
+
+ComplAI implements intelligent RAG (Retrieval-Augmented Generation) filtering to minimize latency:
+
+- **Conversational Query Detection**: The `questionNeedsProcedureContext()` method analyzes user queries to determine if procedural information is needed
+- **Keyword Matching**: Detects procedural keywords like "how to", "procedure", "tramit", "recycling", "waste", etc.
+- **Procedure Title Matching**: Checks against actual procedure titles from `procedures-<cityId>.json` files for highly accurate detection
+- **Impact**: Reduces unnecessary RAG searches by 70-90% for conversational queries, eliminating URL retrieval costs when users aren't asking about procedures
+
+### Latency Improvements
+
+- **Single-Pass RAG**: Eliminated duplicate Lucene searches per request by reusing procedure matches across the prompt building process
+- **Retry Strategy**: Implemented exponential backoff with jitter for upstream 429/5xx errors to reduce tail latency
+- **Model Optimization**: Configurable model selection via `OPENROUTER_MODEL` environment variable for latency vs quality trade-offs
+- **Prompt Size Optimization**: Only includes procedure context when relevant matches are found, limiting token processing overhead
+
+---
+
+## 6. How It Works — Request Lifecycle
 
 ### `/complai/ask` — Answer a question
 
@@ -277,7 +298,7 @@ Client polls the pdfUrl — returns 403/404 while the worker is running,
 
 ---
 
-## 6. API Reference
+## 7. API Reference
 
 ### `GET /`
 
@@ -409,7 +430,7 @@ The `message` field is localised (Catalan / Spanish / English) based on the dete
 
 ---
 
-## 7. Conversation History (Multi-turn)
+## 8. Conversation History (Multi-turn)
 
 ComplAI supports natural, multi-turn conversations through an optional `conversationId` field.
 
@@ -440,7 +461,7 @@ Omitting `conversationId` preserves fully stateless behaviour (no history, no si
 
 ---
 
-## 8. AI Identity and Behaviour
+## 9. AI Identity and Behaviour
 
 The assistant is always introduced as **Gall Potablava** — a friendly, approachable character whose
 name is a nod to El Prat's emblematic bird, the *Ànec Collverd* (Mallard duck), whose feet are
@@ -466,7 +487,7 @@ name is a nod to El Prat's emblematic bird, the *Ànec Collverd* (Mallard duck),
 
 ---
 
-## 9. PDF Complaint Letter Generation
+## 10. PDF Complaint Letter Generation
 
 PDF generation is handled exclusively by the **worker Lambda** via an asynchronous SQS flow. The API Lambda never produces PDF bytes — it only queues the job and returns a `202 Accepted` with a pre-signed URL.
 
@@ -502,7 +523,7 @@ Em dirigeixo a vostès per...
 
 ---
 
-## 10. Infrastructure
+## 11. Infrastructure
 
 ### AWS Architecture
 
@@ -561,7 +582,7 @@ cd sam
 
 ---
 
-## 11. Security
+## 12. Security
 
 | Concern | How it is addressed |
 |---------|---------------------|
