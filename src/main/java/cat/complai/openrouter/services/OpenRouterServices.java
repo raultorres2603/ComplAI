@@ -8,7 +8,6 @@ import cat.complai.openrouter.dto.Source;
 import cat.complai.http.HttpWrapper;
 import cat.complai.http.dto.HttpDto;
 import cat.complai.openrouter.helpers.RedactPromptBuilder;
-import cat.complai.openrouter.helpers.ProcedureRagHelper;
 import cat.complai.openrouter.helpers.ProcedureRagHelperRegistry;
 import jakarta.inject.Singleton;
 import jakarta.inject.Inject;
@@ -184,7 +183,7 @@ public class OpenRouterServices implements IOpenRouterService {
         
         // Only add procedure context if we have complete identity (ready to draft)
         // Skip RAG search during identity collection to improve latency
-        String contextBlock = null;
+        String contextBlock;
         boolean hasCompleteIdentity = identity != null && identity.isComplete();
         if (hasCompleteIdentity) {
             contextBlock = promptBuilder.buildProcedureContextBlock(complaint, cityId);
@@ -205,7 +204,7 @@ public class OpenRouterServices implements IOpenRouterService {
         // When identity is incomplete, the AI is instructed to ask for the missing fields first.
         // The caller is expected to collect the AI's question, present it to the user, and
         // re-submit with the full identity in a subsequent request.
-        final String userPrompt;
+        String userPrompt = "";
         final boolean identityComplete = identity != null && identity.isComplete();
         if (identityComplete) {
             // On the second turn the user's message contains the identity data they typed (e.g.
@@ -224,10 +223,14 @@ public class OpenRouterServices implements IOpenRouterService {
             String complaintForPrompt = (originalComplaint != null)
                     ? originalComplaint + "\n\n" + complaint
                     : complaint;
-            userPrompt = promptBuilder.buildRedactPromptWithIdentity(complaintForPrompt, identity, cityId);
+            if (complaintForPrompt != null) {
+                userPrompt = promptBuilder.buildRedactPromptWithIdentity(complaintForPrompt, identity, cityId);
+            }
         } else {
             if (conversationId != null && !conversationId.isBlank()) {
-                pendingComplaintCache.put(conversationId, complaint);
+                if (complaint != null) {
+                    pendingComplaintCache.put(conversationId, complaint);
+                }
                 logger.fine(() -> "redactComplaint() saved complaint for identity follow-up — conversationId=" + conversationId);
             }
             userPrompt = promptBuilder.buildRedactPromptRequestingIdentity(complaint, identity, cityId);
@@ -276,14 +279,13 @@ public class OpenRouterServices implements IOpenRouterService {
      * Detects whether the user's message explicitly asks for the complaint to be anonymous.
      * The Ajuntament does not accept anonymous complaints, so we reject these early and clearly
      * rather than letting the AI draft an unusable letter.
-     *
      * The check is intentionally conservative: we only match phrases where the user clearly states
      * they want anonymity, not every mention of the word "anonymous".
      */
     private boolean requestsAnonymity(String text) {
         if (text == null) return false;
         String lower = text.toLowerCase(Locale.ROOT)
-                .replace("\u2018", "'").replace("\u2019", "'")
+                .replace("‘", "'").replace("’", "'")
                 .replaceAll("[.,;:!?()\\[\\]{}-]", " ")
                 .replaceAll("\\s+", " ")
                 .trim();
@@ -325,8 +327,8 @@ public class OpenRouterServices implements IOpenRouterService {
         if (aiMessage == null) return false;
         // Normalize typographic quotes/apostrophes for reliable matching.
         String normalized = aiMessage
-                .replace('\u2018', '\'').replace('\u2019', '\'')
-                .replace('\u201c', '"').replace('\u201d', '"');
+                .replace('‘', '\'').replace('’', '\'')
+                .replace('“', '"').replace('”', '"');
         String lower = normalized.toLowerCase(Locale.ROOT).trim();
         String lowerNoPunct = lower.replaceAll("[.,;:!?()\\[\\]{}-]", " ").replaceAll("\\s+", " ").trim();
 
@@ -436,9 +438,6 @@ public class OpenRouterServices implements IOpenRouterService {
     }
 
     /**
-     * Wraps {@link RedactPromptBuilder#buildProcedureContextBlock(String, String)} to also return the list of sources with URL and title.
-     */
-    /**
      * Determines if a question likely needs procedure/municipal information.
      * This avoids expensive RAG searches for conversational queries.
      * Checks against actual procedure titles for more accurate detection.
@@ -478,12 +477,8 @@ public class OpenRouterServices implements IOpenRouterService {
         }
         
         // Questions about specific municipal services
-        if (lower.contains("ajuntament") || lower.contains("city hall") || 
-            lower.contains("municipal") || lower.contains("council")) {
-            return true;
-        }
-        
-        return false;
+        return lower.contains("ajuntament") || lower.contains("city hall") ||
+                lower.contains("municipal") || lower.contains("council");
     }
 
     private ProcedureContextResult buildProcedureContextResult(String query, String cityId) {

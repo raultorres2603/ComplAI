@@ -374,7 +374,7 @@ Independent local news source: %s
 
     private static String formatSources(List<String> sources, String sep, String lastSep) {
         if (sources == null || sources.isEmpty()) return "";
-        if (sources.size() == 1) return sources.get(0);
+        if (sources.size() == 1) return sources.getFirst();
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < sources.size(); i++) {
             if (i > 0) sb.append(i == sources.size() - 1 ? lastSep : sep);

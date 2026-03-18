@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for {@link RedactPromptBuilder}.
- *
  * These tests verify the structural requirements of each prompt — not word-for-word content,
  * which is fragile and test-breaking when the wording improves. We test the invariants the
  * AI depends on: mandatory fields present, forbidden patterns absent, correct format header.
@@ -126,6 +125,6 @@ class RedactPromptBuilderTest {
         // A nonsense query should produce no RAG matches and return null.
         // Either null (no results) or a non-empty string (if fuzzy matched) — both are valid.
         // The important contract: it must never throw.
-        String result = builder.buildProcedureContextBlock("xyzzy_nonexistent_term_abc123", "elprat");
+        builder.buildProcedureContextBlock("xyzzy_nonexistent_term_abc123", "elprat");
     }
 }
