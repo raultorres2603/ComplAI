@@ -116,6 +116,9 @@ class RedactPromptBuilderTest {
         // The system message should not contain hardcoded example URLs that don't exist in procedures
         assertFalse(msg.contains("https://tramits.pratespais.com/Ciutadania/Empadronament"), 
                   "System message must not contain hardcoded Empadronament URL example");
+        // Should contain clarification about official sources being for general info only
+        assertTrue(msg.contains("només són per a informació general, no per enllaços específics de tràmits"), 
+                  "System message must clarify that official sources are for general info only");
     }
 
     @Test
