@@ -136,6 +136,8 @@ export class LambdaStack extends cdk.Stack {
       code,
       memorySize: 768,
       timeout: cdk.Duration.seconds(60),
+      // Enable JDK Vector API for Lucene performance optimization
+      javaRuntimeOptions: ['--add-modules', 'jdk.incubator.vector'],
       // Wire the OpenRouter API key (from CFN parameter) into the Lambda environment.
       // Be aware that environment variables are visible in the Lambda console; using
       // Secrets Manager or SSM Parameter Store with encryption is more secure if available.
@@ -211,6 +213,8 @@ export class LambdaStack extends cdk.Stack {
       // Must be ≤ SQS visibility timeout (90s). Lambda extends visibility automatically
       // while running, so using the same duration is the safest choice here.
       timeout: cdk.Duration.seconds(60),
+      // Enable JDK Vector API for Lucene performance optimization
+      javaRuntimeOptions: ['--add-modules', 'jdk.incubator.vector'],
       environment: {
         OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '',
         OPENROUTER_REQUEST_TIMEOUT_SECONDS: process.env.OPENROUTER_REQUEST_TIMEOUT_SECONDS || '60',
