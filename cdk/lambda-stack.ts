@@ -138,6 +138,8 @@ export class LambdaStack extends cdk.Stack {
       timeout: cdk.Duration.seconds(60),
       // Enable JDK Vector API for Lucene performance optimization
       javaRuntimeOptions: ['--add-modules', 'jdk.incubator.vector'],
+      // Enable SnapStart with CRaC for cold start optimization
+      snapStart: lambda.SnapStartConf.ON,
       // Wire the OpenRouter API key (from CFN parameter) into the Lambda environment.
       // Be aware that environment variables are visible in the Lambda console; using
       // Secrets Manager or SSM Parameter Store with encryption is more secure if available.
@@ -215,6 +217,8 @@ export class LambdaStack extends cdk.Stack {
       timeout: cdk.Duration.seconds(60),
       // Enable JDK Vector API for Lucene performance optimization
       javaRuntimeOptions: ['--add-modules', 'jdk.incubator.vector'],
+      // Enable SnapStart with CRaC for cold start optimization
+      snapStart: lambda.SnapStartConf.ON,
       environment: {
         OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '',
         OPENROUTER_REQUEST_TIMEOUT_SECONDS: process.env.OPENROUTER_REQUEST_TIMEOUT_SECONDS || '60',
