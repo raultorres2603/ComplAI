@@ -34,6 +34,7 @@ Globals:
         OPENROUTER_API_KEY: !Ref OpenRouterApiKey
         AWS_ENDPOINT_URL: "http://localhost:4566"
         COMPLAINTS_REGION: !Ref LambdaRegion
+        JAVA_TOOL_OPTIONS: "--add-modules=jdk.incubator.vector"
 
 Resources:
   ComplAILambdaRole:
@@ -182,8 +183,9 @@ Resources:
           REDACT_QUEUE_URL: !Ref RedactQueue
           COMPLAINTS_BUCKET: !Ref ComplaintsBucket
           COMPLAINTS_REGION: !Ref LambdaRegion
-          # Enable JDK Vector API for Lucene performance optimization
-          JAVA_TOOL_OPTIONS: "--add-modules jdk.incubator.vector"
+      # Enable SnapStart with CRaC for cold start optimization
+      SnapStart:
+        ApplyOn: PublishedVersions
       Events:
         ProxyRoot:
           Type: HttpApi
@@ -217,8 +219,9 @@ Resources:
           PROCEDURES_BUCKET: !Ref ProceduresBucket
           PROCEDURES_REGION: !Ref LambdaRegion
           AWS_ENDPOINT_URL: "http://host.docker.internal:4566"
-          # Enable JDK Vector API for Lucene performance optimization
-          JAVA_TOOL_OPTIONS: "--add-modules jdk.incubator.vector"
+      # Enable SnapStart with CRaC for cold start optimization
+      SnapStart:
+        ApplyOn: PublishedVersions
       Events:
         SQSTrigger:
           Type: SQS
