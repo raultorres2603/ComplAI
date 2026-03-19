@@ -10,6 +10,7 @@ export interface StorageStackProps extends cdk.StackProps {
 export class StorageStack extends cdk.Stack {
   // Exposed so the LambdaStack can wire IAM grants and inject bucket names.
   readonly proceduresBucket: s3.Bucket;
+  readonly eventsBucket: s3.Bucket;
   readonly complaintsBucket: s3.Bucket;
   // Stores the compiled fat JARs used by both Lambda functions.
   // Keeping deployment artifacts here lets CI upload the JAR once and reference
@@ -27,6 +28,18 @@ export class StorageStack extends cdk.Stack {
     // survive stack updates or accidental teardowns.
     this.proceduresBucket = new s3.Bucket(this, `ComplAIProceduresBucket-${environment}`, {
       bucketName: `complai-procedures-${environment}`,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      versioned: false,
+      lifecycleRules: [{ expiration: cdk.Duration.days(365) }],
+    });
+
+    // Events corpus — read by Lambda at startup for event context.
+    // RETAIN in all environments: the file is uploaded out-of-band and must
+    // survive stack updates or accidental teardowns.
+    this.eventsBucket = new s3.Bucket(this, `ComplAIEventsBucket-${environment}`, {
+      bucketName: `complai-events-${environment}`,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       encryption: s3.BucketEncryption.S3_MANAGED,
@@ -66,6 +79,11 @@ export class StorageStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'ComplAIProceduresBucketName', {
       value: this.proceduresBucket.bucketName,
       description: `S3 bucket for procedures corpus (${environment})`,
+    });
+
+    new cdk.CfnOutput(this, 'ComplAIEventsBucketName', {
+      value: this.eventsBucket.bucketName,
+      description: `S3 bucket for events corpus (${environment})`,
     });
 
     new cdk.CfnOutput(this, 'ComplAIComplaintsBucketName', {
