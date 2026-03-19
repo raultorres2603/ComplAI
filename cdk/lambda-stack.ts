@@ -134,7 +134,7 @@ export class LambdaStack extends cdk.Stack {
       // our CDK HttpApi integration.
       handler: 'io.micronaut.function.aws.proxy.payload2.APIGatewayV2HTTPEventFunction::handleRequest',
       code,
-      memorySize: 768,
+      memorySize: 1024,
       timeout: cdk.Duration.seconds(60),
       // Enable JDK Vector API for Lucene performance optimization
       javaRuntimeOptions: ['--add-modules', 'jdk.incubator.vector'],
@@ -211,7 +211,7 @@ export class LambdaStack extends cdk.Stack {
       // Same shadow JAR, different handler class — no separate build needed.
       handler: 'cat.complai.worker.RedactWorkerHandler::handleRequest',
       code,
-      memorySize: 768,
+      memorySize: 1024,
       // Must be ≤ SQS visibility timeout (90s). Lambda extends visibility automatically
       // while running, so using the same duration is the safest choice here.
       timeout: cdk.Duration.seconds(60),
