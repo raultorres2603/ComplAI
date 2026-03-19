@@ -57,7 +57,7 @@ public class HttpWrapper {
 
     @Inject
     public HttpWrapper(OpenRouterClient openRouterClient,
-                       @Value("${openrouter.url:${OPENROUTER_URL:https://openrouter.ai}}") String openRouterUrl,
+                       @Value("${openrouter.url:${OPENROUTER_URL:https://openrouter.ai}") String openRouterUrl,
                        @Value("${OPENROUTER_API_KEY:}") String openRouterApiKey,
                        @Value("${OPENROUTER_REQUEST_TIMEOUT_SECONDS:60}") int requestTimeoutSeconds,
                        @Value("${OPENROUTER_MODEL:openrouter/free}") String openRouterModel,
