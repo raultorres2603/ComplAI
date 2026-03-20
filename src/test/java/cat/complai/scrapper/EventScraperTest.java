@@ -57,9 +57,10 @@ class EventScraperTest {
     void testCrawlEventDetailUrls_pagination() throws Exception {
         // Simulate two pages with event links and a next page link
         String baseUrl = "https://www.elprat.cat/la-ciutat/guia-agenda";
-        String page1 = "<div class='view-content'><a href='/la-ciutat/guia-agenda/event1'>Event 1</a></div>" +
+        String page1 = "<div class='view-guia-agenda'><div class='llistat-serveis-view'><h4><a href='https://www.elprat.cat/la-ciutat/guia-agenda/event1'>Event 1</a></h4></div></div>"
+                +
                 "<a class='pager-next' href='/la-ciutat/guia-agenda?page=1'>Next</a>";
-        String page2 = "<div class='view-content'><a href='/la-ciutat/guia-agenda/event2'>Event 2</a></div>";
+        String page2 = "<div class='view-guia-agenda'><div class='llistat-serveis-view'><h4><a href='https://www.elprat.cat/la-ciutat/guia-agenda/event2'>Event 2</a></h4></div></div>";
 
         // Patch Jsoup.connect().get() using Mockito
         var jsoupConnect = Mockito.mockStatic(Jsoup.class, Mockito.CALLS_REAL_METHODS);
@@ -72,7 +73,7 @@ class EventScraperTest {
             mapping.events = new ProcedureScraper.EventsConfig();
             mapping.events.baseUrl = baseUrl;
             mapping.events.crawl = new ProcedureScraper.EventCrawlConfig();
-            mapping.events.crawl.eventLinkSelector = "a[href^='/la-ciutat/guia-agenda/']";
+            mapping.events.crawl.eventLinkSelector = ".view-guia-agenda .llistat-serveis-view h4 a[href^='https://www.elprat.cat/la-ciutat/guia-agenda/']";
             mapping.events.crawl.eventDetailExcludePattern = null;
 
             Set<String> urls = invokeCrawlEventDetailUrls(mapping);

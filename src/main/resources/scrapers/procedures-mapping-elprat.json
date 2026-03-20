@@ -42,7 +42,7 @@
   "events": {
     "baseUrl": "https://www.elprat.cat/la-ciutat/guia-agenda",
     "crawl": {
-      "eventLinkSelector": "a[href^='/la-ciutat/guia-agenda/']",
+      "eventLinkSelector": ".view-guia-agenda .llistat-serveis-view h4 a[href^='https://www.elprat.cat/la-ciutat/guia-agenda/']",
       "eventDetailExcludePattern": ""
     },
     "fields": {
