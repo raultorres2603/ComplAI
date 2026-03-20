@@ -116,19 +116,9 @@ public class EventScraper {
                 logger.info("Page " + pageCount + ": Found " + eventsOnPage + " event links (" + nextPageUrl + ")");
                 totalEvents += eventsOnPage;
 
-                // Find next page link (common Drupal/agenda pattern: .pager-next a or
-                // rel="next")
-                Element nextLink = doc.selectFirst("a.pager-next, li.pager__item--next a, a[rel=next]");
-                if (nextLink != null) {
-                    String absNext = nextLink.absUrl("href");
-                    if (!absNext.isBlank() && !visitedPageUrls.contains(absNext)) {
-                        nextPageUrl = absNext;
-                    } else {
-                        nextPageUrl = null;
-                    }
-                } else {
-                    nextPageUrl = null;
-                }
+                // Find next page link in Drupal pager: look for "li.pager-item a" 
+                // that contains "next" or "següent" text, or rel=next attribute
+                nextPageUrl = findNextPageUrl(doc, visitedPageUrls);
             } catch (Exception e) {
                 logger.severe("Failed to fetch event page: " + nextPageUrl + " — " + e.getMessage());
                 break;
@@ -136,6 +126,38 @@ public class EventScraper {
         }
         logger.info("Total event detail URLs found: " + detailUrls.size() + " across " + pageCount + " pages");
         return detailUrls;
+    }
+
+    private static String findNextPageUrl(Document doc, Set<String> visitedPageUrls) {
+        // Try rel=next first (most reliable)
+        Element nextLink = doc.selectFirst("a[rel=next]");
+        if (nextLink != null) {
+            String absNext = nextLink.absUrl("href");
+            if (!absNext.isBlank() && !visitedPageUrls.contains(absNext)) {
+                return absNext;
+            }
+        }
+
+        // Try Drupal pager: look for li.pager-next a (contains "next" or "següent" text)
+        nextLink = doc.selectFirst("li.pager-next a");
+        if (nextLink != null) {
+            String absNext = nextLink.absUrl("href");
+            if (!absNext.isBlank() && !visitedPageUrls.contains(absNext)) {
+                return absNext;
+            }
+        }
+
+        // Fallback: look for any link with next/previous indicators in text
+        for (Element link : doc.select("a")) {
+            String text = link.text().trim().toLowerCase();
+            String href = link.absUrl("href");
+            if ((text.contains("next") || text.contains("següent") || text.equals("›")) 
+                    && !href.isBlank() && !visitedPageUrls.contains(href)) {
+                return href;
+            }
+        }
+
+        return null;
     }
 
     // -------------------------------------------------------------------------
