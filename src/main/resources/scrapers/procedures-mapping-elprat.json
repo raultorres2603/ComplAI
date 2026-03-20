@@ -1,8 +1,14 @@
 {
   "cityId": "elprat",
   "cityName": "El Prat de Llobregat",
-  "officialSources": ["https://www.elprat.cat/", "https://www.pratespais.com/", "https://tramits.pratespais.com/Ciutadania/"],
-  "newsSources": ["https://www.instagram.com/elprataldia/"],
+  "officialSources": [
+    "https://www.elprat.cat/",
+    "https://www.pratespais.com/",
+    "https://tramits.pratespais.com/Ciutadania/"
+  ],
+  "newsSources": [
+    "https://www.instagram.com/elprataldia/"
+  ],
   "baseUrl": "https://tramits.pratespais.com/Ciutadania/TramitsTemes.aspx",
   "s3Region": "eu-west-1",
   "crawl": {
@@ -29,48 +35,49 @@
     }
   },
   "skip": {
-    "whenTitleEmptyOrEquals": ["Portal de Tràmits"]
+    "whenTitleEmptyOrEquals": [
+      "Portal de Tràmits"
+    ]
   },
   "events": {
     "baseUrl": "https://www.elprat.cat/la-ciutat/guia-agenda",
     "crawl": {
-      "eventLinkSelector": "div.view-content div.views-row a[href]",
+      "eventLinkSelector": "a[href^='/la-ciutat/guia-agenda/']",
       "eventDetailExcludePattern": ""
     },
     "fields": {
       "title": {
-        "selector": "h1.page-header, h2.event-title",
+        "selector": "h1.page-header, h1.titol, h2.event-title, .node-title",
         "multiple": false
       },
       "description": {
-        "selector": ".field-name-body, .event-description",
+        "selector": ".field-name-body, .event-description, .field--name-body, .field--type-text-with-summary",
         "multiple": false
       },
       "eventType": {
-        "selector": ".field-name-field-tipus-acte, .event-type",
+        "selector": ".field-name-field-tipus-acte, .event-type, .field--name-field-tipus-acte",
         "multiple": false
       },
       "targetAudience": {
-        "selector": ".field-name-field-per-a-qui, .event-audience",
+        "selector": ".field-name-field-per-a-qui, .event-audience, .field--name-field-per-a-qui",
         "multiple": true
       },
       "date": {
-        "selector": ".field-name-field-data, .event-date",
+        "selector": ".field-name-field-data, .event-date, .field--name-field-data",
         "multiple": false
       },
       "time": {
-        "selector": ".field-name-field-hora, .event-time",
+        "selector": ".field-name-field-hora, .event-time, .field--name-field-hora",
         "multiple": false
       },
       "location": {
-        "selector": ".field-name-field-lloc, .event-location",
+        "selector": ".field-name-field-lloc, .event-location, .field--name-field-lloc",
         "multiple": false
       },
       "theme": {
-        "selector": ".field-name-field-tema, .event-theme",
+        "selector": ".field-name-field-tema, .event-theme, .field--name-field-tema",
         "multiple": false
       }
     }
   }
 }
-

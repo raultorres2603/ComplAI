@@ -11,6 +11,8 @@ repositories {
 }
 
 dependencies {
+        testImplementation("org.mockito:mockito-core:5.2.0")
+        testImplementation("org.mockito:mockito-inline:5.2.0")
     implementation("com.amazonaws:aws-lambda-java-events")
     implementation("io.micronaut:micronaut-http-client")
     // Micronaut JSON support via Jackson - provides JsonMapper bean

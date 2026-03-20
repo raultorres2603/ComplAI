@@ -88,24 +88,18 @@ public class EventScraper {
     // -------------------------------------------------------------------------
 
     private static Set<String> crawlEventDetailUrls(ProcedureScraper.ScraperMapping mapping) {
-        Set<String> pendingCategoryUrls = new LinkedHashSet<>();
-        Set<String> visitedCategoryUrls = new HashSet<>();
+        Set<String> visitedPageUrls = new HashSet<>();
         Set<String> detailUrls = new LinkedHashSet<>();
+        String nextPageUrl = mapping.events.baseUrl;
+        int pageCount = 0;
+        int totalEvents = 0;
 
-        pendingCategoryUrls.add(mapping.events.baseUrl);
-
-        while (!pendingCategoryUrls.isEmpty()) {
-            String currentUrl = pendingCategoryUrls.iterator().next();
-            pendingCategoryUrls.remove(currentUrl);
-
-            if (!visitedCategoryUrls.add(currentUrl))
-                continue;
-
+        while (nextPageUrl != null && !visitedPageUrls.contains(nextPageUrl)) {
+            pageCount++;
+            visitedPageUrls.add(nextPageUrl);
             try {
-                Document doc = Jsoup.connect(currentUrl).get();
-
-                // For events, we typically only need to find event detail links
-                // No category navigation like procedures
+                Document doc = Jsoup.connect(nextPageUrl).get();
+                int eventsOnPage = 0;
                 for (Element link : doc.select(mapping.events.crawl.eventLinkSelector)) {
                     String href = link.absUrl("href");
                     if (href.isBlank())
@@ -113,13 +107,32 @@ public class EventScraper {
                     if (mapping.events.crawl.eventDetailExcludePattern != null
                             && href.contains(mapping.events.crawl.eventDetailExcludePattern))
                         continue;
-                    detailUrls.add(href);
+                    if (detailUrls.add(href)) {
+                        eventsOnPage++;
+                    }
+                }
+                logger.info("Page " + pageCount + ": Found " + eventsOnPage + " event links (" + nextPageUrl + ")");
+                totalEvents += eventsOnPage;
+
+                // Find next page link (common Drupal/agenda pattern: .pager-next a or
+                // rel="next")
+                Element nextLink = doc.selectFirst("a.pager-next, li.pager__item--next a, a[rel=next]");
+                if (nextLink != null) {
+                    String absNext = nextLink.absUrl("href");
+                    if (!absNext.isBlank() && !visitedPageUrls.contains(absNext)) {
+                        nextPageUrl = absNext;
+                    } else {
+                        nextPageUrl = null;
+                    }
+                } else {
+                    nextPageUrl = null;
                 }
             } catch (Exception e) {
-                logger.severe("Failed to fetch event page: " + currentUrl + " — " + e.getMessage());
+                logger.severe("Failed to fetch event page: " + nextPageUrl + " — " + e.getMessage());
+                break;
             }
         }
-
+        logger.info("Total event detail URLs found: " + detailUrls.size() + " across " + pageCount + " pages");
         return detailUrls;
     }
 
