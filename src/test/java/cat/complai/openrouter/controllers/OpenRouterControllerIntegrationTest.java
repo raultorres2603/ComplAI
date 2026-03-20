@@ -12,6 +12,7 @@ import cat.complai.openrouter.services.OpenRouterServices;
 import cat.complai.openrouter.services.ai.AiResponseProcessingService;
 import cat.complai.openrouter.services.conversation.ConversationManagementService;
 import cat.complai.openrouter.services.procedure.ProcedureContextService;
+import cat.complai.openrouter.helpers.EventRagHelperRegistry;
 import cat.complai.openrouter.services.validation.InputValidationService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -524,7 +525,7 @@ public class OpenRouterControllerIntegrationTest {
             InputValidationService validationService = new InputValidationService(5000);
             ConversationManagementService conversationService = new ConversationManagementService();
             AiResponseProcessingService aiResponseService = new AiResponseProcessingService(httpWrapper, 30);
-            ProcedureContextService procedureContextService = new ProcedureContextService(new ProcedureRagHelperRegistry(), new cat.complai.openrouter.helpers.RedactPromptBuilder());
+            ProcedureContextService procedureContextService = new ProcedureContextService(new ProcedureRagHelperRegistry(), new EventRagHelperRegistry(), new cat.complai.openrouter.helpers.RedactPromptBuilder());
             return new OpenRouterServices(validationService, conversationService, aiResponseService, procedureContextService, new cat.complai.openrouter.helpers.RedactPromptBuilder());
         }
         @Singleton

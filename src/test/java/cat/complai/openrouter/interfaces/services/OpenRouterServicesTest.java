@@ -6,6 +6,7 @@ import cat.complai.openrouter.dto.ComplainantIdentity;
 import cat.complai.openrouter.dto.OpenRouterResponseDto;
 import cat.complai.openrouter.dto.Source;
 import cat.complai.openrouter.helpers.ProcedureRagHelperRegistry;
+import cat.complai.openrouter.helpers.EventRagHelperRegistry;
 import cat.complai.openrouter.services.OpenRouterServices;
 import cat.complai.openrouter.helpers.ProcedureRagHelper;
 import cat.complai.openrouter.services.ai.AiResponseProcessingService;
@@ -35,7 +36,7 @@ public class OpenRouterServicesTest {
         InputValidationService validationService = new InputValidationService(5000);
         ConversationManagementService conversationService = new ConversationManagementService();
         AiResponseProcessingService aiResponseService = new AiResponseProcessingService(wrapper, 30);
-        ProcedureContextService procedureContextService = new ProcedureContextService(wrapper.ragRegistry, new RedactPromptBuilder());
+        ProcedureContextService procedureContextService = new ProcedureContextService(wrapper.ragRegistry, new EventRagHelperRegistry(), new RedactPromptBuilder());
         return new OpenRouterServices(validationService, conversationService, aiResponseService, procedureContextService, new RedactPromptBuilder());
     }
 
@@ -233,7 +234,7 @@ public class OpenRouterServicesTest {
         InputValidationService validationService = new InputValidationService(5000);
         ConversationManagementService conversationService = new ConversationManagementService();
         AiResponseProcessingService aiResponseService = new AiResponseProcessingService(wrapper, 30);
-        ProcedureContextService procedureContextService = new ProcedureContextService(wrapper.ragRegistry, new RedactPromptBuilder());
+        ProcedureContextService procedureContextService = new ProcedureContextService(wrapper.ragRegistry, new EventRagHelperRegistry(), new RedactPromptBuilder());
         OpenRouterServices svc = new OpenRouterServices(validationService, conversationService, aiResponseService, procedureContextService, new RedactPromptBuilder());
 
         OpenRouterResponseDto out = svc.redactComplaint("   ", OutputFormat.JSON, null, null, "testcity");
