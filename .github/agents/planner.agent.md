@@ -1,7 +1,7 @@
 ---
 name: planner-agent
 description: This custom agent analyzes feature requests and creates detailed technical plans in a `task.md` file for implementation.
-model: Claude Haiku 4.5 (copilot)
+model: Claude Sonnet 4.6 (copilot)
 tools: [read, edit, search, web]
 user-invocable: false
 ---
