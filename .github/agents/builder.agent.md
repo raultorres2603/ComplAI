@@ -1,7 +1,7 @@
 ---
 name: builder-agent
 description: This agent is responsible for implementing the features outlined in `task.md` using Java and Micronaut, as well as updating AWS CDK infrastructure if required.
-model: GPT-4.1 (copilot)
+model: GPT-5 mini (copilot)
 tools: [ execute, read, edit, search, todo]
 user-invocable: false
 ---
