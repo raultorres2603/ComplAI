@@ -24,18 +24,22 @@ import java.util.logging.Logger;
 /**
  * Generic city events scraper.
  *
- * <p>Reads the events section from a per-city mapping file from the classpath
+ * <p>
+ * Reads the events section from a per-city mapping file from the classpath
  * ({@code scrapers/procedures-mapping-<cityId>.json}) that describes which HTML
  * selectors to use when crawling the city's events website. Produces a
  * {@code events-<cityId>.json} file locally and uploads it to S3.
  *
- * <p>Usage:
+ * <p>
+ * Usage:
+ * 
  * <pre>
  *   EVENTS_BUCKET=complai-events-development \
  *   java -cp complai-all.jar cat.complai.scrapper.EventScraper elprat
  * </pre>
  *
- * <p>To add a new city, ensure the mapping file contains an "events" section
+ * <p>
+ * To add a new city, ensure the mapping file contains an "events" section
  * following the schema of {@code procedures-mapping-elprat.json}.
  */
 public class EventScraper {
@@ -94,7 +98,8 @@ public class EventScraper {
             String currentUrl = pendingCategoryUrls.iterator().next();
             pendingCategoryUrls.remove(currentUrl);
 
-            if (!visitedCategoryUrls.add(currentUrl)) continue;
+            if (!visitedCategoryUrls.add(currentUrl))
+                continue;
 
             try {
                 Document doc = Jsoup.connect(currentUrl).get();
@@ -103,9 +108,11 @@ public class EventScraper {
                 // No category navigation like procedures
                 for (Element link : doc.select(mapping.events.crawl.eventLinkSelector)) {
                     String href = link.absUrl("href");
-                    if (href.isBlank()) continue;
+                    if (href.isBlank())
+                        continue;
                     if (mapping.events.crawl.eventDetailExcludePattern != null
-                            && href.contains(mapping.events.crawl.eventDetailExcludePattern)) continue;
+                            && href.contains(mapping.events.crawl.eventDetailExcludePattern))
+                        continue;
                     detailUrls.add(href);
                 }
             } catch (Exception e) {
@@ -120,7 +127,8 @@ public class EventScraper {
     // Scrape
     // -------------------------------------------------------------------------
 
-    private static List<Map<String, Object>> scrapeEvents(Set<String> detailUrls, ProcedureScraper.ScraperMapping mapping) {
+    private static List<Map<String, Object>> scrapeEvents(Set<String> detailUrls,
+            ProcedureScraper.ScraperMapping mapping) {
         List<Map<String, Object>> events = new ArrayList<>();
         for (String url : detailUrls) {
             try {
@@ -138,7 +146,8 @@ public class EventScraper {
         return events;
     }
 
-    private static Optional<Map<String, Object>> scrapeEvent(String url, ProcedureScraper.ScraperMapping mapping) throws IOException {
+    private static Optional<Map<String, Object>> scrapeEvent(String url, ProcedureScraper.ScraperMapping mapping)
+            throws IOException {
         Document doc = Jsoup.connect(url).get();
 
         Map<String, Object> event = new LinkedHashMap<>();
@@ -166,7 +175,8 @@ public class EventScraper {
             for (Element el : elements) {
                 String text = el.text().trim();
                 if (!text.isEmpty()) {
-                    if (!sb.isEmpty()) sb.append("\n");
+                    if (!sb.isEmpty())
+                        sb.append("\n");
                     sb.append(text);
                 }
             }
@@ -179,10 +189,13 @@ public class EventScraper {
 
     // Package-private for unit testing.
     static boolean shouldSkip(String title, ProcedureScraper.SkipConfig skip) {
-        if (title == null || title.isBlank()) return true;
-        if (skip == null || skip.whenTitleEmptyOrEquals == null) return false;
+        if (title == null || title.isBlank())
+            return true;
+        if (skip == null || skip.whenTitleEmptyOrEquals == null)
+            return false;
         for (String forbidden : skip.whenTitleEmptyOrEquals) {
-            if (title.equalsIgnoreCase(forbidden)) return true;
+            if (title.equalsIgnoreCase(forbidden))
+                return true;
         }
         return false;
     }
@@ -211,7 +224,7 @@ public class EventScraper {
     private static void uploadToS3(File file, String key, String bucket, String region) {
         try (S3Client s3 = S3Client.builder()
                 .region(Region.of(region))
-                .credentialsProvider(DefaultCredentialsProvider.create())
+                .credentialsProvider(DefaultCredentialsProvider.builder().build())
                 .build()) {
             s3.putObject(
                     PutObjectRequest.builder().bucket(bucket).key(key).build(),

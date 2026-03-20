@@ -75,10 +75,10 @@ public class ProcedureRagHelper {
         String s3Key = "procedures-" + cityId + ".json";
 
         if (bucket != null && region != null) {
-            software.amazon.awssdk.services.s3.S3ClientBuilder clientBuilder =
-                    software.amazon.awssdk.services.s3.S3Client.builder()
-                            .region(software.amazon.awssdk.regions.Region.of(region))
-                            .credentialsProvider(software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider.create());
+                software.amazon.awssdk.services.s3.S3ClientBuilder clientBuilder =
+                software.amazon.awssdk.services.s3.S3Client.builder()
+                    .region(software.amazon.awssdk.regions.Region.of(region))
+                    .credentialsProvider(software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider.builder().build());
 
             if (endpointUrl != null && !endpointUrl.isBlank()) {
                 clientBuilder.endpointOverride(URI.create(endpointUrl));

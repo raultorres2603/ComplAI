@@ -32,9 +32,9 @@ public class EventRagHelper {
         public final String theme;
         public final String url;
 
-        public Event(String eventId, String title, String description, String eventType, 
-                    String targetAudience, String date, String time, String location, 
-                    String theme, String url) {
+        public Event(String eventId, String title, String description, String eventType,
+                String targetAudience, String date, String time, String location,
+                String theme, String url) {
             this.eventId = eventId;
             this.title = title;
             this.description = description;
@@ -48,7 +48,8 @@ public class EventRagHelper {
         }
     }
 
-    private static final String[] SEARCH_FIELDS = {"title", "description", "eventType", "targetAudience", "location", "theme"};
+    private static final String[] SEARCH_FIELDS = { "title", "description", "eventType", "targetAudience", "location",
+            "theme" };
     private static final int MAX_RESULTS = 5;
     private static final String ENV_EVENTS_BUCKET = "EVENTS_BUCKET";
     private static final String ENV_EVENTS_REGION = "EVENTS_REGION";
@@ -62,7 +63,8 @@ public class EventRagHelper {
     /**
      * Builds an in-memory Lucene index for the given city's events.
      *
-     * <p>Events are loaded from S3 when {@code EVENTS_BUCKET} and
+     * <p>
+     * Events are loaded from S3 when {@code EVENTS_BUCKET} and
      * {@code EVENTS_REGION} are set; the S3 object key is always
      * {@code events-<cityId>.json}. Falls back to the classpath resource
      * {@code /events-<cityId>.json} when S3 env vars are absent (e.g. local tests).
@@ -77,29 +79,30 @@ public class EventRagHelper {
     }
 
     private InputStream getEventsInputStream() throws IOException {
-        String bucket     = System.getenv(ENV_EVENTS_BUCKET);
-        String region     = System.getenv(ENV_EVENTS_REGION);
+        String bucket = System.getenv(ENV_EVENTS_BUCKET);
+        String region = System.getenv(ENV_EVENTS_REGION);
         String endpointUrl = System.getenv("AWS_ENDPOINT_URL");
         // The S3 key is always derived from the cityId — no env var override.
         // This ensures multi-city requests each load the correct file.
         String s3Key = "events-" + cityId + ".json";
 
         if (bucket != null && region != null) {
-            software.amazon.awssdk.services.s3.S3ClientBuilder clientBuilder =
-                    software.amazon.awssdk.services.s3.S3Client.builder()
-                            .region(software.amazon.awssdk.regions.Region.of(region))
-                            .credentialsProvider(software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider.create());
+            software.amazon.awssdk.services.s3.S3ClientBuilder clientBuilder = software.amazon.awssdk.services.s3.S3Client
+                    .builder()
+                    .region(software.amazon.awssdk.regions.Region.of(region))
+                    .credentialsProvider(
+                            software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider.builder().build());
 
             if (endpointUrl != null && !endpointUrl.isBlank()) {
                 clientBuilder.endpointOverride(URI.create(endpointUrl));
             }
 
             try (software.amazon.awssdk.services.s3.S3Client s3 = clientBuilder.build()) {
-                software.amazon.awssdk.services.s3.model.GetObjectRequest req =
-                        software.amazon.awssdk.services.s3.model.GetObjectRequest.builder()
-                                .bucket(bucket)
-                                .key(s3Key)
-                                .build();
+                software.amazon.awssdk.services.s3.model.GetObjectRequest req = software.amazon.awssdk.services.s3.model.GetObjectRequest
+                        .builder()
+                        .bucket(bucket)
+                        .key(s3Key)
+                        .build();
                 logger.info(() -> "Loading events from S3 — bucket=" + bucket + " key=" + s3Key + " region=" + region);
                 // getObjectAsBytes() reads all bytes into memory before the S3Client
                 // (and its underlying HTTP connection) is closed by try-with-resources.
@@ -139,8 +142,7 @@ public class EventRagHelper {
                     node.path("time").asText(),
                     node.path("location").asText(),
                     node.path("theme").asText(),
-                    node.path("url").asText()
-            ));
+                    node.path("url").asText()));
         }
         return result;
     }
@@ -166,7 +168,8 @@ public class EventRagHelper {
     }
 
     public List<Event> search(String query) {
-        if (query == null || query.isBlank()) return Collections.emptyList();
+        if (query == null || query.isBlank())
+            return Collections.emptyList();
         List<Event> results = new ArrayList<>();
         try (DirectoryReader reader = DirectoryReader.open(ramDirectory)) {
             IndexSearcher searcher = new IndexSearcher(reader);
@@ -185,8 +188,7 @@ public class EventRagHelper {
                         doc.get("time"),
                         doc.get("location"),
                         doc.get("theme"),
-                        doc.get("url")
-                ));
+                        doc.get("url")));
             }
             logger.fine(() -> "Event RAG search — queryLength=" + query.length() + " resultCount=" + results.size());
         } catch (IOException | ParseException e) {
