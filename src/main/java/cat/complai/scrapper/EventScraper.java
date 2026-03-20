@@ -98,7 +98,9 @@ public class EventScraper {
             pageCount++;
             visitedPageUrls.add(nextPageUrl);
             try {
-                Document doc = Jsoup.connect(nextPageUrl).get();
+                Document doc = Jsoup.connect(nextPageUrl)
+                        .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                        .get();
                 int eventsOnPage = 0;
                 for (Element link : doc.select(mapping.events.crawl.eventLinkSelector)) {
                     String href = link.absUrl("href");
@@ -161,7 +163,9 @@ public class EventScraper {
 
     private static Optional<Map<String, Object>> scrapeEvent(String url, ProcedureScraper.ScraperMapping mapping)
             throws IOException {
-        Document doc = Jsoup.connect(url).get();
+        Document doc = Jsoup.connect(url)
+                .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                .get();
 
         Map<String, Object> event = new LinkedHashMap<>();
         // eventId is deterministic: same URL always produces the same ID.

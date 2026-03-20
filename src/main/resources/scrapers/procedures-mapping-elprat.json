@@ -43,39 +43,39 @@
     "baseUrl": "https://www.elprat.cat/la-ciutat/guia-agenda",
     "crawl": {
       "eventLinkSelector": ".view-guia-agenda .llistat-serveis-view h4 a[href^='https://www.elprat.cat/la-ciutat/guia-agenda/']",
-      "eventDetailExcludePattern": ""
+      "eventDetailExcludePattern": null
     },
     "fields": {
       "title": {
-        "selector": "h1.page-header, h1.titol, h2.event-title, .node-title",
+        "selector": "h1.title-slim, h1.page-header, h1.titol, h2.event-title, .node-title, h1",
         "multiple": false
       },
       "description": {
-        "selector": ".field-name-body, .event-description, .field--name-body, .field--type-text-with-summary",
+        "selector": ".col-md-9.col-md-pull-3 p, .field-name-body, .event-description, .field--name-body, .field--type-text-with-summary",
         "multiple": false
       },
       "eventType": {
-        "selector": ".field-name-field-tipus-acte, .event-type, .field--name-field-tipus-acte",
+        "selector": "a[href*='/intereses/'], .field-name-field-tipus-acte, .event-type, .field--name-field-tipus-acte",
         "multiple": false
       },
       "targetAudience": {
-        "selector": ".field-name-field-per-a-qui, .event-audience, .field--name-field-per-a-qui",
+        "selector": "a[href*='/categoria-de-poblaci'], a[href*='/arees-tematiques/'], .field-name-field-per-a-qui, .event-audience, .field--name-field-per-a-qui",
         "multiple": true
       },
       "date": {
-        "selector": ".field-name-field-data, .event-date, .field--name-field-data",
+        "selector": ".notranslate, .field-name-field-data, .event-date, .field--name-field-data",
         "multiple": false
       },
       "time": {
-        "selector": ".field-name-field-hora, .event-time, .field--name-field-hora",
+        "selector": ".icon-quan ~ p, .field-name-field-hora, .event-time, .field--name-field-hora",
         "multiple": false
       },
       "location": {
-        "selector": ".field-name-field-lloc, .event-location, .field--name-field-lloc",
+        "selector": ".icon-on ~ a, .field-name-field-lloc, .event-location, .field--name-field-lloc",
         "multiple": false
       },
       "theme": {
-        "selector": ".field-name-field-tema, .event-theme, .field--name-field-tema",
+        "selector": "a[href*='/arees-tematiques/'], .field-name-field-tema, .event-theme, .field--name-field-tema",
         "multiple": false
       }
     }
