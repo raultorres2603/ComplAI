@@ -168,7 +168,7 @@ export class LambdaStack extends cdk.Stack {
         // is bundled in oidc-mapping.json — enabled per city, no env var needed.
         // The worker Lambda does not receive JWT_SECRET and therefore never loads the
         // OidcIdentityTokenValidator bean.
-        JAVA_TOOL_OPTIONS: '--add-modules jdk.incubator.vector',
+        JAVA_TOOL_OPTIONS: '--add-modules=jdk.incubator.vector'
 
       },
       role: lambdaRole,
@@ -242,7 +242,7 @@ export class LambdaStack extends cdk.Stack {
         HTTP_CLIENT_READ_TIMEOUT: process.env.HTTP_CLIENT_READ_TIMEOUT || '60s',
         HTTP_CLIENT_MAX_CONNECTIONS: process.env.HTTP_CLIENT_MAX_CONNECTIONS || '20',
         HTTP_CLIENT_LOG_LEVEL: process.env.HTTP_CLIENT_LOG_LEVEL || 'WARN',
-        JAVA_TOOL_OPTIONS: '--add-modules jdk.incubator.vector'
+        JAVA_TOOL_OPTIONS: '--add-modules=jdk.incubator.vector'
       },
       role: workerRole,
       logGroup: workerLogGroup,
