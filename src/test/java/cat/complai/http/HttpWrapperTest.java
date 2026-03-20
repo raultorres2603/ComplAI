@@ -10,8 +10,6 @@ import org.junit.jupiter.api.Test;
 
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
-import java.net.http.HttpClient;
-import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -35,13 +33,11 @@ public class HttpWrapperTest {
         server.start();
 
         Map<String, Object> props = Map.of(
-                "openrouter.url", "http://localhost:" + server.getAddress().getPort() + "/api/v1/chat/completions",
+                "openrouter.url", "http://localhost:" + server.getAddress().getPort(),
                 "OPENROUTER_API_KEY", "test-key",
                 "micronaut.application.name", "complai-test"
         );
         try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST).build()) {
-            // register singletons before starting context so DI finds them
-            ctx.registerSingleton(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build());
             ctx.registerSingleton(new ObjectMapper());
             ctx.start();
             HttpWrapper httpWrapper = ctx.getBean(HttpWrapper.class);
@@ -73,11 +69,10 @@ public class HttpWrapperTest {
         server.start();
 
         Map<String, Object> props = Map.of(
-                "openrouter.url", "http://localhost:" + server.getAddress().getPort() + "/api/v1/chat/completions",
+                "openrouter.url", "http://localhost:" + server.getAddress().getPort(),
                 "OPENROUTER_API_KEY", "test-key"
         );
         try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST).build()) {
-            ctx.registerSingleton(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build());
             ctx.registerSingleton(new ObjectMapper());
             ctx.start();
             HttpWrapper wrapper = ctx.getBean(HttpWrapper.class);
@@ -110,11 +105,10 @@ public class HttpWrapperTest {
         server.start();
 
         Map<String, Object> props = Map.of(
-                "openrouter.url", "http://localhost:" + server.getAddress().getPort() + "/api/v1/chat/completions",
+                "openrouter.url", "http://localhost:" + server.getAddress().getPort(),
                 "OPENROUTER_API_KEY", "test-key"
         );
         try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST).build()) {
-            ctx.registerSingleton(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build());
             ctx.registerSingleton(new ObjectMapper());
             ctx.start();
             HttpWrapper wrapper = ctx.getBean(HttpWrapper.class);
@@ -150,12 +144,11 @@ public class HttpWrapperTest {
         server.start();
 
         Map<String, Object> props = Map.of(
-                "openrouter.url", "http://localhost:" + server.getAddress().getPort() + "/api/v1/chat/completions",
+                "openrouter.url", "http://localhost:" + server.getAddress().getPort(),
                 // Put a plain token so wrapper prefixes Bearer
                 "OPENROUTER_API_KEY", "plain-token"
         );
         try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST).build()) {
-            ctx.registerSingleton(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build());
             ctx.registerSingleton(new ObjectMapper());
             ctx.start();
             HttpWrapper wrapper = ctx.getBean(HttpWrapper.class);

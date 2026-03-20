@@ -48,6 +48,9 @@ export class LambdaStack extends cdk.Stack {
     const proceduresBucket = s3.Bucket.fromBucketName(
       this, `ProceduresBucketRef-${environment}`, `complai-procedures-${environment}`
     );
+    const eventsBucket = s3.Bucket.fromBucketName(
+      this, `EventsBucketRef-${environment}`, `complai-events-${environment}`
+    );
     const complaintsBucket = s3.Bucket.fromBucketName(
       this, `ComplaintsBucketRef-${environment}`, `complai-complaints-${environment}`
     );
@@ -134,8 +137,10 @@ export class LambdaStack extends cdk.Stack {
       // our CDK HttpApi integration.
       handler: 'io.micronaut.function.aws.proxy.payload2.APIGatewayV2HTTPEventFunction::handleRequest',
       code,
-      memorySize: 768,
+      memorySize: 1024,
+      snapStart: lambda.SnapStartConf.ON_PUBLISHED_VERSIONS,
       timeout: cdk.Duration.seconds(60),
+      // Enable SnapStart with CRaC for cold start optimization
       // Wire the OpenRouter API key (from CFN parameter) into the Lambda environment.
       // Be aware that environment variables are visible in the Lambda console; using
       // Secrets Manager or SSM Parameter Store with encryption is more secure if available.
@@ -146,16 +151,25 @@ export class LambdaStack extends cdk.Stack {
         OPENROUTER_MAX_RETRIES: process.env.OPENROUTER_MAX_RETRIES || '3',
         PROCEDURES_BUCKET: proceduresBucket.bucketName,
         PROCEDURES_REGION: this.region,
+        EVENTS_BUCKET: eventsBucket.bucketName,
+        EVENTS_REGION: this.region,
         OPENROUTER_MODEL: process.env.OPENROUTER_MODEL || 'openrouter/free',
         JWT_SECRET: process.env.JWT_SECRET || '',
         // Async redact flow: queue URL for publishing + bucket details for pre-signed URLs.
         REDACT_QUEUE_URL: redactQueue.queueUrl,
         COMPLAINTS_BUCKET: complaintsBucket.bucketName,
         COMPLAINTS_REGION: this.region,
+        // HTTP Client configuration for Micronaut (operational flexibility)
+        HTTP_CLIENT_CONNECT_TIMEOUT: process.env.HTTP_CLIENT_CONNECT_TIMEOUT || '10s',
+        HTTP_CLIENT_READ_TIMEOUT: process.env.HTTP_CLIENT_READ_TIMEOUT || '60s',
+        HTTP_CLIENT_MAX_CONNECTIONS: process.env.HTTP_CLIENT_MAX_CONNECTIONS || '20',
+        HTTP_CLIENT_LOG_LEVEL: process.env.HTTP_CLIENT_LOG_LEVEL || 'WARN',
         // OIDC identity verification. Per-city config (issuer, JWKS URI, audience, NIF claim)
         // is bundled in oidc-mapping.json — enabled per city, no env var needed.
         // The worker Lambda does not receive JWT_SECRET and therefore never loads the
         // OidcIdentityTokenValidator bean.
+        JAVA_TOOL_OPTIONS: '--add-modules=jdk.incubator.vector'
+
       },
       role: lambdaRole,
       logGroup: logGroup,
@@ -169,6 +183,7 @@ export class LambdaStack extends cdk.Stack {
     // signed URL would return 403 when the user tries to download the PDF.
     complaintsBucket.grantRead(lambdaRole);
     proceduresBucket.grantRead(lambdaRole);
+    eventsBucket.grantRead(lambdaRole);
 
     // -------------------------------------------------------------------------
     // Worker Lambda — processes SQS messages and uploads generated PDFs to S3.
@@ -188,6 +203,8 @@ export class LambdaStack extends cdk.Stack {
     complaintsBucket.grantPut(workerRole);
     // Worker needs procedures access for RAG context in the AI prompt.
     proceduresBucket.grantRead(workerRole);
+    // Worker needs events access for event context in the AI prompt.
+    eventsBucket.grantRead(workerRole);
 
     const workerLogGroup = new logs.LogGroup(this, `ComplAIWorkerLogGroup-${environment}`, {
       logGroupName: `/aws/lambda/ComplAIRedactorLambda-${environment}`,
@@ -202,10 +219,12 @@ export class LambdaStack extends cdk.Stack {
       // Same shadow JAR, different handler class — no separate build needed.
       handler: 'cat.complai.worker.RedactWorkerHandler::handleRequest',
       code,
-      memorySize: 768,
+      memorySize: 1024,
+      snapStart: lambda.SnapStartConf.ON_PUBLISHED_VERSIONS,
       // Must be ≤ SQS visibility timeout (90s). Lambda extends visibility automatically
       // while running, so using the same duration is the safest choice here.
       timeout: cdk.Duration.seconds(60),
+      // Enable SnapStart with CRaC for cold start optimization
       environment: {
         OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '',
         OPENROUTER_REQUEST_TIMEOUT_SECONDS: process.env.OPENROUTER_REQUEST_TIMEOUT_SECONDS || '60',
@@ -216,6 +235,14 @@ export class LambdaStack extends cdk.Stack {
         COMPLAINTS_REGION: this.region,
         PROCEDURES_BUCKET: proceduresBucket.bucketName,
         PROCEDURES_REGION: this.region,
+        EVENTS_BUCKET: eventsBucket.bucketName,
+        EVENTS_REGION: this.region,
+        // HTTP Client configuration for Micronaut (operational flexibility)
+        HTTP_CLIENT_CONNECT_TIMEOUT: process.env.HTTP_CLIENT_CONNECT_TIMEOUT || '10s',
+        HTTP_CLIENT_READ_TIMEOUT: process.env.HTTP_CLIENT_READ_TIMEOUT || '60s',
+        HTTP_CLIENT_MAX_CONNECTIONS: process.env.HTTP_CLIENT_MAX_CONNECTIONS || '20',
+        HTTP_CLIENT_LOG_LEVEL: process.env.HTTP_CLIENT_LOG_LEVEL || 'WARN',
+        JAVA_TOOL_OPTIONS: '--add-modules=jdk.incubator.vector'
       },
       role: workerRole,
       logGroup: workerLogGroup,

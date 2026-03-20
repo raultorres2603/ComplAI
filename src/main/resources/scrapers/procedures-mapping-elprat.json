@@ -30,6 +30,47 @@
   },
   "skip": {
     "whenTitleEmptyOrEquals": ["Portal de Tràmits"]
+  },
+  "events": {
+    "baseUrl": "https://www.elprat.cat/la-ciutat/guia-agenda",
+    "crawl": {
+      "eventLinkSelector": "div.view-content div.views-row a[href]",
+      "eventDetailExcludePattern": ""
+    },
+    "fields": {
+      "title": {
+        "selector": "h1.page-header, h2.event-title",
+        "multiple": false
+      },
+      "description": {
+        "selector": ".field-name-body, .event-description",
+        "multiple": false
+      },
+      "eventType": {
+        "selector": ".field-name-field-tipus-acte, .event-type",
+        "multiple": false
+      },
+      "targetAudience": {
+        "selector": ".field-name-field-per-a-qui, .event-audience",
+        "multiple": true
+      },
+      "date": {
+        "selector": ".field-name-field-data, .event-date",
+        "multiple": false
+      },
+      "time": {
+        "selector": ".field-name-field-hora, .event-time",
+        "multiple": false
+      },
+      "location": {
+        "selector": ".field-name-field-lloc, .event-location",
+        "multiple": false
+      },
+      "theme": {
+        "selector": ".field-name-field-tema, .event-theme",
+        "multiple": false
+      }
+    }
   }
 }
 

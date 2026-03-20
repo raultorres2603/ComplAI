@@ -283,6 +283,8 @@ public class ProcedureScraper {
          */
         public Map<String, FieldExtractionRule> fields = new LinkedHashMap<>();
         public SkipConfig skip;
+        /** Events configuration for scraping city events */
+        public EventsConfig events;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -313,6 +315,27 @@ public class ProcedureScraper {
          * or case-insensitively matches any entry in this list.
          */
         public List<String> whenTitleEmptyOrEquals = new ArrayList<>();
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static final class EventsConfig {
+        /** Base URL for the events agenda page */
+        public String baseUrl;
+        /** Crawl configuration for events */
+        public EventCrawlConfig crawl;
+        /**
+         * Field extraction rules keyed by output field name (e.g. "title", "description", "date").
+         * Insertion order is preserved.
+         */
+        public Map<String, FieldExtractionRule> fields = new LinkedHashMap<>();
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static final class EventCrawlConfig {
+        /** CSS selector that matches event detail page links */
+        public String eventLinkSelector;
+        /** Substring pattern — links whose href contains this string are excluded. Null = no exclusion. */
+        public String eventDetailExcludePattern;
     }
 }
 

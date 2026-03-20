@@ -275,12 +275,26 @@ jobs:
       # using DEPLOYMENT_JAR_KEY — nothing is staged to the CDK bootstrap bucket.
       - name: Deploy Lambda stack
         env:
+          # Required secrets/vars ------------------------------------------------
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           TARGET_ENV: ${{ steps.target.outputs.environment }}
-          # DEPLOYMENT_JAR_KEY was written to $GITHUB_ENV in the previous step and
-          # is automatically injected here as a shell variable.
+          # DEPLOYMENT_JAR_KEY is written to $GITHUB_ENV in the Upload JAR step.
+          # Re-expose it explicitly here so the step contract is obvious.
+          DEPLOYMENT_JAR_KEY: ${{ env.DEPLOYMENT_JAR_KEY }}
+
+          # Optional tuning variables (set these as repository/organization
+          # Variables or Environment-level Variables in GitHub if you want to
+          # override the code defaults in lambda-stack.ts). Leave unset to use
+          # the sensible defaults defined in the CDK code.
+          OPENROUTER_REQUEST_TIMEOUT_SECONDS: ${{ vars.OPENROUTER_REQUEST_TIMEOUT_SECONDS }}
+          OPENROUTER_OVERALL_TIMEOUT_SECONDS: ${{ vars.OPENROUTER_OVERALL_TIMEOUT_SECONDS }}
+          OPENROUTER_MAX_RETRIES: ${{ vars.OPENROUTER_MAX_RETRIES }}
+          HTTP_CLIENT_CONNECT_TIMEOUT: ${{ vars.HTTP_CLIENT_CONNECT_TIMEOUT }}
+          HTTP_CLIENT_READ_TIMEOUT: ${{ vars.HTTP_CLIENT_READ_TIMEOUT }}
+          HTTP_CLIENT_MAX_CONNECTIONS: ${{ vars.HTTP_CLIENT_MAX_CONNECTIONS }}
+          HTTP_CLIENT_LOG_LEVEL: ${{ vars.HTTP_CLIENT_LOG_LEVEL }}
         run: |
           cd cdk
           npx cdk deploy "ComplAILambdaStack-${TARGET_ENV}" \
