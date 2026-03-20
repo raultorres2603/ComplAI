@@ -1,7 +1,7 @@
 ---
 name: orchestrator-agent
 description: This agent manages the end-to-end lifecycle of feature requests by coordinating the Planner Agent and the Builder Agent, ensuring that plans are created, reviewed, and implemented according to project standards.
-model: Claude Sonnet 4.6 (copilot)
+model: Claude Haiku 4.5 (copilot)
 tools: [execute, read, edit, search, agent]
 user-invocable: true
 ---
