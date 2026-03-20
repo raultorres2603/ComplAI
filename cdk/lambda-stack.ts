@@ -138,11 +138,9 @@ export class LambdaStack extends cdk.Stack {
       handler: 'io.micronaut.function.aws.proxy.payload2.APIGatewayV2HTTPEventFunction::handleRequest',
       code,
       memorySize: 1024,
+      snapStart: lambda.SnapStartConf.ON_PUBLISHED_VERSIONS,
       timeout: cdk.Duration.seconds(60),
-      // Enable JDK Vector API for Lucene performance optimization
-      javaRuntimeOptions: ['--add-modules', 'jdk.incubator.vector'],
       // Enable SnapStart with CRaC for cold start optimization
-      snapStart: lambda.SnapStartConf.ON,
       // Wire the OpenRouter API key (from CFN parameter) into the Lambda environment.
       // Be aware that environment variables are visible in the Lambda console; using
       // Secrets Manager or SSM Parameter Store with encryption is more secure if available.
@@ -170,6 +168,8 @@ export class LambdaStack extends cdk.Stack {
         // is bundled in oidc-mapping.json — enabled per city, no env var needed.
         // The worker Lambda does not receive JWT_SECRET and therefore never loads the
         // OidcIdentityTokenValidator bean.
+        JAVA_TOOL_OPTIONS: '--add-modules jdk.incubator.vector',
+
       },
       role: lambdaRole,
       logGroup: logGroup,
@@ -220,13 +220,11 @@ export class LambdaStack extends cdk.Stack {
       handler: 'cat.complai.worker.RedactWorkerHandler::handleRequest',
       code,
       memorySize: 1024,
+      snapStart: lambda.SnapStartConf.ON_PUBLISHED_VERSIONS,
       // Must be ≤ SQS visibility timeout (90s). Lambda extends visibility automatically
       // while running, so using the same duration is the safest choice here.
       timeout: cdk.Duration.seconds(60),
-      // Enable JDK Vector API for Lucene performance optimization
-      javaRuntimeOptions: ['--add-modules', 'jdk.incubator.vector'],
       // Enable SnapStart with CRaC for cold start optimization
-      snapStart: lambda.SnapStartConf.ON,
       environment: {
         OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '',
         OPENROUTER_REQUEST_TIMEOUT_SECONDS: process.env.OPENROUTER_REQUEST_TIMEOUT_SECONDS || '60',
@@ -244,6 +242,7 @@ export class LambdaStack extends cdk.Stack {
         HTTP_CLIENT_READ_TIMEOUT: process.env.HTTP_CLIENT_READ_TIMEOUT || '60s',
         HTTP_CLIENT_MAX_CONNECTIONS: process.env.HTTP_CLIENT_MAX_CONNECTIONS || '20',
         HTTP_CLIENT_LOG_LEVEL: process.env.HTTP_CLIENT_LOG_LEVEL || 'WARN',
+        JAVA_TOOL_OPTIONS: '--add-modules jdk.incubator.vector'
       },
       role: workerRole,
       logGroup: workerLogGroup,
