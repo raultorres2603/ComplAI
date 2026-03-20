@@ -30,6 +30,7 @@ on:
         options:
           - development
           - production
+        default: 'development'
       branch:
         description: 'Branch to deploy (production only accepts master)'
         required: true
