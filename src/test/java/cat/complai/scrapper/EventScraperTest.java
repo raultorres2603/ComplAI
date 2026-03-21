@@ -3,13 +3,11 @@ package cat.complai.scrapper;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
 import org.jsoup.parser.Parser;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.net.CookieStore;
 import java.net.Proxy;
@@ -70,11 +68,18 @@ class EventScraperTest {
                     .thenReturn(new FakeConnection(page2));
 
             ProcedureScraper.ScraperMapping mapping = new ProcedureScraper.ScraperMapping();
+
             mapping.events = new ProcedureScraper.EventsConfig();
             mapping.events.baseUrl = baseUrl;
             mapping.events.crawl = new ProcedureScraper.EventCrawlConfig();
             mapping.events.crawl.eventLinkSelector = ".view-guia-agenda .llistat-serveis-view h4 a[href^='https://www.elprat.cat/la-ciutat/guia-agenda/']";
             mapping.events.crawl.eventDetailExcludePattern = null;
+            // Add at least one dummy field to make mapping structurally valid
+            mapping.events.fields = new LinkedHashMap<>();
+            ProcedureScraper.FieldExtractionRule dummyRule = new ProcedureScraper.FieldExtractionRule();
+            dummyRule.selector = "h1";
+            dummyRule.multiple = false;
+            mapping.events.fields.put("title", dummyRule);
 
             Set<String> urls = invokeCrawlEventDetailUrls(mapping);
             assertEquals(2, urls.size());
@@ -174,14 +179,14 @@ class EventScraperTest {
 
         @Override
         public Connection userAgent(String userAgent) {
-            // TODO Auto-generated method stub
-            throw new UnsupportedOperationException("Unimplemented method 'userAgent'");
+            // Support method chaining in tests
+            return this;
         }
 
         @Override
         public Connection timeout(int millis) {
-            // TODO Auto-generated method stub
-            throw new UnsupportedOperationException("Unimplemented method 'timeout'");
+            // Support method chaining in tests
+            return this;
         }
 
         @Override
