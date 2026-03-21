@@ -24,18 +24,22 @@ import java.util.logging.Logger;
 /**
  * Generic city events scraper.
  *
- * <p>Reads the events section from a per-city mapping file from the classpath
+ * <p>
+ * Reads the events section from a per-city mapping file from the classpath
  * ({@code scrapers/procedures-mapping-<cityId>.json}) that describes which HTML
  * selectors to use when crawling the city's events website. Produces a
  * {@code events-<cityId>.json} file locally and uploads it to S3.
  *
- * <p>Usage:
+ * <p>
+ * Usage:
+ * 
  * <pre>
  *   EVENTS_BUCKET=complai-events-development \
  *   java -cp complai-all.jar cat.complai.scrapper.EventScraper elprat
  * </pre>
  *
- * <p>To add a new city, ensure the mapping file contains an "events" section
+ * <p>
+ * To add a new city, ensure the mapping file contains an "events" section
  * following the schema of {@code procedures-mapping-elprat.json}.
  */
 public class EventScraper {
@@ -84,43 +88,84 @@ public class EventScraper {
     // -------------------------------------------------------------------------
 
     private static Set<String> crawlEventDetailUrls(ProcedureScraper.ScraperMapping mapping) {
-        Set<String> pendingCategoryUrls = new LinkedHashSet<>();
-        Set<String> visitedCategoryUrls = new HashSet<>();
+        Set<String> visitedPageUrls = new HashSet<>();
         Set<String> detailUrls = new LinkedHashSet<>();
+        String nextPageUrl = mapping.events.baseUrl;
+        int pageCount = 0;
+        int totalEvents = 0;
 
-        pendingCategoryUrls.add(mapping.events.baseUrl);
-
-        while (!pendingCategoryUrls.isEmpty()) {
-            String currentUrl = pendingCategoryUrls.iterator().next();
-            pendingCategoryUrls.remove(currentUrl);
-
-            if (!visitedCategoryUrls.add(currentUrl)) continue;
-
+        while (nextPageUrl != null && !visitedPageUrls.contains(nextPageUrl)) {
+            pageCount++;
+            visitedPageUrls.add(nextPageUrl);
             try {
-                Document doc = Jsoup.connect(currentUrl).get();
-
-                // For events, we typically only need to find event detail links
-                // No category navigation like procedures
+                Document doc = Jsoup.connect(nextPageUrl)
+                        .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                        .get();
+                int eventsOnPage = 0;
                 for (Element link : doc.select(mapping.events.crawl.eventLinkSelector)) {
                     String href = link.absUrl("href");
-                    if (href.isBlank()) continue;
+                    if (href.isBlank())
+                        continue;
                     if (mapping.events.crawl.eventDetailExcludePattern != null
-                            && href.contains(mapping.events.crawl.eventDetailExcludePattern)) continue;
-                    detailUrls.add(href);
+                            && href.contains(mapping.events.crawl.eventDetailExcludePattern))
+                        continue;
+                    if (detailUrls.add(href)) {
+                        eventsOnPage++;
+                    }
                 }
+                logger.info("Page " + pageCount + ": Found " + eventsOnPage + " event links (" + nextPageUrl + ")");
+                totalEvents += eventsOnPage;
+
+                // Find next page link in Drupal pager: look for "li.pager-item a" 
+                // that contains "next" or "següent" text, or rel=next attribute
+                nextPageUrl = findNextPageUrl(doc, visitedPageUrls);
             } catch (Exception e) {
-                logger.severe("Failed to fetch event page: " + currentUrl + " — " + e.getMessage());
+                logger.severe("Failed to fetch event page: " + nextPageUrl + " — " + e.getMessage());
+                break;
+            }
+        }
+        logger.info("Total event detail URLs found: " + detailUrls.size() + " across " + pageCount + " pages");
+        return detailUrls;
+    }
+
+    private static String findNextPageUrl(Document doc, Set<String> visitedPageUrls) {
+        // Try rel=next first (most reliable)
+        Element nextLink = doc.selectFirst("a[rel=next]");
+        if (nextLink != null) {
+            String absNext = nextLink.absUrl("href");
+            if (!absNext.isBlank() && !visitedPageUrls.contains(absNext)) {
+                return absNext;
             }
         }
 
-        return detailUrls;
+        // Try Drupal pager: look for li.pager-next a (contains "next" or "següent" text)
+        nextLink = doc.selectFirst("li.pager-next a");
+        if (nextLink != null) {
+            String absNext = nextLink.absUrl("href");
+            if (!absNext.isBlank() && !visitedPageUrls.contains(absNext)) {
+                return absNext;
+            }
+        }
+
+        // Fallback: look for any link with next/previous indicators in text
+        for (Element link : doc.select("a")) {
+            String text = link.text().trim().toLowerCase();
+            String href = link.absUrl("href");
+            if ((text.contains("next") || text.contains("següent") || text.equals("›")) 
+                    && !href.isBlank() && !visitedPageUrls.contains(href)) {
+                return href;
+            }
+        }
+
+        return null;
     }
 
     // -------------------------------------------------------------------------
     // Scrape
     // -------------------------------------------------------------------------
 
-    private static List<Map<String, Object>> scrapeEvents(Set<String> detailUrls, ProcedureScraper.ScraperMapping mapping) {
+    private static List<Map<String, Object>> scrapeEvents(Set<String> detailUrls,
+            ProcedureScraper.ScraperMapping mapping) {
         List<Map<String, Object>> events = new ArrayList<>();
         for (String url : detailUrls) {
             try {
@@ -138,8 +183,11 @@ public class EventScraper {
         return events;
     }
 
-    private static Optional<Map<String, Object>> scrapeEvent(String url, ProcedureScraper.ScraperMapping mapping) throws IOException {
-        Document doc = Jsoup.connect(url).get();
+    private static Optional<Map<String, Object>> scrapeEvent(String url, ProcedureScraper.ScraperMapping mapping)
+            throws IOException {
+        Document doc = Jsoup.connect(url)
+                .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                .get();
 
         Map<String, Object> event = new LinkedHashMap<>();
         // eventId is deterministic: same URL always produces the same ID.
@@ -166,7 +214,8 @@ public class EventScraper {
             for (Element el : elements) {
                 String text = el.text().trim();
                 if (!text.isEmpty()) {
-                    if (!sb.isEmpty()) sb.append("\n");
+                    if (!sb.isEmpty())
+                        sb.append("\n");
                     sb.append(text);
                 }
             }
@@ -179,10 +228,13 @@ public class EventScraper {
 
     // Package-private for unit testing.
     static boolean shouldSkip(String title, ProcedureScraper.SkipConfig skip) {
-        if (title == null || title.isBlank()) return true;
-        if (skip == null || skip.whenTitleEmptyOrEquals == null) return false;
+        if (title == null || title.isBlank())
+            return true;
+        if (skip == null || skip.whenTitleEmptyOrEquals == null)
+            return false;
         for (String forbidden : skip.whenTitleEmptyOrEquals) {
-            if (title.equalsIgnoreCase(forbidden)) return true;
+            if (title.equalsIgnoreCase(forbidden))
+                return true;
         }
         return false;
     }
@@ -211,7 +263,7 @@ public class EventScraper {
     private static void uploadToS3(File file, String key, String bucket, String region) {
         try (S3Client s3 = S3Client.builder()
                 .region(Region.of(region))
-                .credentialsProvider(DefaultCredentialsProvider.create())
+                .credentialsProvider(DefaultCredentialsProvider.builder().build())
                 .build()) {
             s3.putObject(
                     PutObjectRequest.builder().bucket(bucket).key(key).build(),

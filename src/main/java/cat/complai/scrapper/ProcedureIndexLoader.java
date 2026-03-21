@@ -23,7 +23,7 @@ public class ProcedureIndexLoader {
     public Path downloadProceduresJson() throws Exception {
         S3Client s3 = S3Client.builder()
                 .region(region)
-                .credentialsProvider(DefaultCredentialsProvider.create())
+                .credentialsProvider(DefaultCredentialsProvider.builder().build())
                 .build();
         GetObjectRequest req = GetObjectRequest.builder()
                 .bucket(bucket)
@@ -36,4 +36,3 @@ public class ProcedureIndexLoader {
         return tempFile;
     }
 }
-

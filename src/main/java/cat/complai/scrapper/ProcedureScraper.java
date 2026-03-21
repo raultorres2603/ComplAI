@@ -24,18 +24,22 @@ import java.util.logging.Logger;
 /**
  * Generic city procedures scraper.
  *
- * <p>Reads a per-city mapping file from the classpath
+ * <p>
+ * Reads a per-city mapping file from the classpath
  * ({@code scrapers/procedures-mapping-<cityId>.json}) that describes which HTML
  * selectors to use when crawling the city's procedure website. Produces a
  * {@code procedures-<cityId>.json} file locally and uploads it to S3.
  *
- * <p>Usage:
+ * <p>
+ * Usage:
+ * 
  * <pre>
  *   PROCEDURES_BUCKET=complai-procedures-development \
  *   java -cp complai-all.jar cat.complai.pratespais.ProcedureScraper elprat
  * </pre>
  *
- * <p>To add a new city, create
+ * <p>
+ * To add a new city, create
  * {@code src/main/resources/scrapers/procedures-mapping-<cityId>.json}
  * following the schema of the existing {@code procedures-mapping-elprat.json}.
  */
@@ -87,7 +91,7 @@ public class ProcedureScraper {
         if (is == null) {
             throw new IOException(
                     "No mapping found for city='" + cityId + "'. "
-                    + "Expected classpath resource: " + resourcePath);
+                            + "Expected classpath resource: " + resourcePath);
         }
         ScraperMapping mapping = MAPPER.readValue(is, ScraperMapping.class);
         validateMapping(mapping, cityId);
@@ -132,7 +136,8 @@ public class ProcedureScraper {
             String currentUrl = pendingCategoryUrls.iterator().next();
             pendingCategoryUrls.remove(currentUrl);
 
-            if (!visitedCategoryUrls.add(currentUrl)) continue;
+            if (!visitedCategoryUrls.add(currentUrl))
+                continue;
 
             try {
                 Document doc = Jsoup.connect(currentUrl).get();
@@ -148,9 +153,11 @@ public class ProcedureScraper {
 
                 for (Element link : doc.select(mapping.crawl.detailLinkSelector)) {
                     String href = link.absUrl("href");
-                    if (href.isBlank()) continue;
+                    if (href.isBlank())
+                        continue;
                     if (mapping.crawl.detailLinkExcludePattern != null
-                            && href.contains(mapping.crawl.detailLinkExcludePattern)) continue;
+                            && href.contains(mapping.crawl.detailLinkExcludePattern))
+                        continue;
                     detailUrls.add(href);
                 }
             } catch (Exception e) {
@@ -183,7 +190,8 @@ public class ProcedureScraper {
         return procedures;
     }
 
-    private static Optional<Map<String, Object>> scrapeProcedure(String url, ScraperMapping mapping) throws IOException {
+    private static Optional<Map<String, Object>> scrapeProcedure(String url, ScraperMapping mapping)
+            throws IOException {
         Document doc = Jsoup.connect(url).get();
 
         Map<String, Object> procedure = new LinkedHashMap<>();
@@ -211,7 +219,8 @@ public class ProcedureScraper {
             for (Element el : elements) {
                 String text = el.text().trim();
                 if (!text.isEmpty()) {
-                    if (!sb.isEmpty()) sb.append("\n");
+                    if (!sb.isEmpty())
+                        sb.append("\n");
                     sb.append(text);
                 }
             }
@@ -224,10 +233,13 @@ public class ProcedureScraper {
 
     // Package-private for unit testing.
     static boolean shouldSkip(String title, SkipConfig skip) {
-        if (title == null || title.isBlank()) return true;
-        if (skip == null || skip.whenTitleEmptyOrEquals == null) return false;
+        if (title == null || title.isBlank())
+            return true;
+        if (skip == null || skip.whenTitleEmptyOrEquals == null)
+            return false;
         for (String forbidden : skip.whenTitleEmptyOrEquals) {
-            if (title.equalsIgnoreCase(forbidden)) return true;
+            if (title.equalsIgnoreCase(forbidden))
+                return true;
         }
         return false;
     }
@@ -256,7 +268,7 @@ public class ProcedureScraper {
     private static void uploadToS3(File file, String key, String bucket, String region) {
         try (S3Client s3 = S3Client.builder()
                 .region(Region.of(region))
-                .credentialsProvider(DefaultCredentialsProvider.create())
+                .credentialsProvider(DefaultCredentialsProvider.builder().build())
                 .build()) {
             s3.putObject(
                     PutObjectRequest.builder().bucket(bucket).key(key).build(),
@@ -278,7 +290,8 @@ public class ProcedureScraper {
         public String s3Region;
         public CrawlConfig crawl;
         /**
-         * Field extraction rules keyed by output field name (e.g. "title", "description").
+         * Field extraction rules keyed by output field name (e.g. "title",
+         * "description").
          * Insertion order is preserved — use a schema that puts "title" first.
          */
         public Map<String, FieldExtractionRule> fields = new LinkedHashMap<>();
@@ -293,7 +306,10 @@ public class ProcedureScraper {
         public String categoryLinkSelector;
         /** CSS selector that matches procedure detail page links. */
         public String detailLinkSelector;
-        /** Substring pattern — links whose href contains this string are excluded. Null = no exclusion. */
+        /**
+         * Substring pattern — links whose href contains this string are excluded. Null
+         * = no exclusion.
+         */
         public String detailLinkExcludePattern;
     }
 
@@ -324,7 +340,8 @@ public class ProcedureScraper {
         /** Crawl configuration for events */
         public EventCrawlConfig crawl;
         /**
-         * Field extraction rules keyed by output field name (e.g. "title", "description", "date").
+         * Field extraction rules keyed by output field name (e.g. "title",
+         * "description", "date").
          * Insertion order is preserved.
          */
         public Map<String, FieldExtractionRule> fields = new LinkedHashMap<>();
@@ -334,8 +351,10 @@ public class ProcedureScraper {
     public static final class EventCrawlConfig {
         /** CSS selector that matches event detail page links */
         public String eventLinkSelector;
-        /** Substring pattern — links whose href contains this string are excluded. Null = no exclusion. */
+        /**
+         * Substring pattern — links whose href contains this string are excluded. Null
+         * = no exclusion.
+         */
         public String eventDetailExcludePattern;
     }
 }
-

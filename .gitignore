@@ -22,3 +22,6 @@ sam/debug.log
 sam/.aws-sam/build.toml
 sam/event.json
 cdk/package-lock.json
+task.md
+.vscode/settings.json
+bin/

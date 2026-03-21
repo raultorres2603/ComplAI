@@ -1,0 +1,93 @@
+{
+  "generatedAt" : "2026-03-20T16:15:22.348445Z",
+  "sourceUrl" : "https://www.elprat.cat/la-ciutat/guia-agenda",
+  "events" : [ {
+    "eventId" : "d2923426-95b3-3e36-b7a7-e8780ff0f155",
+    "title" : "Donació de sang",
+    "description" : "Cal demanar cita prèvia al Banc de Sang i Teixits",
+    "eventType" : "Proposta",
+    "targetAudience" : "Persones\nViure en Salut\nAdult",
+    "date" : "20/03/2026 De 10 a 14 h i de 17 a 21 h",
+    "time" : "",
+    "location" : "",
+    "theme" : "Persones",
+    "url" : "https://www.elprat.cat/la-ciutat/guia-agenda/donacio-de-sang-87"
+  }, {
+    "eventId" : "83c82a6a-44f9-3250-9b72-13638ae8edc4",
+    "title" : "Àgores + Granotes al cel, aigua a la terra! Rituals i danses de la pluja",
+    "description" : "Àgores és una proposta participativa que reivindica la dansa com un espai comú, plural i festiu, obert a tothom. Al llarg de la tarda, l’activitat combina intervencions de tres grups de dansa de la nostra ciutat, un espectacle professional a la plaça i una ballada col·lectiva amb la participació del públic.",
+    "eventType" : "Dansa",
+    "targetAudience" : "Cultura\nArts en Viu\nCentre Cívic Jardins de la Pau\nPer a tots els públics",
+    "date" : "20/03/2026 de 17:30 a 19:00 h",
+    "time" : "",
+    "location" : "",
+    "theme" : "Cultura",
+    "url" : "https://www.elprat.cat/la-ciutat/guia-agenda/agores-granotes-al-cel-aigua-la-terra-rituals-i-danses-de-la-pluja-2"
+  }, {
+    "eventId" : "a0dc0eab-ea55-35b0-a631-90ad37228d1c",
+    "title" : "La Cocina de mi Vecina: Carxofa",
+    "description" : "La Cocina de mi Vecina és un espai de trobada quinzenal a la cuina del Ribera, per cuinar plegades, fer intercanvis de receptes i de coneixements entre veïnes i veïns.",
+    "eventType" : "Proposta",
+    "targetAudience" : "Cultura\nCentre Cívic Sant Jordi - Ribera Baixa\nAdult",
+    "date" : "20/03/2026 Divendres, a partir de les 17.30h",
+    "time" : "",
+    "location" : "",
+    "theme" : "Cultura",
+    "url" : "https://www.elprat.cat/la-ciutat/guia-agenda/la-cocina-de-mi-vecina-carxofa"
+  }, {
+    "eventId" : "6e6ea574-e13e-3ee5-941b-3d2a9615abcf",
+    "title" : "Sortida de camp: Ocells forestals a Can Camins",
+    "description" : "El cicle de sortides ornitològiques és un programa de sortides de camp dedicat a l’observació de diferents grups d’ocells al seu hàbitat natural. Guiats per un ornitòleg, aprendrem a identificar les diferents espècies d'ocells, a reconèixer-ne les característiques principals: l’aspecte, les vocalitzacions, l’alimentació i l’hàbitat on viuen.",
+    "eventType" : "Proposta",
+    "targetAudience" : "Turisme\nCiutat i Territori\nEspais Naturals\nEducació ambiental\nLa platja del Prat\nEsdeveniments\nPer a tots els públics\nAdult\nJove",
+    "date" : "21/03/2026 De 8 h a 11 h",
+    "time" : "",
+    "location" : "",
+    "theme" : "Turisme",
+    "url" : "https://www.elprat.cat/la-ciutat/guia-agenda/sortida-de-camp-ocells-forestals-can-camins"
+  }, {
+    "eventId" : "13453836-f9f6-3247-bd63-e9e749d6721f",
+    "title" : "Com es rescata una tortuga marina?",
+    "description" : "Com podem ajudar a les tortugues marines? Què s’ha de fer si en trobem una a la platja? Quins són els passos per rescatar-la i curar-la?",
+    "eventType" : "Proposta",
+    "targetAudience" : "Turisme\nCiutat i Territori\nEducació ambiental\nFamiliar",
+    "date" : "21/03/2026 De 10 h a 11.30 h.",
+    "time" : "",
+    "location" : "",
+    "theme" : "Turisme",
+    "url" : "https://www.elprat.cat/la-ciutat/guia-agenda/com-es-rescata-una-tortuga-marina-85"
+  }, {
+    "eventId" : "17ef4119-c8ab-38fe-a6d3-821b1e3ab82d",
+    "title" : "Dia de la Canalla",
+    "description" : "L'Associació Castellers del Prat celebra el dia de la Canalla. Organitzen un seguit d'activitats.",
+    "eventType" : "Festa popular",
+    "targetAudience" : "Cultura\nCultura popular\nFamiliar",
+    "date" : "21/03/2026 de 11:00 a 19:00 h",
+    "time" : "",
+    "location" : "",
+    "theme" : "Cultura",
+    "url" : "https://www.elprat.cat/la-ciutat/guia-agenda/dia-de-la-canalla"
+  }, {
+    "eventId" : "b3176fc8-f8e5-3289-b01a-f06686551407",
+    "title" : "Club de lectura Parlons livre",
+    "description" : "Le Crime du comte Neville: roman, d'Amélie Nothomb",
+    "eventType" : "Lectura",
+    "targetAudience" : "Cultura\nBiblioteca Antonio Martín\nCèntric Espai Cultural\nFoment de la Lectura\nAdult",
+    "date" : "21/03/2026 - 11:00 h",
+    "time" : "",
+    "location" : "",
+    "theme" : "Cultura",
+    "url" : "https://www.elprat.cat/la-ciutat/guia-agenda/club-de-lectura-parlons-livre-79"
+  }, {
+    "eventId" : "700502e3-8a79-3ed2-bb3a-40d1eb120629",
+    "title" : "L'hora dels nadons: \"Animalets\", amb Joan de Boer",
+    "description" : "Sessió de contes dedicada als més petits de la casa amb tot un seguit d'històries protagonitzades per animalets: Cargols, girafes, lleons i micos faran entendre als més petits que veritablement han NASCUT PER LLEGIR!",
+    "eventType" : "Lectura",
+    "targetAudience" : "Cultura\nCèntric Espai Cultural\nBiblioteca Antonio Martín\nFoment de la Lectura\nFamiliar",
+    "date" : "21/03/2026 de 11:00 a 12:00 h",
+    "time" : "",
+    "location" : "",
+    "theme" : "Cultura",
+    "url" : "https://www.elprat.cat/la-ciutat/guia-agenda/lhora-dels-nadons-animalets-amb-joan-de-boer"
+  } ]
+}

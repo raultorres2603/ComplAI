@@ -1,0 +1,64 @@
+{
+    "events": [
+        {
+            "eventId": "ev-001",
+            "title": "Film Festival: International Short Films",
+            "description": "A selection of award-winning short films.",
+            "eventType": "Cinema",
+            "targetAudience": "Adults",
+            "date": "2026-04-10",
+            "time": "20:00",
+            "location": "Auditori Municipal",
+            "theme": "Film",
+            "url": "https://example.test/events/ev-001"
+        },
+        {
+            "eventId": "ev-002",
+            "title": "Music Festival: Summer Beats",
+            "description": "Outdoor concerts featuring local bands.",
+            "eventType": "Music",
+            "targetAudience": "All",
+            "date": "2026-05-21",
+            "time": "18:00",
+            "location": "Parc Central",
+            "theme": "Festival",
+            "url": "https://example.test/events/ev-002"
+        },
+        {
+            "eventId": "ev-003",
+            "title": "Cultural Performance: Dance & Theatre",
+            "description": "A night of contemporary dance and theatre.",
+            "eventType": "Performance",
+            "targetAudience": "All",
+            "date": "2026-06-01",
+            "time": "19:30",
+            "location": "Teatre Principal",
+            "theme": "Cultural",
+            "url": "https://example.test/events/ev-003"
+        },
+        {
+            "eventId": "ev-004",
+            "title": "Cinema Night: Classic Films",
+            "description": "Screening of classic cinema pieces.",
+            "eventType": "Cinema",
+            "targetAudience": "Adults",
+            "date": "2026-04-15",
+            "time": "21:00",
+            "location": "Cinema Raval",
+            "theme": "Film",
+            "url": "https://example.test/events/ev-004"
+        },
+        {
+            "eventId": "ev-005",
+            "title": "Kids Concert: Children's Orchestra",
+            "description": "An interactive concert for children.",
+            "eventType": "Music",
+            "targetAudience": "Kids",
+            "date": "2026-04-20",
+            "time": "11:00",
+            "location": "Sala Petita",
+            "theme": "Family",
+            "url": "https://example.test/events/ev-005"
+        }
+    ]
+}
