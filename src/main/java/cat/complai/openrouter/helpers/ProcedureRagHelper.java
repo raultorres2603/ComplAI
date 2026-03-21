@@ -166,7 +166,8 @@ public class ProcedureRagHelper {
                         doc.get("url")
                 ));
             }
-            logger.fine(() -> "RAG search — queryLength=" + query.length() + " resultCount=" + results.size());
+            logger.fine(() -> "RAG SEARCH — type=PROCEDURE cityId=" + cityId + " queryLength=" + query.length() 
+                    + " resultCount=" + results.size() + " maxRequested=" + MAX_RESULTS);
         } catch (IOException | ParseException e) {
             logger.log(Level.WARNING, "RAG search failed — queryLength=" + query.length()
                     + " error=" + e.getMessage(), e);

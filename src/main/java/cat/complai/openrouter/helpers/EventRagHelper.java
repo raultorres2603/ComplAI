@@ -50,7 +50,7 @@ public class EventRagHelper {
 
     private static final String[] SEARCH_FIELDS = { "title", "description", "eventType", "targetAudience", "location",
             "theme" };
-    private static final int MAX_RESULTS = 5;
+    private static final int MAX_RESULTS = 3;
     private static final String ENV_EVENTS_BUCKET = "EVENTS_BUCKET";
     private static final String ENV_EVENTS_REGION = "EVENTS_REGION";
     private static final Logger logger = Logger.getLogger(EventRagHelper.class.getName());
@@ -190,7 +190,8 @@ public class EventRagHelper {
                         doc.get("theme"),
                         doc.get("url")));
             }
-            logger.fine(() -> "Event RAG search — queryLength=" + query.length() + " resultCount=" + results.size());
+            logger.fine(() -> "RAG SEARCH — type=EVENT cityId=" + cityId + " queryLength=" + query.length() 
+                    + " resultCount=" + results.size() + " maxRequested=" + MAX_RESULTS);
         } catch (IOException | ParseException e) {
             logger.log(Level.WARNING, "Event RAG search failed — queryLength=" + query.length()
                     + " error=" + e.getMessage(), e);
