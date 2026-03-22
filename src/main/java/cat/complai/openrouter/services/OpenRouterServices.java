@@ -32,10 +32,10 @@ public class OpenRouterServices implements IOpenRouterService {
 
     @Inject
     public OpenRouterServices(InputValidationService validationService,
-                              ConversationManagementService conversationService,
-                              AiResponseProcessingService aiResponseService,
-                              ProcedureContextService procedureContextService,
-                              RedactPromptBuilder promptBuilder) {
+            ConversationManagementService conversationService,
+            AiResponseProcessingService aiResponseService,
+            ProcedureContextService procedureContextService,
+            RedactPromptBuilder promptBuilder) {
         this.validationService = validationService;
         this.conversationService = conversationService;
         this.aiResponseService = aiResponseService;
@@ -52,21 +52,22 @@ public class OpenRouterServices implements IOpenRouterService {
         return validationService.validateRedactInput(complaint);
     }
 
-
     @Override
     public OpenRouterResponseDto ask(String question, String conversationId, String cityId) {
         int inputLength = question != null ? question.length() : 0;
-        logger.info(() -> "ask() called — conversationId=" + conversationId + " inputLength=" + inputLength + " city=" + cityId);
-        
+        logger.info(() -> "ask() called — conversationId=" + conversationId + " inputLength=" + inputLength + " city="
+                + cityId);
+
         var validationError = validationService.validateQuestion(question);
         if (validationError.isPresent()) {
-            logger.fine(() -> "ask() rejected — reason=" + validationError.get().getError() + " conversationId=" + conversationId);
+            logger.fine(() -> "ask() rejected — reason=" + validationError.get().getError() + " conversationId="
+                    + conversationId);
             return validationError.get();
         }
 
         List<Map<String, Object>> messages = new ArrayList<>();
         messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage(cityId)));
-        
+
         // Only do expensive RAG search if question likely needs procedure information
         // This avoids unnecessary index lookups for conversational queries
         ProcedureContextResult procCtx = null;
@@ -76,19 +77,39 @@ public class OpenRouterServices implements IOpenRouterService {
                 messages.add(Map.of("role", "system", "content", procCtx.getContextBlock()));
             }
         }
-        
+
+        // Only do expensive RAG search if question likely needs event information
+        // This avoids unnecessary index lookups for conversational queries
+        ProcedureContextService.EventContextResult eventCtx = null;
+        if (procedureContextService.questionNeedsEventContext(question, cityId)) {
+            eventCtx = procedureContextService.buildEventContextResult(question, cityId);
+            if (eventCtx.getContextBlock() != null) {
+                messages.add(Map.of("role", "system", "content", eventCtx.getContextBlock()));
+            }
+        }
+
         // Add conversation history
         var history = conversationService.getConversationHistory(conversationId);
         conversationService.addToMessages(messages, history);
-        
+
         messages.add(Map.of("role", "user", "content", question.trim()));
 
         logger.fine(() -> "ask() messages prepared — messageCount=" + messages.size()
                 + " conversationId=" + conversationId);
         OpenRouterResponseDto response = aiResponseService.callOpenRouterAndExtract(messages, cityId);
 
-        // Attach sources from procedure context only when there are actual sources (de-duped, ordered by relevance)
-        if (response.isSuccess() && procCtx != null && !procCtx.getSources().isEmpty()) {
+        // Merge and de-duplicate sources from both procedure and event context
+        // Procedure sources take precedence if there are duplicates (stable ordering by
+        // relevance)
+        List<Source> mergedSources = new ArrayList<>();
+        if (procCtx != null && !procCtx.getSources().isEmpty()) {
+            mergedSources.addAll(procedureContextService.deDuplicateAndOrderSources(procCtx.getSources()));
+        }
+        if (eventCtx != null && !eventCtx.getSources().isEmpty()) {
+            mergedSources.addAll(eventCtx.getSources());
+        }
+
+        if (response.isSuccess() && !mergedSources.isEmpty()) {
             response = new OpenRouterResponseDto(
                     response.isSuccess(),
                     response.getMessage(),
@@ -96,8 +117,7 @@ public class OpenRouterServices implements IOpenRouterService {
                     response.getStatusCode(),
                     response.getErrorCode(),
                     response.getPdfData(),
-                    procedureContextService.deDuplicateAndOrderSources(procCtx.getSources())
-            );
+                    procedureContextService.deDuplicateAndOrderSources(mergedSources));
         }
 
         if (conversationId != null && !conversationId.isBlank() && response.getMessage() != null) {
@@ -107,11 +127,13 @@ public class OpenRouterServices implements IOpenRouterService {
     }
 
     @Override
-    public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format, String conversationId, ComplainantIdentity identity, String cityId) {
+    public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format, String conversationId,
+            ComplainantIdentity identity, String cityId) {
         int inputLength = complaint != null ? complaint.length() : 0;
         boolean identityProvided = identity != null && identity.isPartiallyProvided();
         logger.info(() -> "redactComplaint() called — conversationId=" + conversationId
-                + " inputLength=" + inputLength + " format=" + format + " identityProvided=" + identityProvided + " city=" + cityId);
+                + " inputLength=" + inputLength + " format=" + format + " identityProvided=" + identityProvided
+                + " city=" + cityId);
 
         var validationError = validationService.validateRedactInput(complaint);
         if (validationError.isPresent()) {
@@ -122,7 +144,7 @@ public class OpenRouterServices implements IOpenRouterService {
 
         List<Map<String, Object>> messages = new ArrayList<>();
         messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage(cityId)));
-        
+
         // Only add procedure context if we have complete identity (ready to draft)
         // Skip RAG search during identity collection to improve latency
         String contextBlock;
@@ -138,16 +160,22 @@ public class OpenRouterServices implements IOpenRouterService {
         conversationService.addToMessages(messages, history);
 
         // Choose the prompt based on whether we have a complete identity.
-        // When identity is incomplete, the AI is instructed to ask for the missing fields first.
-        // The caller is expected to collect the AI's question, present it to the user, and
+        // When identity is incomplete, the AI is instructed to ask for the missing
+        // fields first.
+        // The caller is expected to collect the AI's question, present it to the user,
+        // and
         // re-submit with the full identity in a subsequent request.
         String userPrompt = "";
         final boolean identityComplete = identity != null && identity.isComplete();
         if (identityComplete) {
-            // On the second turn the user's message contains the identity data they typed (e.g.
-            // "My name is Raul Torres, DNI 49872354C, I live at Carrer Major 10"). The original
-            // complaint was saved on the first turn. We combine both so that any optional contact
-            // details the user included in their identity reply (address, phone, etc.) are visible
+            // On the second turn the user's message contains the identity data they typed
+            // (e.g.
+            // "My name is Raul Torres, DNI 49872354C, I live at Carrer Major 10"). The
+            // original
+            // complaint was saved on the first turn. We combine both so that any optional
+            // contact
+            // details the user included in their identity reply (address, phone, etc.) are
+            // visible
             // to the prompt and can be included in the letter.
             String originalComplaint = conversationService.getPendingComplaint(conversationId);
             if (originalComplaint != null) {
@@ -164,7 +192,8 @@ public class OpenRouterServices implements IOpenRouterService {
         } else {
             if (conversationId != null && !conversationId.isBlank()) {
                 conversationService.storePendingComplaint(conversationId, complaint);
-                logger.fine(() -> "redactComplaint() saved complaint for identity follow-up — conversationId=" + conversationId);
+                logger.fine(() -> "redactComplaint() saved complaint for identity follow-up — conversationId="
+                        + conversationId);
             }
             userPrompt = promptBuilder.buildRedactPromptRequestingIdentity(complaint, identity, cityId);
         }
