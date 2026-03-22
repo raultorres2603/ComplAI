@@ -164,6 +164,9 @@ export class LambdaStack extends cdk.Stack {
         HTTP_CLIENT_READ_TIMEOUT: process.env.HTTP_CLIENT_READ_TIMEOUT || '60s',
         HTTP_CLIENT_MAX_CONNECTIONS: process.env.HTTP_CLIENT_MAX_CONNECTIONS || '20',
         HTTP_CLIENT_LOG_LEVEL: process.env.HTTP_CLIENT_LOG_LEVEL || 'WARN',
+        // CORS header injection: disable in production (Lambda Function URL handles CORS).
+        // Duplicate CORS headers from both app filter and infrastructure cause browser errors.
+        COMPLAI_LOCAL_CORS_ENABLED: 'false',
         // OIDC identity verification. Per-city config (issuer, JWKS URI, audience, NIF claim)
         // is bundled in oidc-mapping.json — enabled per city, no env var needed.
         // The worker Lambda does not receive JWT_SECRET and therefore never loads the
@@ -266,9 +269,11 @@ export class LambdaStack extends cdk.Stack {
     lambdaFn.addFunctionUrl({
       authType: lambda.FunctionUrlAuthType.NONE,
       cors: {
-        allowedOrigins: ['*'],
-        allowedMethods: [lambda.HttpMethod.ALL],
-        allowedHeaders: ['*'],
+        // Restrict CORS to the GitHub Pages frontend.
+        // Override with COMPLAI_CORS_ALLOWED_ORIGIN env var if needed.
+        allowedOrigins: [process.env.COMPLAI_CORS_ALLOWED_ORIGIN || 'https://raultorres2603.github.io'],
+        allowedMethods: [lambda.HttpMethod.POST, lambda.HttpMethod.GET],
+        allowedHeaders: ['Content-Type', 'Authorization'],
       },
     });
 
