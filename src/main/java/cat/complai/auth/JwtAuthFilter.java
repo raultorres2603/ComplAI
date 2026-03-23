@@ -18,19 +18,23 @@ import java.util.logging.Logger;
 /**
  * Enforces JWT Bearer authentication on all requests.
  *
- * Excluded paths (no token required — monitoring systems must reach these without credentials):
- *   GET /
- *   GET /health
+ * Excluded paths (no token required — monitoring systems must reach these
+ * without credentials):
+ * GET /
+ * GET /health
  *
  * All other requests must carry a valid "Authorization: Bearer <token>" header.
- * Returning null from a @RequestFilter method tells Micronaut to continue the filter chain.
+ * Returning null from a @RequestFilter method tells Micronaut to continue the
+ * filter chain.
  * Returning an HttpResponse short-circuits and sends that response immediately.
  *
- * The exclusion list is explicit here rather than in configuration so the security surface
+ * The exclusion list is explicit here rather than in configuration so the
+ * security surface
  * is obvious and auditable in one place.
  */
 // Only active when jwt.secret is present — mirrors the guard on JwtValidator.
-// The SQS worker Lambda has no HTTP server and no JWT_SECRET; loading this filter
+// The SQS worker Lambda has no HTTP server and no JWT_SECRET; loading this
+// filter
 // there would cause a missing-bean error when injecting JwtValidator.
 @Requires(property = "jwt.secret")
 @ServerFilter("/**")
@@ -38,7 +42,10 @@ public class JwtAuthFilter {
 
     private static final Logger logger = Logger.getLogger(JwtAuthFilter.class.getName());
 
-    /** Request attribute key that downstream controllers read to determine the caller's city. */
+    /**
+     * Request attribute key that downstream controllers read to determine the
+     * caller's city.
+     */
     public static final String CITY_ATTRIBUTE = "city";
 
     private final JwtValidator jwtValidator;
@@ -50,8 +57,11 @@ public class JwtAuthFilter {
 
     /**
      * Returns null to continue the chain, or a 401 response to short-circuit.
-     * @Nullable is required — Micronaut refuses a null return from @RequestFilter unless the
-     * method is explicitly marked nullable (the null signals "proceed to the next filter/handler").
+     * 
+     * @Nullable is required — Micronaut refuses a null return from @RequestFilter
+     *           unless the
+     *           method is explicitly marked nullable (the null signals "proceed to
+     *           the next filter/handler").
      */
     @RequestFilter
     @Nullable
@@ -79,17 +89,18 @@ public class JwtAuthFilter {
     private boolean isExcluded(HttpRequest<?> request) {
         String path = request.getPath();
         HttpMethod method = request.getMethod();
-        // Only GET / and GET /health bypass the JWT check.
-        return HttpMethod.GET.equals(method) && (path.equals("/") || path.equals("/health"));
+        // Only GET /, GET /health, and GET /health/startup bypass the JWT check.
+        return HttpMethod.GET.equals(method)
+                && (path.equals("/") || path.equals("/health") || path.equals("/health/startup"));
     }
 
     private MutableHttpResponse<?> unauthorizedResponse(String reason) {
-        // Return the same shape as OpenRouterPublicDto so clients can handle 401 uniformly.
+        // Return the same shape as OpenRouterPublicDto so clients can handle 401
+        // uniformly.
         Map<String, Object> body = Map.of(
                 "success", false,
                 "message", reason == null ? "Unauthorized" : reason,
-                "errorCode", OpenRouterErrorCode.UNAUTHORIZED.getCode()
-        );
+                "errorCode", OpenRouterErrorCode.UNAUTHORIZED.getCode());
         return HttpResponse.unauthorized().body(body);
     }
 }
