@@ -44,6 +44,39 @@ public class OpenRouterServices implements IOpenRouterService {
         return Math.max(1, text.length() / 4);
     }
 
+    /**
+     * Compute a deterministic hash of RAG sources for cache key generation.
+     * 
+     * PRIVACY NOTE: Hashing the sources is safe for caching because:
+     * - Sources contain only public document titles and URLs
+     * - No user query text or conversation history included
+     * - Hash is deterministic: same sources always produce same hash
+     * - Different procedure/event sets produce different hashes
+     * 
+     * @param sources The list of Source objects from RAG
+     * @return A hash of the sources (0 if empty)
+     */
+    private static long computeSourcesHash(List<Source> sources) {
+        if (sources == null || sources.isEmpty()) {
+            return 0;
+        }
+
+        // Create a deterministic hash from source titles and URLs
+        StringBuilder sb = new StringBuilder();
+        for (Source source : sources) {
+            String title = source.getTitle();
+            String url = source.getUrl();
+            if (title != null)
+                sb.append(title).append("|");
+            if (url != null)
+                sb.append(url).append("|");
+        }
+
+        // Use Java's default hashCode (not cryptographically secure, but good for
+        // caching)
+        return sb.toString().hashCode();
+    }
+
     @Inject
     public OpenRouterServices(InputValidationService validationService,
             ConversationManagementService conversationService,
@@ -164,7 +197,13 @@ public class OpenRouterServices implements IOpenRouterService {
 
         logger.fine(() -> "ask() messages prepared — messageCount=" + messages.size()
                 + " conversationId=" + conversationId);
-        OpenRouterResponseDto response = aiResponseService.callOpenRouterAndExtract(messages, cityId);
+
+        // Calculate context hashes for caching (deterministic, reproducible)
+        long procContextHash = computeSourcesHash(procCtx != null ? procCtx.getSources() : List.of());
+        long eventContextHash = computeSourcesHash(eventCtx != null ? eventCtx.getSources() : List.of());
+
+        OpenRouterResponseDto response = aiResponseService.callOpenRouterAndExtract(messages, cityId, procContextHash,
+                eventContextHash);
 
         // Merge and de-duplicate sources from both procedure and event context
         // Procedure sources take precedence if there are duplicates (stable ordering by
@@ -270,7 +309,9 @@ public class OpenRouterServices implements IOpenRouterService {
 
         logger.fine(() -> "redactComplaint() messages prepared — messageCount=" + messages.size()
                 + " identityComplete=" + identityComplete + " conversationId=" + conversationId);
-        OpenRouterResponseDto aiDto = aiResponseService.callOpenRouterAndExtract(messages, cityId);
+
+        // No procedure/event context for complaints, use default cache key
+        OpenRouterResponseDto aiDto = aiResponseService.callOpenRouterAndExtract(messages, cityId, 0, 0);
 
         // Process the AI response using the dedicated service
         OpenRouterResponseDto processedResponse = aiResponseService.processComplaintResponse(aiDto, identityComplete);

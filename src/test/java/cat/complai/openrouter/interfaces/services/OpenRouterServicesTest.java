@@ -23,6 +23,7 @@ import java.util.concurrent.CompletableFuture;
 import cat.complai.openrouter.helpers.RedactPromptBuilder;
 import cat.complai.openrouter.dto.OpenRouterErrorCode;
 import cat.complai.openrouter.dto.OutputFormat;
+import cat.complai.openrouter.services.cache.ResponseCacheService;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -36,7 +37,8 @@ public class OpenRouterServicesTest {
     private OpenRouterServices createOpenRouterService(ScenarioFakeWrapper wrapper) {
         InputValidationService validationService = new InputValidationService(5000);
         ConversationManagementService conversationService = new ConversationManagementService(5);
-        AiResponseProcessingService aiResponseService = new AiResponseProcessingService(wrapper, 30);
+        ResponseCacheService cacheService = new ResponseCacheService(true, 10, 500);
+        AiResponseProcessingService aiResponseService = new AiResponseProcessingService(wrapper, cacheService, 30);
         ProcedureContextService procedureContextService = new ProcedureContextService(wrapper.ragRegistry,
                 new EventRagHelperRegistry(), new RedactPromptBuilder());
         return new OpenRouterServices(validationService, conversationService, aiResponseService,

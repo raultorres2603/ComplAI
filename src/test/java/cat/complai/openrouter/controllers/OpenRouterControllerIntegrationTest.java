@@ -599,7 +599,10 @@ public class OpenRouterControllerIntegrationTest {
         IOpenRouterService openRouterService(HttpWrapper httpWrapper) {
             InputValidationService validationService = new InputValidationService(5000);
             ConversationManagementService conversationService = new ConversationManagementService(5);
-            AiResponseProcessingService aiResponseService = new AiResponseProcessingService(httpWrapper, 30);
+            // ResponseCacheService is @Singleton injected, not instantiated in tests
+            // Tests use real instance from ApplicationContext
+            AiResponseProcessingService aiResponseService = new AiResponseProcessingService(httpWrapper, cacheService,
+                    30);
             ProcedureContextService procedureContextService = new ProcedureContextService(
                     new ProcedureRagHelperRegistry(), new EventRagHelperRegistry(),
                     new cat.complai.openrouter.helpers.RedactPromptBuilder());

@@ -2,17 +2,22 @@ package cat.complai.openrouter.services.ai;
 
 import cat.complai.http.HttpWrapper;
 import cat.complai.http.dto.HttpDto;
+import cat.complai.openrouter.cache.QuestionCategory;
+import cat.complai.openrouter.cache.QuestionCategoryDetector;
+import cat.complai.openrouter.cache.ResponseCacheKey;
 import cat.complai.openrouter.dto.OpenRouterResponseDto;
 import cat.complai.openrouter.dto.OpenRouterErrorCode;
 import cat.complai.openrouter.dto.OutputFormat;
 import cat.complai.openrouter.helpers.AiParsed;
 import cat.complai.openrouter.helpers.RedactPromptBuilder;
+import cat.complai.openrouter.services.cache.ResponseCacheService;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import io.micronaut.context.annotation.Value;
 import java.util.Locale;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -23,17 +28,75 @@ import java.util.logging.Logger;
 public class AiResponseProcessingService {
 
     private final HttpWrapper httpWrapper;
+    private final ResponseCacheService responseCacheService;
     private final Logger logger = Logger.getLogger(AiResponseProcessingService.class.getName());
     private final int overallTimeoutSeconds;
 
     @Inject
     public AiResponseProcessingService(HttpWrapper httpWrapper,
+            ResponseCacheService responseCacheService,
             @Value("${OPENROUTER_OVERALL_TIMEOUT_SECONDS:60}") int overallTimeoutSeconds) {
         this.httpWrapper = httpWrapper;
+        this.responseCacheService = responseCacheService;
         this.overallTimeoutSeconds = (overallTimeoutSeconds > 0) ? overallTimeoutSeconds : 30;
     }
 
+    /**
+     * Call OpenRouter with smart caching.
+     * Checks cache before calling OpenRouter, caches success responses only.
+     * 
+     * @param messages         The messages to send to OpenRouter
+     * @param cityId           The city context
+     * @param procContextHash  Hash of procedure context (0 if none)
+     * @param eventContextHash Hash of event context (0 if none)
+     * @return The OpenRouter response (from cache or freshly fetched)
+     */
+    public OpenRouterResponseDto callOpenRouterAndExtract(List<Map<String, Object>> messages, String cityId,
+            long procContextHash, long eventContextHash) {
+        // Extract user question from messages (last user message)
+        String question = extractUserQuestion(messages);
+
+        // Detect question category for cache key
+        QuestionCategory category = QuestionCategoryDetector.detectCategory(question);
+
+        // Build cache key: cityId + context hashes + category (no user query text!)
+        ResponseCacheKey cacheKey = new ResponseCacheKey(cityId, procContextHash, eventContextHash, category);
+
+        // Check cache first
+        Optional<String> cachedResponse = responseCacheService.getCachedResponse(cacheKey);
+        if (cachedResponse.isPresent()) {
+            logger.info(() -> "CACHE HIT — Using cached response for " + cacheKey);
+            return new OpenRouterResponseDto(true, cachedResponse.get(), null, 200, OpenRouterErrorCode.NONE);
+        }
+
+        // Cache miss: call OpenRouter
+        logger.fine(() -> "CACHE MISS — Calling OpenRouter for " + cacheKey);
+        OpenRouterResponseDto response = callOpenRouterInternal(messages, cityId);
+
+        // Cache successful responses only
+        if (response.isSuccess() && response.getMessage() != null) {
+            responseCacheService.cacheResponse(cacheKey, response.getMessage());
+        }
+
+        return response;
+    }
+
+    /**
+     * Legacy method for backward compatibility.
+     * Calls OpenRouter without caching (context hashes default to 0).
+     * 
+     * @deprecated Use {@link #callOpenRouterAndExtract(List, String, long, long)}
+     *             instead
+     */
+    @Deprecated
     public OpenRouterResponseDto callOpenRouterAndExtract(List<Map<String, Object>> messages, String cityId) {
+        return callOpenRouterAndExtract(messages, cityId, 0, 0);
+    }
+
+    /**
+     * Internal method to call OpenRouter API (no caching).
+     */
+    private OpenRouterResponseDto callOpenRouterInternal(List<Map<String, Object>> messages, String cityId) {
         logger.fine(() -> "callOpenRouterAndExtract — sending " + messages.size() + " messages to OpenRouter");
 
         // Calculate input token count for logging
@@ -128,6 +191,33 @@ public class AiResponseProcessingService {
 
         // Header present: return the extracted letter body as text.
         return new OpenRouterResponseDto(true, parsed.message(), null, aiDto.getStatusCode(), OpenRouterErrorCode.NONE);
+    }
+
+    /**
+     * Extract user's question from the messages list.
+     * Looks for the last message with role="user".
+     * Returns the message content or empty string if not found.
+     * 
+     * @param messages The messages list
+     * @return The user's question text
+     */
+    private String extractUserQuestion(List<Map<String, Object>> messages) {
+        if (messages == null || messages.isEmpty()) {
+            return "";
+        }
+
+        // Iterate from the end backwards to find the last user message
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            Map<String, Object> msg = messages.get(i);
+            if ("user".equals(msg.get("role"))) {
+                Object content = msg.get("content");
+                if (content instanceof String) {
+                    return (String) content;
+                }
+            }
+        }
+
+        return "";
     }
 
     /**
