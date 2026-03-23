@@ -296,6 +296,9 @@ jobs:
           HTTP_CLIENT_READ_TIMEOUT: ${{ vars.HTTP_CLIENT_READ_TIMEOUT }}
           HTTP_CLIENT_MAX_CONNECTIONS: ${{ vars.HTTP_CLIENT_MAX_CONNECTIONS }}
           HTTP_CLIENT_LOG_LEVEL: ${{ vars.HTTP_CLIENT_LOG_LEVEL }}
+          RESPONSE_CACHE_ENABLED: ${{ vars.RESPONSE_CACHE_ENABLED }}
+          RESPONSE_CACHE_TTL_MINUTES: ${{ vars.RESPONSE_CACHE_TTL_MINUTES }}
+          RESPONSE_CACHE_MAX_ENTRIES: ${{ vars.RESPONSE_CACHE_MAX_ENTRIES }}
         run: |
           cd cdk
           npx cdk deploy "ComplAILambdaStack-${TARGET_ENV}" \
