@@ -598,7 +598,7 @@ public class OpenRouterControllerIntegrationTest {
         @Replaces(OpenRouterServices.class)
         IOpenRouterService openRouterService(HttpWrapper httpWrapper) {
             InputValidationService validationService = new InputValidationService(5000);
-            ConversationManagementService conversationService = new ConversationManagementService();
+            ConversationManagementService conversationService = new ConversationManagementService(5);
             AiResponseProcessingService aiResponseService = new AiResponseProcessingService(httpWrapper, 30);
             ProcedureContextService procedureContextService = new ProcedureContextService(
                     new ProcedureRagHelperRegistry(), new EventRagHelperRegistry(),

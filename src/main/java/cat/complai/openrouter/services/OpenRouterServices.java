@@ -18,6 +18,9 @@ import jakarta.inject.Inject;
 import io.micronaut.context.annotation.Value;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 @Singleton
@@ -68,24 +71,44 @@ public class OpenRouterServices implements IOpenRouterService {
         List<Map<String, Object>> messages = new ArrayList<>();
         messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage(cityId)));
 
-        // Only do expensive RAG search if question likely needs procedure information
-        // This avoids unnecessary index lookups for conversational queries
+        // Parallelize RAG searches for procedure and event context
+        // Start both searches concurrently to reduce latency
+        long ragStartTime = System.currentTimeMillis();
+        CompletableFuture<ProcedureContextResult> procFuture = procedureContextService
+                .questionNeedsProcedureContext(question, cityId)
+                        ? procedureContextService.buildProcedureContextResultAsync(question, cityId)
+                        : CompletableFuture.completedFuture(null);
+
+        CompletableFuture<ProcedureContextService.EventContextResult> eventFuture = procedureContextService
+                .questionNeedsEventContext(question, cityId)
+                        ? procedureContextService.buildEventContextResultAsync(question, cityId)
+                        : CompletableFuture.completedFuture(null);
+
+        // Wait for both searches to complete
         ProcedureContextResult procCtx = null;
-        if (procedureContextService.questionNeedsProcedureContext(question, cityId)) {
-            procCtx = procedureContextService.buildProcedureContextResult(question, cityId);
-            if (procCtx.getContextBlock() != null) {
-                messages.add(Map.of("role", "system", "content", procCtx.getContextBlock()));
-            }
+        ProcedureContextService.EventContextResult eventCtx = null;
+        try {
+            CompletableFuture.allOf(procFuture, eventFuture).join();
+            procCtx = procFuture.get();
+            eventCtx = eventFuture.get();
+        } catch (InterruptedException | ExecutionException e) {
+            logger.log(Level.WARNING,
+                    "Async RAG search failed — error=" + e.getMessage() + " conversationId=" + conversationId, e);
+            procCtx = null;
+            eventCtx = null;
+        }
+        long ragEndTime = System.currentTimeMillis();
+        logger.fine(() -> "ask() RAG search completed — time=" + (ragEndTime - ragStartTime) + "ms conversationId="
+                + conversationId);
+
+        // Add procedure context if available
+        if (procCtx != null && procCtx.getContextBlock() != null) {
+            messages.add(Map.of("role", "system", "content", procCtx.getContextBlock()));
         }
 
-        // Only do expensive RAG search if question likely needs event information
-        // This avoids unnecessary index lookups for conversational queries
-        ProcedureContextService.EventContextResult eventCtx = null;
-        if (procedureContextService.questionNeedsEventContext(question, cityId)) {
-            eventCtx = procedureContextService.buildEventContextResult(question, cityId);
-            if (eventCtx.getContextBlock() != null) {
-                messages.add(Map.of("role", "system", "content", eventCtx.getContextBlock()));
-            }
+        // Add event context if available
+        if (eventCtx != null && eventCtx.getContextBlock() != null) {
+            messages.add(Map.of("role", "system", "content", eventCtx.getContextBlock()));
         }
 
         // Add conversation history
