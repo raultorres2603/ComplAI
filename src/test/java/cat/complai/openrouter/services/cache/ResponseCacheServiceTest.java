@@ -195,6 +195,8 @@ class ResponseCacheServiceTest {
     @DisplayName("should respect maximum cache size")
     void testRespectMaximumCacheSize() {
         // Create cache with max 5 entries
+        // Note: Caffeine uses LRU eviction, so when we add the 6th entry, the oldest is
+        // evicted
         ResponseCacheService smallCache = new ResponseCacheService(true, 10, 5);
 
         // Add 10 entries
@@ -203,9 +205,10 @@ class ResponseCacheServiceTest {
             smallCache.cacheResponse(key, "Response " + i);
         }
 
-        // Cache size should not exceed 5
+        // Cache size should not exceed 5 (Caffeine enforces LRU eviction)
         long size = smallCache.getSize();
-        assertTrue(size <= 5, "Cache size should not exceed maximum of 5");
+        // Allow time for eviction if async
+        assertTrue(size <= 5, "Cache size should not exceed maximum of 5, but got " + size);
     }
 
     @Test

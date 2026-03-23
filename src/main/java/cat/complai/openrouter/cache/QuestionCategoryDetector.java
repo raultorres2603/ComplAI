@@ -27,10 +27,19 @@ public class QuestionCategoryDetector {
 
         String lowerQuestion = question.toLowerCase();
 
-        // Parking-related keywords
+        // Parking-related keywords (check first, most specific)
+        // Include vehicle permit as parking context
+        // English: parking, vehicle permit, park, permit
+        // Catalan: aparcament, estacionament, plaça, permís
         if (containsAny(lowerQuestion,
-                "parking", "permit", "zone", "fine", "reservation",
-                "vehicle", "car", "spot", "aparcament", "plaça", "estacionament")) {
+                "parking", "vehicle permit", "parking permit", "zone",
+                "aparcament", "estacionament", "plaça", "permís")) {
+            return QuestionCategory.PARKING;
+        }
+        // Match "park" as a standalone word (verb: to park)
+        // Match when "park" appears with word boundary (space before/after, or at
+        // start/end)
+        if ((lowerQuestion.contains("park ") || lowerQuestion.contains(" park") || lowerQuestion.endsWith("park"))) {
             return QuestionCategory.PARKING;
         }
 
@@ -50,8 +59,8 @@ public class QuestionCategoryDetector {
 
         // Library-related keywords
         if (containsAny(lowerQuestion,
-                "library", "book", "reservation", "hours", "membership",
-                "loan", "fiction", "lending", "biblioteca", "llibre", "préstec")) {
+                "library", "book", "loan", "lending", "fiction", "hours", "membership",
+                "biblioteca", "llibre", "préstec")) {
             return QuestionCategory.LIBRARY;
         }
 
@@ -62,7 +71,7 @@ public class QuestionCategoryDetector {
             return QuestionCategory.COMPLAINT;
         }
 
-        // Administration/Licensing-related keywords
+        // Administration/Licensing-related keywords (least specific, check last)
         if (containsAny(lowerQuestion,
                 "license", "permit", "certification", "certificate", "registration",
                 "form", "application", "bureaucrat", "approval", "request",

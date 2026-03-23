@@ -53,8 +53,9 @@ public class AiResponseProcessingService {
      */
     public OpenRouterResponseDto callOpenRouterAndExtract(List<Map<String, Object>> messages, String cityId,
             long procContextHash, long eventContextHash) {
-        // Detect question category for cache key
-        QuestionCategory category = QuestionCategoryDetector.detectCategory("");
+        // Extract the actual user question from messages for category detection
+        String userQuestion = extractUserQuestion(messages);
+        QuestionCategory category = QuestionCategoryDetector.detectCategory(userQuestion);
 
         // Build cache key: cityId + context hashes + category (no user query text!)
         ResponseCacheKey cacheKey = new ResponseCacheKey(cityId, procContextHash, eventContextHash, category);
@@ -76,6 +77,25 @@ public class AiResponseProcessingService {
         }
 
         return response;
+    }
+
+    /**
+     * Extract the last user message from the message list.
+     * Essential for proper question categorization during caching decisions.
+     */
+    private String extractUserQuestion(List<Map<String, Object>> messages) {
+        if (messages == null || messages.isEmpty()) {
+            return "";
+        }
+        // Find the last message from the user
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            Map<String, Object> msg = messages.get(i);
+            if (msg != null && "user".equals(msg.get("role"))) {
+                Object content = msg.get("content");
+                return content != null ? content.toString() : "";
+            }
+        }
+        return "";
     }
 
     /**
