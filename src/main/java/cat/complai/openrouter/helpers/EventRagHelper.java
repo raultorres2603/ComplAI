@@ -172,6 +172,10 @@ public class EventRagHelper {
     public List<Event> search(String query) {
         if (query == null || query.isBlank())
             return Collections.emptyList();
+
+        // Preprocess the query to normalize whitespace, remove accents
+        String cleanedQuery = QueryPreprocessor.preprocess(query);
+
         List<Event> results = new ArrayList<>();
         try (DirectoryReader reader = DirectoryReader.open(ramDirectory)) {
             IndexSearcher searcher = new IndexSearcher(reader);
@@ -182,7 +186,7 @@ public class EventRagHelper {
                             put("description", SEARCH_FIELD_BOOSTS[1]);
                         }
                     });
-            Query luceneQuery = parser.parse(query);
+            Query luceneQuery = parser.parse(cleanedQuery);
             TopDocs topDocs = searcher.search(luceneQuery, MAX_RESULTS);
             int[] filteredCountArray = { 0 };
             float[] maxScoreArray = { 0.0f };
@@ -209,12 +213,13 @@ public class EventRagHelper {
             }
             final int filteredCount = filteredCountArray[0];
             final float maxScore = maxScoreArray[0];
-            logger.fine(() -> "RAG SEARCH — type=EVENT cityId=" + cityId + " queryLength=" + query.length()
-                    + " resultCount=" + results.size() + " filteredCount=" + filteredCount
+            logger.fine(() -> "RAG SEARCH — type=EVENT cityId=" + cityId + " originalQuery=" + query
+                    + " cleanedQuery=" + cleanedQuery + " resultCount=" + results.size() + " filteredCount="
+                    + filteredCount
                     + " maxScore=" + maxScore + " minThreshold=" + MIN_RELEVANCE_SCORE);
         } catch (IOException | ParseException e) {
-            logger.log(Level.WARNING, "Event RAG search failed — queryLength=" + query.length()
-                    + " error=" + e.getMessage(), e);
+            logger.log(Level.WARNING, "Event RAG search failed — originalQuery=" + query
+                    + " cleanedQuery=" + cleanedQuery + " error=" + e.getMessage(), e);
         }
         return results;
     }
