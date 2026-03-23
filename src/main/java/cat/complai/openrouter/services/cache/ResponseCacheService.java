@@ -48,9 +48,8 @@ public class ResponseCacheService {
 
         if (cacheEnabled) {
             this.cache = Caffeine.newBuilder()
-                    .expireAfterWrite(ttlMinutes, TimeUnit.MINUTES)
                     .maximumSize(maxEntries)
-                    .recordStats() // Enable statistics for observability
+                    .expireAfterWrite(ttlMinutes, TimeUnit.MINUTES)
                     .build();
             LOGGER.info(() -> String.format("ResponseCacheService initialized: ttl=%d min, maxEntries=%d",
                     ttlMinutes, maxEntries));

@@ -74,6 +74,10 @@ public class OpenRouterControllerIntegrationTest {
     @Inject
     IOpenRouterService openRouterService;
 
+    // Injected to clear cache between tests and prevent test pollution
+    @Inject
+    ResponseCacheService cacheService;
+
     private final ObjectMapper mapper = new ObjectMapper();
 
     // A fresh, valid JWT is minted before each test.
@@ -83,6 +87,12 @@ public class OpenRouterControllerIntegrationTest {
 
     @BeforeEach
     void mintTestToken() {
+        // Clear the response cache before each test to prevent pollution from previous
+        // tests.
+        // ResponseCacheService is a @Singleton that persists across tests, so we must
+        // invalidate it to ensure each test gets fresh mock responses.
+        cacheService.invalidateAll();
+
         byte[] keyBytes = Base64.getDecoder().decode(TEST_SECRET_B64);
         SecretKey key = Keys.hmacShaKeyFor(keyBytes);
         String token = Jwts.builder()
