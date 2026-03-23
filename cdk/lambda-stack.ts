@@ -164,6 +164,11 @@ export class LambdaStack extends cdk.Stack {
         HTTP_CLIENT_READ_TIMEOUT: process.env.HTTP_CLIENT_READ_TIMEOUT || '60s',
         HTTP_CLIENT_MAX_CONNECTIONS: process.env.HTTP_CLIENT_MAX_CONNECTIONS || '20',
         HTTP_CLIENT_LOG_LEVEL: process.env.HTTP_CLIENT_LOG_LEVEL || 'WARN',
+        // Response caching configuration for OpenRouter API responses
+        // Disable for testing to prevent test pollution; enable in production to reduce API calls
+        RESPONSE_CACHE_ENABLED: process.env.RESPONSE_CACHE_ENABLED || 'true',
+        RESPONSE_CACHE_TTL_MINUTES: process.env.RESPONSE_CACHE_TTL_MINUTES || '10',
+        RESPONSE_CACHE_MAX_ENTRIES: process.env.RESPONSE_CACHE_MAX_ENTRIES || '500',
         // CORS header injection: disable in production (Lambda Function URL handles CORS).
         // Duplicate CORS headers from both app filter and infrastructure cause browser errors.
         COMPLAI_LOCAL_CORS_ENABLED: 'false',
@@ -245,6 +250,10 @@ export class LambdaStack extends cdk.Stack {
         HTTP_CLIENT_READ_TIMEOUT: process.env.HTTP_CLIENT_READ_TIMEOUT || '60s',
         HTTP_CLIENT_MAX_CONNECTIONS: process.env.HTTP_CLIENT_MAX_CONNECTIONS || '20',
         HTTP_CLIENT_LOG_LEVEL: process.env.HTTP_CLIENT_LOG_LEVEL || 'WARN',
+        // Response caching configuration for OpenRouter API responses
+        RESPONSE_CACHE_ENABLED: process.env.RESPONSE_CACHE_ENABLED || 'true',
+        RESPONSE_CACHE_TTL_MINUTES: process.env.RESPONSE_CACHE_TTL_MINUTES || '10',
+        RESPONSE_CACHE_MAX_ENTRIES: process.env.RESPONSE_CACHE_MAX_ENTRIES || '500',
         JAVA_TOOL_OPTIONS: '--add-modules=jdk.incubator.vector'
       },
       role: workerRole,
