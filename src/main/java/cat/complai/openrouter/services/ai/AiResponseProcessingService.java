@@ -11,7 +11,6 @@ import cat.complai.openrouter.dto.OutputFormat;
 import cat.complai.openrouter.helpers.AiParsed;
 import cat.complai.openrouter.helpers.RedactPromptBuilder;
 import cat.complai.openrouter.services.cache.ResponseCacheService;
-import cat.complai.openrouter.services.cache.QuestionFrequencyTracker;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import io.micronaut.context.annotation.Value;
@@ -30,18 +29,15 @@ public class AiResponseProcessingService {
 
     private final HttpWrapper httpWrapper;
     private final ResponseCacheService responseCacheService;
-    private final QuestionFrequencyTracker frequencyTracker;
     private final Logger logger = Logger.getLogger(AiResponseProcessingService.class.getName());
     private final int overallTimeoutSeconds;
 
     @Inject
     public AiResponseProcessingService(HttpWrapper httpWrapper,
             ResponseCacheService responseCacheService,
-            QuestionFrequencyTracker frequencyTracker,
             @Value("${OPENROUTER_OVERALL_TIMEOUT_SECONDS:60}") int overallTimeoutSeconds) {
         this.httpWrapper = httpWrapper;
         this.responseCacheService = responseCacheService;
-        this.frequencyTracker = frequencyTracker;
         this.overallTimeoutSeconds = (overallTimeoutSeconds > 0) ? overallTimeoutSeconds : 30;
     }
 
@@ -57,19 +53,11 @@ public class AiResponseProcessingService {
      */
     public OpenRouterResponseDto callOpenRouterAndExtract(List<Map<String, Object>> messages, String cityId,
             long procContextHash, long eventContextHash) {
-        // Extract user question from messages (last user message)
-        String question = extractUserQuestion(messages);
-
         // Detect question category for cache key
-        QuestionCategory category = QuestionCategoryDetector.detectCategory(question);
+        QuestionCategory category = QuestionCategoryDetector.detectCategory("");
 
         // Build cache key: cityId + context hashes + category (no user query text!)
         ResponseCacheKey cacheKey = new ResponseCacheKey(cityId, procContextHash, eventContextHash, category);
-
-        // Track question frequency for auto-promotion (privacy-safe: no raw query
-        // stored)
-        String normalizedQuestion = normalizeQuestion(question);
-        frequencyTracker.trackQuestion(cityId, category, procContextHash, eventContextHash, normalizedQuestion);
 
         // Check cache first
         Optional<String> cachedResponse = responseCacheService.getCachedResponse(cacheKey);
@@ -200,70 +188,6 @@ public class AiResponseProcessingService {
 
         // Header present: return the extracted letter body as text.
         return new OpenRouterResponseDto(true, parsed.message(), null, aiDto.getStatusCode(), OpenRouterErrorCode.NONE);
-    }
-
-    /**
-     * Extract user's question from the messages list.
-     * Looks for the last message with role="user".
-     * Returns the message content or empty string if not found.
-     * 
-     * @param messages The messages list
-     * @return The user's question text
-     */
-    private String extractUserQuestion(List<Map<String, Object>> messages) {
-        if (messages == null || messages.isEmpty()) {
-            return "";
-        }
-
-        // Iterate from the end backwards to find the last user message
-        for (int i = messages.size() - 1; i >= 0; i--) {
-            Map<String, Object> msg = messages.get(i);
-            if ("user".equals(msg.get("role"))) {
-                Object content = msg.get("content");
-                if (content instanceof String) {
-                    return (String) content;
-                }
-            }
-        }
-
-        return "";
-    }
-
-    /**
-     * Normalize a question for frequency tracking.
-     * 
-     * This method produces a privacy-safe representation:
-     * - Converts to lowercase
-     * - Removes extra whitespace
-     * - Removes punctuation
-     * - Hashes the result for further anonymization
-     * 
-     * Result is suitable for tracking question patterns without storing raw query
-     * text.
-     * 
-     * @param question The raw user question
-     * @return Normalized question string (hash-safe)
-     */
-    private String normalizeQuestion(String question) {
-        if (question == null || question.isBlank()) {
-            return "empty";
-        }
-
-        // Normalize: lowercase, remove punctuation, collapse whitespace
-        String normalized = question
-                .toLowerCase(Locale.ROOT)
-                .replaceAll("[.,;:!?()\\[\\]{}-]", " ")
-                .replaceAll("\\s+", " ")
-                .trim();
-
-        // If it becomes empty after normalization, return a marker
-        if (normalized.isBlank()) {
-            return "empty";
-        }
-
-        // Use the first 100 characters as the normalized form
-        // (sufficient for pattern matching, respects privacy)
-        return normalized.substring(0, Math.min(100, normalized.length()));
     }
 
     /**

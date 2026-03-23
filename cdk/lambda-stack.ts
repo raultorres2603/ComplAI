@@ -57,9 +57,6 @@ export class LambdaStack extends cdk.Stack {
     const deploymentsBucket = s3.Bucket.fromBucketName(
       this, `DeploymentsBucketRef-${environment}`, `complai-deployments-${environment}`
     );
-    const commonResponsesBucket = s3.Bucket.fromBucketName(
-      this, `CommonResponsesBucketRef-${environment}`, `complai-common-responses-${environment}`
-    );
 
     // Create a custom IAM role for Lambda with least privilege.
     // The logical ID includes the environment so both stacks can live in the same account.
@@ -174,11 +171,6 @@ export class LambdaStack extends cdk.Stack {
         // is bundled in oidc-mapping.json — enabled per city, no env var needed.
         // The worker Lambda does not receive JWT_SECRET and therefore never loads the
         // OidcIdentityTokenValidator bean.
-        COMPLAI_COMMON_RESPONSES_BUCKET: commonResponsesBucket.bucketName,
-        COMPLAI_COMMON_RESPONSES_KEY: 'common-ai-requests.json',
-        COMPLAI_FREQUENCY_TRACKING_ENABLED: 'true',
-        COMPLAI_FREQUENCY_PROMOTION_THRESHOLD: '10',
-        COMPLAI_FREQUENCY_BATCH_SIZE: '5',
         JAVA_TOOL_OPTIONS: '--add-modules=jdk.incubator.vector'
 
       },
@@ -195,10 +187,6 @@ export class LambdaStack extends cdk.Stack {
     complaintsBucket.grantRead(lambdaRole);
     proceduresBucket.grantRead(lambdaRole);
     eventsBucket.grantRead(lambdaRole);
-    
-    // API Lambda needs read+write on common responses bucket for frequency tracking
-    // (reads current common responses, writes updated responses after promotion).
-    commonResponsesBucket.grantReadWrite(lambdaRole);
 
     // -------------------------------------------------------------------------
     // Worker Lambda — processes SQS messages and uploads generated PDFs to S3.

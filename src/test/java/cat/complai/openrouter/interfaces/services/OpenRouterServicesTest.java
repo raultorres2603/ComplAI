@@ -13,7 +13,6 @@ import cat.complai.openrouter.services.ai.AiResponseProcessingService;
 import cat.complai.openrouter.services.conversation.ConversationManagementService;
 import cat.complai.openrouter.services.procedure.ProcedureContextService;
 import cat.complai.openrouter.services.validation.InputValidationService;
-import cat.complai.openrouter.services.cache.QuestionFrequencyTracker;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -39,9 +38,7 @@ public class OpenRouterServicesTest {
         InputValidationService validationService = new InputValidationService(5000);
         ConversationManagementService conversationService = new ConversationManagementService(5);
         ResponseCacheService cacheService = new ResponseCacheService(true, 10, 500);
-        QuestionFrequencyTracker frequencyTracker = new QuestionFrequencyTracker();
-        AiResponseProcessingService aiResponseService = new AiResponseProcessingService(wrapper, cacheService,
-                frequencyTracker, 30);
+        AiResponseProcessingService aiResponseService = new AiResponseProcessingService(wrapper, cacheService, 30);
         ProcedureContextService procedureContextService = new ProcedureContextService(wrapper.ragRegistry,
                 new EventRagHelperRegistry(), new RedactPromptBuilder());
         return new OpenRouterServices(validationService, conversationService, aiResponseService,
@@ -252,9 +249,7 @@ public class OpenRouterServicesTest {
         InputValidationService validationService = new InputValidationService(5000);
         ConversationManagementService conversationService = new ConversationManagementService(5);
         ResponseCacheService cacheService = new ResponseCacheService(true, 10, 500);
-        QuestionFrequencyTracker frequencyTracker = new QuestionFrequencyTracker();
-        AiResponseProcessingService aiResponseService = new AiResponseProcessingService(wrapper, cacheService,
-                frequencyTracker, 30);
+        AiResponseProcessingService aiResponseService = new AiResponseProcessingService(wrapper, cacheService, 30);
         ProcedureContextService procedureContextService = new ProcedureContextService(wrapper.ragRegistry,
                 new EventRagHelperRegistry(), new RedactPromptBuilder());
         OpenRouterServices svc = new OpenRouterServices(validationService, conversationService, aiResponseService,

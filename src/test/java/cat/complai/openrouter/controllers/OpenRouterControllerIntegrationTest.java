@@ -12,7 +12,6 @@ import cat.complai.openrouter.services.OpenRouterServices;
 import cat.complai.openrouter.services.ai.AiResponseProcessingService;
 import cat.complai.openrouter.services.conversation.ConversationManagementService;
 import cat.complai.openrouter.services.procedure.ProcedureContextService;
-import cat.complai.openrouter.services.cache.QuestionFrequencyTracker;
 import cat.complai.openrouter.services.cache.ResponseCacheService;
 import cat.complai.openrouter.helpers.EventRagHelperRegistry;
 import cat.complai.openrouter.services.validation.InputValidationService;
@@ -599,14 +598,12 @@ public class OpenRouterControllerIntegrationTest {
         @Singleton
         @Replaces(OpenRouterServices.class)
         IOpenRouterService openRouterService(HttpWrapper httpWrapper,
-                ResponseCacheService cacheService,
-                QuestionFrequencyTracker frequencyTracker) {
+                ResponseCacheService cacheService) {
             InputValidationService validationService = new InputValidationService(5000);
             ConversationManagementService conversationService = new ConversationManagementService(5);
-            // ResponseCacheService and QuestionFrequencyTracker are injected from
-            // ApplicationContext
+            // ResponseCacheService is injected from ApplicationContext
             AiResponseProcessingService aiResponseService = new AiResponseProcessingService(httpWrapper, cacheService,
-                    frequencyTracker, 30);
+                    30);
             ProcedureContextService procedureContextService = new ProcedureContextService(
                     new ProcedureRagHelperRegistry(), new EventRagHelperRegistry(),
                     new cat.complai.openrouter.helpers.RedactPromptBuilder());

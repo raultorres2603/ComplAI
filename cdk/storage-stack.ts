@@ -17,10 +17,6 @@ export class StorageStack extends cdk.Stack {
   // it with Code.fromBucket(), which means the CDK bootstrap bucket never
   // receives the JAR and does not accumulate large, stale objects.
   readonly deploymentsBucket: s3.Bucket;
-  // Common AI responses (dynamically updated via frequency tracking).
-  // Stores common-ai-requests.json which is auto-updated when questions
-  // are promoted based on frequency threshold.
-  readonly commonResponsesBucket: s3.Bucket;
 
   constructor(scope: Construct, id: string, props: StorageStackProps) {
     super(scope, id, props);
@@ -80,19 +76,6 @@ export class StorageStack extends cdk.Stack {
       lifecycleRules: [{ expiration: cdk.Duration.days(30) }],
     });
 
-    // Common AI responses — dynamically updated via frequency tracking.
-    // Stores common-ai-requests.json file with high-frequency Q&A pairs.
-    // Lambda periodically auto-promotes frequently-asked questions to this bucket.
-    // Versioning enabled for audit trail and rollback capability.
-    this.commonResponsesBucket = new s3.Bucket(this, `ComplAICommonResponsesBucket-${environment}`, {
-      bucketName: `complai-common-responses-${environment}`,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      encryption: s3.BucketEncryption.S3_MANAGED,
-      versioned: true,
-      lifecycleRules: [{ expiration: cdk.Duration.days(365) }],
-    });
-
     new cdk.CfnOutput(this, 'ComplAIProceduresBucketName', {
       value: this.proceduresBucket.bucketName,
       description: `S3 bucket for procedures corpus (${environment})`,
@@ -111,11 +94,6 @@ export class StorageStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'ComplAIDeploymentsBucketName', {
       value: this.deploymentsBucket.bucketName,
       description: `S3 bucket for fat JAR deployments (${environment})`,
-    });
-
-    new cdk.CfnOutput(this, 'ComplAICommonResponsesBucketName', {
-      value: this.commonResponsesBucket.bucketName,
-      description: `S3 bucket for common AI responses with frequency tracking (${environment})`,
     });
   }
 }
