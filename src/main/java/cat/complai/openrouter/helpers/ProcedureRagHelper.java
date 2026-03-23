@@ -28,7 +28,8 @@ public class ProcedureRagHelper {
         public final String steps;
         public final String url;
 
-        public Procedure(String procedureId, String title, String description, String requirements, String steps, String url) {
+        public Procedure(String procedureId, String title, String description, String requirements, String steps,
+                String url) {
             this.procedureId = procedureId;
             this.title = title;
             this.description = description;
@@ -38,8 +39,10 @@ public class ProcedureRagHelper {
         }
     }
 
-    private static final String[] SEARCH_FIELDS = {"title", "description", "requirements", "steps"};
+    private static final String[] SEARCH_FIELDS = { "title", "description" };
+    private static final float[] SEARCH_FIELD_BOOSTS = { 2.0f, 1.0f };
     private static final int MAX_RESULTS = 3;
+    private static final float MIN_RELEVANCE_SCORE = 0.5f;
     private static final String ENV_PROCEDURES_BUCKET = "PROCEDURES_BUCKET";
     private static final String ENV_PROCEDURES_REGION = "PROCEDURES_REGION";
     private static final Logger logger = Logger.getLogger(ProcedureRagHelper.class.getName());
@@ -52,10 +55,12 @@ public class ProcedureRagHelper {
     /**
      * Builds an in-memory Lucene index for the given city's procedures.
      *
-     * <p>Procedures are loaded from S3 when {@code PROCEDURES_BUCKET} and
+     * <p>
+     * Procedures are loaded from S3 when {@code PROCEDURES_BUCKET} and
      * {@code PROCEDURES_REGION} are set; the S3 object key is always
      * {@code procedures-<cityId>.json}. Falls back to the classpath resource
-     * {@code /procedures-<cityId>.json} when S3 env vars are absent (e.g. local tests).
+     * {@code /procedures-<cityId>.json} when S3 env vars are absent (e.g. local
+     * tests).
      */
     public ProcedureRagHelper(String cityId) throws IOException {
         this.cityId = cityId;
@@ -67,30 +72,32 @@ public class ProcedureRagHelper {
     }
 
     private InputStream getProceduresInputStream() throws IOException {
-        String bucket     = System.getenv(ENV_PROCEDURES_BUCKET);
-        String region     = System.getenv(ENV_PROCEDURES_REGION);
+        String bucket = System.getenv(ENV_PROCEDURES_BUCKET);
+        String region = System.getenv(ENV_PROCEDURES_REGION);
         String endpointUrl = System.getenv("AWS_ENDPOINT_URL");
         // The S3 key is always derived from the cityId — no env var override.
         // This ensures multi-city requests each load the correct file.
         String s3Key = "procedures-" + cityId + ".json";
 
         if (bucket != null && region != null) {
-                software.amazon.awssdk.services.s3.S3ClientBuilder clientBuilder =
-                software.amazon.awssdk.services.s3.S3Client.builder()
+            software.amazon.awssdk.services.s3.S3ClientBuilder clientBuilder = software.amazon.awssdk.services.s3.S3Client
+                    .builder()
                     .region(software.amazon.awssdk.regions.Region.of(region))
-                    .credentialsProvider(software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider.builder().build());
+                    .credentialsProvider(
+                            software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider.builder().build());
 
             if (endpointUrl != null && !endpointUrl.isBlank()) {
                 clientBuilder.endpointOverride(URI.create(endpointUrl));
             }
 
             try (software.amazon.awssdk.services.s3.S3Client s3 = clientBuilder.build()) {
-                software.amazon.awssdk.services.s3.model.GetObjectRequest req =
-                        software.amazon.awssdk.services.s3.model.GetObjectRequest.builder()
-                                .bucket(bucket)
-                                .key(s3Key)
-                                .build();
-                logger.info(() -> "Loading procedures from S3 — bucket=" + bucket + " key=" + s3Key + " region=" + region);
+                software.amazon.awssdk.services.s3.model.GetObjectRequest req = software.amazon.awssdk.services.s3.model.GetObjectRequest
+                        .builder()
+                        .bucket(bucket)
+                        .key(s3Key)
+                        .build();
+                logger.info(
+                        () -> "Loading procedures from S3 — bucket=" + bucket + " key=" + s3Key + " region=" + region);
                 // getObjectAsBytes() reads all bytes into memory before the S3Client
                 // (and its underlying HTTP connection) is closed by try-with-resources.
                 // Using getObject() would return a stream backed by the HTTP connection,
@@ -125,8 +132,7 @@ public class ProcedureRagHelper {
                     node.path("description").asText(),
                     node.path("requirements").asText(),
                     node.path("steps").asText(),
-                    node.path("url").asText()
-            ));
+                    node.path("url").asText()));
         }
         return result;
     }
@@ -139,8 +145,9 @@ public class ProcedureRagHelper {
                 doc.add(new StringField("procedureId", p.procedureId, Field.Store.YES));
                 doc.add(new TextField("title", p.title, Field.Store.YES));
                 doc.add(new TextField("description", p.description, Field.Store.YES));
-                doc.add(new TextField("requirements", p.requirements, Field.Store.YES));
-                doc.add(new TextField("steps", p.steps, Field.Store.YES));
+                // Store but don't index the following fields (not in SEARCH_FIELDS)
+                doc.add(new StringField("requirements", p.requirements, Field.Store.YES));
+                doc.add(new StringField("steps", p.steps, Field.Store.YES));
                 doc.add(new StringField("url", p.url, Field.Store.YES));
                 writer.addDocument(doc);
             }
@@ -148,29 +155,52 @@ public class ProcedureRagHelper {
     }
 
     public List<Procedure> search(String query) {
-        if (query == null || query.isBlank()) return Collections.emptyList();
+        if (query == null || query.isBlank())
+            return Collections.emptyList();
+
+        // Preprocess the query to normalize whitespace, remove accents
+        String cleanedQuery = QueryPreprocessor.preprocess(query);
+
         List<Procedure> results = new ArrayList<>();
         try (DirectoryReader reader = DirectoryReader.open(ramDirectory)) {
             IndexSearcher searcher = new IndexSearcher(reader);
-            MultiFieldQueryParser parser = new MultiFieldQueryParser(SEARCH_FIELDS, analyzer);
-            Query luceneQuery = parser.parse(query); // No QueryParserUtil.escape
+            MultiFieldQueryParser parser = new MultiFieldQueryParser(SEARCH_FIELDS, analyzer,
+                    new java.util.HashMap<>() {
+                        {
+                            put("title", SEARCH_FIELD_BOOSTS[0]);
+                            put("description", SEARCH_FIELD_BOOSTS[1]);
+                        }
+                    });
+            Query luceneQuery = parser.parse(cleanedQuery);
             TopDocs topDocs = searcher.search(luceneQuery, MAX_RESULTS);
+            int[] filteredCountArray = { 0 };
+            float[] maxScoreArray = { 0.0f };
             for (ScoreDoc sd : topDocs.scoreDocs) {
-                Document doc = searcher.doc(sd.doc);
-                results.add(new Procedure(
-                        doc.get("procedureId"),
-                        doc.get("title"),
-                        doc.get("description"),
-                        doc.get("requirements"),
-                        doc.get("steps"),
-                        doc.get("url")
-                ));
+                maxScoreArray[0] = Math.max(maxScoreArray[0], sd.score);
+                if (sd.score >= MIN_RELEVANCE_SCORE) {
+                    Document doc = searcher.doc(sd.doc);
+                    results.add(new Procedure(
+                            doc.get("procedureId"),
+                            doc.get("title"),
+                            doc.get("description"),
+                            doc.get("requirements"),
+                            doc.get("steps"),
+                            doc.get("url")));
+                } else {
+                    filteredCountArray[0]++;
+                    logger.fine(() -> "RAG SEARCH — Filtering low-score result: score=" + sd.score
+                            + " < threshold=" + MIN_RELEVANCE_SCORE);
+                }
             }
-            logger.fine(() -> "RAG SEARCH — type=PROCEDURE cityId=" + cityId + " queryLength=" + query.length() 
-                    + " resultCount=" + results.size() + " maxRequested=" + MAX_RESULTS);
+            final int filteredCount = filteredCountArray[0];
+            final float maxScore = maxScoreArray[0];
+            logger.fine(() -> "RAG SEARCH — type=PROCEDURE cityId=" + cityId + " originalQuery=" + query
+                    + " cleanedQuery=" + cleanedQuery + " resultCount=" + results.size() + " filteredCount="
+                    + filteredCount
+                    + " maxScore=" + maxScore + " minThreshold=" + MIN_RELEVANCE_SCORE);
         } catch (IOException | ParseException e) {
-            logger.log(Level.WARNING, "RAG search failed — queryLength=" + query.length()
-                    + " error=" + e.getMessage(), e);
+            logger.log(Level.WARNING, "RAG search failed — originalQuery=" + query
+                    + " cleanedQuery=" + cleanedQuery + " error=" + e.getMessage(), e);
         }
         return results;
     }

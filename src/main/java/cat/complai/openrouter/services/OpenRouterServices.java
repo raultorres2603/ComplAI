@@ -18,6 +18,9 @@ import jakarta.inject.Inject;
 import io.micronaut.context.annotation.Value;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 @Singleton
@@ -29,6 +32,50 @@ public class OpenRouterServices implements IOpenRouterService {
     private final AiResponseProcessingService aiResponseService;
     private final ProcedureContextService procedureContextService;
     private final RedactPromptBuilder promptBuilder;
+
+    /**
+     * Estimates token count for text using OpenAI's rule of thumb: ~1 token per 4
+     * characters.
+     */
+    private static int estimateTokenCount(String text) {
+        if (text == null || text.isEmpty()) {
+            return 0;
+        }
+        return Math.max(1, text.length() / 4);
+    }
+
+    /**
+     * Compute a deterministic hash of RAG sources for cache key generation.
+     * 
+     * PRIVACY NOTE: Hashing the sources is safe for caching because:
+     * - Sources contain only public document titles and URLs
+     * - No user query text or conversation history included
+     * - Hash is deterministic: same sources always produce same hash
+     * - Different procedure/event sets produce different hashes
+     * 
+     * @param sources The list of Source objects from RAG
+     * @return A hash of the sources (0 if empty)
+     */
+    private static long computeSourcesHash(List<Source> sources) {
+        if (sources == null || sources.isEmpty()) {
+            return 0;
+        }
+
+        // Create a deterministic hash from source titles and URLs
+        StringBuilder sb = new StringBuilder();
+        for (Source source : sources) {
+            String title = source.getTitle();
+            String url = source.getUrl();
+            if (title != null)
+                sb.append(title).append("|");
+            if (url != null)
+                sb.append(url).append("|");
+        }
+
+        // Use Java's default hashCode (not cryptographically secure, but good for
+        // caching)
+        return sb.toString().hashCode();
+    }
 
     @Inject
     public OpenRouterServices(InputValidationService validationService,
@@ -68,24 +115,44 @@ public class OpenRouterServices implements IOpenRouterService {
         List<Map<String, Object>> messages = new ArrayList<>();
         messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage(cityId)));
 
-        // Only do expensive RAG search if question likely needs procedure information
-        // This avoids unnecessary index lookups for conversational queries
+        // Parallelize RAG searches for procedure and event context
+        // Start both searches concurrently to reduce latency
+        long ragStartTime = System.currentTimeMillis();
+        CompletableFuture<ProcedureContextResult> procFuture = procedureContextService
+                .questionNeedsProcedureContext(question, cityId)
+                        ? procedureContextService.buildProcedureContextResultAsync(question, cityId)
+                        : CompletableFuture.completedFuture(null);
+
+        CompletableFuture<ProcedureContextService.EventContextResult> eventFuture = procedureContextService
+                .questionNeedsEventContext(question, cityId)
+                        ? procedureContextService.buildEventContextResultAsync(question, cityId)
+                        : CompletableFuture.completedFuture(null);
+
+        // Wait for both searches to complete
         ProcedureContextResult procCtx = null;
-        if (procedureContextService.questionNeedsProcedureContext(question, cityId)) {
-            procCtx = procedureContextService.buildProcedureContextResult(question, cityId);
-            if (procCtx.getContextBlock() != null) {
-                messages.add(Map.of("role", "system", "content", procCtx.getContextBlock()));
-            }
+        ProcedureContextService.EventContextResult eventCtx = null;
+        try {
+            CompletableFuture.allOf(procFuture, eventFuture).join();
+            procCtx = procFuture.get();
+            eventCtx = eventFuture.get();
+        } catch (InterruptedException | ExecutionException e) {
+            logger.log(Level.WARNING,
+                    "Async RAG search failed — error=" + e.getMessage() + " conversationId=" + conversationId, e);
+            procCtx = null;
+            eventCtx = null;
+        }
+        long ragEndTime = System.currentTimeMillis();
+        logger.fine(() -> "ask() RAG search completed — time=" + (ragEndTime - ragStartTime) + "ms conversationId="
+                + conversationId);
+
+        // Add procedure context if available
+        if (procCtx != null && procCtx.getContextBlock() != null) {
+            messages.add(Map.of("role", "system", "content", procCtx.getContextBlock()));
         }
 
-        // Only do expensive RAG search if question likely needs event information
-        // This avoids unnecessary index lookups for conversational queries
-        ProcedureContextService.EventContextResult eventCtx = null;
-        if (procedureContextService.questionNeedsEventContext(question, cityId)) {
-            eventCtx = procedureContextService.buildEventContextResult(question, cityId);
-            if (eventCtx.getContextBlock() != null) {
-                messages.add(Map.of("role", "system", "content", eventCtx.getContextBlock()));
-            }
+        // Add event context if available
+        if (eventCtx != null && eventCtx.getContextBlock() != null) {
+            messages.add(Map.of("role", "system", "content", eventCtx.getContextBlock()));
         }
 
         // Add conversation history
@@ -94,9 +161,49 @@ public class OpenRouterServices implements IOpenRouterService {
 
         messages.add(Map.of("role", "user", "content", question.trim()));
 
+        // Calculate and log context metrics
+        final int systemTokens;
+        final int historyTokens;
+        final int userTokens;
+        int tmpSystemTokens = 0;
+        int tmpHistoryTokens = 0;
+        int tmpUserTokens = 0;
+        for (Map<String, Object> msg : messages) {
+            String content = (String) msg.get("content");
+            if (content == null)
+                continue;
+            String role = (String) msg.get("role");
+            int tokens = estimateTokenCount(content);
+
+            if ("system".equals(role)) {
+                tmpSystemTokens += tokens;
+            } else if (!"user".equals(role)) {
+                tmpHistoryTokens += tokens;
+            }
+        }
+        tmpUserTokens = estimateTokenCount(question);
+        systemTokens = tmpSystemTokens;
+        historyTokens = tmpHistoryTokens;
+        userTokens = tmpUserTokens;
+        final int totalTokens = systemTokens + historyTokens + userTokens;
+        final int historyTurns = history != null ? (history.size() / 2) : 0;
+
+        logger.fine(() -> "ask() CONTEXT METRICS — systemTokens=" + systemTokens
+                + " historyTokens=" + historyTokens
+                + " userTokens=" + userTokens
+                + " totalTokens=" + totalTokens
+                + " historyTurns=" + historyTurns
+                + " conversationId=" + conversationId);
+
         logger.fine(() -> "ask() messages prepared — messageCount=" + messages.size()
                 + " conversationId=" + conversationId);
-        OpenRouterResponseDto response = aiResponseService.callOpenRouterAndExtract(messages, cityId);
+
+        // Calculate context hashes for caching (deterministic, reproducible)
+        long procContextHash = computeSourcesHash(procCtx != null ? procCtx.getSources() : List.of());
+        long eventContextHash = computeSourcesHash(eventCtx != null ? eventCtx.getSources() : List.of());
+
+        OpenRouterResponseDto response = aiResponseService.callOpenRouterAndExtract(messages, cityId, procContextHash,
+                eventContextHash);
 
         // Merge and de-duplicate sources from both procedure and event context
         // Procedure sources take precedence if there are duplicates (stable ordering by
@@ -202,7 +309,9 @@ public class OpenRouterServices implements IOpenRouterService {
 
         logger.fine(() -> "redactComplaint() messages prepared — messageCount=" + messages.size()
                 + " identityComplete=" + identityComplete + " conversationId=" + conversationId);
-        OpenRouterResponseDto aiDto = aiResponseService.callOpenRouterAndExtract(messages, cityId);
+
+        // No procedure/event context for complaints, use default cache key
+        OpenRouterResponseDto aiDto = aiResponseService.callOpenRouterAndExtract(messages, cityId, 0, 0);
 
         // Process the AI response using the dedicated service
         OpenRouterResponseDto processedResponse = aiResponseService.processComplaintResponse(aiDto, identityComplete);

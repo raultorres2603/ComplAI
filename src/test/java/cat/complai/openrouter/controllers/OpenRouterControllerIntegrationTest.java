@@ -12,6 +12,7 @@ import cat.complai.openrouter.services.OpenRouterServices;
 import cat.complai.openrouter.services.ai.AiResponseProcessingService;
 import cat.complai.openrouter.services.conversation.ConversationManagementService;
 import cat.complai.openrouter.services.procedure.ProcedureContextService;
+import cat.complai.openrouter.services.cache.ResponseCacheService;
 import cat.complai.openrouter.helpers.EventRagHelperRegistry;
 import cat.complai.openrouter.services.validation.InputValidationService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -73,6 +74,10 @@ public class OpenRouterControllerIntegrationTest {
     @Inject
     IOpenRouterService openRouterService;
 
+    // Injected to clear cache between tests and prevent test pollution
+    @Inject
+    ResponseCacheService cacheService;
+
     private final ObjectMapper mapper = new ObjectMapper();
 
     // A fresh, valid JWT is minted before each test.
@@ -82,6 +87,12 @@ public class OpenRouterControllerIntegrationTest {
 
     @BeforeEach
     void mintTestToken() {
+        // Clear the response cache before each test to prevent pollution from previous
+        // tests.
+        // ResponseCacheService is a @Singleton that persists across tests, so we must
+        // invalidate it to ensure each test gets fresh mock responses.
+        cacheService.invalidateAll();
+
         byte[] keyBytes = Base64.getDecoder().decode(TEST_SECRET_B64);
         SecretKey key = Keys.hmacShaKeyFor(keyBytes);
         String token = Jwts.builder()
@@ -596,10 +607,13 @@ public class OpenRouterControllerIntegrationTest {
     static class TestBeans {
         @Singleton
         @Replaces(OpenRouterServices.class)
-        IOpenRouterService openRouterService(HttpWrapper httpWrapper) {
+        IOpenRouterService openRouterService(HttpWrapper httpWrapper,
+                ResponseCacheService cacheService) {
             InputValidationService validationService = new InputValidationService(5000);
-            ConversationManagementService conversationService = new ConversationManagementService();
-            AiResponseProcessingService aiResponseService = new AiResponseProcessingService(httpWrapper, 30);
+            ConversationManagementService conversationService = new ConversationManagementService(5);
+            // ResponseCacheService is injected from ApplicationContext
+            AiResponseProcessingService aiResponseService = new AiResponseProcessingService(httpWrapper, cacheService,
+                    30);
             ProcedureContextService procedureContextService = new ProcedureContextService(
                     new ProcedureRagHelperRegistry(), new EventRagHelperRegistry(),
                     new cat.complai.openrouter.helpers.RedactPromptBuilder());

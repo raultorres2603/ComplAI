@@ -48,9 +48,10 @@ public class EventRagHelper {
         }
     }
 
-    private static final String[] SEARCH_FIELDS = { "title", "description", "eventType", "targetAudience", "location",
-            "theme" };
+    private static final String[] SEARCH_FIELDS = { "title", "description" };
+    private static final float[] SEARCH_FIELD_BOOSTS = { 2.0f, 1.0f };
     private static final int MAX_RESULTS = 3;
+    private static final float MIN_RELEVANCE_SCORE = 0.5f;
     private static final String ENV_EVENTS_BUCKET = "EVENTS_BUCKET";
     private static final String ENV_EVENTS_REGION = "EVENTS_REGION";
     private static final Logger logger = Logger.getLogger(EventRagHelper.class.getName());
@@ -155,12 +156,13 @@ public class EventRagHelper {
                 doc.add(new StringField("eventId", e.eventId, Field.Store.YES));
                 doc.add(new TextField("title", e.title, Field.Store.YES));
                 doc.add(new TextField("description", e.description, Field.Store.YES));
-                doc.add(new TextField("eventType", e.eventType, Field.Store.YES));
-                doc.add(new TextField("targetAudience", e.targetAudience, Field.Store.YES));
-                doc.add(new TextField("date", e.date, Field.Store.YES));
-                doc.add(new TextField("time", e.time, Field.Store.YES));
-                doc.add(new TextField("location", e.location, Field.Store.YES));
-                doc.add(new TextField("theme", e.theme, Field.Store.YES));
+                // Store but don't index the following fields (not in SEARCH_FIELDS)
+                doc.add(new StringField("eventType", e.eventType, Field.Store.YES));
+                doc.add(new StringField("targetAudience", e.targetAudience, Field.Store.YES));
+                doc.add(new StringField("date", e.date, Field.Store.YES));
+                doc.add(new StringField("time", e.time, Field.Store.YES));
+                doc.add(new StringField("location", e.location, Field.Store.YES));
+                doc.add(new StringField("theme", e.theme, Field.Store.YES));
                 doc.add(new StringField("url", e.url, Field.Store.YES));
                 writer.addDocument(doc);
             }
@@ -170,31 +172,54 @@ public class EventRagHelper {
     public List<Event> search(String query) {
         if (query == null || query.isBlank())
             return Collections.emptyList();
+
+        // Preprocess the query to normalize whitespace, remove accents
+        String cleanedQuery = QueryPreprocessor.preprocess(query);
+
         List<Event> results = new ArrayList<>();
         try (DirectoryReader reader = DirectoryReader.open(ramDirectory)) {
             IndexSearcher searcher = new IndexSearcher(reader);
-            MultiFieldQueryParser parser = new MultiFieldQueryParser(SEARCH_FIELDS, analyzer);
-            Query luceneQuery = parser.parse(query); // No QueryParserUtil.escape
+            MultiFieldQueryParser parser = new MultiFieldQueryParser(SEARCH_FIELDS, analyzer,
+                    new java.util.HashMap<>() {
+                        {
+                            put("title", SEARCH_FIELD_BOOSTS[0]);
+                            put("description", SEARCH_FIELD_BOOSTS[1]);
+                        }
+                    });
+            Query luceneQuery = parser.parse(cleanedQuery);
             TopDocs topDocs = searcher.search(luceneQuery, MAX_RESULTS);
+            int[] filteredCountArray = { 0 };
+            float[] maxScoreArray = { 0.0f };
             for (ScoreDoc sd : topDocs.scoreDocs) {
-                Document doc = searcher.doc(sd.doc);
-                results.add(new Event(
-                        doc.get("eventId"),
-                        doc.get("title"),
-                        doc.get("description"),
-                        doc.get("eventType"),
-                        doc.get("targetAudience"),
-                        doc.get("date"),
-                        doc.get("time"),
-                        doc.get("location"),
-                        doc.get("theme"),
-                        doc.get("url")));
+                maxScoreArray[0] = Math.max(maxScoreArray[0], sd.score);
+                if (sd.score >= MIN_RELEVANCE_SCORE) {
+                    Document doc = searcher.doc(sd.doc);
+                    results.add(new Event(
+                            doc.get("eventId"),
+                            doc.get("title"),
+                            doc.get("description"),
+                            doc.get("eventType"),
+                            doc.get("targetAudience"),
+                            doc.get("date"),
+                            doc.get("time"),
+                            doc.get("location"),
+                            doc.get("theme"),
+                            doc.get("url")));
+                } else {
+                    filteredCountArray[0]++;
+                    logger.fine(() -> "RAG SEARCH — Filtering low-score result: score=" + sd.score
+                            + " < threshold=" + MIN_RELEVANCE_SCORE);
+                }
             }
-            logger.fine(() -> "RAG SEARCH — type=EVENT cityId=" + cityId + " queryLength=" + query.length() 
-                    + " resultCount=" + results.size() + " maxRequested=" + MAX_RESULTS);
+            final int filteredCount = filteredCountArray[0];
+            final float maxScore = maxScoreArray[0];
+            logger.fine(() -> "RAG SEARCH — type=EVENT cityId=" + cityId + " originalQuery=" + query
+                    + " cleanedQuery=" + cleanedQuery + " resultCount=" + results.size() + " filteredCount="
+                    + filteredCount
+                    + " maxScore=" + maxScore + " minThreshold=" + MIN_RELEVANCE_SCORE);
         } catch (IOException | ParseException e) {
-            logger.log(Level.WARNING, "Event RAG search failed — queryLength=" + query.length()
-                    + " error=" + e.getMessage(), e);
+            logger.log(Level.WARNING, "Event RAG search failed — originalQuery=" + query
+                    + " cleanedQuery=" + cleanedQuery + " error=" + e.getMessage(), e);
         }
         return results;
     }

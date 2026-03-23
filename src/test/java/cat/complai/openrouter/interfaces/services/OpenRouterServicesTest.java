@@ -23,25 +23,32 @@ import java.util.concurrent.CompletableFuture;
 import cat.complai.openrouter.helpers.RedactPromptBuilder;
 import cat.complai.openrouter.dto.OpenRouterErrorCode;
 import cat.complai.openrouter.dto.OutputFormat;
+import cat.complai.openrouter.services.cache.ResponseCacheService;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Unit tests for OpenRouterServices. Uses a small fake HttpWrapper to avoid network calls.
+ * Unit tests for OpenRouterServices. Uses a small fake HttpWrapper to avoid
+ * network calls.
  */
 public class OpenRouterServicesTest {
 
     // Helper method to create OpenRouterServices with new dependencies
     private OpenRouterServices createOpenRouterService(ScenarioFakeWrapper wrapper) {
         InputValidationService validationService = new InputValidationService(5000);
-        ConversationManagementService conversationService = new ConversationManagementService();
-        AiResponseProcessingService aiResponseService = new AiResponseProcessingService(wrapper, 30);
-        ProcedureContextService procedureContextService = new ProcedureContextService(wrapper.ragRegistry, new EventRagHelperRegistry(), new RedactPromptBuilder());
-        return new OpenRouterServices(validationService, conversationService, aiResponseService, procedureContextService, new RedactPromptBuilder());
+        ConversationManagementService conversationService = new ConversationManagementService(5);
+        ResponseCacheService cacheService = new ResponseCacheService(true, 10, 500);
+        AiResponseProcessingService aiResponseService = new AiResponseProcessingService(wrapper, cacheService, 30);
+        ProcedureContextService procedureContextService = new ProcedureContextService(wrapper.ragRegistry,
+                new EventRagHelperRegistry(), new RedactPromptBuilder());
+        return new OpenRouterServices(validationService, conversationService, aiResponseService,
+                procedureContextService, new RedactPromptBuilder());
     }
 
-    // Flexible fake wrapper that simulates all test scenarios based on the last user message content.
-    // The service always calls postToOpenRouterAsync(List) with the assembled message history,
+    // Flexible fake wrapper that simulates all test scenarios based on the last
+    // user message content.
+    // The service always calls postToOpenRouterAsync(List) with the assembled
+    // message history,
     // so that is the overload we must override to intercept calls correctly.
     static class ScenarioFakeWrapper extends HttpWrapper {
         // Add a field to allow test to override the next response
@@ -67,9 +74,11 @@ public class OpenRouterServicesTest {
         public void overrideNextResponse(String response) {
             this.nextResponse = response;
         }
+
         public void overrideFakeProcedures(List<ProcedureRagHelper.Procedure> fakeProcedures) {
             this.fakeProcedures = fakeProcedures;
         }
+
         @Override
         public CompletableFuture<HttpDto> postToOpenRouterAsync(List<Map<String, Object>> messages) {
             this.lastMessages = messages;
@@ -79,15 +88,19 @@ public class OpenRouterServicesTest {
                 return CompletableFuture.completedFuture(new HttpDto(resp, 200, "POST", null));
             }
 
-            // Extract the content of the last user message to determine which scenario to run.
-            String userPrompt = messages == null ? null : messages.stream()
-                    .filter(m -> "user".equals(m.get("role")))
-                    .reduce((first, second) -> second)
-                    .map(m -> (String) m.get("content"))
-                    .orElse(null);
+            // Extract the content of the last user message to determine which scenario to
+            // run.
+            String userPrompt = messages == null ? null
+                    : messages.stream()
+                            .filter(m -> "user".equals(m.get("role")))
+                            .reduce((first, second) -> second)
+                            .map(m -> (String) m.get("content"))
+                            .orElse(null);
 
             if (userPrompt != null && userPrompt.contains("[REFUSE]")) {
-                return CompletableFuture.completedFuture(new HttpDto("I'm sorry, I can't help with that request because it's not about El Prat de Llobregat.", 200, "POST", null));
+                return CompletableFuture.completedFuture(new HttpDto(
+                        "I'm sorry, I can't help with that request because it's not about El Prat de Llobregat.", 200,
+                        "POST", null));
             }
             if (userPrompt != null && userPrompt.contains("[UPSTREAM]")) {
                 return CompletableFuture.completedFuture(new HttpDto(null, 500, "POST", "Upstream error"));
@@ -130,7 +143,9 @@ public class OpenRouterServicesTest {
                 return CompletableFuture.completedFuture(new HttpDto("Hello from El Prat AI", 200, "POST", null));
             }
             // Fallback: simulate a generic successful response
-            return CompletableFuture.completedFuture(new HttpDto("Dear Ajuntament,\n\nI am writing to complain about...\n\nSincerely,\nResident", 200, "POST", null));
+            return CompletableFuture.completedFuture(
+                    new HttpDto("Dear Ajuntament,\n\nI am writing to complain about...\n\nSincerely,\nResident", 200,
+                            "POST", null));
         }
     }
 
@@ -151,9 +166,9 @@ public class OpenRouterServicesTest {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
         OpenRouterServices svc = createOpenRouterService(wrapper);
         List<ProcedureRagHelper.Procedure> fakeProcs = List.of(
-                new ProcedureRagHelper.Procedure("p1", "Recycling", "Desc", "Req", "Steps", "https://example.com/recycling"),
-                new ProcedureRagHelper.Procedure("p2", "Waste", "Desc", "Req", "Steps", "https://example.com/waste")
-        );
+                new ProcedureRagHelper.Procedure("p1", "Recycling", "Desc", "Req", "Steps",
+                        "https://example.com/recycling"),
+                new ProcedureRagHelper.Procedure("p2", "Waste", "Desc", "Req", "Steps", "https://example.com/waste"));
         wrapper.overrideFakeProcedures(fakeProcs);
         wrapper.overrideNextResponse("Answer about recycling");
 
@@ -162,7 +177,7 @@ public class OpenRouterServicesTest {
         assertEquals("Answer about recycling", out.getMessage());
         List<Source> sources = out.getSources();
         assertEquals(2, sources.size());
-        
+
         // Check sources by URL and title
         boolean foundRecycling = false;
         boolean foundWaste = false;
@@ -232,10 +247,13 @@ public class OpenRouterServicesTest {
     void redact_emptyComplaint_rejects() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
         InputValidationService validationService = new InputValidationService(5000);
-        ConversationManagementService conversationService = new ConversationManagementService();
-        AiResponseProcessingService aiResponseService = new AiResponseProcessingService(wrapper, 30);
-        ProcedureContextService procedureContextService = new ProcedureContextService(wrapper.ragRegistry, new EventRagHelperRegistry(), new RedactPromptBuilder());
-        OpenRouterServices svc = new OpenRouterServices(validationService, conversationService, aiResponseService, procedureContextService, new RedactPromptBuilder());
+        ConversationManagementService conversationService = new ConversationManagementService(5);
+        ResponseCacheService cacheService = new ResponseCacheService(true, 10, 500);
+        AiResponseProcessingService aiResponseService = new AiResponseProcessingService(wrapper, cacheService, 30);
+        ProcedureContextService procedureContextService = new ProcedureContextService(wrapper.ragRegistry,
+                new EventRagHelperRegistry(), new RedactPromptBuilder());
+        OpenRouterServices svc = new OpenRouterServices(validationService, conversationService, aiResponseService,
+                procedureContextService, new RedactPromptBuilder());
 
         OpenRouterResponseDto out = svc.redactComplaint("   ", OutputFormat.JSON, null, null, "testcity");
         assertFalse(out.isSuccess());
@@ -322,7 +340,8 @@ public class OpenRouterServicesTest {
         OpenRouterServices svc = createOpenRouterService(wrapper);
 
         ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
-        OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [HEADER]", OutputFormat.PDF, null, identity, "testcity");
+        OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [HEADER]", OutputFormat.PDF, null,
+                identity, "testcity");
         assertTrue(out.isSuccess());
         assertNull(out.getPdfData(), "Service must never produce PDF bytes — PDFs are always async");
         assertNotNull(out.getMessage(), "Letter body must be returned as text");
@@ -335,7 +354,8 @@ public class OpenRouterServicesTest {
 
         String aiMessage = "Dear Ajuntament,\n\nI am writing to complain about...\n\nSincerely,\nResident";
         ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
-        OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [NOHEADER]", OutputFormat.AUTO, null, identity, "testcity");
+        OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [NOHEADER]", OutputFormat.AUTO, null,
+                identity, "testcity");
 
         assertTrue(out.isSuccess(), "Missing header with AUTO must not fail the request");
         assertEquals(aiMessage, out.getMessage(), "Raw AI message must be returned as-is");
@@ -349,7 +369,8 @@ public class OpenRouterServicesTest {
 
         String aiMessage = "Dear Ajuntament,\n\nI am writing to complain about...\n\nSincerely,\nResident";
         ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
-        OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [NOHEADER]", OutputFormat.JSON, null, identity, "testcity");
+        OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [NOHEADER]", OutputFormat.JSON, null,
+                identity, "testcity");
 
         assertTrue(out.isSuccess(), "Missing header with JSON must not fail the request");
         assertEquals(aiMessage, out.getMessage());
@@ -362,7 +383,8 @@ public class OpenRouterServicesTest {
 
         String aiMessage = "Dear Ajuntament,\n\nI am writing to complain about...\n\nSincerely,\nResident";
         ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
-        OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [NOHEADER]", OutputFormat.PDF, null, identity, "testcity");
+        OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [NOHEADER]", OutputFormat.PDF, null,
+                identity, "testcity");
 
         assertTrue(out.isSuccess(), "Missing header with explicit PDF format must still succeed");
         assertNull(out.getPdfData(), "Service must never produce PDF bytes — PDFs are always async");
@@ -375,7 +397,8 @@ public class OpenRouterServicesTest {
         OpenRouterServices svc = createOpenRouterService(wrapper);
 
         ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
-        OpenRouterResponseDto out = svc.redactComplaint("Some long complaint text [HEADER_LONG]", OutputFormat.AUTO, null, identity, "testcity");
+        OpenRouterResponseDto out = svc.redactComplaint("Some long complaint text [HEADER_LONG]", OutputFormat.AUTO,
+                null, identity, "testcity");
         assertTrue(out.isSuccess(), "Service should report success");
         assertNull(out.getPdfData(), "Service must never produce PDF bytes — PDFs are always async");
         assertNotNull(out.getMessage(), "Letter body must be returned as text");
@@ -409,7 +432,8 @@ public class OpenRouterServicesTest {
         String aiResponse = "{\"format\": \"pdf\"}\n\n" + catalanText;
         wrapper.overrideNextResponse(aiResponse);
         ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
-        OpenRouterResponseDto out = svc.redactComplaint("Prova unicode català [HEADER]", OutputFormat.PDF, null, identity, "testcity");
+        OpenRouterResponseDto out = svc.redactComplaint("Prova unicode català [HEADER]", OutputFormat.PDF, null,
+                identity, "testcity");
         assertTrue(out.isSuccess());
         assertNull(out.getPdfData(), "Service must never produce PDF bytes — PDFs are always async");
         assertNotNull(out.getMessage(), "Letter body with Unicode characters must be returned as text");
