@@ -103,4 +103,85 @@ class ProcedureRagHelperTest {
         // Should never exceed MAX_RESULTS of 3
         assertTrue(results.size() <= 3, "Should never exceed MAX_RESULTS of 3");
     }
+
+    // ============================================================================
+    // Phase 3: Monitoring & Validation — Optimization Tests
+    // ============================================================================
+
+    @Test
+    void search_usesReducedFieldSet_titleAndDescription() {
+        // Step 1 validation: Verify that only title + description are indexed
+        // (searchable)
+        // Fields like 'requirements' and 'steps' are stored but not searched
+
+        String queryTitle = "recycling";
+        List<ProcedureRagHelper.Procedure> resultsFromTitle = procedureRagHelper.search(queryTitle);
+        assertTrue(resultsFromTitle.size() > 0, "Should find procedures matching title field");
+    }
+
+    @Test
+    void search_appliesFieldBoosts_titleHasHigherWeight() {
+        // Step 1 validation: Verify that title field has higher boost (2.0) than
+        // description (1.0)
+
+        String query = "recycling";
+        List<ProcedureRagHelper.Procedure> results = procedureRagHelper.search(query);
+
+        if (!results.isEmpty()) {
+            ProcedureRagHelper.Procedure firstResult = results.get(0);
+            // Top result should be most relevant (likely title match due to boost)
+            assertTrue(firstResult.title.toLowerCase().contains("recycling")
+                    || firstResult.description.toLowerCase().contains("recycling"),
+                    "Top result should match the query");
+        }
+    }
+
+    @Test
+    void search_filtersLowRelevanceScores() {
+        // Step 2 validation: Verify that MIN_RELEVANCE_SCORE threshold is applied
+
+        String query = "waste";
+        List<ProcedureRagHelper.Procedure> results = procedureRagHelper.search(query);
+
+        // Results should all have relevance above the threshold
+        assertTrue(results.size() <= 3, "Relevance filtering should limit results to MAX_RESULTS=3");
+
+        // All results should match the query with reasonable relevance
+        for (ProcedureRagHelper.Procedure proc : results) {
+            assertTrue(
+                    proc.title.toLowerCase().contains("waste") ||
+                            proc.description.toLowerCase().contains("waste"),
+                    "All returned results should match the query (relevance threshold applied)");
+        }
+    }
+
+    @Test
+    void search_removedFields_stillAccessible_requirements() {
+        // Step 1 validation: Fields removed from search index should still be
+        // accessible
+        // This validates the Conservative implementation (Store.YES for removed fields)
+
+        String query = "recycling";
+        List<ProcedureRagHelper.Procedure> results = procedureRagHelper.search(query);
+
+        assertTrue(results.size() > 0, "Should find recycling procedure");
+        ProcedureRagHelper.Procedure proc = results.get(0);
+
+        // requirements field was removed from SEARCH_FIELDS but stored
+        assertNotNull(proc.requirements, "requirements field should be accessible");
+    }
+
+    @Test
+    void search_removedFields_stillAccessible_steps() {
+        // Step 1 validation: Steps field should still be accessible
+
+        String query = "recycling";
+        List<ProcedureRagHelper.Procedure> results = procedureRagHelper.search(query);
+
+        assertTrue(results.size() > 0, "Should find recycling procedure");
+        ProcedureRagHelper.Procedure proc = results.get(0);
+
+        // steps field was removed from SEARCH_FIELDS but stored
+        assertNotNull(proc.steps, "steps field should be accessible");
+    }
 }

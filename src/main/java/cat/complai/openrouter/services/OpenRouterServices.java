@@ -33,6 +33,17 @@ public class OpenRouterServices implements IOpenRouterService {
     private final ProcedureContextService procedureContextService;
     private final RedactPromptBuilder promptBuilder;
 
+    /**
+     * Estimates token count for text using OpenAI's rule of thumb: ~1 token per 4
+     * characters.
+     */
+    private static int estimateTokenCount(String text) {
+        if (text == null || text.isEmpty()) {
+            return 0;
+        }
+        return Math.max(1, text.length() / 4);
+    }
+
     @Inject
     public OpenRouterServices(InputValidationService validationService,
             ConversationManagementService conversationService,
@@ -116,6 +127,40 @@ public class OpenRouterServices implements IOpenRouterService {
         conversationService.addToMessages(messages, history);
 
         messages.add(Map.of("role", "user", "content", question.trim()));
+
+        // Calculate and log context metrics
+        final int systemTokens;
+        final int historyTokens;
+        final int userTokens;
+        int tmpSystemTokens = 0;
+        int tmpHistoryTokens = 0;
+        int tmpUserTokens = 0;
+        for (Map<String, Object> msg : messages) {
+            String content = (String) msg.get("content");
+            if (content == null)
+                continue;
+            String role = (String) msg.get("role");
+            int tokens = estimateTokenCount(content);
+
+            if ("system".equals(role)) {
+                tmpSystemTokens += tokens;
+            } else if (!"user".equals(role)) {
+                tmpHistoryTokens += tokens;
+            }
+        }
+        tmpUserTokens = estimateTokenCount(question);
+        systemTokens = tmpSystemTokens;
+        historyTokens = tmpHistoryTokens;
+        userTokens = tmpUserTokens;
+        final int totalTokens = systemTokens + historyTokens + userTokens;
+        final int historyTurns = history != null ? (history.size() / 2) : 0;
+
+        logger.fine(() -> "ask() CONTEXT METRICS — systemTokens=" + systemTokens
+                + " historyTokens=" + historyTokens
+                + " userTokens=" + userTokens
+                + " totalTokens=" + totalTokens
+                + " historyTurns=" + historyTurns
+                + " conversationId=" + conversationId);
 
         logger.fine(() -> "ask() messages prepared — messageCount=" + messages.size()
                 + " conversationId=" + conversationId);

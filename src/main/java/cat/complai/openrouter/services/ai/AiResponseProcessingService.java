@@ -21,25 +21,42 @@ import java.util.logging.Logger;
 
 @Singleton
 public class AiResponseProcessingService {
-    
+
     private final HttpWrapper httpWrapper;
     private final Logger logger = Logger.getLogger(AiResponseProcessingService.class.getName());
     private final int overallTimeoutSeconds;
-    
+
     @Inject
-    public AiResponseProcessingService(HttpWrapper httpWrapper, @Value("${OPENROUTER_OVERALL_TIMEOUT_SECONDS:60}") int overallTimeoutSeconds) {
+    public AiResponseProcessingService(HttpWrapper httpWrapper,
+            @Value("${OPENROUTER_OVERALL_TIMEOUT_SECONDS:60}") int overallTimeoutSeconds) {
         this.httpWrapper = httpWrapper;
         this.overallTimeoutSeconds = (overallTimeoutSeconds > 0) ? overallTimeoutSeconds : 30;
     }
-    
+
     public OpenRouterResponseDto callOpenRouterAndExtract(List<Map<String, Object>> messages, String cityId) {
         logger.fine(() -> "callOpenRouterAndExtract — sending " + messages.size() + " messages to OpenRouter");
+
+        // Calculate input token count for logging
+        int inputTokens = messages.stream()
+                .mapToInt(msg -> {
+                    String content = (String) msg.get("content");
+                    return content != null ? Math.max(1, content.length() / 4) : 0;
+                })
+                .sum();
+        logger.fine(() -> "callOpenRouterAndExtract — inputTokenCount=" + inputTokens);
+
+        long callStartTime = System.currentTimeMillis();
         try {
             CompletableFuture<HttpDto> future = httpWrapper.postToOpenRouterAsync(messages);
             HttpDto dto = future.get(overallTimeoutSeconds, TimeUnit.SECONDS);
+            long callEndTime = System.currentTimeMillis();
+            long callTime = callEndTime - callStartTime;
+            logger.fine(() -> "OpenRouter call time = " + callTime + "ms");
+
             if (dto == null) {
                 logger.warning("callOpenRouterAndExtract — OpenRouter returned null response (no HTTP status)");
-                return new OpenRouterResponseDto(false, null, "No response from AI service.", null, OpenRouterErrorCode.UPSTREAM);
+                return new OpenRouterResponseDto(false, null, "No response from AI service.", null,
+                        OpenRouterErrorCode.UPSTREAM);
             }
             logger.fine(() -> "callOpenRouterAndExtract — OpenRouter responded httpStatus=" + dto.statusCode()
                     + " hasMessage=" + (dto.message() != null && !dto.message().isBlank())
@@ -47,9 +64,14 @@ public class AiResponseProcessingService {
             if (dto.error() != null && !dto.error().isBlank()) {
                 logger.warning(() -> "callOpenRouterAndExtract — OpenRouter error httpStatus=" + dto.statusCode()
                         + " error=" + dto.error());
-                return new OpenRouterResponseDto(false, dto.message(), dto.error(), dto.statusCode(), OpenRouterErrorCode.UPSTREAM);
+                return new OpenRouterResponseDto(false, dto.message(), dto.error(), dto.statusCode(),
+                        OpenRouterErrorCode.UPSTREAM);
             }
             if (dto.message() != null && !dto.message().isBlank()) {
+                // Log output token count
+                int outputTokens = Math.max(1, dto.message().length() / 4);
+                logger.fine(() -> "callOpenRouterAndExtract — outputTokenCount=" + outputTokens);
+
                 if (aiRefusedAsOffTopic(dto.message(), cityId)) {
                     String cityName = RedactPromptBuilder.resolveCityDisplayName(cityId);
                     logger.info(() -> "callOpenRouterAndExtract — AI refused (off-topic for city=" + cityId
@@ -63,16 +85,18 @@ public class AiResponseProcessingService {
                 return new OpenRouterResponseDto(true, dto.message(), null, dto.statusCode(), OpenRouterErrorCode.NONE);
             }
             logger.warning(() -> "callOpenRouterAndExtract — AI returned empty message httpStatus=" + dto.statusCode());
-            return new OpenRouterResponseDto(false, null, "AI returned no message.", dto.statusCode(), OpenRouterErrorCode.UPSTREAM);
+            return new OpenRouterResponseDto(false, null, "AI returned no message.", dto.statusCode(),
+                    OpenRouterErrorCode.UPSTREAM);
         } catch (TimeoutException te) {
-            logger.log(Level.SEVERE, "callOpenRouterAndExtract — AI service timed out after " + overallTimeoutSeconds + "s", te);
+            logger.log(Level.SEVERE,
+                    "callOpenRouterAndExtract — AI service timed out after " + overallTimeoutSeconds + "s", te);
             return new OpenRouterResponseDto(false, null, "AI service timed out.", null, OpenRouterErrorCode.TIMEOUT);
         } catch (Exception e) {
             logger.log(Level.SEVERE, "callOpenRouterAndExtract — unexpected exception calling AI service", e);
             return new OpenRouterResponseDto(false, null, e.getMessage(), null, OpenRouterErrorCode.INTERNAL);
         }
     }
-    
+
     public OpenRouterResponseDto processComplaintResponse(OpenRouterResponseDto aiDto, boolean identityComplete) {
         // Propagate any non-success result immediately.
         if (aiDto.getErrorCode() != OpenRouterErrorCode.NONE) {
@@ -84,30 +108,38 @@ public class AiResponseProcessingService {
         // Identity incomplete: the AI is asking the user for missing fields.
         // Return its question as text so the client can display it.
         if (!identityComplete) {
-            return new OpenRouterResponseDto(true, parsed.message(), null, aiDto.getStatusCode(), OpenRouterErrorCode.NONE);
+            return new OpenRouterResponseDto(true, parsed.message(), null, aiDto.getStatusCode(),
+                    OpenRouterErrorCode.NONE);
         }
 
-        // Graceful fallback when the AI omits the required JSON header: return the raw message.
-        // PDF generation has been removed from the sync path — PDFs are always produced by the
+        // Graceful fallback when the AI omits the required JSON header: return the raw
+        // message.
+        // PDF generation has been removed from the sync path — PDFs are always produced
+        // by the
         // async worker Lambda.
         if (parsed.format() == null || parsed.format() == OutputFormat.AUTO) {
             String rawPreview = aiDto.getMessage() == null ? "<null>"
-                    : (aiDto.getMessage().length() > 200 ? aiDto.getMessage().substring(0, 200) + "..." : aiDto.getMessage());
+                    : (aiDto.getMessage().length() > 200 ? aiDto.getMessage().substring(0, 200) + "..."
+                            : aiDto.getMessage());
             logger.warning("AI response missing required JSON header; raw response prefix: " + rawPreview);
-            return new OpenRouterResponseDto(true, aiDto.getMessage(), null, aiDto.getStatusCode(), OpenRouterErrorCode.NONE);
+            return new OpenRouterResponseDto(true, aiDto.getMessage(), null, aiDto.getStatusCode(),
+                    OpenRouterErrorCode.NONE);
         }
 
         // Header present: return the extracted letter body as text.
         return new OpenRouterResponseDto(true, parsed.message(), null, aiDto.getStatusCode(), OpenRouterErrorCode.NONE);
     }
-    
+
     /**
-     * Detect whether the assistant explicitly refused because the request is not about the
-     * given city. Generic refusal phrases are city-agnostic and detected first; a secondary
+     * Detect whether the assistant explicitly refused because the request is not
+     * about the
+     * given city. Generic refusal phrases are city-agnostic and detected first; a
+     * secondary
      * check looks for the city name paired with scope-limiting words.
      */
     private boolean aiRefusedAsOffTopic(String aiMessage, String cityId) {
-        if (aiMessage == null) return false;
+        if (aiMessage == null)
+            return false;
         // Normalize typographic quotes/apostrophes for reliable matching.
         String normalized = aiMessage
                 .replace('\u2018', '\'').replace('\u2019', '\'')
@@ -153,10 +185,12 @@ public class AiResponseProcessingService {
             }
         }
 
-        // City-specific secondary check: the AI mentioned the city name alongside scope-limiting language.
+        // City-specific secondary check: the AI mentioned the city name alongside
+        // scope-limiting language.
         String cityNameLower = RedactPromptBuilder.resolveCityDisplayName(cityId).toLowerCase(Locale.ROOT);
         if (lower.contains(cityNameLower)
-                && (lower.contains("only") || lower.contains("solament") || lower.contains("solo") || lower.contains("only about"))) {
+                && (lower.contains("only") || lower.contains("solament") || lower.contains("solo")
+                        || lower.contains("only about"))) {
             logger.fine("Refusal detected: city name '" + cityNameLower + "' + scope-limiting word");
             return true;
         }
