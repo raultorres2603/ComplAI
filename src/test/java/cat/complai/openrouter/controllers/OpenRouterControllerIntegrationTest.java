@@ -12,6 +12,8 @@ import cat.complai.openrouter.services.OpenRouterServices;
 import cat.complai.openrouter.services.ai.AiResponseProcessingService;
 import cat.complai.openrouter.services.conversation.ConversationManagementService;
 import cat.complai.openrouter.services.procedure.ProcedureContextService;
+import cat.complai.openrouter.services.cache.QuestionFrequencyTracker;
+import cat.complai.openrouter.services.cache.ResponseCacheService;
 import cat.complai.openrouter.helpers.EventRagHelperRegistry;
 import cat.complai.openrouter.services.validation.InputValidationService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -596,13 +598,15 @@ public class OpenRouterControllerIntegrationTest {
     static class TestBeans {
         @Singleton
         @Replaces(OpenRouterServices.class)
-        IOpenRouterService openRouterService(HttpWrapper httpWrapper) {
+        IOpenRouterService openRouterService(HttpWrapper httpWrapper,
+                ResponseCacheService cacheService,
+                QuestionFrequencyTracker frequencyTracker) {
             InputValidationService validationService = new InputValidationService(5000);
             ConversationManagementService conversationService = new ConversationManagementService(5);
-            // ResponseCacheService is @Singleton injected, not instantiated in tests
-            // Tests use real instance from ApplicationContext
+            // ResponseCacheService and QuestionFrequencyTracker are injected from
+            // ApplicationContext
             AiResponseProcessingService aiResponseService = new AiResponseProcessingService(httpWrapper, cacheService,
-                    30);
+                    frequencyTracker, 30);
             ProcedureContextService procedureContextService = new ProcedureContextService(
                     new ProcedureRagHelperRegistry(), new EventRagHelperRegistry(),
                     new cat.complai.openrouter.helpers.RedactPromptBuilder());

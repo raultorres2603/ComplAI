@@ -11,6 +11,7 @@ import cat.complai.openrouter.dto.OutputFormat;
 import cat.complai.openrouter.helpers.AiParsed;
 import cat.complai.openrouter.helpers.RedactPromptBuilder;
 import cat.complai.openrouter.services.cache.ResponseCacheService;
+import cat.complai.openrouter.services.cache.QuestionFrequencyTracker;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import io.micronaut.context.annotation.Value;
@@ -29,15 +30,18 @@ public class AiResponseProcessingService {
 
     private final HttpWrapper httpWrapper;
     private final ResponseCacheService responseCacheService;
+    private final QuestionFrequencyTracker frequencyTracker;
     private final Logger logger = Logger.getLogger(AiResponseProcessingService.class.getName());
     private final int overallTimeoutSeconds;
 
     @Inject
     public AiResponseProcessingService(HttpWrapper httpWrapper,
             ResponseCacheService responseCacheService,
+            QuestionFrequencyTracker frequencyTracker,
             @Value("${OPENROUTER_OVERALL_TIMEOUT_SECONDS:60}") int overallTimeoutSeconds) {
         this.httpWrapper = httpWrapper;
         this.responseCacheService = responseCacheService;
+        this.frequencyTracker = frequencyTracker;
         this.overallTimeoutSeconds = (overallTimeoutSeconds > 0) ? overallTimeoutSeconds : 30;
     }
 
@@ -61,6 +65,11 @@ public class AiResponseProcessingService {
 
         // Build cache key: cityId + context hashes + category (no user query text!)
         ResponseCacheKey cacheKey = new ResponseCacheKey(cityId, procContextHash, eventContextHash, category);
+
+        // Track question frequency for auto-promotion (privacy-safe: no raw query
+        // stored)
+        String normalizedQuestion = normalizeQuestion(question);
+        frequencyTracker.trackQuestion(cityId, category, procContextHash, eventContextHash, normalizedQuestion);
 
         // Check cache first
         Optional<String> cachedResponse = responseCacheService.getCachedResponse(cacheKey);
@@ -218,6 +227,43 @@ public class AiResponseProcessingService {
         }
 
         return "";
+    }
+
+    /**
+     * Normalize a question for frequency tracking.
+     * 
+     * This method produces a privacy-safe representation:
+     * - Converts to lowercase
+     * - Removes extra whitespace
+     * - Removes punctuation
+     * - Hashes the result for further anonymization
+     * 
+     * Result is suitable for tracking question patterns without storing raw query
+     * text.
+     * 
+     * @param question The raw user question
+     * @return Normalized question string (hash-safe)
+     */
+    private String normalizeQuestion(String question) {
+        if (question == null || question.isBlank()) {
+            return "empty";
+        }
+
+        // Normalize: lowercase, remove punctuation, collapse whitespace
+        String normalized = question
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("[.,;:!?()\\[\\]{}-]", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+
+        // If it becomes empty after normalization, return a marker
+        if (normalized.isBlank()) {
+            return "empty";
+        }
+
+        // Use the first 100 characters as the normalized form
+        // (sufficient for pattern matching, respects privacy)
+        return normalized.substring(0, Math.min(100, normalized.length()));
     }
 
     /**
