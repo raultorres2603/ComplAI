@@ -1,7 +1,6 @@
 package cat.complai.openrouter.helpers;
 
 import java.util.*;
-import java.util.regex.Pattern;
 
 /**
  * Utility class for preprocessing and normalizing search queries before

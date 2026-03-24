@@ -2,9 +2,6 @@ package cat.complai.openrouter.helpers;
 
 import org.junit.jupiter.api.Test;
 
-import java.util.logging.LogManager;
-import java.util.logging.Logger;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 class AuditLoggerTest {
@@ -25,8 +22,8 @@ class AuditLoggerTest {
     @Test
     void log_writesStructuredLine() {
         // This test checks that log() does not throw and writes a line.
-        // We do not assert on log output (would require a custom handler), but ensure no exceptions.
+        // We do not assert on log output (would require a custom handler), but ensure
+        // no exceptions.
         assertDoesNotThrow(() -> AuditLogger.log("/complai/ask", "abc123", 0, 42, "PDF", "CA"));
     }
 }
-

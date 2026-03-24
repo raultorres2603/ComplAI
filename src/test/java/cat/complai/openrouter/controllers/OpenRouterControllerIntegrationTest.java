@@ -123,7 +123,6 @@ public class OpenRouterControllerIntegrationTest {
     @Test
     void integration_ask_includesSources_whenProceduresMatch() throws Exception {
         // Prepare fake procedures with URLs
-        OpenRouterServices svc = (OpenRouterServices) openRouterService;
         // Since we can't inject procedures via the public API, we rely on the mock
         // HttpWrapper
         // to simulate a scenario where the AI would receive procedure context.

@@ -1,6 +1,5 @@
 package cat.complai.scrapper;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -14,7 +13,6 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.time.Instant;
@@ -45,7 +43,6 @@ import java.util.logging.Logger;
 public class EventScraper {
 
     private static final Logger logger = Logger.getLogger(EventScraper.class.getName());
-    private static final String MAPPING_RESOURCE_PATTERN = "/scrapers/procedures-mapping-%s.json";
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     public static void main(String[] args) throws IOException {
@@ -92,17 +89,19 @@ public class EventScraper {
         Set<String> detailUrls = new LinkedHashSet<>();
         String nextPageUrl = mapping.events.baseUrl;
         int pageCount = 0;
-        int totalEvents = 0;
 
         while (nextPageUrl != null && !visitedPageUrls.contains(nextPageUrl)) {
             pageCount++;
             visitedPageUrls.add(nextPageUrl);
             try {
+                @SuppressWarnings("null")
                 Document doc = Jsoup.connect(nextPageUrl)
                         .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
                         .get();
                 int eventsOnPage = 0;
-                for (Element link : doc.select(mapping.events.crawl.eventLinkSelector)) {
+                @SuppressWarnings("null")
+                var eventLinks = doc.select(mapping.events.crawl.eventLinkSelector);
+                for (Element link : eventLinks) {
                     String href = link.absUrl("href");
                     if (href.isBlank())
                         continue;
@@ -114,9 +113,8 @@ public class EventScraper {
                     }
                 }
                 logger.info("Page " + pageCount + ": Found " + eventsOnPage + " event links (" + nextPageUrl + ")");
-                totalEvents += eventsOnPage;
 
-                // Find next page link in Drupal pager: look for "li.pager-item a" 
+                // Find next page link in Drupal pager: look for "li.pager-item a"
                 // that contains "next" or "següent" text, or rel=next attribute
                 nextPageUrl = findNextPageUrl(doc, visitedPageUrls);
             } catch (Exception e) {
@@ -138,7 +136,8 @@ public class EventScraper {
             }
         }
 
-        // Try Drupal pager: look for li.pager-next a (contains "next" or "següent" text)
+        // Try Drupal pager: look for li.pager-next a (contains "next" or "següent"
+        // text)
         nextLink = doc.selectFirst("li.pager-next a");
         if (nextLink != null) {
             String absNext = nextLink.absUrl("href");
@@ -151,7 +150,7 @@ public class EventScraper {
         for (Element link : doc.select("a")) {
             String text = link.text().trim().toLowerCase();
             String href = link.absUrl("href");
-            if ((text.contains("next") || text.contains("següent") || text.equals("›")) 
+            if ((text.contains("next") || text.contains("següent") || text.equals("›"))
                     && !href.isBlank() && !visitedPageUrls.contains(href)) {
                 return href;
             }
@@ -185,6 +184,7 @@ public class EventScraper {
 
     private static Optional<Map<String, Object>> scrapeEvent(String url, ProcedureScraper.ScraperMapping mapping)
             throws IOException {
+        @SuppressWarnings("null")
         Document doc = Jsoup.connect(url)
                 .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
                 .get();
@@ -209,6 +209,7 @@ public class EventScraper {
 
     private static String extractFieldValue(Document doc, ProcedureScraper.FieldExtractionRule rule) {
         if (rule.multiple) {
+            @SuppressWarnings("null")
             Elements elements = doc.select(rule.selector);
             StringBuilder sb = new StringBuilder();
             for (Element el : elements) {
@@ -221,6 +222,7 @@ public class EventScraper {
             }
             return sb.toString();
         } else {
+            @SuppressWarnings("null")
             Element el = doc.selectFirst(rule.selector);
             return el != null ? el.text().trim() : "";
         }

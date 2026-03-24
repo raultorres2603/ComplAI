@@ -2,7 +2,6 @@ package cat.complai.auth;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
@@ -18,8 +17,9 @@ import java.util.Date;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests JwtAuthFilter in isolation by calling filter() directly and inspecting the return value.
- * null  → request is allowed through (chain continues).
+ * Tests JwtAuthFilter in isolation by calling filter() directly and inspecting
+ * the return value.
+ * null → request is allowed through (chain continues).
  * non-null → request is blocked (the returned response is sent immediately).
  */
 class JwtAuthFilterTest {
@@ -86,7 +86,8 @@ class JwtAuthFilterTest {
     @Test
     void validToken_returnsNull() {
         MutableHttpRequest<?> request = HttpRequest.POST("/complai/ask", "{}")
-                .header("Authorization", "Bearer " + buildTokenWithCity("citizen-app", ISSUER, futureDate(30), "testcity"));
+                .header("Authorization",
+                        "Bearer " + buildTokenWithCity("citizen-app", ISSUER, futureDate(30), "testcity"));
         assertNull(filter.filter(request), "Valid token must pass through (return null)");
     }
 
@@ -140,7 +141,7 @@ class JwtAuthFilterTest {
 
         assertNull(filter.filter(request));
 
-        String city = request.getAttribute(JwtAuthFilter.CITY_ATTRIBUTE, String.class).orElse(null);
+        String city = request.getAttribute(JwtAuthFilter.CITY_ATTRIBUTE, String.class).orElse("");
         assertEquals("somecity", city);
     }
 

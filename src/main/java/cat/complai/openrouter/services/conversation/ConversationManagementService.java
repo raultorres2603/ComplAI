@@ -48,7 +48,9 @@ public class ConversationManagementService {
             logger.fine(() -> "updateConversationHistory() — conversationId=" + conversationId
                     + " pruned to maxHistoryTurns=" + maxTurns);
         }
-        conversationCache.put(conversationId, history);
+        @SuppressWarnings("unchecked")
+        List<MessageEntry> historyList = (List<MessageEntry>) (List<?>) history;
+        conversationCache.put(conversationId, historyList);
         final int currentHistorySize = history.size();
         logger.fine(() -> "updateConversationHistory() — conversationId=" + conversationId
                 + " currentHistorySize=" + currentHistorySize + " maxHistoryTurns=" + maxTurns);
