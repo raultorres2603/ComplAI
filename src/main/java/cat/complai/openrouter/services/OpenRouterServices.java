@@ -206,18 +206,20 @@ public class OpenRouterServices implements IOpenRouterService {
         OpenRouterResponseDto response = aiResponseService.callOpenRouterAndExtract(messages, cityId, procContextHash,
                 eventContextHash);
 
-        // Merge and de-duplicate sources from both procedure and event context
-        // Procedure sources take precedence if there are duplicates (stable ordering by
-        // relevance)
+        // Collect all sources WITHOUT deduplication - symmetric handling
+        // Procedure and event sources are treated equally at collection time
         List<Source> mergedSources = new ArrayList<>();
         if (procCtx != null && !procCtx.getSources().isEmpty()) {
-            mergedSources.addAll(procedureContextService.deDuplicateAndOrderSources(procCtx.getSources()));
+            mergedSources.addAll(procCtx.getSources());
         }
         if (eventCtx != null && !eventCtx.getSources().isEmpty()) {
             mergedSources.addAll(eventCtx.getSources());
         }
 
+        // Deduplicate ONCE after all sources are collected
+        // This ensures symmetric handling and prevents double deduplication
         if (response.isSuccess() && !mergedSources.isEmpty()) {
+            List<Source> finalSources = procedureContextService.deDuplicateAndOrderSources(mergedSources);
             response = new OpenRouterResponseDto(
                     response.isSuccess(),
                     response.getMessage(),
@@ -225,7 +227,7 @@ public class OpenRouterServices implements IOpenRouterService {
                     response.getStatusCode(),
                     response.getErrorCode(),
                     response.getPdfData(),
-                    procedureContextService.deDuplicateAndOrderSources(mergedSources));
+                    finalSources);
         }
 
         if (conversationId != null && !conversationId.isBlank() && response.getMessage() != null) {
