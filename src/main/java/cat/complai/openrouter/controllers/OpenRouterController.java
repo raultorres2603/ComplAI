@@ -43,29 +43,33 @@ public class OpenRouterController {
     private final IOpenRouterService service;
     private final SqsComplaintPublisher sqsPublisher;
     private final S3PdfUploader s3PdfUploader;
-    // Null when jwt.secret is not configured (worker Lambda). When non-null, individual
-    // cities may still have verification disabled — check isEnabledForCity() before use.
+    // Null when jwt.secret is not configured (worker Lambda). When non-null,
+    // individual
+    // cities may still have verification disabled — check isEnabledForCity() before
+    // use.
     private final OidcIdentityTokenValidator identityTokenValidator;
     private final Logger logger = Logger.getLogger(OpenRouterController.class.getName());
 
     @Inject
     public OpenRouterController(IOpenRouterService service,
-                                SqsComplaintPublisher sqsPublisher,
-                                S3PdfUploader s3PdfUploader,
-                                @Nullable OidcIdentityTokenValidator identityTokenValidator) {
-        this.service                  = service;
-        this.sqsPublisher             = sqsPublisher;
-        this.s3PdfUploader            = s3PdfUploader;
-        this.identityTokenValidator   = identityTokenValidator;
+            SqsComplaintPublisher sqsPublisher,
+            S3PdfUploader s3PdfUploader,
+            @Nullable OidcIdentityTokenValidator identityTokenValidator) {
+        this.service = service;
+        this.sqsPublisher = sqsPublisher;
+        this.s3PdfUploader = s3PdfUploader;
+        this.identityTokenValidator = identityTokenValidator;
     }
 
     @Post("/ask")
     public HttpResponse<OpenRouterPublicDto> ask(@Body AskRequest request, HttpRequest<?> httpRequest) {
         String cityId = httpRequest.getAttribute(JwtAuthFilter.CITY_ATTRIBUTE, String.class)
-                .orElseThrow(() -> new IllegalStateException("city attribute missing from request — JWT filter should have set it"));
+                .orElseThrow(() -> new IllegalStateException(
+                        "city attribute missing from request — JWT filter should have set it"));
         String conversationId = request != null ? request.getConversationId() : null;
         int inputLength = request != null && request.getText() != null ? request.getText().length() : 0;
-        logger.info(() -> "POST /complai/ask received — conversationId=" + conversationId + " inputLength=" + inputLength + " city=" + cityId);
+        logger.info(() -> "POST /complai/ask received — conversationId=" + conversationId + " inputLength="
+                + inputLength + " city=" + cityId);
         long start = System.currentTimeMillis();
         try {
             OpenRouterResponseDto dto;
@@ -75,7 +79,7 @@ public class OpenRouterController {
                 dto = null;
             }
             long latency = System.currentTimeMillis() - start;
-            AuditLogger.log("/complai/ask", AuditLogger.hashText(request.getText()),
+            AuditLogger.log("/complai/ask", AuditLogger.hashText(request != null ? request.getText() : null),
                     dto != null ? dto.getErrorCode().getCode() : -1, latency, null, null);
             MutableHttpResponse<OpenRouterPublicDto> response = errorToHttpResponse(dto, "ask");
             logger.info(() -> "POST /complai/ask completed — httpStatus=" + response.status().getCode()
@@ -89,16 +93,18 @@ public class OpenRouterController {
                     OpenRouterErrorCode.INTERNAL.getCode(), latency, null, null);
             logger.log(Level.SEVERE, "POST /complai/ask failed — httpStatus=500"
                     + " latencyMs=" + latency + " conversationId=" + conversationId, e);
-            OpenRouterPublicDto err = new OpenRouterPublicDto(false, null, e.getMessage(), OpenRouterErrorCode.INTERNAL.getCode(), List.of());
+            OpenRouterPublicDto err = new OpenRouterPublicDto(false, null, e.getMessage(),
+                    OpenRouterErrorCode.INTERNAL.getCode(), List.of());
             return HttpResponse.serverError(err);
         }
     }
 
     @Post("/redact")
-    @Produces({MediaType.APPLICATION_JSON})
+    @Produces({ MediaType.APPLICATION_JSON })
     public HttpResponse<?> redact(@Body RedactRequest request, HttpRequest<?> httpRequest) {
         String cityId = httpRequest.getAttribute(JwtAuthFilter.CITY_ATTRIBUTE, String.class)
-                .orElseThrow(() -> new IllegalStateException("city attribute missing from request — JWT filter should have set it"));
+                .orElseThrow(() -> new IllegalStateException(
+                        "city attribute missing from request — JWT filter should have set it"));
         String conversationId = request != null ? request.getConversationId() : null;
         int inputLength = request != null && request.getText() != null ? request.getText().length() : 0;
         OutputFormat requestedFormat = request != null ? request.getFormat() : null;
@@ -106,8 +112,8 @@ public class OpenRouterController {
                 + " inputLength=" + inputLength + " format=" + requestedFormat + " city=" + cityId);
         long start = System.currentTimeMillis();
         try {
-            String text           = request != null ? request.getText() : null;
-            OutputFormat format   = request == null ? OutputFormat.AUTO : request.getFormat();
+            String text = request != null ? request.getText() : null;
+            OutputFormat format = request == null ? OutputFormat.AUTO : request.getFormat();
             ComplainantIdentity identity = request != null ? request.getComplainantIdentity() : null;
 
             if (!OutputFormat.isSupportedClientFormat(format)) {
@@ -181,7 +187,8 @@ public class OpenRouterController {
                     request != null && request.getFormat() != null ? request.getFormat().name() : null, null);
             logger.log(Level.SEVERE, "POST /complai/redact failed — httpStatus=500"
                     + " latencyMs=" + latency + " conversationId=" + conversationId, e);
-            OpenRouterPublicDto err = new OpenRouterPublicDto(false, null, e.getMessage(), OpenRouterErrorCode.INTERNAL.getCode(), List.of());
+            OpenRouterPublicDto err = new OpenRouterPublicDto(false, null, e.getMessage(),
+                    OpenRouterErrorCode.INTERNAL.getCode(), List.of());
             return HttpResponse.serverError(err).contentType(MediaType.APPLICATION_JSON);
         }
     }
@@ -191,12 +198,13 @@ public class OpenRouterController {
     // -------------------------------------------------------------------------
 
     /**
-     * Validates, enqueues, and returns a {@code 202 Accepted} response containing the
+     * Validates, enqueues, and returns a {@code 202 Accepted} response containing
+     * the
      * pre-signed S3 URL where the worker Lambda will upload the finished PDF.
      */
     private HttpResponse<?> handleAsyncRedact(String text, OutputFormat format,
-                                              String conversationId, ComplainantIdentity identity,
-                                              String cityId, long requestStart) {
+            String conversationId, ComplainantIdentity identity,
+            String cityId, long requestStart) {
         // Run the same validation the sync path does (input length, anonymity).
         Optional<OpenRouterResponseDto> validationError = service.validateRedactInput(text);
         if (validationError.isPresent()) {
@@ -243,9 +251,10 @@ public class OpenRouterController {
                 + " conversationId=" + conversationId + " language=" + detectedLanguage);
 
         String acceptedMessage = switch (detectedLanguage) {
-            case "CA" -> "La vostra carta de reclamació s'està generant. Estarà disponible d'aquí a pocs minuts a l'adreça de sota.";
+            case "CA" ->
+                "La vostra carta de reclamació s'està generant. Estarà disponible d'aquí a pocs minuts a l'adreça de sota.";
             case "ES" -> "Su carta de queja se está generando. Estará disponible en breve en la dirección siguiente.";
-            default   -> "Your complaint letter is being created. It will be available shortly at the URL below.";
+            default -> "Your complaint letter is being created. It will be available shortly at the URL below.";
         };
 
         RedactAcceptedDto accepted = new RedactAcceptedDto(
@@ -260,8 +269,11 @@ public class OpenRouterController {
      * Generates the S3 object key for a complaint PDF.
      * Format: {@code complaints/<id>/<epoch-seconds>-complaint.pdf}
      *
-     * <p>The folder prefix is the conversationId when provided (groups multi-turn complaints)
-     * or a fresh UUID otherwise. The timestamp prefix inside the folder enables chronological
+     * <p>
+     * The folder prefix is the conversationId when provided (groups multi-turn
+     * complaints)
+     * or a fresh UUID otherwise. The timestamp prefix inside the folder enables
+     * chronological
      * listing.
      */
     private static String buildS3Key(String conversationId) {
@@ -273,8 +285,10 @@ public class OpenRouterController {
     }
 
     /**
-     * Maps a service response to the appropriate HTTP status. The errorCode on the DTO is the
-     * authoritative signal; the error message is only consulted as a fallback for legacy responses
+     * Maps a service response to the appropriate HTTP status. The errorCode on the
+     * DTO is the
+     * authoritative signal; the error message is only consulted as a fallback for
+     * legacy responses
      * that predate the errorCode field.
      */
     private MutableHttpResponse<OpenRouterPublicDto> errorToHttpResponse(OpenRouterResponseDto dto, String operation) {
@@ -288,7 +302,8 @@ public class OpenRouterController {
 
         MutableHttpResponse<OpenRouterPublicDto> response = switch (errorCode) {
             case VALIDATION -> {
-                logger.fine(() -> operation + ": httpStatus=400 errorCode=VALIDATION — " + dto.getError());
+                logger.fine(() -> operation + ": httpStatus=400 errorCode=VALIDATION — "
+                        + (dto != null ? dto.getError() : "validation error"));
                 yield HttpResponse.badRequest(publicDto);
             }
             case REFUSAL -> {
@@ -300,7 +315,8 @@ public class OpenRouterController {
                 yield HttpResponse.status(HttpStatus.GATEWAY_TIMEOUT).body(publicDto);
             }
             case UPSTREAM -> {
-                logger.warning(() -> operation + ": httpStatus=502 errorCode=UPSTREAM — " + dto.getError());
+                logger.warning(() -> operation + ": httpStatus=502 errorCode=UPSTREAM — "
+                        + (dto != null ? dto.getError() : "upstream error"));
                 yield HttpResponse.status(HttpStatus.BAD_GATEWAY).body(publicDto);
             }
             default -> {

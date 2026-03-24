@@ -71,8 +71,12 @@ public class AiResponseProcessingService {
         logger.fine(() -> "CACHE MISS — Calling OpenRouter for " + cacheKey);
         OpenRouterResponseDto response = callOpenRouterInternal(messages, cityId);
 
-        // Cache successful responses only
-        if (response.isSuccess() && response.getMessage() != null) {
+        // Cache successful responses only when RAG context is present.
+        // When both hashes are 0, the response depends entirely on the question text,
+        // which is not part of the cache key — caching these would return wrong answers
+        // for different questions that share the same (city, 0, 0, category) key.
+        boolean hasRagContext = procContextHash != 0 || eventContextHash != 0;
+        if (response.isSuccess() && response.getMessage() != null && hasRagContext) {
             responseCacheService.cacheResponse(cacheKey, response.getMessage());
         }
 

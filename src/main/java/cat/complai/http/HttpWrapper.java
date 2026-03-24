@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -21,9 +22,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 /**
  * HTTP wrapper for calling OpenRouter (or compatible) endpoints.
  *
- * <p>Retry policy: on a {@code 429} (upstream rate-limit) or {@code 5xx} response, the request
- * is retried up to {@code maxRetries} times (controlled by {@code OPENROUTER_MAX_RETRIES},
- * default 3). Other 4xx responses and network exceptions are never retried.</p>
+ * <p>
+ * Retry policy: on a {@code 429} (upstream rate-limit) or {@code 5xx} response,
+ * the request
+ * is retried up to {@code maxRetries} times (controlled by
+ * {@code OPENROUTER_MAX_RETRIES},
+ * default 3). Other 4xx responses and network exceptions are never retried.
+ * </p>
  */
 @Singleton
 public class HttpWrapper {
@@ -42,7 +47,8 @@ public class HttpWrapper {
     private final int maxRetries;
 
     /**
-     * Protected no-arg constructor to allow tests to subclass HttpWrapper without needing DI.
+     * Protected no-arg constructor to allow tests to subclass HttpWrapper without
+     * needing DI.
      * Initializes fields with safe defaults.
      */
     protected HttpWrapper() {
@@ -57,15 +63,16 @@ public class HttpWrapper {
 
     @Inject
     public HttpWrapper(OpenRouterClient openRouterClient,
-                       @Value("${openrouter.url:${OPENROUTER_URL:https://openrouter.ai}") String openRouterUrl,
-                       @Value("${OPENROUTER_API_KEY:}") String openRouterApiKey,
-                       @Value("${OPENROUTER_REQUEST_TIMEOUT_SECONDS:60}") int requestTimeoutSeconds,
-                       @Value("${OPENROUTER_MODEL:openrouter/free}") String openRouterModel,
-                       @Value("${OPENROUTER_MAX_RETRIES:3}") int maxRetries) {
+            @Value("${openrouter.url:${OPENROUTER_URL:https://openrouter.ai}") String openRouterUrl,
+            @Value("${OPENROUTER_API_KEY:}") String openRouterApiKey,
+            @Value("${OPENROUTER_REQUEST_TIMEOUT_SECONDS:60}") int requestTimeoutSeconds,
+            @Value("${OPENROUTER_MODEL:openrouter/free}") String openRouterModel,
+            @Value("${OPENROUTER_MAX_RETRIES:3}") int maxRetries) {
         this.openRouterClient = openRouterClient;
         this.openRouterUrl = normalizeOpenRouterBaseUrl(openRouterUrl);
         this.mapper = new ObjectMapper();
-        this.requestTimeoutSeconds = (requestTimeoutSeconds > 0) ? requestTimeoutSeconds : 20; // fallback to 20s if invalid
+        this.requestTimeoutSeconds = (requestTimeoutSeconds > 0) ? requestTimeoutSeconds : 20; // fallback to 20s if
+                                                                                               // invalid
         this.openRouterModel = openRouterModel;
         this.maxRetries = (maxRetries > 0) ? maxRetries : 1; // 1 = no retry, just one attempt
         Map<String, String> h = new HashMap<>();
@@ -79,16 +86,18 @@ public class HttpWrapper {
 
     public CompletableFuture<HttpDto> postToOpenRouterAsync(String userPrompt) {
         int promptLength = userPrompt == null ? 0 : userPrompt.length();
-        logger.fine(() -> "postToOpenRouterAsync (single-turn) — promptLength=" + promptLength + " model=" + openRouterModel);
+        logger.fine(() -> "postToOpenRouterAsync (single-turn) — promptLength=" + promptLength + " model="
+                + openRouterModel);
         try {
-            // Friendlier, town-tone system message for civilian users from El Prat de Llobregat.
+            // Friendlier, town-tone system message for civilian users from El Prat de
+            // Llobregat.
             String systemMessage = """
                     Ets un assistent que es diu Gall Potablava, amable i proper per als veïns d'El Prat de Llobregat. Ajudes a redactar cartes i queixes clares i civils adreçades a l'Ajuntament i ofereixes informació pràctica i local d'El Prat. Mantén les respostes curtes, respectuoses i fàcils de llegir, com un veí que vol ajudar. Si la consulta no és sobre El Prat de Llobregat, digues-ho educadament i explica que no pots ajudar amb aquesta petició; també pots suggerir que facin una pregunta sobre assumptes locals.\
-                    
-                    
+
+
                     En español: Eres un asistente que se llama Gall Potablava amable y cercano para los vecinos de El Prat de Llobregat. Ayuda a redactar cartes i queixes dirigides al Ayuntamiento i ofereix informació pràctica i local. Mantén las respuestas cortas y fáciles de entender. Si la consulta no trata sobre El Prat, dilo educadamente y sugiere que pregunten sobre asuntos locales.\
-                    
-                    
+
+
                     In English (support): You are a friendly local assistant named Gall Potablava for residents of El Prat de Llobregat. Help draft clear, civil letters to the City Hall and provide practical local information. Keep answers short and easy to read. If the request is not about El Prat de Llobregat, politely say you can't help with that request.""";
 
             Map<String, Object> userMessage = Map.of("role", "user", "content", userPrompt);
@@ -96,14 +105,15 @@ public class HttpWrapper {
 
             Map<String, Object> payload = Map.of(
                     "model", openRouterModel,
-                    "messages", List.of(systemMsg, userMessage)
-            );
+                    "messages", List.of(systemMsg, userMessage));
             String requestBody = mapper.writeValueAsString(payload);
 
             logger.fine(() -> "postToOpenRouterAsync — request body prepared payloadSize=" + requestBody.length()
                     + " model=" + openRouterModel);
-            logger.finer(() -> "postToOpenRouterAsync — prompt snippet: "
-                    + (userPrompt.length() > 200 ? userPrompt.substring(0, 200) + "..." : userPrompt));
+            String promptSnippet = userPrompt != null && userPrompt.length() > 200
+                    ? userPrompt.substring(0, 200) + "..."
+                    : userPrompt;
+            logger.finer(() -> "postToOpenRouterAsync — prompt snippet: " + promptSnippet);
 
             String authValue = resolveAuthHeader();
             if (authValue == null) {
@@ -123,17 +133,18 @@ public class HttpWrapper {
 
     public CompletableFuture<HttpDto> postToOpenRouterAsync(List<Map<String, Object>> messages) {
         int messageCount = messages == null ? 0 : messages.size();
-        logger.fine(() -> "postToOpenRouterAsync (multi-turn) — messageCount=" + messageCount + " model=" + openRouterModel);
+        logger.fine(() -> "postToOpenRouterAsync (multi-turn) — messageCount=" + messageCount + " model="
+                + openRouterModel);
         try {
             Map<String, Object> payload = Map.of(
                     "model", openRouterModel,
-                    "messages", messages
-            );
+                    "messages", messages);
             String requestBody = mapper.writeValueAsString(payload);
 
             String authValue = resolveAuthHeader();
             if (authValue == null) {
-                logger.warning("postToOpenRouterAsync (multi-turn) — cannot proceed: OPENROUTER_API_KEY is not configured");
+                logger.warning(
+                        "postToOpenRouterAsync (multi-turn) — cannot proceed: OPENROUTER_API_KEY is not configured");
                 return CompletableFuture.completedFuture(new HttpDto(null, null, "POST", "Missing OPENROUTER_API_KEY"));
             }
 
@@ -150,50 +161,62 @@ public class HttpWrapper {
 
     /**
      * Sends request using Micronaut HTTP client and retries on transient failures.
-     * This replaces the old HttpClient-based implementation with Micronaut's managed client.
+     * This replaces the old HttpClient-based implementation with Micronaut's
+     * managed client.
      *
-     * <p>Retried statuses:
+     * <p>
+     * Retried statuses:
      * <ul>
-     *   <li>{@code 429} — OpenRouter upstream rate-limit (transient; retrying after a moment succeeds)</li>
-     *   <li>{@code 5xx} — server-side errors</li>
+     * <li>{@code 429} — OpenRouter upstream rate-limit (transient; retrying after a
+     * moment succeeds)</li>
+     * <li>{@code 5xx} — server-side errors</li>
      * </ul>
-     * 4xx responses other than 429 are definitive client errors and are returned immediately.
-     * Network exceptions are also not retried — they are unlikely to self-heal within the same
-     * request lifecycle.</p>
+     * 4xx responses other than 429 are definitive client errors and are returned
+     * immediately.
+     * Network exceptions are also not retried — they are unlikely to self-heal
+     * within the same
+     * request lifecycle.
+     * </p>
      */
-    private CompletableFuture<HttpDto> sendWithRetryMicronaut(Map<String, Object> payload, String authValue, int attemptsLeft) {
+    private CompletableFuture<HttpDto> sendWithRetryMicronaut(Map<String, Object> payload, String authValue,
+            int attemptsLeft) {
         int attemptNumber = maxRetries - attemptsLeft + 1;
-        
+
+        // Use a recursive callback to handle retries properly with async futures
+        return performAsyncRequest(payload, authValue, attemptNumber, attemptsLeft);
+    }
+
+    private CompletableFuture<HttpDto> performAsyncRequest(Map<String, Object> payload, String authValue,
+            int attemptNumber, int attemptsLeft) {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 String responseBody = openRouterClient.chatCompletions(
-                        payload, 
-                        authValue, 
+                        payload,
+                        authValue,
                         headers.getOrDefault("HTTP-Referer", "https://complai.cat"),
-                        headers.getOrDefault("X-Title", "Complai")
-                );
-                
+                        headers.getOrDefault("X-Title", "Complai"));
+
                 int bodyLength = responseBody == null ? 0 : responseBody.length();
                 logger.fine(() -> "OpenRouter response — bodyLength=" + bodyLength
                         + " attempt=" + attemptNumber + "/" + maxRetries
                         + " url=" + openRouterUrl);
-                
+
                 // For Micronaut client, we assume 200 status on successful response
                 // HttpClientResponseException will be thrown for error status codes
                 String extracted = extractTextFromOpenRouterResponse(responseBody, mapper);
                 logger.fine(() -> "OpenRouter success — extractedLength=" + (extracted == null ? 0 : extracted.length())
                         + " attempt=" + attemptNumber + "/" + maxRetries);
                 return new HttpDto(extracted, 200, "POST", null);
-                
+
             } catch (HttpClientResponseException e) {
                 int status = e.getStatus().getCode();
-                String body = e.getResponse().getBody(String.class).orElse(null);
+                String body = e.getResponse().getBody(String.class).orElse("");
                 int bodyLength = body == null ? 0 : body.length();
                 logger.fine(() -> "OpenRouter error response — httpStatus=" + status
                         + " bodyLength=" + bodyLength
                         + " attempt=" + attemptNumber + "/" + maxRetries
                         + " url=" + openRouterUrl);
-                
+
                 if ((status == 429 || status >= 500) && attemptsLeft > 1) {
                     String reason = status == 429 ? "rate-limited" : "server error";
                     long baseDelayMs = 250L;
@@ -204,39 +227,55 @@ public class HttpWrapper {
                             + " retrying attempt=" + (attemptNumber + 1) + "/" + maxRetries
                             + " backoffMs=" + delayMs
                             + " url=" + openRouterUrl);
-                    
+
                     try {
                         Thread.sleep(delayMs);
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
                         return new HttpDto(null, null, "POST", "Request interrupted during retry");
                     }
-                    return sendWithRetryMicronaut(payload, authValue, attemptsLeft - 1).join();
+                    // Return a special marker to signal retry needed
+                    return new HttpDto(null, null, "__RETRY__", null);
                 }
-                
+
                 logger.warning(() -> "OpenRouter non-2xx response — httpStatus=" + status
                         + " attempt=" + attemptNumber + "/" + maxRetries
                         + " url=" + openRouterUrl);
                 return new HttpDto(body, status, "POST", String.format("OpenRouter non-2xx response: %d", status));
-                
+
             } catch (Exception e) {
                 logger.log(Level.SEVERE, "OpenRouter request failed — attempt=" + attemptNumber + "/" + maxRetries
                         + " url=" + openRouterUrl + " error=" + e.getMessage(), e);
                 return new HttpDto(null, null, "POST", e.getMessage());
             }
-        });
+        }).thenCompose(dto -> handleRetryLogic(dto, payload, authValue, attemptNumber, attemptsLeft));
+    }
+
+    @SuppressWarnings("unchecked")
+    private CompletionStage<HttpDto> handleRetryLogic(HttpDto dto, Map<String, Object> payload,
+            String authValue, int attemptNumber, int attemptsLeft) {
+        // If retry is needed, recursively call with reduced attempts
+        if ("__RETRY__".equals(dto.method()) && attemptsLeft > 1) {
+            int nextAttempt = attemptNumber + 1;
+            return performAsyncRequest(payload, authValue, nextAttempt, attemptsLeft - 1);
+        }
+        // Otherwise return the result
+        return CompletableFuture.completedFuture(dto);
     }
 
     /**
-     * Resolves the Bearer token from the pre-configured headers, falling back to the
+     * Resolves the Bearer token from the pre-configured headers, falling back to
+     * the
      * {@code OPENROUTER_API_KEY} environment variable if absent.
      *
-     * @return the full "Bearer …" auth value, or {@code null} if no key is available.
+     * @return the full "Bearer …" auth value, or {@code null} if no key is
+     *         available.
      */
     private String resolveAuthHeader() {
         String authValue = headers.get("Authorization");
         if (authValue == null || authValue.isBlank()) {
-            logger.warning("Authorization header not present in headers map; falling back to environment variable OPENROUTER_API_KEY");
+            logger.warning(
+                    "Authorization header not present in headers map; falling back to environment variable OPENROUTER_API_KEY");
             authValue = System.getenv("OPENROUTER_API_KEY");
         }
         if (authValue == null) {
@@ -245,11 +284,10 @@ public class HttpWrapper {
         return authValue.toLowerCase().startsWith("bearer ") ? authValue : "Bearer " + authValue;
     }
 
-
     private String extractTextFromOpenRouterResponse(String responseBody, ObjectMapper mapper) {
         try {
             JsonNode root = mapper.readTree(responseBody);
-            // Try common shapes: choices[].message.content  (OpenAI-like)
+            // Try common shapes: choices[].message.content (OpenAI-like)
             if (root.has("choices") && root.get("choices").isArray() && !root.get("choices").isEmpty()) {
                 JsonNode first = root.get("choices").get(0);
                 if (first.has("message") && first.get("message").has("content")) {
@@ -274,13 +312,15 @@ public class HttpWrapper {
         String original = url;
         url = url.trim();
 
-        // If URL starts with scheme-relative '//' (e.g. //openrouter.ai/...), remove leading slashes and prefix https://
+        // If URL starts with scheme-relative '//' (e.g. //openrouter.ai/...), remove
+        // leading slashes and prefix https://
         if (url.startsWith("//")) {
             url = url.replaceFirst("^/*", ""); // remove leading slashes
             url = "https://" + url;
         } else {
             String lower = url.toLowerCase();
-            // If URL already has an http or https scheme, normalize duplicate slashes after the scheme
+            // If URL already has an http or https scheme, normalize duplicate slashes after
+            // the scheme
             if (lower.startsWith("http://") || lower.startsWith("https://")) {
                 // Collapse any number of slashes after the scheme to exactly two
                 url = url.replaceFirst("^(https?:)/*", "$1//");
@@ -295,7 +335,8 @@ public class HttpWrapper {
             URI uri = URI.create(url);
             return uri.toString();
         } catch (IllegalArgumentException e) {
-            logger.log(Level.WARNING, "Configured OpenRouter URL is malformed (original='" + original + "', normalized='" + url + "'), falling back to default URL", e);
+            logger.log(Level.WARNING, "Configured OpenRouter URL is malformed (original='" + original
+                    + "', normalized='" + url + "'), falling back to default URL", e);
             return DEFAULT_OPENROUTER_URL;
         }
     }
@@ -317,4 +358,5 @@ public class HttpWrapper {
     }
 }
 // Timeout is configurable via OPENROUTER_REQUEST_TIMEOUT_SECONDS (default 60s).
-// Retry count is configurable via OPENROUTER_MAX_RETRIES (default 3). 429 and 5xx responses are retried.
+// Retry count is configurable via OPENROUTER_MAX_RETRIES (default 3). 429 and
+// 5xx responses are retried.

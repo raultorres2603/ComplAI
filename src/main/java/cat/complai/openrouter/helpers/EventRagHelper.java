@@ -193,7 +193,7 @@ public class EventRagHelper {
             for (ScoreDoc sd : topDocs.scoreDocs) {
                 maxScoreArray[0] = Math.max(maxScoreArray[0], sd.score);
                 if (sd.score >= MIN_RELEVANCE_SCORE) {
-                    Document doc = searcher.doc(sd.doc);
+                    Document doc = searcher.storedFields().document(sd.doc);
                     results.add(new Event(
                             doc.get("eventId"),
                             doc.get("title"),

@@ -1,6 +1,5 @@
 package cat.complai.openrouter.services;
 
-import cat.complai.openrouter.helpers.AiParsed;
 import cat.complai.openrouter.services.validation.InputValidationService;
 import cat.complai.openrouter.services.conversation.ConversationManagementService;
 import cat.complai.openrouter.services.ai.AiResponseProcessingService;
@@ -8,14 +7,12 @@ import cat.complai.openrouter.services.procedure.ProcedureContextService;
 import cat.complai.openrouter.services.procedure.ProcedureContextService.ProcedureContextResult;
 import cat.complai.openrouter.interfaces.IOpenRouterService;
 import cat.complai.openrouter.dto.OpenRouterResponseDto;
-import cat.complai.openrouter.dto.OpenRouterErrorCode;
 import cat.complai.openrouter.dto.Source;
 import cat.complai.openrouter.helpers.RedactPromptBuilder;
 import cat.complai.openrouter.dto.ComplainantIdentity;
 import cat.complai.openrouter.dto.OutputFormat;
 import jakarta.inject.Singleton;
 import jakarta.inject.Inject;
-import io.micronaut.context.annotation.Value;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -159,7 +156,11 @@ public class OpenRouterServices implements IOpenRouterService {
         var history = conversationService.getConversationHistory(conversationId);
         conversationService.addToMessages(messages, history);
 
-        messages.add(Map.of("role", "user", "content", question.trim()));
+        if (question != null) {
+            messages.add(Map.of("role", "user", "content", question.trim()));
+        } else {
+            messages.add(Map.of("role", "user", "content", ""));
+        }
 
         // Calculate and log context metrics
         final int systemTokens;

@@ -1,7 +1,5 @@
 package cat.complai.openrouter.cache;
 
-import java.util.Optional;
-
 /**
  * Utility class for keyword-based question categorization.
  * 

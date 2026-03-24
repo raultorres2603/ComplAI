@@ -7,7 +7,6 @@ import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import cat.complai.home.HealthDto;
 
 import static org.junit.jupiter.api.Assertions.*;
 

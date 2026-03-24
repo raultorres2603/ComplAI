@@ -140,10 +140,13 @@ public class ProcedureScraper {
                 continue;
 
             try {
+                @SuppressWarnings("null")
                 Document doc = Jsoup.connect(currentUrl).get();
 
                 if (mapping.crawl.categoryLinkSelector != null && !mapping.crawl.categoryLinkSelector.isBlank()) {
-                    for (Element link : doc.select(mapping.crawl.categoryLinkSelector)) {
+                    @SuppressWarnings("null")
+                    var categoryLinks = doc.select(mapping.crawl.categoryLinkSelector);
+                    for (Element link : categoryLinks) {
                         String href = link.absUrl("href");
                         if (!href.isBlank() && !visitedCategoryUrls.contains(href)) {
                             pendingCategoryUrls.add(href);
@@ -151,7 +154,9 @@ public class ProcedureScraper {
                     }
                 }
 
-                for (Element link : doc.select(mapping.crawl.detailLinkSelector)) {
+                @SuppressWarnings("null")
+                var detailLinks = doc.select(mapping.crawl.detailLinkSelector);
+                for (Element link : detailLinks) {
                     String href = link.absUrl("href");
                     if (href.isBlank())
                         continue;
@@ -192,6 +197,7 @@ public class ProcedureScraper {
 
     private static Optional<Map<String, Object>> scrapeProcedure(String url, ScraperMapping mapping)
             throws IOException {
+        @SuppressWarnings("null")
         Document doc = Jsoup.connect(url).get();
 
         Map<String, Object> procedure = new LinkedHashMap<>();
@@ -214,6 +220,7 @@ public class ProcedureScraper {
 
     private static String extractFieldValue(Document doc, FieldExtractionRule rule) {
         if (rule.multiple) {
+            @SuppressWarnings("null")
             Elements elements = doc.select(rule.selector);
             StringBuilder sb = new StringBuilder();
             for (Element el : elements) {
@@ -226,6 +233,7 @@ public class ProcedureScraper {
             }
             return sb.toString();
         } else {
+            @SuppressWarnings("null")
             Element el = doc.selectFirst(rule.selector);
             return el != null ? el.text().trim() : "";
         }

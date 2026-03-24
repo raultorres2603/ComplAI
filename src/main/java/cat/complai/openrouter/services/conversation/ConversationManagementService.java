@@ -48,7 +48,9 @@ public class ConversationManagementService {
             logger.fine(() -> "updateConversationHistory() — conversationId=" + conversationId
                     + " pruned to maxHistoryTurns=" + maxTurns);
         }
-        conversationCache.put(conversationId, history);
+        @SuppressWarnings("unchecked")
+        List<MessageEntry> historyList = (List<MessageEntry>) (List<?>) history;
+        storeCacheEntry(conversationId, historyList);
         final int currentHistorySize = history.size();
         logger.fine(() -> "updateConversationHistory() — conversationId=" + conversationId
                 + " currentHistorySize=" + currentHistorySize + " maxHistoryTurns=" + maxTurns);
@@ -65,6 +67,11 @@ public class ConversationManagementService {
                     + " historySize=" + history.size() + " maxHistoryTurns=" + maxTurns);
         }
         return history != null ? history : List.of();
+    }
+
+    @SuppressWarnings("unchecked")
+    private void storeCacheEntry(String conversationId, List<MessageEntry> historyList) {
+        conversationCache.put(conversationId, historyList);
     }
 
     public void storePendingComplaint(String conversationId, String complaint) {

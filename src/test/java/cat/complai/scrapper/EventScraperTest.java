@@ -4,6 +4,7 @@ import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.parser.Parser;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -91,6 +92,7 @@ class EventScraperTest {
     }
 
     // Helper to invoke private static method
+    @SuppressWarnings("unchecked")
     private Set<String> invokeCrawlEventDetailUrls(ProcedureScraper.ScraperMapping mapping) {
         try {
             var m = EventScraper.class.getDeclaredMethod("crawlEventDetailUrls", ProcedureScraper.ScraperMapping.class);
@@ -102,221 +104,226 @@ class EventScraperTest {
     }
 
     // Fake Jsoup.Connection for mocking
+    @SuppressWarnings("all")
     static class FakeConnection implements org.jsoup.Connection {
         private final String html;
 
-        public FakeConnection(String html) {
+        public FakeConnection(@NonNull String html) {
             this.html = html;
         }
 
-        public Document get() {
-            return Jsoup.parse(html, "https://www.elprat.cat");
+        @Override
+        public @NonNull Document get() {
+            return Jsoup.parse(html, (String) "https://www.elprat.cat");
         }
 
         @Override
-        public org.jsoup.Connection response(org.jsoup.Connection.Response response) {
+        public @NonNull Connection response(Connection.Response response) {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public org.jsoup.Connection.Response response() {
+        public Connection.@NonNull Response response() {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public org.jsoup.Connection request(org.jsoup.Connection.Request request) {
+        public @NonNull Connection request(Connection.Request request) {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public org.jsoup.Connection.Request request() {
+        public Connection.@NonNull Request request() {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public org.jsoup.Connection.Response execute() {
-            throw new UnsupportedOperationException();
-        }
-
-        public Document post() {
+        public Connection.@NonNull Response execute() {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public org.jsoup.Connection postDataCharset(String charset) {
+        public @NonNull Document post() {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public Connection newRequest() {
+        public @NonNull Connection postDataCharset(@NonNull String charset) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public @NonNull Connection newRequest() {
             // TODO Auto-generated method stub
             throw new UnsupportedOperationException("Unimplemented method 'newRequest'");
         }
 
         @Override
-        public Connection url(URL url) {
+        public @NonNull Connection url(@NonNull URL url) {
             // TODO Auto-generated method stub
             throw new UnsupportedOperationException("Unimplemented method 'url'");
         }
 
         @Override
-        public Connection url(String url) {
+        public @NonNull Connection url(@NonNull String url) {
             // TODO Auto-generated method stub
             throw new UnsupportedOperationException("Unimplemented method 'url'");
         }
 
         @Override
-        public Connection proxy(@Nullable Proxy proxy) {
+        public @NonNull Connection proxy(@Nullable Proxy proxy) {
             // TODO Auto-generated method stub
             throw new UnsupportedOperationException("Unimplemented method 'proxy'");
         }
 
         @Override
-        public Connection proxy(String host, int port) {
+        public @NonNull Connection proxy(@NonNull String host, int port) {
             // TODO Auto-generated method stub
             throw new UnsupportedOperationException("Unimplemented method 'proxy'");
         }
 
         @Override
-        public Connection userAgent(String userAgent) {
+        public @NonNull Connection userAgent(@NonNull String userAgent) {
             // Support method chaining in tests
             return this;
         }
 
         @Override
-        public Connection timeout(int millis) {
+        public @NonNull Connection timeout(int millis) {
             // Support method chaining in tests
             return this;
         }
 
         @Override
-        public Connection maxBodySize(int bytes) {
+        public @NonNull Connection maxBodySize(int bytes) {
             // TODO Auto-generated method stub
             throw new UnsupportedOperationException("Unimplemented method 'maxBodySize'");
         }
 
         @Override
-        public Connection referrer(String referrer) {
+        public @NonNull Connection referrer(@NonNull String referrer) {
             // TODO Auto-generated method stub
             throw new UnsupportedOperationException("Unimplemented method 'referrer'");
         }
 
         @Override
-        public Connection followRedirects(boolean followRedirects) {
+        public @NonNull Connection followRedirects(boolean followRedirects) {
             // TODO Auto-generated method stub
             throw new UnsupportedOperationException("Unimplemented method 'followRedirects'");
         }
 
         @Override
-        public Connection method(Method method) {
+        public @NonNull Connection method(@NonNull Method method) {
             // TODO Auto-generated method stub
             throw new UnsupportedOperationException("Unimplemented method 'method'");
         }
 
         @Override
-        public Connection ignoreHttpErrors(boolean ignoreHttpErrors) {
+        public @NonNull Connection ignoreHttpErrors(boolean ignoreHttpErrors) {
             // TODO Auto-generated method stub
             throw new UnsupportedOperationException("Unimplemented method 'ignoreHttpErrors'");
         }
 
         @Override
-        public Connection ignoreContentType(boolean ignoreContentType) {
+        public @NonNull Connection ignoreContentType(boolean ignoreContentType) {
             // TODO Auto-generated method stub
             throw new UnsupportedOperationException("Unimplemented method 'ignoreContentType'");
         }
 
         @Override
-        public Connection sslSocketFactory(SSLSocketFactory sslSocketFactory) {
+        public @NonNull Connection sslSocketFactory(@NonNull SSLSocketFactory sslSocketFactory) {
             // TODO Auto-generated method stub
             throw new UnsupportedOperationException("Unimplemented method 'sslSocketFactory'");
         }
 
         @Override
-        public Connection data(String key, String value) {
+        public @NonNull Connection data(@NonNull String key, @NonNull String value) {
             // TODO Auto-generated method stub
             throw new UnsupportedOperationException("Unimplemented method 'data'");
         }
 
         @Override
-        public Connection data(String key, String filename, InputStream inputStream) {
+        public @NonNull Connection data(@NonNull String key, @NonNull String filename,
+                @NonNull InputStream inputStream) {
             // TODO Auto-generated method stub
             throw new UnsupportedOperationException("Unimplemented method 'data'");
         }
 
         @Override
-        public Connection data(String key, String filename, InputStream inputStream, String contentType) {
+        public @NonNull Connection data(@NonNull String key, @NonNull String filename, @NonNull InputStream inputStream,
+                @NonNull String contentType) {
             // TODO Auto-generated method stub
             throw new UnsupportedOperationException("Unimplemented method 'data'");
         }
 
         @Override
-        public Connection data(Collection<KeyVal> data) {
+        public @NonNull Connection data(@NonNull Collection<KeyVal> data) {
             // TODO Auto-generated method stub
             throw new UnsupportedOperationException("Unimplemented method 'data'");
         }
 
         @Override
-        public Connection data(Map<String, String> data) {
+        public @NonNull Connection data(@NonNull Map<String, String> data) {
             // TODO Auto-generated method stub
             throw new UnsupportedOperationException("Unimplemented method 'data'");
         }
 
         @Override
-        public Connection data(String... keyvals) {
+        public @NonNull Connection data(@NonNull String @NonNull... keyvals) {
             // TODO Auto-generated method stub
             throw new UnsupportedOperationException("Unimplemented method 'data'");
         }
 
         @Override
-        public @Nullable KeyVal data(String key) {
+        public @Nullable KeyVal data(@NonNull String key) {
             // TODO Auto-generated method stub
             throw new UnsupportedOperationException("Unimplemented method 'data'");
         }
 
         @Override
-        public Connection requestBody(String body) {
+        public @NonNull Connection requestBody(@NonNull String body) {
             // TODO Auto-generated method stub
             throw new UnsupportedOperationException("Unimplemented method 'requestBody'");
         }
 
         @Override
-        public Connection header(String name, String value) {
+        public @NonNull Connection header(@NonNull String name, @NonNull String value) {
             // TODO Auto-generated method stub
             throw new UnsupportedOperationException("Unimplemented method 'header'");
         }
 
         @Override
-        public Connection headers(Map<String, String> headers) {
+        public @NonNull Connection headers(@NonNull Map<String, String> headers) {
             // TODO Auto-generated method stub
             throw new UnsupportedOperationException("Unimplemented method 'headers'");
         }
 
         @Override
-        public Connection cookie(String name, String value) {
+        public @NonNull Connection cookie(@NonNull String name, @NonNull String value) {
             // TODO Auto-generated method stub
             throw new UnsupportedOperationException("Unimplemented method 'cookie'");
         }
 
         @Override
-        public Connection cookies(Map<String, String> cookies) {
+        public @NonNull Connection cookies(@NonNull Map<String, String> cookies) {
             // TODO Auto-generated method stub
             throw new UnsupportedOperationException("Unimplemented method 'cookies'");
         }
 
         @Override
-        public Connection cookieStore(CookieStore cookieStore) {
+        public @NonNull Connection cookieStore(@NonNull CookieStore cookieStore) {
             // TODO Auto-generated method stub
             throw new UnsupportedOperationException("Unimplemented method 'cookieStore'");
         }
 
         @Override
-        public CookieStore cookieStore() {
+        public @NonNull CookieStore cookieStore() {
             // TODO Auto-generated method stub
             throw new UnsupportedOperationException("Unimplemented method 'cookieStore'");
         }
 
         @Override
-        public Connection parser(Parser parser) {
+        public @NonNull Connection parser(@NonNull Parser parser) {
             // TODO Auto-generated method stub
             throw new UnsupportedOperationException("Unimplemented method 'parser'");
         }
