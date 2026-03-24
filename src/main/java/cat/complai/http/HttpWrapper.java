@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -247,15 +248,19 @@ public class HttpWrapper {
                         + " url=" + openRouterUrl + " error=" + e.getMessage(), e);
                 return new HttpDto(null, null, "POST", e.getMessage());
             }
-        }).thenCompose(dto -> {
-            // If retry is needed, recursively call with reduced attempts
-            if ("__RETRY__".equals(dto.method()) && attemptsLeft > 1) {
-                int nextAttempt = attemptNumber + 1;
-                return performAsyncRequest(payload, authValue, nextAttempt, attemptsLeft - 1);
-            }
-            // Otherwise return the result
-            return CompletableFuture.completedFuture(dto);
-        });
+        }).thenCompose(dto -> handleRetryLogic(dto, payload, authValue, attemptNumber, attemptsLeft));
+    }
+
+    @SuppressWarnings("unchecked")
+    private CompletionStage<HttpDto> handleRetryLogic(HttpDto dto, Map<String, Object> payload,
+            String authValue, int attemptNumber, int attemptsLeft) {
+        // If retry is needed, recursively call with reduced attempts
+        if ("__RETRY__".equals(dto.method()) && attemptsLeft > 1) {
+            int nextAttempt = attemptNumber + 1;
+            return performAsyncRequest(payload, authValue, nextAttempt, attemptsLeft - 1);
+        }
+        // Otherwise return the result
+        return CompletableFuture.completedFuture(dto);
     }
 
     /**
