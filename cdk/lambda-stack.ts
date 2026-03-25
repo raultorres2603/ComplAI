@@ -187,8 +187,7 @@ export class LambdaStack extends cdk.Stack {
 
       },
       role: lambdaRole,
-      logGroup: logGroup,
-      reservedConcurrentExecutions: parseInt(process.env.API_LAMBDA_CONCURRENCY || '10'),
+      logGroup: logGroup
     });
 
     // API Lambda needs to publish to the redact queue.
@@ -287,8 +286,7 @@ export class LambdaStack extends cdk.Stack {
         JAVA_TOOL_OPTIONS: '--add-modules=jdk.incubator.vector'
       },
       role: workerRole,
-      logGroup: workerLogGroup,
-      reservedConcurrentExecutions: parseInt(process.env.WORKER_LAMBDA_CONCURRENCY || '5'),
+      logGroup: workerLogGroup
     });
 
     const feedbackWorkerFn = new lambda.Function(this, `ComplAIFeedbackWorkerLambda-${environment}`, {
@@ -308,8 +306,7 @@ export class LambdaStack extends cdk.Stack {
         JAVA_TOOL_OPTIONS: '--add-modules=jdk.incubator.vector'
       },
       role: feedbackWorkerRole,
-      logGroup: feedbackWorkerLogGroup,
-      reservedConcurrentExecutions: parseInt(process.env.FEEDBACK_WORKER_LAMBDA_CONCURRENCY || '5'),
+      logGroup: feedbackWorkerLogGroup
     });
 
     // Wire SQS → worker Lambda.
