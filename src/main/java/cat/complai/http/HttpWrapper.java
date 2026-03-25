@@ -251,7 +251,6 @@ public class HttpWrapper {
         }).thenCompose(dto -> handleRetryLogic(dto, payload, authValue, attemptNumber, attemptsLeft));
     }
 
-    @SuppressWarnings("unchecked")
     private CompletionStage<HttpDto> handleRetryLogic(HttpDto dto, Map<String, Object> payload,
             String authValue, int attemptNumber, int attemptsLeft) {
         // If retry is needed, recursively call with reduced attempts

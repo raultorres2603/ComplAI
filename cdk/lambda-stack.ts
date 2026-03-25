@@ -25,13 +25,14 @@ export interface LambdaStackProps extends cdk.StackProps {
   // construct path that mirrors the original QueueStack path so the hash — and
   // the EventSourceMapping logical ID — remains stable.
   readonly redactQueue: sqs.IQueue;
+  readonly feedbackQueue: sqs.IQueue;
 }
 
 export class LambdaStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: LambdaStackProps) {
     super(scope, id, props);
 
-    const { environment, redactQueue } = props;
+    const { environment, redactQueue, feedbackQueue } = props;
 
     // Reconstruct cross-stack bucket references from their deterministic names
     // rather than accepting CDK construct objects as props. Passing construct
@@ -53,6 +54,9 @@ export class LambdaStack extends cdk.Stack {
     );
     const complaintsBucket = s3.Bucket.fromBucketName(
       this, `ComplaintsBucketRef-${environment}`, `complai-complaints-${environment}`
+    );
+    const feedbackBucket = s3.Bucket.fromBucketName(
+      this, `FeedbackBucketRef-${environment}`, `complai-feedback-${environment}`
     );
     const deploymentsBucket = s3.Bucket.fromBucketName(
       this, `DeploymentsBucketRef-${environment}`, `complai-deployments-${environment}`
@@ -157,6 +161,8 @@ export class LambdaStack extends cdk.Stack {
         JWT_SECRET: process.env.JWT_SECRET || '',
         // Async redact flow: queue URL for publishing + bucket details for pre-signed URLs.
         REDACT_QUEUE_URL: redactQueue.queueUrl,
+        FEEDBACK_QUEUE_URL: feedbackQueue.queueUrl,
+        FEEDBACK_QUEUE_REGION: this.region,
         COMPLAINTS_BUCKET: complaintsBucket.bucketName,
         COMPLAINTS_REGION: this.region,
         // HTTP Client configuration for Micronaut (operational flexibility)
@@ -176,15 +182,17 @@ export class LambdaStack extends cdk.Stack {
         // is bundled in oidc-mapping.json — enabled per city, no env var needed.
         // The worker Lambda does not receive JWT_SECRET and therefore never loads the
         // OidcIdentityTokenValidator bean.
-        JAVA_TOOL_OPTIONS: '--add-modules=jdk.incubator.vector'
+        JAVA_TOOL_OPTIONS: '--add-modules=jdk.incubator.vector',
+        RATE_LIMIT_REQUESTS_PER_MINUTE: process.env.RATE_LIMIT_REQUESTS_PER_MINUTE || '20'
 
       },
       role: lambdaRole,
-      logGroup: logGroup,
+      logGroup: logGroup
     });
 
     // API Lambda needs to publish to the redact queue.
     redactQueue.grantSendMessages(lambdaRole);
+    feedbackQueue.grantSendMessages(lambdaRole);
 
     // API Lambda needs s3:GetObject to sign pre-signed GET URLs on behalf of callers.
     // Pre-signed URLs embed the signer's credentials; without this permission the
@@ -214,8 +222,29 @@ export class LambdaStack extends cdk.Stack {
     // Worker needs events access for event context in the AI prompt.
     eventsBucket.grantRead(workerRole);
 
+    // Feedback Worker Role — separate from redact worker for least privilege
+    const feedbackWorkerRole = new iam.Role(this, `ComplAIFeedbackWorkerRole-${environment}`, {
+      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+      description: `IAM role for ComplAI feedback worker Lambda (${environment}) - SQS consume + S3 write`,
+    });
+    feedbackWorkerRole.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
+    );
+    // Feedback worker consumes from feedback queue
+    feedbackQueue.grantConsumeMessages(feedbackWorkerRole);
+    // Feedback worker writes JSON files to feedback bucket
+    feedbackBucket.grantPut(feedbackWorkerRole);
+
     const workerLogGroup = new logs.LogGroup(this, `ComplAIWorkerLogGroup-${environment}`, {
       logGroupName: `/aws/lambda/ComplAIRedactorLambda-${environment}`,
+      retention: logRetention,
+      removalPolicy: environment === 'production'
+        ? cdk.RemovalPolicy.RETAIN
+        : cdk.RemovalPolicy.DESTROY,
+    });
+
+    const feedbackWorkerLogGroup = new logs.LogGroup(this, `ComplAIFeedbackWorkerLogGroup-${environment}`, {
+      logGroupName: `/aws/lambda/ComplAIFeedbackWorkerLambda-${environment}`,
       retention: logRetention,
       removalPolicy: environment === 'production'
         ? cdk.RemovalPolicy.RETAIN
@@ -257,7 +286,27 @@ export class LambdaStack extends cdk.Stack {
         JAVA_TOOL_OPTIONS: '--add-modules=jdk.incubator.vector'
       },
       role: workerRole,
-      logGroup: workerLogGroup,
+      logGroup: workerLogGroup
+    });
+
+    const feedbackWorkerFn = new lambda.Function(this, `ComplAIFeedbackWorkerLambda-${environment}`, {
+      runtime: lambda.Runtime.JAVA_21,
+      // Handler must match the feedback worker: FeedbackWorkerHandler::handleRequest
+      handler: 'cat.complai.feedback.worker.FeedbackWorkerHandler::handleRequest',
+      code,
+      memorySize: 512,  // Feedback processing is lighter than AI redaction
+      snapStart: lambda.SnapStartConf.ON_PUBLISHED_VERSIONS,
+      timeout: cdk.Duration.seconds(60),
+      // Feedback worker environment
+      environment: {
+        FEEDBACK_QUEUE_URL: feedbackQueue.queueUrl,
+        FEEDBACK_BUCKET_NAME: feedbackBucket.bucketName,
+        FEEDBACK_QUEUE_REGION: this.region,
+        ...(process.env.AWS_ENDPOINT_URL ? { AWS_ENDPOINT_URL: process.env.AWS_ENDPOINT_URL } : {}),
+        JAVA_TOOL_OPTIONS: '--add-modules=jdk.incubator.vector'
+      },
+      role: feedbackWorkerRole,
+      logGroup: feedbackWorkerLogGroup
     });
 
     // Wire SQS → worker Lambda.
@@ -265,6 +314,14 @@ export class LambdaStack extends cdk.Stack {
     // complexity with no throughput benefit at this scale.
     // reportBatchItemFailures=true: partial failures don't re-process succeeded items.
     workerFn.addEventSource(new lambdaEventSources.SqsEventSource(redactQueue, {
+      batchSize: 1,
+      reportBatchItemFailures: true,
+    }));
+
+    // Wire SQS → feedback worker Lambda.
+    // batchSize=1: each feedback is independent; batching adds complexity with no benefit.
+    // reportBatchItemFailures=true: partial failures don't re-process succeeded items.
+    feedbackWorkerFn.addEventSource(new lambdaEventSources.SqsEventSource(feedbackQueue, {
       batchSize: 1,
       reportBatchItemFailures: true,
     }));
@@ -346,6 +403,16 @@ export class LambdaStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'ComplAIWorkerLogGroupName', {
       value: workerLogGroup.logGroupName,
       description: `CloudWatch Log Group for the worker Lambda function (${environment})`,
+    });
+
+    new cdk.CfnOutput(this, 'ComplAIFeedbackWorkerLambdaName', {
+      value: feedbackWorkerFn.functionName,
+      description: `Name of the feedback worker Lambda function (${environment})`,
+    });
+
+    new cdk.CfnOutput(this, 'ComplAIFeedbackWorkerLogGroupName', {
+      value: feedbackWorkerLogGroup.logGroupName,
+      description: `CloudWatch Log Group for the feedback worker Lambda function (${environment})`,
     });
   }
 }

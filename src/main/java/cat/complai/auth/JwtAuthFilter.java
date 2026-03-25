@@ -48,6 +48,12 @@ public class JwtAuthFilter {
      */
     public static final String CITY_ATTRIBUTE = "city";
 
+    /**
+     * Request attribute key that downstream filters read to determine the
+     * authenticated user (JWT subject).
+     */
+    public static final String USER_ATTRIBUTE = "user";
+
     private final JwtValidator jwtValidator;
 
     @Inject
@@ -82,6 +88,7 @@ public class JwtAuthFilter {
         // Propagate the city claim downstream so controllers can load the correct
         // procedures context without re-parsing the token.
         request.setAttribute(CITY_ATTRIBUTE, result.city());
+        request.setAttribute(USER_ATTRIBUTE, result.subject());
 
         return null;
     }

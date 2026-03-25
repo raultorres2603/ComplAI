@@ -144,6 +144,24 @@ Resources:
           - Status: Enabled
             ExpirationInDays: 30
 
+  FeedbackBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub complai-feedback-${Environment}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Status: Enabled
+            ExpirationInDays: !If [IsProduction, 90, 30]
+
   RedactDLQ:
     Type: AWS::SQS::Queue
     Properties:
@@ -158,6 +176,22 @@ Resources:
       MessageRetentionPeriod: 14400  # 4 hours
       RedrivePolicy:
         deadLetterTargetArn: !GetAtt RedactDLQ.Arn
+        maxReceiveCount: 3
+
+  FeedbackDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub complai-feedback-dlq-${Environment}
+      MessageRetentionPeriod: 604800  # 7 days
+
+  FeedbackQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub complai-feedback-${Environment}
+      VisibilityTimeout: 90
+      MessageRetentionPeriod: 14400  # 4 hours
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt FeedbackDLQ.Arn
         maxReceiveCount: 3
 
   ComplAIFunction:
@@ -181,6 +215,8 @@ Resources:
           OPENROUTER_MODEL: google/gemma-3-27b-it:free
           JWT_SECRET: !Ref JwtSecret
           REDACT_QUEUE_URL: !Ref RedactQueue
+          FEEDBACK_QUEUE_URL: !Ref FeedbackQueue
+          FEEDBACK_QUEUE_REGION: !Ref LambdaRegion
           COMPLAINTS_BUCKET: !Ref ComplaintsBucket
           COMPLAINTS_REGION: !Ref LambdaRegion
           JAVA_TOOL_OPTIONS: "--add-modules=jdk.incubator.vector -XX:+UnlockDiagnosticVMOptions -XX:+EnableVectorReboxing"
@@ -233,6 +269,31 @@ Resources:
             FunctionResponseTypes:
               - ReportBatchItemFailures
 
+  ComplAIFeedbackWorkerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../build/libs/complai-all.jar
+      Handler: cat.complai.feedback.worker.FeedbackWorkerHandler::handleRequest
+      Runtime: java21
+      MemorySize: 512
+      Timeout: 60
+      Role: !GetAtt ComplAIWorkerRole.Arn
+      Environment:
+        Variables:
+          FEEDBACK_QUEUE_URL: !Ref FeedbackQueue
+          FEEDBACK_BUCKET_NAME: !Ref FeedbackBucket
+          FEEDBACK_QUEUE_REGION: !Ref LambdaRegion
+          AWS_ENDPOINT_URL: "http://host.docker.internal:4566"
+          JAVA_TOOL_OPTIONS: "--add-modules=jdk.incubator.vector"
+      Events:
+        SQSTrigger:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt FeedbackQueue.Arn
+            BatchSize: 1
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+
 Outputs:
   ComplAILambdaFunctionName:
     Description: Name of the deployed ComplAI Lambda function
@@ -246,3 +307,9 @@ Outputs:
   ComplAIComplaintsBucketName:
     Description: S3 bucket for generated complaint PDFs
     Value: !Ref ComplaintsBucket
+  ComplAIFeedbackQueueUrl:
+    Description: SQS queue URL for the async feedback flow
+    Value: !Ref FeedbackQueue
+  ComplAIFeedbackBucketName:
+    Description: S3 bucket for user feedback JSON files
+    Value: !Ref FeedbackBucket

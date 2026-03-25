@@ -32,6 +32,7 @@ create_bucket() {
 
 create_bucket "complai-local"
 create_bucket "complai-complaints-local"
+create_bucket "complai-feedback-local"
 
 # ---- SQS queues ----------------------------------------------------------------
 
@@ -84,6 +85,37 @@ if [ -n "${DLQ_ARN}" ]; then
 else
   # DLQ ARN not resolvable (e.g. first boot with no persistence) — create without redrive.
   create_queue "complai-redact-local"
+fi
+
+# Create feedback queue and DLQ following the same pattern as redact queue
+create_queue "complai-feedback-dlq-local"
+
+# Then create complai-feedback-local with DLQ redrive
+DLQ_URL=$(awslocal sqs get-queue-url \
+  --queue-name "complai-feedback-dlq-local" \
+  --query 'QueueUrl' --output text 2>/dev/null || echo "")
+
+DLQ_ARN=""
+if [ -n "${DLQ_URL}" ]; then
+  DLQ_ARN=$(awslocal sqs get-queue-attributes \
+    --queue-url "${DLQ_URL}" \
+    --attribute-names QueueArn \
+    --query 'Attributes.QueueArn' --output text 2>/dev/null || echo "")
+fi
+if [ -n "${DLQ_ARN}" ]; then
+  REDRIVE_POLICY_RAW="{\"deadLetterTargetArn\":\"${DLQ_ARN}\",\"maxReceiveCount\":\"3\"}"
+  REDRIVE_POLICY_ESCAPED=$(printf '%s' "${REDRIVE_POLICY_RAW}" | sed 's/"/\\"/g')
+  echo "[init] Creating SQS queue: complai-feedback-local (with DLQ redrive)"
+  if awslocal sqs get-queue-url --queue-name "complai-feedback-local" 2>/dev/null; then
+    echo "[init] Queue 'complai-feedback-local' already exists — skipping creation."
+  else
+    awslocal sqs create-queue \
+      --queue-name "complai-feedback-local" \
+      --attributes "{\"VisibilityTimeout\":\"90\",\"MessageRetentionPeriod\":\"14400\",\"RedrivePolicy\":\"${REDRIVE_POLICY_ESCAPED}\"}"
+    echo "[init] Queue 'complai-feedback-local' created."
+  fi
+else
+  create_queue "complai-feedback-local"
 fi
 
 echo "[init] LocalStack init complete."

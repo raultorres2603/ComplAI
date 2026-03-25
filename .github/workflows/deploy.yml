@@ -299,6 +299,10 @@ jobs:
           RESPONSE_CACHE_ENABLED: ${{ vars.RESPONSE_CACHE_ENABLED }}
           RESPONSE_CACHE_TTL_MINUTES: ${{ vars.RESPONSE_CACHE_TTL_MINUTES }}
           RESPONSE_CACHE_MAX_ENTRIES: ${{ vars.RESPONSE_CACHE_MAX_ENTRIES }}
+          # In the "Deploy Lambda stack" section, add:
+          RATE_LIMIT_REQUESTS_PER_MINUTE: ${{ vars.RATE_LIMIT_REQUESTS_PER_MINUTE }}
+          FEEDBACK_MAX_MESSAGE_LENGTH: ${{ vars.FEEDBACK_MAX_MESSAGE_LENGTH }}
+          FEEDBACK_MAX_USERNAME_LENGTH: ${{ vars.FEEDBACK_MAX_USERNAME_LENGTH }}
         run: |
           cd cdk
           npx cdk deploy "ComplAILambdaStack-${TARGET_ENV}" \

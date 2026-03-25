@@ -1,0 +1,42 @@
+meta {
+  name: Submit feedback missing idUser
+  type: http
+  seq: 6
+  tags: [
+    feedback,
+    validation
+  ]
+}
+
+post {
+  url: {{complaiPath}}/feedback
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "userName": "Joan Garcia",
+    "message": "The airport noise levels are excessively high at night."
+  }
+}
+
+tests {
+  test("HTTP status is 400 Bad Request", () => {
+    expect(res.getStatus()).to.equal(400);
+  });
+  test("Response body has success: false", () => {
+    expect(res.getBody().success).to.equal(false);
+  });
+  test("Error code is 100 (VALIDATION)", () => {
+    expect(res.getBody().errorCode).to.equal(100);
+  });
+  test("Response body contains error message about idUser", () => {
+    expect(res.getBody().message).to.not.be.empty;
+  });
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

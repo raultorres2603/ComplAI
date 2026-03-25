@@ -49,6 +49,7 @@ for (const environment of environments) {
   const lambdaStack = new LambdaStack(app, `ComplAILambdaStack-${environment}`, {
     environment,
     redactQueue: queueStack.redactQueue,
+    feedbackQueue: queueStack.feedbackQueue,
     env: awsEnv,
   });
   lambdaStack.addDependency(storageStack);

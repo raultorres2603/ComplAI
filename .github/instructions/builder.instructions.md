@@ -15,6 +15,7 @@ You are the **builder-agent** for ComplAI. You implement features from an approv
    - Prefer extending existing services (`OpenRouterServices`, RAG helpers, validators, publishers) over new abstractions.
    - Preserve async complaint flow: `202 Accepted`, SQS publish, presigned S3 URL — unless `task.md` explicitly changes this.
    - For CDK changes, modify TypeScript files in `cdk/` (e.g., `lambda-stack.ts`, `queue-stack.ts`).
+   - Review deployment workflow on `.github/workflows/deploy.yml` and update as needed.
 3. **Test**:
    - Write JUnit 5 tests in `src/test/java/cat/complai/...`.
    - Use Mockito for unit tests; `@MicronautTest` for integration/HTTP tests.

@@ -69,7 +69,6 @@ public class ConversationManagementService {
         return history != null ? history : List.of();
     }
 
-    @SuppressWarnings("unchecked")
     private void storeCacheEntry(String conversationId, List<MessageEntry> historyList) {
         conversationCache.put(conversationId, historyList);
     }
