@@ -9,6 +9,7 @@ import cat.complai.openrouter.dto.OpenRouterResponseDto;
 import cat.complai.openrouter.dto.OpenRouterErrorCode;
 import cat.complai.openrouter.dto.OutputFormat;
 import cat.complai.openrouter.helpers.AiParsed;
+import cat.complai.openrouter.helpers.HtmlFormatter;
 import cat.complai.openrouter.helpers.RedactPromptBuilder;
 import cat.complai.openrouter.services.cache.ResponseCacheService;
 import jakarta.inject.Inject;
@@ -192,7 +193,8 @@ public class AiResponseProcessingService {
         // Identity incomplete: the AI is asking the user for missing fields.
         // Return its question as text so the client can display it.
         if (!identityComplete) {
-            return new OpenRouterResponseDto(true, parsed.message(), null, aiDto.getStatusCode(),
+            String cleanedMessage = HtmlFormatter.cleanHtml(parsed.message());
+            return new OpenRouterResponseDto(true, cleanedMessage, null, aiDto.getStatusCode(),
                     OpenRouterErrorCode.NONE);
         }
 
@@ -206,12 +208,14 @@ public class AiResponseProcessingService {
                     : (aiDto.getMessage().length() > 200 ? aiDto.getMessage().substring(0, 200) + "..."
                             : aiDto.getMessage());
             logger.warning("AI response missing required JSON header; raw response prefix: " + rawPreview);
-            return new OpenRouterResponseDto(true, aiDto.getMessage(), null, aiDto.getStatusCode(),
+            String cleanedMessage = HtmlFormatter.cleanHtml(aiDto.getMessage());
+            return new OpenRouterResponseDto(true, cleanedMessage, null, aiDto.getStatusCode(),
                     OpenRouterErrorCode.NONE);
         }
 
         // Header present: return the extracted letter body as text.
-        return new OpenRouterResponseDto(true, parsed.message(), null, aiDto.getStatusCode(), OpenRouterErrorCode.NONE);
+        String cleanedMessage = HtmlFormatter.cleanHtml(parsed.message());
+        return new OpenRouterResponseDto(true, cleanedMessage, null, aiDto.getStatusCode(), OpenRouterErrorCode.NONE);
     }
 
     /**
