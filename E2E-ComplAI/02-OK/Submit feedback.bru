@@ -1,0 +1,50 @@
+meta {
+  name: Submit feedback
+  type: http
+  seq: 10
+  tags: [
+    feedback
+  ]
+}
+
+post {
+  url: {{complaiPath}}/feedback
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "userName": "Joan Garcia",
+    "idUser": "12345678A",
+    "message": "The airport noise levels are excessively high at night, affecting sleep and quality of life in our neighborhood."
+  }
+}
+
+tests {
+  test("HTTP status is 202 Accepted", () => {
+    expect(res.getStatus()).to.equal(202);
+  });
+  test("Response body has success: true", () => {
+    expect(res.getBody().success).to.equal(true);
+  });
+  test("Response body contains feedbackId", () => {
+    expect(res.getBody().feedbackId).to.not.be.empty;
+    expect(res.getBody().feedbackId).to.be.a("string");
+  });
+  test("Response body contains status: accepted", () => {
+    expect(res.getBody().status).to.equal("accepted");
+  });
+  test("Response body contains message field", () => {
+    expect(res.getBody().message).to.not.be.empty;
+    expect(res.getBody().message).to.include("Feedback received");
+  });
+  test("errorCode is 0", () => {
+    expect(res.getBody().errorCode).to.equal(0);
+  });
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

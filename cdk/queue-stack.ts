@@ -12,6 +12,8 @@ export class QueueStack extends cdk.Stack {
   // attach the SQS event source to the worker Lambda.
   readonly redactQueue: sqs.Queue;
   readonly redactDlq: sqs.Queue;
+  readonly feedbackQueue: sqs.Queue;
+  readonly feedbackDlq: sqs.Queue;
 
   constructor(scope: Construct, id: string, props: QueueStackProps) {
     super(scope, id, props);
@@ -50,6 +52,41 @@ export class QueueStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'ComplAIRedactQueueUrl', {
       value: this.redactQueue.queueUrl,
       description: `SQS queue URL for the async redact flow (${environment})`,
+    });
+
+    // Feedback queue DLQ — receives feedback messages that fail after maxReceiveCount attempts
+    this.feedbackDlq = new sqs.Queue(this, `ComplAIFeedbackDLQ-${environment}`, {
+      queueName: `complai-feedback-dlq-${environment}`,
+      retentionPeriod: cdk.Duration.days(7),
+      removalPolicy: environment === 'production'
+        ? cdk.RemovalPolicy.RETAIN
+        : cdk.RemovalPolicy.DESTROY,
+    });
+
+    // Main feedback queue
+    // Visibility timeout (90s) must be ≥ 1.5× the worker Lambda timeout (60s)
+    // Retention is kept short (4 hours) as feedback is typically processed within minutes
+    this.feedbackQueue = new sqs.Queue(this, `ComplAIFeedbackQueue-${environment}`, {
+      queueName: `complai-feedback-${environment}`,
+      visibilityTimeout: cdk.Duration.seconds(90),
+      retentionPeriod: cdk.Duration.hours(4),
+      deadLetterQueue: {
+        maxReceiveCount: 3,
+        queue: this.feedbackDlq,
+      },
+      removalPolicy: environment === 'production'
+        ? cdk.RemovalPolicy.RETAIN
+        : cdk.RemovalPolicy.DESTROY,
+    });
+
+    new cdk.CfnOutput(this, 'ComplAIFeedbackQueueUrl', {
+      value: this.feedbackQueue.queueUrl,
+      description: `SQS queue URL for the async feedback flow (${environment})`,
+    });
+
+    new cdk.CfnOutput(this, 'ComplAIFeedbackDLQUrl', {
+      value: this.feedbackDlq.queueUrl,
+      description: `SQS dead-letter queue for feedback (${environment})`,
     });
   }
 }

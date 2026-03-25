@@ -12,6 +12,7 @@ export class StorageStack extends cdk.Stack {
   readonly proceduresBucket: s3.Bucket;
   readonly eventsBucket: s3.Bucket;
   readonly complaintsBucket: s3.Bucket;
+  readonly feedbackBucket: s3.Bucket;
   // Stores the compiled fat JARs used by both Lambda functions.
   // Keeping deployment artifacts here lets CI upload the JAR once and reference
   // it with Code.fromBucket(), which means the CDK bootstrap bucket never
@@ -60,6 +61,21 @@ export class StorageStack extends cdk.Stack {
       lifecycleRules: [{ expiration: cdk.Duration.days(30) }],
     });
 
+    // User feedback JSON files — short-lived, deleted automatically after 30 days (dev) or 90 days (prod).
+    // Feedback is processed quickly; retention is short-lived for privacy.
+    this.feedbackBucket = new s3.Bucket(this, `ComplAIFeedbackBucket-${environment}`, {
+      bucketName: `complai-feedback-${environment}`,
+      removalPolicy: environment === 'production'
+        ? cdk.RemovalPolicy.RETAIN
+        : cdk.RemovalPolicy.DESTROY,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      versioned: false,
+      lifecycleRules: [{ 
+        expiration: cdk.Duration.days(environment === 'production' ? 90 : 30) 
+      }],
+    });
+
     // Compiled fat JARs — written by CI once per build, read by CloudFormation
     // during Lambda deployment (Code.fromBucket).  Keeping these here instead of
     // relying on the CDK bootstrap staging bucket (cdk-hnb659fds-assets-*) means
@@ -89,6 +105,11 @@ export class StorageStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'ComplAIComplaintsBucketName', {
       value: this.complaintsBucket.bucketName,
       description: `S3 bucket for generated complaint PDFs (${environment})`,
+    });
+
+    new cdk.CfnOutput(this, 'ComplAIFeedbackBucketName', {
+      value: this.feedbackBucket.bucketName,
+      description: `S3 bucket for user feedback JSON files (${environment})`,
     });
 
     new cdk.CfnOutput(this, 'ComplAIDeploymentsBucketName', {

@@ -25,13 +25,14 @@ export interface LambdaStackProps extends cdk.StackProps {
   // construct path that mirrors the original QueueStack path so the hash — and
   // the EventSourceMapping logical ID — remains stable.
   readonly redactQueue: sqs.IQueue;
+  readonly feedbackQueue: sqs.IQueue;
 }
 
 export class LambdaStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: LambdaStackProps) {
     super(scope, id, props);
 
-    const { environment, redactQueue } = props;
+    const { environment, redactQueue, feedbackQueue } = props;
 
     // Reconstruct cross-stack bucket references from their deterministic names
     // rather than accepting CDK construct objects as props. Passing construct
@@ -53,6 +54,9 @@ export class LambdaStack extends cdk.Stack {
     );
     const complaintsBucket = s3.Bucket.fromBucketName(
       this, `ComplaintsBucketRef-${environment}`, `complai-complaints-${environment}`
+    );
+    const feedbackBucket = s3.Bucket.fromBucketName(
+      this, `FeedbackBucketRef-${environment}`, `complai-feedback-${environment}`
     );
     const deploymentsBucket = s3.Bucket.fromBucketName(
       this, `DeploymentsBucketRef-${environment}`, `complai-deployments-${environment}`
