@@ -161,6 +161,8 @@ export class LambdaStack extends cdk.Stack {
         JWT_SECRET: process.env.JWT_SECRET || '',
         // Async redact flow: queue URL for publishing + bucket details for pre-signed URLs.
         REDACT_QUEUE_URL: redactQueue.queueUrl,
+        FEEDBACK_QUEUE_URL: feedbackQueue.queueUrl,
+        FEEDBACK_QUEUE_REGION: this.region,
         COMPLAINTS_BUCKET: complaintsBucket.bucketName,
         COMPLAINTS_REGION: this.region,
         // HTTP Client configuration for Micronaut (operational flexibility)
@@ -189,6 +191,7 @@ export class LambdaStack extends cdk.Stack {
 
     // API Lambda needs to publish to the redact queue.
     redactQueue.grantSendMessages(lambdaRole);
+    feedbackQueue.grantSendMessages(lambdaRole);
 
     // API Lambda needs s3:GetObject to sign pre-signed GET URLs on behalf of callers.
     // Pre-signed URLs embed the signer's credentials; without this permission the
