@@ -18,7 +18,6 @@ node_modules/
 dist/
 ComplAI.code-workspace
 sam/debug.log
-.gitignore
 sam/.aws-sam/build.toml
 sam/event.json
 cdk/package-lock.json

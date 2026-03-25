@@ -218,8 +218,29 @@ export class LambdaStack extends cdk.Stack {
     // Worker needs events access for event context in the AI prompt.
     eventsBucket.grantRead(workerRole);
 
+    // Feedback Worker Role — separate from redact worker for least privilege
+    const feedbackWorkerRole = new iam.Role(this, `ComplAIFeedbackWorkerRole-${environment}`, {
+      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+      description: `IAM role for ComplAI feedback worker Lambda (${environment}) - SQS consume + S3 write`,
+    });
+    feedbackWorkerRole.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
+    );
+    // Feedback worker consumes from feedback queue
+    feedbackQueue.grantConsumeMessages(feedbackWorkerRole);
+    // Feedback worker writes JSON files to feedback bucket
+    feedbackBucket.grantPut(feedbackWorkerRole);
+
     const workerLogGroup = new logs.LogGroup(this, `ComplAIWorkerLogGroup-${environment}`, {
       logGroupName: `/aws/lambda/ComplAIRedactorLambda-${environment}`,
+      retention: logRetention,
+      removalPolicy: environment === 'production'
+        ? cdk.RemovalPolicy.RETAIN
+        : cdk.RemovalPolicy.DESTROY,
+    });
+
+    const feedbackWorkerLogGroup = new logs.LogGroup(this, `ComplAIFeedbackWorkerLogGroup-${environment}`, {
+      logGroupName: `/aws/lambda/ComplAIFeedbackWorkerLambda-${environment}`,
       retention: logRetention,
       removalPolicy: environment === 'production'
         ? cdk.RemovalPolicy.RETAIN
@@ -264,11 +285,39 @@ export class LambdaStack extends cdk.Stack {
       logGroup: workerLogGroup,
     });
 
+    const feedbackWorkerFn = new lambda.Function(this, `ComplAIFeedbackWorkerLambda-${environment}`, {
+      runtime: lambda.Runtime.JAVA_21,
+      // Handler must match the feedback worker: FeedbackWorkerHandler::handleRequest
+      handler: 'cat.complai.feedback.worker.FeedbackWorkerHandler::handleRequest',
+      code,
+      memorySize: 512,  // Feedback processing is lighter than AI redaction
+      snapStart: lambda.SnapStartConf.ON_PUBLISHED_VERSIONS,
+      timeout: cdk.Duration.seconds(60),
+      // Feedback worker environment
+      environment: {
+        FEEDBACK_QUEUE_URL: feedbackQueue.queueUrl,
+        FEEDBACK_BUCKET_NAME: feedbackBucket.bucketName,
+        FEEDBACK_QUEUE_REGION: this.region,
+        AWS_ENDPOINT_URL: process.env.AWS_ENDPOINT_URL || '',
+        JAVA_TOOL_OPTIONS: '--add-modules=jdk.incubator.vector'
+      },
+      role: feedbackWorkerRole,
+      logGroup: feedbackWorkerLogGroup,
+    });
+
     // Wire SQS → worker Lambda.
     // batchSize=1: each complaint is independent and takes ~30s; batching adds
     // complexity with no throughput benefit at this scale.
     // reportBatchItemFailures=true: partial failures don't re-process succeeded items.
     workerFn.addEventSource(new lambdaEventSources.SqsEventSource(redactQueue, {
+      batchSize: 1,
+      reportBatchItemFailures: true,
+    }));
+
+    // Wire SQS → feedback worker Lambda.
+    // batchSize=1: each feedback is independent; batching adds complexity with no benefit.
+    // reportBatchItemFailures=true: partial failures don't re-process succeeded items.
+    feedbackWorkerFn.addEventSource(new lambdaEventSources.SqsEventSource(feedbackQueue, {
       batchSize: 1,
       reportBatchItemFailures: true,
     }));
@@ -350,6 +399,16 @@ export class LambdaStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'ComplAIWorkerLogGroupName', {
       value: workerLogGroup.logGroupName,
       description: `CloudWatch Log Group for the worker Lambda function (${environment})`,
+    });
+
+    new cdk.CfnOutput(this, 'ComplAIFeedbackWorkerLambdaName', {
+      value: feedbackWorkerFn.functionName,
+      description: `Name of the feedback worker Lambda function (${environment})`,
+    });
+
+    new cdk.CfnOutput(this, 'ComplAIFeedbackWorkerLogGroupName', {
+      value: feedbackWorkerLogGroup.logGroupName,
+      description: `CloudWatch Log Group for the feedback worker Lambda function (${environment})`,
     });
   }
 }
