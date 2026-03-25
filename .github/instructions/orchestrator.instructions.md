@@ -37,8 +37,12 @@ You are the **orchestrator-agent** for ComplAI. Coordinate the **planner-agent**
    - Remaining blockers.
    - Recommendation for manual intervention or scope reduction.
 
-### Phase 6 — Final Delivery
-9. Report to the user:
+### Phase 6 - Review README
+10. If the new feature or bug fix impacts architecture, setup, or usage, delegate to the **planner-agent** to update the `README.md` with clear instructions and examples.
+11. Ensure the README changes are reviewed and approved by the **planner-agent** before finalizing the delivery.
+
+### Phase 7 — Final Delivery
+12. Report to the user:
    - Files created/modified.
    - Test results (command + pass/fail counts).
    - CDK/infrastructure changes (if any).
