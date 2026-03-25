@@ -6,7 +6,6 @@ import cat.complai.openrouter.helpers.RedactPromptBuilder;
 import cat.complai.s3.S3PdfUploader;
 import cat.complai.sqs.dto.RedactSqsMessage;
 import com.amazonaws.services.lambda.runtime.events.SQSBatchResponse;
-import com.amazonaws.services.lambda.runtime.events.SQSEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
@@ -32,7 +31,6 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class RedactWorkerHandlerTest {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final RedactPromptBuilder PROMPT_BUILDER = new RedactPromptBuilder();
 
     // -------------------------------------------------------------------------

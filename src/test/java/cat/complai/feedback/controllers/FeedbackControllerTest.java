@@ -118,7 +118,7 @@ public class FeedbackControllerTest {
         } catch (HttpClientResponseException e) {
             assertEquals(400, e.getStatus().getCode());
             // Extract the error response from the exception
-            Map<?, ?> body = e.getResponse().getBody(Map.class).orElse(null);
+            Map<?, ?> body = e.getResponse().getBody(Map.class).orElse(new java.util.HashMap<>());
             assertNotNull(body, "Error response body must not be null");
             assertEquals(FeedbackErrorCode.VALIDATION.getCode(), body.get("errorCode"));
         }
