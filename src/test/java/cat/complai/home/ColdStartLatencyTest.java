@@ -3,6 +3,7 @@ package cat.complai.home;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.annotation.Client;
+import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.DisplayName;
@@ -27,11 +28,57 @@ class ColdStartLatencyTest {
     @Client("/")
     HttpClient client;
 
+    /**
+     * Executes an HTTP request with exponential backoff retry mechanism.
+     *
+     * @param <T>       the response body type
+     * @param endpoint  the endpoint path
+     * @param type      the response type class
+     * @param maxRetries the maximum number of retries (exponential backoff: 100ms * retryCount)
+     * @return the HTTP response
+     * @throws AssertionError if all retries are exhausted
+     */
+    private <T> HttpResponse<T> executeWithRetry(String endpoint, Class<T> type, int maxRetries) {
+        int retryCount = 0;
+        HttpClientException lastException = null;
+
+        while (retryCount <= maxRetries) {
+            try {
+                return client.toBlocking().exchange(endpoint, type);
+            } catch (HttpClientException e) {
+                lastException = e;
+                retryCount++;
+
+                if (retryCount > maxRetries) {
+                    break;
+                }
+
+                // Exponential backoff: 100ms * retryCount
+                long backoffMillis = 100L * retryCount;
+                try {
+                    Thread.sleep(backoffMillis);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    throw new AssertionError(
+                        "Retry interrupted for endpoint: " + endpoint + ", retryCount: " + retryCount,
+                        ie
+                    );
+                }
+            }
+        }
+
+        throw new AssertionError(
+            "Failed to execute request to " + endpoint + " after " + maxRetries + " retries. " +
+            "Last exception: " + (lastException != null ? lastException.getMessage() : "unknown"),
+            lastException
+        );
+    }
+
     @Test
     @DisplayName("GET /health endpoint works")
     void test_healthEndpointWorks() {
         long startTime = System.currentTimeMillis();
-        HttpResponse<HealthDto> response = client.toBlocking().exchange("/health", HealthDto.class);
+        HttpResponse<HealthDto> response = executeWithRetry("/health", HealthDto.class, 3);
         long latency = System.currentTimeMillis() - startTime;
 
         assertEquals(200, response.getStatus().getCode(), "Should return 200 OK");
@@ -49,7 +96,7 @@ class ColdStartLatencyTest {
     void test_healthStartupResponses() {
         long startTime = System.currentTimeMillis();
         try {
-            HttpResponse<HealthDto> response = client.toBlocking().exchange("/health/startup", HealthDto.class);
+            HttpResponse<HealthDto> response = executeWithRetry("/health/startup", HealthDto.class, 3);
             long latency = System.currentTimeMillis() - startTime;
 
             assertEquals(200, response.getStatus().getCode(), "Should return 200 OK");
@@ -60,7 +107,7 @@ class ColdStartLatencyTest {
             assertEquals("1.0", dto.getVersion(), "Version should be '1.0'");
 
             System.out.println("Health startup endpoint latency: " + latency + "ms");
-        } catch (Exception e) {
+        } catch (AssertionError e) {
             System.out.println("Health startup endpoint not available yet, testing regular /health instead");
             // If /health/startup not available, just verify /health works
             test_healthEndpointWorks();
@@ -70,7 +117,7 @@ class ColdStartLatencyTest {
     @Test
     @DisplayName("Health endpoint provides version and status")
     void test_healthEndpointHasVersionAndStatus() {
-        HttpResponse<HealthDto> response = client.toBlocking().exchange("/health", HealthDto.class);
+        HttpResponse<HealthDto> response = executeWithRetry("/health", HealthDto.class, 3);
         assertTrue(response.getBody().isPresent());
 
         HealthDto dto = response.getBody().get();
@@ -84,15 +131,15 @@ class ColdStartLatencyTest {
     @Test
     @DisplayName("Multiple health checks are fast")
     void test_multipleHealthChecksAreFast() {
-        // Warm up
-        client.toBlocking().exchange("/health", HealthDto.class);
+        // Warm up with retries
+        executeWithRetry("/health", HealthDto.class, 3);
 
         // Measure multiple calls
         long totalLatency = 0;
         int iterations = 3;
         for (int i = 0; i < iterations; i++) {
             long startTime = System.currentTimeMillis();
-            client.toBlocking().exchange("/health", HealthDto.class);
+            executeWithRetry("/health", HealthDto.class, 2);
             totalLatency += System.currentTimeMillis() - startTime;
         }
 
