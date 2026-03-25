@@ -30,15 +30,12 @@ import java.util.logging.Logger;
  */
 public class FeedbackWorkerHandler extends MicronautRequestHandler<SQSEvent, SQSBatchResponse> {
 
-    private final S3FeedbackUploader s3Uploader;
+    @Inject
+    private S3FeedbackUploader s3Uploader;
+
     private final ObjectMapper mapper = new ObjectMapper();
 
     private final Logger logger = Logger.getLogger(FeedbackWorkerHandler.class.getName());
-
-    @Inject
-    public FeedbackWorkerHandler(S3FeedbackUploader s3Uploader) {
-        this.s3Uploader = s3Uploader;
-    }
 
     /**
      * Processes a batch of SQS messages from the feedback queue.
