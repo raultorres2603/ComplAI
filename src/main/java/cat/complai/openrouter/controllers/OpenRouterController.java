@@ -93,7 +93,8 @@ public class OpenRouterController {
                     OpenRouterErrorCode.INTERNAL.getCode(), latency, null, null);
             logger.log(Level.SEVERE, "POST /complai/ask failed — httpStatus=500"
                     + " latencyMs=" + latency + " conversationId=" + conversationId, e);
-            OpenRouterPublicDto err = new OpenRouterPublicDto(false, null, e.getMessage(),
+            OpenRouterPublicDto err = new OpenRouterPublicDto(false, null,
+                    "An internal error occurred. Please try again later.",
                     OpenRouterErrorCode.INTERNAL.getCode(), List.of());
             return HttpResponse.serverError(err);
         }
@@ -187,7 +188,8 @@ public class OpenRouterController {
                     request != null && request.getFormat() != null ? request.getFormat().name() : null, null);
             logger.log(Level.SEVERE, "POST /complai/redact failed — httpStatus=500"
                     + " latencyMs=" + latency + " conversationId=" + conversationId, e);
-            OpenRouterPublicDto err = new OpenRouterPublicDto(false, null, e.getMessage(),
+            OpenRouterPublicDto err = new OpenRouterPublicDto(false, null,
+                    "An internal error occurred. Please try again later.",
                     OpenRouterErrorCode.INTERNAL.getCode(), List.of());
             return HttpResponse.serverError(err).contentType(MediaType.APPLICATION_JSON);
         }

@@ -182,11 +182,13 @@ export class LambdaStack extends cdk.Stack {
         // is bundled in oidc-mapping.json — enabled per city, no env var needed.
         // The worker Lambda does not receive JWT_SECRET and therefore never loads the
         // OidcIdentityTokenValidator bean.
-        JAVA_TOOL_OPTIONS: '--add-modules=jdk.incubator.vector'
+        JAVA_TOOL_OPTIONS: '--add-modules=jdk.incubator.vector',
+        RATE_LIMIT_REQUESTS_PER_MINUTE: process.env.RATE_LIMIT_REQUESTS_PER_MINUTE || '20'
 
       },
       role: lambdaRole,
       logGroup: logGroup,
+      reservedConcurrentExecutions: parseInt(process.env.API_LAMBDA_CONCURRENCY || '10'),
     });
 
     // API Lambda needs to publish to the redact queue.
@@ -286,6 +288,7 @@ export class LambdaStack extends cdk.Stack {
       },
       role: workerRole,
       logGroup: workerLogGroup,
+      reservedConcurrentExecutions: parseInt(process.env.WORKER_LAMBDA_CONCURRENCY || '5'),
     });
 
     const feedbackWorkerFn = new lambda.Function(this, `ComplAIFeedbackWorkerLambda-${environment}`, {
@@ -306,6 +309,7 @@ export class LambdaStack extends cdk.Stack {
       },
       role: feedbackWorkerRole,
       logGroup: feedbackWorkerLogGroup,
+      reservedConcurrentExecutions: parseInt(process.env.FEEDBACK_WORKER_LAMBDA_CONCURRENCY || '5'),
     });
 
     // Wire SQS → worker Lambda.

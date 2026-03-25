@@ -11,7 +11,9 @@ public enum OpenRouterErrorCode {
     INTERNAL(5),
     // Emitted by JwtAuthFilter before the controller is reached.
     // The controller switch does not need a case for this — the filter short-circuits the request.
-    UNAUTHORIZED(6);
+    UNAUTHORIZED(6),
+    // Emitted by RateLimitFilter when a user exceeds the per-minute request cap.
+    RATE_LIMITED(7);
 
     private final int code;
 

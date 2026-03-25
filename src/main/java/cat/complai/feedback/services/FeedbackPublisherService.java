@@ -41,6 +41,8 @@ public class FeedbackPublisherService {
     private final SqsClient sqsClient;
     private final String queueUrl;
     private final ObjectMapper mapper;
+    private final int maxMessageLength;
+    private final int maxUsernameLength;
 
     private final Logger logger = Logger.getLogger(FeedbackPublisherService.class.getName());
 
@@ -48,9 +50,13 @@ public class FeedbackPublisherService {
     public FeedbackPublisherService(
             @Value("${feedback.queue-url:}") String queueUrl,
             @Value("${feedback.queue-region:eu-west-1}") String queueRegion,
-            @Value("${AWS_ENDPOINT_URL:}") String endpointUrl) {
+            @Value("${AWS_ENDPOINT_URL:}") String endpointUrl,
+            @Value("${feedback.max-message-length:5000}") int maxMessageLength,
+            @Value("${feedback.max-username-length:200}") int maxUsernameLength) {
         this.queueUrl = queueUrl;
         this.mapper = new ObjectMapper();
+        this.maxMessageLength = maxMessageLength;
+        this.maxUsernameLength = maxUsernameLength;
         SqsClientBuilder builder = SqsClient.builder().region(Region.of(queueRegion));
         if (endpointUrl != null && !endpointUrl.isBlank()) {
             builder.endpointOverride(URI.create(endpointUrl));
@@ -65,6 +71,8 @@ public class FeedbackPublisherService {
         this.queueUrl = null;
         this.sqsClient = null;
         this.mapper = new ObjectMapper();
+        this.maxMessageLength = 5000;
+        this.maxUsernameLength = 200;
     }
 
     /**
@@ -89,6 +97,20 @@ public class FeedbackPublisherService {
         if (request.message() == null || request.message().isBlank()) {
             logger.warning(() -> "Feedback validation failed: message is missing or blank");
             return new FeedbackResult.Error(FeedbackErrorCode.VALIDATION, "message is required");
+        }
+
+        // Length-cap validations
+        if (request.userName().length() > maxUsernameLength) {
+            return new FeedbackResult.Error(FeedbackErrorCode.VALIDATION,
+                    "userName exceeds maximum length of " + maxUsernameLength + " characters");
+        }
+        if (request.idUser().length() > 50) {
+            return new FeedbackResult.Error(FeedbackErrorCode.VALIDATION,
+                    "idUser exceeds maximum length of 50 characters");
+        }
+        if (request.message().length() > maxMessageLength) {
+            return new FeedbackResult.Error(FeedbackErrorCode.VALIDATION,
+                    "message exceeds maximum length of " + maxMessageLength + " characters");
         }
 
         // Generate unique feedbackId and timestamp

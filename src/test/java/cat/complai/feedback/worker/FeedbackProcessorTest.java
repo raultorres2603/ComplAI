@@ -124,4 +124,53 @@ class FeedbackProcessorTest {
         assertTrue(key1.contains("id-1"));
         assertTrue(key2.contains("id-2"));
     }
+
+    @Test
+    void process_cityWithPathTraversal_sanitizesKey() throws Exception {
+        CapturingS3Uploader uploader = new CapturingS3Uploader();
+        FeedbackProcessor processor = new FeedbackProcessor(uploader);
+
+        FeedbackSqsMessage message = new FeedbackSqsMessage(
+                "fb-999", System.currentTimeMillis(), "../evil",
+                "User", "ID", "Msg");
+
+        processor.process(message);
+
+        String capturedKey = uploader.capturedKey.get();
+        assertFalse(capturedKey.contains(".."), "Sanitized key must not contain '..'");
+        assertTrue(capturedKey.startsWith("feedback/"), "Key must start with 'feedback/'");
+    }
+
+    @Test
+    void process_cityWithSpecialChars_sanitizesKey() throws Exception {
+        CapturingS3Uploader uploader = new CapturingS3Uploader();
+        FeedbackProcessor processor = new FeedbackProcessor(uploader);
+
+        FeedbackSqsMessage message = new FeedbackSqsMessage(
+                "fb-888", System.currentTimeMillis(), "el prat/test",
+                "User", "ID", "Msg");
+
+        processor.process(message);
+
+        String capturedKey = uploader.capturedKey.get();
+        // Key format: feedback/{safeCity}/{feedbackId}.json — only 2 slashes after sanitization
+        long slashCount = capturedKey.chars().filter(c -> c == '/').count();
+        assertEquals(2, slashCount, "Key must have exactly 2 slashes (feedback/safeCity/feedbackId.json)");
+        assertFalse(capturedKey.contains(" "), "Key must not contain spaces");
+    }
+
+    @Test
+    void process_nullCity_usesUnknown() throws Exception {
+        CapturingS3Uploader uploader = new CapturingS3Uploader();
+        FeedbackProcessor processor = new FeedbackProcessor(uploader);
+
+        FeedbackSqsMessage message = new FeedbackSqsMessage(
+                "fb-000", System.currentTimeMillis(), null,
+                "User", "ID", "Msg");
+
+        processor.process(message);
+
+        String capturedKey = uploader.capturedKey.get();
+        assertTrue(capturedKey.startsWith("feedback/unknown/"), "Null city must map to 'unknown' in S3 key");
+    }
 }

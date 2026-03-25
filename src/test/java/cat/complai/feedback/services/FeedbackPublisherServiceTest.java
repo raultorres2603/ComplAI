@@ -170,4 +170,43 @@ class FeedbackPublisherServiceTest {
         // We verify the error was caught with the right code
         assertTrue(result instanceof FeedbackResult.Error);
     }
+
+    @Test
+    void publishFeedback_userNameTooLong_returnsValidationError() {
+        FeedbackPublisherService publisher = new FeedbackPublisherService();
+
+        FeedbackRequest request = new FeedbackRequest("a".repeat(201), "12345678A", "message");
+        FeedbackResult result = publisher.publishFeedback(request, "elprat");
+
+        assertTrue(result instanceof FeedbackResult.Error);
+        FeedbackResult.Error error = (FeedbackResult.Error) result;
+        assertEquals(FeedbackErrorCode.VALIDATION, error.errorCode());
+        assertTrue(error.message().contains("userName"));
+    }
+
+    @Test
+    void publishFeedback_idUserTooLong_returnsValidationError() {
+        FeedbackPublisherService publisher = new FeedbackPublisherService();
+
+        FeedbackRequest request = new FeedbackRequest("Joan Garcia", "a".repeat(51), "message");
+        FeedbackResult result = publisher.publishFeedback(request, "elprat");
+
+        assertTrue(result instanceof FeedbackResult.Error);
+        FeedbackResult.Error error = (FeedbackResult.Error) result;
+        assertEquals(FeedbackErrorCode.VALIDATION, error.errorCode());
+        assertTrue(error.message().contains("idUser"));
+    }
+
+    @Test
+    void publishFeedback_messageTooLong_returnsValidationError() {
+        FeedbackPublisherService publisher = new FeedbackPublisherService();
+
+        FeedbackRequest request = new FeedbackRequest("Joan Garcia", "12345678A", "a".repeat(5001));
+        FeedbackResult result = publisher.publishFeedback(request, "elprat");
+
+        assertTrue(result instanceof FeedbackResult.Error);
+        FeedbackResult.Error error = (FeedbackResult.Error) result;
+        assertEquals(FeedbackErrorCode.VALIDATION, error.errorCode());
+        assertTrue(error.message().contains("message"));
+    }
 }

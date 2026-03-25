@@ -66,8 +66,10 @@ public class FeedbackProcessor {
      *
      * <p>
      * Format: feedback/{city}/{feedbackId}.json
+     * City is sanitized to prevent path traversal attacks.
      */
     private String generateS3Key(FeedbackSqsMessage message) {
-        return "feedback/" + message.city() + "/" + message.feedbackId() + ".json";
+        String safeCity = (message.city() != null) ? message.city().replaceAll("[^a-zA-Z0-9\\-_]", "-") : "unknown";
+        return "feedback/" + safeCity + "/" + message.feedbackId() + ".json";
     }
 }
