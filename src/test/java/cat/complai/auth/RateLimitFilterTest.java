@@ -1,6 +1,5 @@
 package cat.complai.auth;
 
-import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpRequest;

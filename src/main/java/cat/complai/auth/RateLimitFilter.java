@@ -70,11 +70,6 @@ public class RateLimitFilter implements Ordered {
         }
 
         String userId = request.getAttribute(JwtAuthFilter.USER_ATTRIBUTE, String.class).orElse(null);
-        if (userId == null) {
-            // Safety valve: if JwtAuthFilter did not set the attribute, pass through.
-            return null;
-        }
-
         AtomicInteger counter = rateLimitCache.get(userId, k -> new AtomicInteger(0));
         int count = counter.incrementAndGet();
 
