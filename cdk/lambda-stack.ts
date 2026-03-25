@@ -301,7 +301,7 @@ export class LambdaStack extends cdk.Stack {
         FEEDBACK_QUEUE_URL: feedbackQueue.queueUrl,
         FEEDBACK_BUCKET_NAME: feedbackBucket.bucketName,
         FEEDBACK_QUEUE_REGION: this.region,
-        AWS_ENDPOINT_URL: process.env.AWS_ENDPOINT_URL || '',
+        ...(process.env.AWS_ENDPOINT_URL ? { AWS_ENDPOINT_URL: process.env.AWS_ENDPOINT_URL } : {}),
         JAVA_TOOL_OPTIONS: '--add-modules=jdk.incubator.vector'
       },
       role: feedbackWorkerRole,
