@@ -78,10 +78,10 @@ public class OpenRouterController {
 
         String questionText = request != null ? request.getText() : null;
 
-        Publisher<String> deltaStream = service.streamAsk(questionText, conversationId, cityId);
+        Publisher<String> eventStream = service.streamAsk(questionText, conversationId, cityId);
 
-        return Flux.from(deltaStream)
-                .map(Event::of)
+        return Flux.from(eventStream)
+                .map(Event::of)  // Event stream emits JSON strings; wrap directly without escaping
                 .doOnComplete(() -> {
                     long latency = System.currentTimeMillis() - start;
                     AuditLogger.log("/complai/ask",

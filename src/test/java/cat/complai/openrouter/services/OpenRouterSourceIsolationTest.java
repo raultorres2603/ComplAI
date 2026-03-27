@@ -53,8 +53,9 @@ public class OpenRouterSourceIsolationTest {
         AiResponseProcessingService aiResponseService = new AiResponseProcessingService(wrapper, cacheService, 30);
         ProcedureContextService procedureContextService = new ProcedureContextService(wrapper.ragRegistry,
                 new EventRagHelperRegistry(), new RedactPromptBuilder());
+        com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
         return new OpenRouterServices(validationService, conversationService, aiResponseService,
-                procedureContextService, new RedactPromptBuilder(), wrapper);
+                procedureContextService, new RedactPromptBuilder(), wrapper, objectMapper);
     }
 
     /**

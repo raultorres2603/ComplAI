@@ -50,7 +50,12 @@ public class OpenRouterControllerTest {
 
         @Override
         public Publisher<String> streamAsk(String question, String conversationId, String cityId) {
-            return reactor.core.publisher.Flux.just("OK from AI");
+            // Return properly formatted SSE events: chunk, sources, done
+            return reactor.core.publisher.Flux.just(
+                    "{\"type\":\"chunk\",\"content\":\"OK from AI\"}",
+                    "{\"type\":\"sources\",\"sources\":[]}",
+                    "{\"type\":\"done\",\"conversationId\":null}"
+            );
         }
     }
 
@@ -72,7 +77,10 @@ public class OpenRouterControllerTest {
 
         @Override
         public Publisher<String> streamAsk(String question, String conversationId, String cityId) {
-            return reactor.core.publisher.Flux.just("Request is not about El Prat de Llobregat.");
+            // Return error event in proper format
+            return reactor.core.publisher.Flux.just(
+                    "{\"type\":\"error\",\"error\":\"Request is not about El Prat de Llobregat.\",\"errorCode\":4}"
+            );
         }
     }
 
@@ -207,7 +215,7 @@ public class OpenRouterControllerTest {
                 requestWithCity("testcity"));
         List<Event<String>> events = reactor.core.publisher.Flux.from(publisher).collectList().block();
         assertFalse(events.isEmpty());
-        assertEquals("OK from AI", events.get(0).getData());
+        assertEquals("{\"type\":\"chunk\",\"content\":\"OK from AI\"}", events.get(0).getData());
     }
 
     @Test

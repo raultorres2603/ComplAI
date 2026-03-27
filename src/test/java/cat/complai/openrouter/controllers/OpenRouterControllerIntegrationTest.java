@@ -46,8 +46,7 @@ import org.reactivestreams.Publisher;
 import javax.crypto.SecretKey;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Base64;
-import java.util.Date;
+import java.util.*;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -453,6 +452,118 @@ public class OpenRouterControllerIntegrationTest {
         assertTrue(resp.getBody().get().isSuccess());
     }
 
+    // ---- SSE Multi-Event Streaming Tests ----
+
+    @Test
+    void integration_ask_streamReceivesAllEventTypes() throws Exception {
+        // Test that /complai/ask SSE stream emits all 4 event types in correct sequence.
+        // We mock the HTTP wrapper to return streaming chunks, and verify the
+        // controller properly processes them and emits chunk/sources/done events.
+        AskRequest req = new AskRequest("Is there a recycling center? [SSE_MULTIEXENT]");
+        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
+                .header("Authorization", authHeader);
+
+        // Use toBlocking and read the response body which should contain SSE events.
+        // Micronaut's SSE streaming returns raw string data in the body.
+        HttpResponse<String> resp = client.toBlocking().exchange(httpReq, String.class);
+
+        assertEquals(200, resp.getStatus().getCode());
+        String streamContent = resp.getBody().orElse("");
+
+        // Parse the SSE stream (format: "data: <json>\n\n")
+        String[] lines = streamContent.split("\n\n");
+        List<String> events = new ArrayList<>();
+        for (String line : lines) {
+            if (line.startsWith("data:")) {
+                events.add(line.substring(5).trim());  // Remove "data:" prefix
+            }
+        }
+
+        // Should have at least 3 events: chunk(s), sources, done
+        assertTrue(events.size() >= 3, "Expected at least 3 SSE events, got " + events.size());
+
+        // Verify first event is a chunk
+        JsonNode firstEvent = mapper.readTree(events.get(0));
+        assertEquals("chunk", firstEvent.path("type").asText());
+
+        // Verify sources event (second or later)
+        JsonNode sourcesEvent = null;
+        for (String eventJson : events.subList(1, events.size())) {
+            JsonNode node = mapper.readTree(eventJson);
+            if ("sources".equals(node.path("type").asText())) {
+                sourcesEvent = node;
+                break;
+            }
+        }
+        assertNotNull(sourcesEvent, "Should emit a sources event");
+        assertEquals("sources", sourcesEvent.path("type").asText());
+        assertTrue(sourcesEvent.path("sources").isArray(),
+                "sources event should contain an array of sources");
+
+        // Verify done event (last)
+        JsonNode lastEvent = mapper.readTree(events.get(events.size() - 1));
+        assertEquals("done", lastEvent.path("type").asText());
+        assertTrue(lastEvent.path("conversationId").isNull() || 
+                   !lastEvent.path("conversationId").asText().isEmpty(),
+                   "done event should have conversationId or be null");
+    }
+
+    @Test
+    void integration_ask_streamEmitsErrorOnValidationFailure() throws Exception {
+        // Test that validation errors are emitted as SSE error events.
+        AskRequest req = new AskRequest("");  // Empty question triggers validation error
+        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
+                .header("Authorization", authHeader);
+
+        HttpResponse<String> resp = client.toBlocking().exchange(httpReq, String.class);
+        assertEquals(200, resp.getStatus().getCode());  // Stream initiated
+        
+        String streamContent = resp.getBody().orElse("");
+        String[] lines = streamContent.split("\n\n");
+        
+        String errorEventJson = null;
+        for (String line : lines) {
+            if (line.startsWith("data:")) {
+                errorEventJson = line.substring(5).trim();
+                break;
+            }
+        }
+
+        assertNotNull(errorEventJson, "Should emit at least one event");
+        JsonNode event = mapper.readTree(errorEventJson);
+        assertEquals("error", event.path("type").asText());
+        assertEquals(OpenRouterErrorCode.VALIDATION.getCode(), event.path("errorCode").asInt());
+    }
+
+    @Test
+    void integration_ask_streamIncludesConversationIdInDoneEvent() throws Exception {
+        // Test that the done event includes the conversationId if provided.
+        AskRequest req = new AskRequest("Is there a recycling center? [SSE_MULTIEXENT_CONVID]", 
+                "test-conversation-xyz");
+        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
+                .header("Authorization", authHeader);
+
+        HttpResponse<String> resp = client.toBlocking().exchange(httpReq, String.class);
+        assertEquals(200, resp.getStatus().getCode());
+
+        String streamContent = resp.getBody().orElse("");
+        String[] lines = streamContent.split("\n\n");
+        
+        JsonNode doneEvent = null;
+        for (String line : lines) {
+            if (line.startsWith("data:")) {
+                JsonNode event = mapper.readTree(line.substring(5).trim());
+                if ("done".equals(event.path("type").asText())) {
+                    doneEvent = event;
+                }
+            }
+        }
+
+        assertNotNull(doneEvent, "Should emit a done event");
+        assertEquals("test-conversation-xyz", doneEvent.path("conversationId").asText(),
+                "done event should include the provided conversationId");
+    }
+
     @MockBean(HttpWrapper.class)
     @Replaces(HttpWrapper.class)
     HttpWrapper openRouterHttpWrapper() {
@@ -549,6 +660,20 @@ public class OpenRouterControllerIntegrationTest {
                             "data: {\"choices\":[{\"delta\":{\"content\":\"" + content.replace("\"", "\\\"") + "\"}}]}",
                             "data: [DONE]");
                 }
+                if (userPrompt != null && userPrompt.contains("[SSE_MULTIEXENT]")) {
+                    // Mock SSE stream with multiple events for testing
+                    String chunk1 = "data: {\"choices\":[{\"delta\":{\"content\":\"Response \"}}]}";
+                    String chunk2 = "data: {\"choices\":[{\"delta\":{\"content\":\"with sources\"}}]}";
+                    String done = "data: [DONE]";
+                    return reactor.core.publisher.Flux.just(chunk1, chunk2, done);
+                }
+                if (userPrompt != null && userPrompt.contains("[SSE_MULTIEXENT_CONVID]")) {
+                    // Same as above
+                    String chunk1 = "data: {\"choices\":[{\"delta\":{\"content\":\"Test \"}}]}";
+                    String chunk2 = "data: {\"choices\":[{\"delta\":{\"content\":\"response\"}}]}";
+                    String done = "data: [DONE]";
+                    return reactor.core.publisher.Flux.just(chunk1, chunk2, done);
+                }
                 // Default: successful streaming response
                 return reactor.core.publisher.Flux.just(
                         "data: {\"choices\":[{\"delta\":{\"content\":\"OK from AI (integration)\"}}]}",
@@ -583,7 +708,8 @@ public class OpenRouterControllerIntegrationTest {
         @Singleton
         @Replaces(OpenRouterServices.class)
         IOpenRouterService openRouterService(HttpWrapper httpWrapper,
-                ResponseCacheService cacheService) {
+                ResponseCacheService cacheService,
+                ObjectMapper objectMapper) {
             InputValidationService validationService = new InputValidationService(5000);
             ConversationManagementService conversationService = new ConversationManagementService(5);
             // ResponseCacheService is injected from ApplicationContext
@@ -593,7 +719,8 @@ public class OpenRouterControllerIntegrationTest {
                     new ProcedureRagHelperRegistry(), new EventRagHelperRegistry(),
                     new cat.complai.openrouter.helpers.RedactPromptBuilder());
             return new OpenRouterServices(validationService, conversationService, aiResponseService,
-                    procedureContextService, new cat.complai.openrouter.helpers.RedactPromptBuilder(), httpWrapper);
+                    procedureContextService, new cat.complai.openrouter.helpers.RedactPromptBuilder(), httpWrapper,
+                    objectMapper);
         }
 
         @Singleton
