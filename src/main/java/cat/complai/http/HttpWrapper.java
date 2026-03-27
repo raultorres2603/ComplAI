@@ -1,20 +1,35 @@
 package cat.complai.http;
 
 import cat.complai.http.dto.HttpDto;
+import cat.complai.http.dto.OpenRouterStreamStartResult;
+import cat.complai.openrouter.dto.OpenRouterErrorCode;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import io.micronaut.context.annotation.Value;
+import io.micronaut.http.client.StreamingHttpClient;
+import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 
 import java.net.URI;
-import java.util.List;
+import java.net.http.HttpClient;
+import java.net.http.HttpResponse;
+import java.net.http.HttpTimeoutException;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.List;
+import java.util.stream.Stream;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -39,6 +54,8 @@ public class HttpWrapper {
 
     // HttpClient and ObjectMapper are fields to allow injection and easier testing
     private final OpenRouterClient openRouterClient;
+    private final HttpClient rawStreamingHttpClient;
+    private final Scheduler streamScheduler;
     private final ObjectMapper mapper;
     private final Logger logger = Logger.getLogger(HttpWrapper.class.getName());
 
@@ -54,6 +71,8 @@ public class HttpWrapper {
     protected HttpWrapper() {
         this.openRouterUrl = "";
         this.openRouterClient = null; // Will be null for test instances
+        this.rawStreamingHttpClient = HttpClient.newBuilder().build();
+        this.streamScheduler = Schedulers.newSingle("openrouter-stream-test");
         this.mapper = new ObjectMapper();
         this.headers = Map.of();
         this.requestTimeoutSeconds = 60; // default fallback
@@ -63,6 +82,7 @@ public class HttpWrapper {
 
     @Inject
     public HttpWrapper(OpenRouterClient openRouterClient,
+            @Client("${openrouter.url:https://openrouter.ai}") StreamingHttpClient streamingClient,
             @Value("${openrouter.url:${OPENROUTER_URL:https://openrouter.ai}") String openRouterUrl,
             @Value("${OPENROUTER_API_KEY:}") String openRouterApiKey,
             @Value("${OPENROUTER_REQUEST_TIMEOUT_SECONDS:60}") int requestTimeoutSeconds,
@@ -70,9 +90,17 @@ public class HttpWrapper {
             @Value("${OPENROUTER_MAX_RETRIES:3}") int maxRetries) {
         this.openRouterClient = openRouterClient;
         this.openRouterUrl = normalizeOpenRouterBaseUrl(openRouterUrl);
-        this.mapper = new ObjectMapper();
         this.requestTimeoutSeconds = (requestTimeoutSeconds > 0) ? requestTimeoutSeconds : 20; // fallback to 20s if
-                                                                                               // invalid
+                                                                                                  // invalid
+        this.rawStreamingHttpClient = HttpClient.newBuilder()
+                .connectTimeout(java.time.Duration.ofSeconds(this.requestTimeoutSeconds))
+                .build();
+        this.streamScheduler = Schedulers.fromExecutorService(Executors.newSingleThreadExecutor(r -> {
+            Thread t = new Thread(r, "openrouter-raw-stream");
+            t.setDaemon(true);
+            return t;
+        }));
+        this.mapper = new ObjectMapper();
         this.openRouterModel = openRouterModel;
         this.maxRetries = (maxRetries > 0) ? maxRetries : 1; // 1 = no retry, just one attempt
         Map<String, String> h = new HashMap<>();
@@ -354,6 +382,105 @@ public class HttpWrapper {
         } catch (Exception e) {
             return "https://openrouter.ai";
         }
+    }
+
+    /**
+     * Streams a chat completion response from OpenRouter using Server-Sent Events.
+     * Each emission is one raw SSE line (e.g. {@code data: {...}} or {@code data: [DONE]}).
+     *
+     * @param messages the full messages list (system + history + user)
+     * @return typed stream-start result containing either a ready publisher or a typed startup failure
+     */
+    public OpenRouterStreamStartResult streamFromOpenRouter(List<Map<String, Object>> messages) {
+        String authValue = resolveAuthHeader();
+        if (authValue == null) {
+            logger.warning("streamFromOpenRouter — OPENROUTER_API_KEY is not configured");
+            return new OpenRouterStreamStartResult.Error(new OpenRouterStreamingException(
+                    OpenRouterErrorCode.INTERNAL,
+                    "Streaming authentication is not configured.",
+                    null));
+        }
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("model", openRouterModel);
+        payload.put("messages", messages);
+        payload.put("stream", true);
+
+        final String bodyJson;
+        try {
+            bodyJson = mapper.writeValueAsString(payload);
+        } catch (Exception e) {
+            return new OpenRouterStreamStartResult.Error(new OpenRouterStreamingException(
+                    OpenRouterErrorCode.INTERNAL,
+                    "Failed to serialize streaming payload.",
+                    null,
+                    e));
+        }
+
+        URI endpoint = URI.create(openRouterUrl + "/api/v1/chat/completions");
+        java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder(endpoint)
+                .timeout(java.time.Duration.ofSeconds(requestTimeoutSeconds))
+                .header("Authorization", authValue)
+                .header("HTTP-Referer", headers.getOrDefault("HTTP-Referer", "https://complai.cat"))
+                .header("X-Title", headers.getOrDefault("X-Title", "Complai"))
+                .header("Accept", "text/event-stream")
+                .header("Content-Type", "application/json")
+            .POST(java.net.http.HttpRequest.BodyPublishers.ofString(bodyJson, StandardCharsets.UTF_8))
+                .build();
+
+        try {
+            HttpResponse<Stream<String>> response = rawStreamingHttpClient.send(request, HttpResponse.BodyHandlers.ofLines());
+            int status = response.statusCode();
+            if (status >= 400) {
+                logger.warning(() -> "OpenRouter stream startup failed — upstreamStatus=" + status
+                        + " url=" + openRouterUrl);
+                response.body().close();
+                return new OpenRouterStreamStartResult.Error(new OpenRouterStreamingException(
+                        OpenRouterErrorCode.UPSTREAM,
+                        "OpenRouter stream startup failed.",
+                        status));
+            }
+
+            Publisher<String> stream = Flux.using(
+                    response::body,
+                    body -> Flux.fromStream(body)
+                            .map(String::trim)
+                            .filter(line -> !line.isBlank() && !line.startsWith(":")),
+                    Stream::close)
+                    .subscribeOn(streamScheduler)
+                    .timeout(java.time.Duration.ofSeconds(requestTimeoutSeconds + 5L))
+                    .onErrorMap(this::mapStreamingException);
+            return new OpenRouterStreamStartResult.Success(stream);
+        } catch (HttpTimeoutException e) {
+            logger.warning(() -> "OpenRouter stream startup timed out — url=" + openRouterUrl);
+            return new OpenRouterStreamStartResult.Error(new OpenRouterStreamingException(
+                    OpenRouterErrorCode.TIMEOUT,
+                    "OpenRouter stream startup timed out.",
+                    null,
+                    e));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return new OpenRouterStreamStartResult.Error(new OpenRouterStreamingException(
+                    OpenRouterErrorCode.INTERNAL,
+                    "OpenRouter stream startup was interrupted.",
+                    null,
+                    e));
+        } catch (Exception e) {
+            logger.log(Level.WARNING, "OpenRouter stream startup failed", e);
+            return new OpenRouterStreamStartResult.Error(mapStreamingException(e));
+        }
+    }
+
+    private OpenRouterStreamingException mapStreamingException(Throwable error) {
+        if (error instanceof OpenRouterStreamingException streamError) {
+            return streamError;
+        }
+        if (error instanceof HttpTimeoutException || error instanceof java.util.concurrent.TimeoutException) {
+            return new OpenRouterStreamingException(OpenRouterErrorCode.TIMEOUT,
+                    "OpenRouter streaming timed out.", null, error);
+        }
+        return new OpenRouterStreamingException(OpenRouterErrorCode.UPSTREAM,
+                "OpenRouter streaming failed.", null, error);
     }
 }
 // Timeout is configurable via OPENROUTER_REQUEST_TIMEOUT_SECONDS (default 60s).

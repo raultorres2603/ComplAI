@@ -212,13 +212,14 @@ Resources:
           OPENROUTER_REQUEST_TIMEOUT_SECONDS: "60"
           OPENROUTER_OVERALL_TIMEOUT_SECONDS: "60"
           OPENROUTER_MAX_RETRIES: "3"
-          OPENROUTER_MODEL: google/gemma-3-27b-it:free
+          OPENROUTER_MODEL: google/gemma-3-12b-it:free
           JWT_SECRET: !Ref JwtSecret
           REDACT_QUEUE_URL: !Ref RedactQueue
           FEEDBACK_QUEUE_URL: !Ref FeedbackQueue
           FEEDBACK_QUEUE_REGION: !Ref LambdaRegion
           COMPLAINTS_BUCKET: !Ref ComplaintsBucket
           COMPLAINTS_REGION: !Ref LambdaRegion
+          COMPLAI_DEFAULT_CITY_ID: elprat
 
       Events:
         ProxyRoot:
@@ -248,7 +249,7 @@ Resources:
           OPENROUTER_REQUEST_TIMEOUT_SECONDS: "60"
           OPENROUTER_OVERALL_TIMEOUT_SECONDS: "60"
           OPENROUTER_MAX_RETRIES: "3"
-          OPENROUTER_MODEL: google/gemma-3-27b-it:free
+          OPENROUTER_MODEL: google/gemma-3-12b-it:free
           COMPLAINTS_BUCKET: !Ref ComplaintsBucket
           COMPLAINTS_REGION: !Ref LambdaRegion
           PROCEDURES_BUCKET: !Ref ProceduresBucket

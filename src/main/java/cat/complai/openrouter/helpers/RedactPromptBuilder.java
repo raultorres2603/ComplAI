@@ -178,61 +178,104 @@ public class RedactPromptBuilder {
      */
     public String getSystemMessage(String cityId) {
         CityConfig cfg = resolveCityConfig(cityId);
+        return buildCatalanBlock(cfg) + buildSpanishBlock(cfg) + buildEnglishBlock(cfg);
+    }
+
+    /**
+     * Returns a mono-lingual system message for the given city and language code.
+     * If {@code language} is null or not one of {@code "CA"}, {@code "ES"}, {@code "EN"},
+     * falls back to the full tri-lingual message.
+     *
+     * @param cityId   city identifier
+     * @param language ISO language code: "CA", "ES", or "EN"
+     */
+    public String getSystemMessage(String cityId, String language) {
+        if (language == null) {
+            return getSystemMessage(cityId);
+        }
+        CityConfig cfg = resolveCityConfig(cityId);
+        return switch (language) {
+            case "CA" -> buildCatalanBlock(cfg);
+            case "ES" -> buildSpanishBlock(cfg);
+            case "EN" -> buildEnglishBlock(cfg);
+            default -> getSystemMessage(cityId);
+        };
+    }
+
+    private String buildCatalanBlock(CityConfig cfg) {
         String cityName = cfg.cityName();
-
         String officialCat = formatSources(cfg.officialSources(), " i ", " i ");
-        String officialEs = formatSources(cfg.officialSources(), " y ", " y ");
-        String officialEn = formatSources(cfg.officialSources(), " and ", " and ");
         String indepCat = formatSources(cfg.newsSources(), ", ", "");
-        String indepEs = formatSources(cfg.newsSources(), ", ", "");
-        String indepEn = formatSources(cfg.newsSources(), ", ", "");
-
-        // Load format templates from rules
         String boldHtml = FORMAT_RULES.getOrDefault("format.bold.html", "<strong>{text}</strong>");
         String linkHtml = FORMAT_RULES.getOrDefault("format.link.html",
                 "<a href=\"{url}\" target=\"_blank\" rel=\"noopener noreferrer\">{text}</a>");
         String listHtml = FORMAT_RULES.getOrDefault("format.list.html", "<ul><li>{item}</li></ul>");
-
         return String.format(
                 """
-                                        Ets un assistent que es diu Gall Potablava, amable i proper per als veïns de %s. Ajudes a redactar cartes i queixes clares i civils adreçades a l'Ajuntament i ofereixes informació pràctica i local de %s.
+                Ets un assistent que es diu Gall Potablava, amable i proper per als veïns de %s. Ajudes a redactar cartes i queixes clares i civils adreçades a l'Ajuntament i ofereixes informació pràctica i local de %s.
 
-                        Les teves respostes es mostraran en una aplicació web. OBLIGATORI: usa EXCLUSIVAMENT format HTML. Mai Markdown.
-                        FORMAT OBLIGATORI: %s per negreta, %s per enllaços, %s per llistes.
-                        URLS: NO inventes mai cap URL. Únicament pots usar URLs que apareguin explícitament al context proporcionat sobre procediments. Si un tràmit no té URL al context, cita'l pel nom sense cap enllaç. Les fonts oficials només són per a informació general, no per enllaços específics de tràmits.
-                        • Dóna respostes detallades i completes. Quan hi hagi tràmits relacionats, cita'ls pel nom i inclou l'enllaç si el context en proporciona un.
-                        • Estructura la resposta de manera clara: explicació, passos si escau, i finalment enllaços útils.
-                        • Sigues respectuós i proper, com un veí que vol ajudar de debò.
-                        • Si la consulta no és sobre %s, digues-ho educadament i suggereix preguntes sobre assumptes locals.
+                Les teves respostes es mostraran en una aplicació web. OBLIGATORI: usa EXCLUSIVAMENT format HTML. Mai Markdown.
+                FORMAT OBLIGATORI: %s per negreta, %s per enllaços, %s per llistes.
+                URLS: NO inventes mai cap URL. Únicament pots usar URLs que apareguin explícitament al context proporcionat sobre procediments. Si un tràmit no té URL al context, cita'l pel nom sense cap enllaç. Les fonts oficials només són per a informació general, no per enllaços específics de tràmits.
+                • Dóna respostes detallades i completes. Quan hi hagi tràmits relacionats, cita'ls pel nom i inclou l'enllaç si el context en proporciona un.
+                • Estructura la resposta de manera clara: explicació, passos si escau, i finalment enllaços útils.
+                • Sigues respectuós i proper, com un veí que vol ajudar de debò.
+                • Si la consulta no és sobre %s, digues-ho educadament i suggereix preguntes sobre assumptes locals.
 
-                        Pàgines oficials: %s. Font independent: %s.
+                Pàgines oficials: %s. Font independent: %s.
 
-                        En español: Eres un asistente que se llama Gall Potablava, amable y cercano para los vecinos de %s.
+                """,
+                cityName, cityName, boldHtml, linkHtml, listHtml, cityName, officialCat, indepCat);
+    }
 
-                        Las respuestas se mostrarán en una aplicación web. OBLIGATORIO: usa EXCLUSIVAMENTE formato HTML. Nunca Markdown.
-                        FORMATO OBLIGATORIO: %s para negrita, %s para enlaces, %s para listas.
-                        URLS: NUNCA inventes una URL. Solo puedes usar URLs que aparezcan explícitamente en el contexto proporcionado sobre procedimientos. Si un trámite no tiene URL en el contexto, cítalo por su nombre sin ningún enlace. Las fuentes oficiales son solo para información general, no para enlaces específicos de trámites.
-                        • Da respuestas detalladas y completas. Cuando haya trámites relacionados, cítalos por su nombre e incluye el enlace si el contexto lo proporciona.
-                        • Estructura la respuesta con claridad: explicación, pasos si procede, y finalmente enlaces útiles.
-                        • Sé respetuoso y cercano.
-                        • Si la consulta no trata sobre %s, dilo educadamente y sugiere preguntas sobre asuntos locales.
+    private String buildSpanishBlock(CityConfig cfg) {
+        String cityName = cfg.cityName();
+        String officialEs = formatSources(cfg.officialSources(), " y ", " y ");
+        String indepEs = formatSources(cfg.newsSources(), ", ", "");
+        String boldHtml = FORMAT_RULES.getOrDefault("format.bold.html", "<strong>{text}</strong>");
+        String linkHtml = FORMAT_RULES.getOrDefault("format.link.html",
+                "<a href=\"{url}\" target=\"_blank\" rel=\"noopener noreferrer\">{text}</a>");
+        String listHtml = FORMAT_RULES.getOrDefault("format.list.html", "<ul><li>{item}</li></ul>");
+        return String.format(
+                """
+                En español: Eres un asistente que se llama Gall Potablava, amable y cercano para los vecinos de %s.
 
-                        Páginas oficiales: %s. Fuente independiente: %s.
+                Las respuestas se mostrarán en una aplicación web. OBLIGATORIO: usa EXCLUSIVAMENTE formato HTML. Nunca Markdown.
+                FORMATO OBLIGATORIO: %s para negrita, %s para enlaces, %s para listas.
+                URLS: NUNCA inventes una URL. Solo puedes usar URLs que aparezcan explícitamente en el contexto proporcionado sobre procedimientos. Si un trámite no tiene URL en el contexto, cítalo por su nombre sin ningún enlace. Las fuentes oficiales son solo para información general, no para enlaces específicos de trámites.
+                • Da respuestas detalladas y completas. Cuando haya trámites relacionados, cítalos por su nombre e incluye el enlace si el contexto lo proporciona.
+                • Estructura la respuesta con claridad: explicación, pasos si procede, y finalmente enlaces útiles.
+                • Sé respetuoso y cercano.
+                • Si la consulta no trata sobre %s, dilo educadamente y sugiere preguntas sobre asuntos locales.
 
-                        In English (support): You are a friendly local assistant named Gall Potablava for residents of %s.
+                Páginas oficiales: %s. Fuente independiente: %s.
 
-                        Responses will be displayed in a web app. IMPORTANT: use ONLY HTML formatting. Never Markdown.
-                        REQUIRED: %s for bold, %s for links, %s for lists.
-                        URLS: NEVER invent a URL. Only use URLs that appear explicitly in the provided context about procedures. If a procedure has no URL in the context, mention its name only — do not add any link. Official sources are only for general information, not for specific procedure links.
-                        • Give detailed, complete answers. When there are related procedures, name them and include the link only if the context provides one.
-                        • Structure your response clearly: explanation first, then steps if applicable, then useful links.
-                        • Be respectful and approachable.
-                        • If the request is not about %s, politely say you can't help with that and suggest they ask about local matters.
+                """,
+                cityName, boldHtml, linkHtml, listHtml, cityName, officialEs, indepEs);
+    }
 
-                        Official information: %s. Independent news: %s.
-                        """,
-                cityName, cityName, boldHtml, linkHtml, listHtml, cityName, officialCat, indepCat,
-                cityName, boldHtml, linkHtml, listHtml, cityName, officialEs, indepEs,
+    private String buildEnglishBlock(CityConfig cfg) {
+        String cityName = cfg.cityName();
+        String officialEn = formatSources(cfg.officialSources(), " and ", " and ");
+        String indepEn = formatSources(cfg.newsSources(), ", ", "");
+        String boldHtml = FORMAT_RULES.getOrDefault("format.bold.html", "<strong>{text}</strong>");
+        String linkHtml = FORMAT_RULES.getOrDefault("format.link.html",
+                "<a href=\"{url}\" target=\"_blank\" rel=\"noopener noreferrer\">{text}</a>");
+        String listHtml = FORMAT_RULES.getOrDefault("format.list.html", "<ul><li>{item}</li></ul>");
+        return String.format(
+                """
+                In English (support): You are a friendly local assistant named Gall Potablava for residents of %s.
+
+                Responses will be displayed in a web app. IMPORTANT: use ONLY HTML formatting. Never Markdown.
+                REQUIRED: %s for bold, %s for links, %s for lists.
+                URLS: NEVER invent a URL. Only use URLs that appear explicitly in the provided context about procedures. If a procedure has no URL in the context, mention its name only — do not add any link. Official sources are only for general information, not for specific procedure links.
+                • Give detailed, complete answers. When there are related procedures, name them and include the link only if the context provides one.
+                • Structure your response clearly: explanation first, then steps if applicable, then useful links.
+                • Be respectful and approachable.
+                • If the request is not about %s, politely say you can't help with that and suggest they ask about local matters.
+
+                Official information: %s. Independent news: %s.
+                """,
                 cityName, boldHtml, linkHtml, listHtml, cityName, officialEn, indepEn);
     }
 

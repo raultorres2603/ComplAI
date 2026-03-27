@@ -127,4 +127,46 @@ class RedactPromptBuilderTest {
         // The important contract: it must never throw.
         builder.buildProcedureContextBlock("xyzzy_nonexistent_term_abc123", "elprat");
     }
+
+    // -------------------------------------------------------------------------
+    // Language-specific system message tests (Step 4)
+    // -------------------------------------------------------------------------
+
+    @Test
+    void getSystemMessage_withCA_containsCatalanAndNotSpanishMarker() {
+        String msg = builder.getSystemMessage("elprat", "CA");
+        assertTrue(msg.contains("Ets un assistent"), "CA prompt must start with Catalan opener");
+        assertFalse(msg.contains("En español:"), "CA prompt must NOT contain the Spanish section marker");
+        assertFalse(msg.contains("In English"), "CA prompt must NOT contain the English section");
+    }
+
+    @Test
+    void getSystemMessage_withES_containsSpanishAndNotCatalanOpener() {
+        String msg = builder.getSystemMessage("elprat", "ES");
+        assertTrue(msg.contains("En español:"), "ES prompt must contain the Spanish section marker");
+        assertFalse(msg.contains("Ets un assistent"), "ES prompt must NOT contain the Catalan opener");
+        assertFalse(msg.contains("In English"), "ES prompt must NOT contain the English section");
+    }
+
+    @Test
+    void getSystemMessage_withEN_containsEnglishBlock() {
+        String msg = builder.getSystemMessage("elprat", "EN");
+        assertTrue(msg.contains("In English"), "EN prompt must contain the English section");
+        assertFalse(msg.contains("Ets un assistent"), "EN prompt must NOT contain the Catalan opener");
+        assertFalse(msg.contains("En español:"), "EN prompt must NOT contain the Spanish section marker");
+    }
+
+    @Test
+    void getSystemMessage_withNull_returnsTriLingual() {
+        String triLingual = builder.getSystemMessage("elprat");
+        String withNull = builder.getSystemMessage("elprat", null);
+        assertEquals(triLingual, withNull, "null language must fall back to tri-lingual prompt");
+    }
+
+    @Test
+    void getSystemMessage_withUnknownCode_fallsBackToTriLingual() {
+        String triLingual = builder.getSystemMessage("elprat");
+        String withXX = builder.getSystemMessage("elprat", "XX");
+        assertEquals(triLingual, withXX, "unrecognized language code must fall back to tri-lingual prompt");
+    }
 }

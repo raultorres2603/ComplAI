@@ -1,21 +1,33 @@
 package cat.complai.http;
 
 import cat.complai.http.dto.HttpDto;
+import cat.complai.http.dto.OpenRouterStreamStartResult;
+import cat.complai.openrouter.dto.OpenRouterErrorCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpServer;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.env.Environment;
 import org.junit.jupiter.api.Test;
+import reactor.core.publisher.Flux;
 
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 public class HttpWrapperTest {
+
+    private static List<String> collectStream(OpenRouterStreamStartResult result) {
+        assertInstanceOf(OpenRouterStreamStartResult.Success.class, result);
+        return Flux.from(((OpenRouterStreamStartResult.Success) result).stream()).collectList()
+                .block(Duration.ofSeconds(5));
+    }
 
     @Test
     public void postToOpenRouterAsync_shouldReturnParsedMessage() throws Exception {
@@ -164,6 +176,158 @@ public class HttpWrapperTest {
             assertNotNull(receivedAuth[0]);
             assertTrue(receivedAuth[0].startsWith("Bearer "));
             assertTrue(receivedAuth[0].endsWith("plain-token"));
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    public void streamFromOpenRouter_shouldSkipCommentLinesAndEmitDataLines() throws Exception {
+        String sseBody = ": OPENROUTER PROCESSING\n\ndata: {\"choices\":[{\"delta\":{\"content\":\"Hi\"}}]}\n\ndata: [DONE]\n\n";
+        HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext("/api/v1/chat/completions", exchange -> {
+            byte[] bytes = sseBody.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "text/event-stream");
+            // Use 0 for chunked transfer encoding so Micronaut's dataStream() receives HttpContent chunks
+            exchange.sendResponseHeaders(200, 0);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(bytes);
+            }
+        });
+        server.start();
+
+        Map<String, Object> props = Map.of(
+                "openrouter.url", "http://localhost:" + server.getAddress().getPort(),
+                "OPENROUTER_API_KEY", "test-key",
+                "micronaut.application.name", "complai-test"
+        );
+        try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST).build()) {
+            ctx.registerSingleton(new ObjectMapper());
+            ctx.start();
+            HttpWrapper wrapper = ctx.getBean(HttpWrapper.class);
+
+                List<String> lines = collectStream(wrapper.streamFromOpenRouter(
+                    List.of(Map.of("role", "user", "content", "test"))
+                ));
+
+            assertNotNull(lines);
+            assertEquals(2, lines.size());
+            assertTrue(lines.contains("data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"}}]}"));
+            assertTrue(lines.contains("data: [DONE]"));
+            assertTrue(lines.stream().noneMatch(l -> l.startsWith(":")));
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    public void streamFromOpenRouter_shouldReconstructLinesAcrossChunkBoundaries() throws Exception {
+        String part1 = ": OPENROUTER PROCESSING\n\ndata: {\"choices\"";
+        String part2 = ":[{\"delta\":{\"content\":\"Hi\"}}]}\n\ndata: [DONE]\n\n";
+        HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext("/api/v1/chat/completions", exchange -> {
+            exchange.getResponseHeaders().add("Content-Type", "text/event-stream");
+            // Use 0 for chunked transfer encoding (unknown length)
+            exchange.sendResponseHeaders(200, 0);
+            OutputStream os = exchange.getResponseBody();
+            os.write(part1.getBytes(StandardCharsets.UTF_8));
+            os.flush();
+            os.write(part2.getBytes(StandardCharsets.UTF_8));
+            os.flush();
+            os.close();
+        });
+        server.start();
+
+        Map<String, Object> props = Map.of(
+                "openrouter.url", "http://localhost:" + server.getAddress().getPort(),
+                "OPENROUTER_API_KEY", "test-key",
+                "micronaut.application.name", "complai-test"
+        );
+        try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST).build()) {
+            ctx.registerSingleton(new ObjectMapper());
+            ctx.start();
+            HttpWrapper wrapper = ctx.getBean(HttpWrapper.class);
+
+                List<String> lines = collectStream(wrapper.streamFromOpenRouter(
+                    List.of(Map.of("role", "user", "content", "test"))
+                ));
+
+            assertNotNull(lines);
+            assertEquals(2, lines.size());
+            assertTrue(lines.contains("data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"}}]}"));
+            assertTrue(lines.contains("data: [DONE]"));
+            assertTrue(lines.stream().noneMatch(l -> l.startsWith(":")));
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    public void streamFromOpenRouter_shouldWorkWithNoCommentLines() throws Exception {
+        String sseBody = "data: {\"choices\":[{\"delta\":{\"content\":\"Hello\"}}]}\n\ndata: [DONE]\n\n";
+        HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext("/api/v1/chat/completions", exchange -> {
+            byte[] bytes = sseBody.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "text/event-stream");
+            // Use 0 for chunked transfer encoding so Micronaut's dataStream() receives HttpContent chunks
+            exchange.sendResponseHeaders(200, 0);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(bytes);
+            }
+        });
+        server.start();
+
+        Map<String, Object> props = Map.of(
+                "openrouter.url", "http://localhost:" + server.getAddress().getPort(),
+                "OPENROUTER_API_KEY", "test-key",
+                "micronaut.application.name", "complai-test"
+        );
+        try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST).build()) {
+            ctx.registerSingleton(new ObjectMapper());
+            ctx.start();
+            HttpWrapper wrapper = ctx.getBean(HttpWrapper.class);
+
+            List<String> lines = collectStream(wrapper.streamFromOpenRouter(
+                    List.of(Map.of("role", "user", "content", "test"))
+            ));
+
+            assertNotNull(lines);
+            assertEquals(2, lines.size());
+            assertTrue(lines.stream().allMatch(l -> l.startsWith("data:")));
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    public void streamFromOpenRouter_shouldReturnTypedUpstreamErrorOn402Startup() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext("/api/v1/chat/completions", exchange -> {
+            byte[] bytes = "payment required".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(402, bytes.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(bytes);
+            }
+        });
+        server.start();
+
+        Map<String, Object> props = Map.of(
+                "openrouter.url", "http://localhost:" + server.getAddress().getPort(),
+                "OPENROUTER_API_KEY", "test-key",
+                "micronaut.application.name", "complai-test"
+        );
+        try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST).build()) {
+            ctx.registerSingleton(new ObjectMapper());
+            ctx.start();
+            HttpWrapper wrapper = ctx.getBean(HttpWrapper.class);
+
+            OpenRouterStreamStartResult result = wrapper.streamFromOpenRouter(
+                    List.of(Map.of("role", "user", "content", "test")));
+
+            assertInstanceOf(OpenRouterStreamStartResult.Error.class, result);
+            OpenRouterStreamingException failure = ((OpenRouterStreamStartResult.Error) result).failure();
+            assertEquals(OpenRouterErrorCode.UPSTREAM, failure.getErrorCode());
+            assertEquals(402, failure.getUpstreamStatus());
         } finally {
             server.stop(0);
         }

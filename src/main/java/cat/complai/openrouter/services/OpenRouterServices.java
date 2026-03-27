@@ -1,24 +1,40 @@
 package cat.complai.openrouter.services;
 
+import cat.complai.http.HttpWrapper;
+import cat.complai.http.dto.OpenRouterStreamStartResult;
 import cat.complai.openrouter.services.validation.InputValidationService;
 import cat.complai.openrouter.services.conversation.ConversationManagementService;
 import cat.complai.openrouter.services.ai.AiResponseProcessingService;
 import cat.complai.openrouter.services.procedure.ProcedureContextService;
 import cat.complai.openrouter.services.procedure.ProcedureContextService.ProcedureContextResult;
 import cat.complai.openrouter.interfaces.IOpenRouterService;
+import cat.complai.openrouter.dto.AskStreamResult;
 import cat.complai.openrouter.dto.OpenRouterResponseDto;
+import cat.complai.openrouter.dto.OpenRouterErrorCode;
 import cat.complai.openrouter.dto.Source;
+import cat.complai.openrouter.dto.sse.SseChunkEvent;
+import cat.complai.openrouter.dto.sse.SseSources;
+import cat.complai.openrouter.dto.sse.SseSourcesEvent;
+import cat.complai.openrouter.dto.sse.SseDoneEvent;
+import cat.complai.openrouter.dto.sse.SseErrorEvent;
+import cat.complai.openrouter.helpers.AskStreamErrorMapper;
+import cat.complai.openrouter.helpers.LanguageDetector;
 import cat.complai.openrouter.helpers.RedactPromptBuilder;
+import cat.complai.openrouter.helpers.SseChunkParser;
 import cat.complai.openrouter.dto.ComplainantIdentity;
 import cat.complai.openrouter.dto.OutputFormat;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.inject.Singleton;
 import jakarta.inject.Inject;
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 @Singleton
 public class OpenRouterServices implements IOpenRouterService {
@@ -29,6 +45,8 @@ public class OpenRouterServices implements IOpenRouterService {
     private final AiResponseProcessingService aiResponseService;
     private final ProcedureContextService procedureContextService;
     private final RedactPromptBuilder promptBuilder;
+    private final HttpWrapper httpWrapper;
+    private final ObjectMapper objectMapper;
 
     /**
      * Estimates token count for text using OpenAI's rule of thumb: ~1 token per 4
@@ -79,12 +97,16 @@ public class OpenRouterServices implements IOpenRouterService {
             ConversationManagementService conversationService,
             AiResponseProcessingService aiResponseService,
             ProcedureContextService procedureContextService,
-            RedactPromptBuilder promptBuilder) {
+            RedactPromptBuilder promptBuilder,
+            HttpWrapper httpWrapper,
+            ObjectMapper objectMapper) {
         this.validationService = validationService;
         this.conversationService = conversationService;
         this.aiResponseService = aiResponseService;
         this.procedureContextService = procedureContextService;
         this.promptBuilder = promptBuilder;
+        this.httpWrapper = httpWrapper;
+        this.objectMapper = objectMapper;
     }
 
     // -------------------------------------------------------------------------
@@ -110,7 +132,8 @@ public class OpenRouterServices implements IOpenRouterService {
         }
 
         List<Map<String, Object>> messages = new ArrayList<>();
-        messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage(cityId)));
+        String detectedLanguage = cat.complai.openrouter.helpers.LanguageDetector.detect(question);
+        messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage(cityId, detectedLanguage)));
 
         // Parallelize RAG searches for procedure and event context
         // Start both searches concurrently to reduce latency
@@ -325,6 +348,189 @@ public class OpenRouterServices implements IOpenRouterService {
         }
 
         return processedResponse;
+    }
+
+    @Override
+    public AskStreamResult streamAsk(String question, String conversationId, String cityId) {
+        // 1. Validate input — emit error event if invalid
+        var validationError = validationService.validateQuestion(question);
+        if (validationError.isPresent()) {
+            String errorText = validationError.get().getError();
+            errorText = errorText != null ? errorText : "Invalid input.";
+            try {
+                SseErrorEvent errorEvent = new SseErrorEvent(errorText, OpenRouterErrorCode.VALIDATION.getCode());
+                String json = objectMapper.writeValueAsString(errorEvent);
+                return new AskStreamResult.Success(Flux.just(json));
+            } catch (Exception e) {
+                logger.log(Level.SEVERE, "streamAsk() failed to serialize validation error", e);
+                return new AskStreamResult.Error(AskStreamErrorMapper.toResponseDto(e));
+            }
+        }
+
+        // 2. Single-language system message + RAG
+        String detectedLanguage = LanguageDetector.detect(question);
+        List<Map<String, Object>> messages = new ArrayList<>();
+        messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage(cityId, detectedLanguage)));
+
+        // 3. Parallelize RAG — blocking join is acceptable (Lucene in-memory, fast)
+        CompletableFuture<ProcedureContextResult> procFuture = procedureContextService
+                .questionNeedsProcedureContext(question, cityId)
+                        ? procedureContextService.buildProcedureContextResultAsync(question, cityId)
+                        : CompletableFuture.completedFuture(null);
+        CompletableFuture<ProcedureContextService.EventContextResult> eventFuture = procedureContextService
+                .questionNeedsEventContext(question, cityId)
+                        ? procedureContextService.buildEventContextResultAsync(question, cityId)
+                        : CompletableFuture.completedFuture(null);
+
+        ProcedureContextResult procCtx = null;
+        ProcedureContextService.EventContextResult eventCtx = null;
+        try {
+            CompletableFuture.allOf(procFuture, eventFuture).join();
+            procCtx = procFuture.get();
+            eventCtx = eventFuture.get();
+        } catch (Exception e) {
+            logger.log(Level.WARNING, "streamAsk() RAG failed — conversationId=" + conversationId, e);
+        }
+
+        if (procCtx != null && procCtx.getContextBlock() != null)
+            messages.add(Map.of("role", "system", "content", procCtx.getContextBlock()));
+        if (eventCtx != null && eventCtx.getContextBlock() != null)
+            messages.add(Map.of("role", "system", "content", eventCtx.getContextBlock()));
+
+        var history = conversationService.getConversationHistory(conversationId);
+        conversationService.addToMessages(messages, history);
+        messages.add(Map.of("role", "user", "content", question != null ? question.trim() : ""));
+
+        // 4. Collect sources from RAG context
+        List<SseSources> allSources = new ArrayList<>();
+        if (procCtx != null && procCtx.getSources() != null) {
+            allSources.addAll(procCtx.getSources().stream()
+                    .map(s -> new SseSources(s.getTitle(), s.getUrl()))
+                    .collect(Collectors.toList()));
+        }
+        if (eventCtx != null && eventCtx.getSources() != null) {
+            allSources.addAll(eventCtx.getSources().stream()
+                    .map(s -> new SseSources(s.getTitle(), s.getUrl()))
+                    .collect(Collectors.toList()));
+        }
+
+        // 5. Stream chunks, then emit sources, then done
+        final String capturedQuestion = question;
+        final String capturedCityId = cityId;
+        final String capturedConvId = conversationId;
+        final StringBuilder assembled = new StringBuilder();
+        final java.util.concurrent.atomic.AtomicBoolean hasEmitted = new java.util.concurrent.atomic.AtomicBoolean(false);
+
+        logger.fine(() -> "streamAsk() preparing to stream — conversationId=" + capturedConvId + " sources="
+                + allSources.size());
+
+        // Verify objectMapper is not null before proceeding
+        if (objectMapper == null) {
+            logger.severe("streamAsk() ERROR: objectMapper is null! This should never happen.");
+            return new AskStreamResult.Error(AskStreamErrorMapper.toResponseDto(
+                    new IllegalStateException("ObjectMapper is not properly injected")));
+        }
+
+        OpenRouterStreamStartResult streamStartResult = httpWrapper.streamFromOpenRouter(messages);
+        if (streamStartResult instanceof OpenRouterStreamStartResult.Error error) {
+            return new AskStreamResult.Error(AskStreamErrorMapper.toResponseDto(error.failure()));
+        }
+
+        Publisher<String> stream = ((OpenRouterStreamStartResult.Success) streamStartResult).stream();
+
+        return new AskStreamResult.Success(Flux.from(stream)
+                .doOnSubscribe(sub -> {
+                }) // Signal subscription start (debugging removed)
+                .handle((raw, sink) -> {
+                    SseChunkParser.ParseResult parsed = SseChunkParser.parseLine(raw);
+                    if (parsed.state() == SseChunkParser.ParseState.MALFORMED) {
+                        sink.error(new IllegalStateException("Malformed upstream stream chunk"));
+                        return;
+                    }
+                    if (parsed.state() == SseChunkParser.ParseState.DELTA && parsed.delta() != null
+                            && !parsed.delta().isEmpty()) {
+                        sink.next(parsed.delta());
+                    }
+                })
+                .cast(String.class)
+                .doOnNext(delta -> {
+                    assembled.append(delta);
+                    hasEmitted.set(true);
+                    logger.fine(() -> "streamAsk() chunk delta processed");
+                })
+                .map(delta -> {
+                    // Serialize each chunk delta to JSON
+                    try {
+                        SseChunkEvent chunk = new SseChunkEvent(delta);
+                        String serialized = objectMapper.writeValueAsString(chunk);
+                        logger.fine(() -> "streamAsk() emitting chunk event serialized");
+                        return serialized;
+                    } catch (Exception e) {
+                        logger.log(Level.SEVERE, "Failed to serialize chunk", e);
+                        throw new RuntimeException("Chunk serialization failed", e);
+                    }
+                })
+                .doOnComplete(() -> {
+                    logger.info("First Flux completed");
+                })
+                .concatWith(produceSourcesAndDone(allSources, capturedConvId))
+                .doOnNext(event -> logger.fine(() -> "streamAsk() emitting event"))
+                .doOnComplete(() -> {
+                    String fullText = assembled.toString();
+                    if (capturedConvId != null && !capturedConvId.isBlank() && !fullText.isBlank()) {
+                        conversationService.updateConversationHistory(capturedConvId, capturedQuestion, fullText);
+                    }
+                    logger.info(() -> "streamAsk() completed — conversationId=" + capturedConvId
+                            + " assembledLength=" + fullText.length() + " city=" + capturedCityId);
+                })
+                .doOnError(e -> {
+                    logger.log(Level.SEVERE, "streamAsk() error during streaming — conversationId=" + capturedConvId,
+                            e);
+                })
+                .onErrorResume(e -> {
+                    // Only convert to SSE error event if data has already been emitted.
+                    // If nothing was emitted yet, let the error propagate so Micronaut
+                    // can return an HTTP 5xx response (no headers committed yet).
+                    if (!hasEmitted.get()) {
+                        return Flux.error(e);
+                    }
+                    try {
+                        SseErrorEvent errorEvent = AskStreamErrorMapper.toSseErrorEvent(e);
+                        String json = objectMapper.writeValueAsString(errorEvent);
+                        return Flux.just(json);
+                    } catch (Exception serEx) {
+                        logger.log(Level.SEVERE, "streamAsk() failed to serialize streaming error event", serEx);
+                        return Flux.empty();
+                    }
+                }));
+    }
+
+    /**
+     * Produces sources and done events for SSE stream.
+     */
+    private Publisher<String> produceSourcesAndDone(List<SseSources> sources, String conversationId) {
+        try {
+            logger.info(() -> "produceSourcesAndDone() CALLED — sources=" + (sources != null ? sources.size() : "null")
+                    + " conversationId=" + conversationId);
+
+            if (objectMapper == null) {
+                logger.severe("produceSourcesAndDone() ERROR: objectMapper is null!");
+                return Flux.error(new IllegalStateException("ObjectMapper is null in produceSourcesAndDone"));
+            }
+
+            SseSourcesEvent sourcesEvent = new SseSourcesEvent(sources);
+            final String sourcesJson = objectMapper.writeValueAsString(sourcesEvent);
+
+            SseDoneEvent doneEvent = new SseDoneEvent(conversationId);
+            final String doneJson = objectMapper.writeValueAsString(doneEvent);
+
+            Publisher<String> result = Flux.just(sourcesJson, doneJson);
+            logger.info("produceSourcesAndDone() RETURNING Flux with 2 events");
+            return result;
+        } catch (Exception e) {
+            logger.log(Level.SEVERE, "produceSourcesAndDone() EXCEPTION: Failed to serialize sources or done event", e);
+            return Flux.error(e);
+        }
     }
 
 }

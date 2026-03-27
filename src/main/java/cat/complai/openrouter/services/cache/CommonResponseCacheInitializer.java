@@ -96,12 +96,13 @@ public class CommonResponseCacheInitializer {
         int cachedCount = 0;
         for (CommonResponseEntry entry : entries) {
             try {
-                // Common responses use hash=0 as a placeholder (matched only if no RAG results)
+                // Common responses use hash=0 as a placeholder (matched only if no RAG results and same question hash)
                 ResponseCacheKey key = new ResponseCacheKey(
                         entry.city() != null ? entry.city() : "global",
                         0, // procedureContextHash - placeholder for common responses
                         0, // eventContextHash - placeholder for common responses
-                        entry.category());
+                        entry.category(),
+                        0); // questionHash - placeholder for common responses
                 cacheService.cacheResponse(key, entry.response());
                 cachedCount++;
             } catch (Exception e) {

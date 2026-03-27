@@ -183,7 +183,8 @@ export class LambdaStack extends cdk.Stack {
         // is bundled in oidc-mapping.json — enabled per city, no env var needed.
         // The worker Lambda does not receive JWT_SECRET and therefore never loads the
         // OidcIdentityTokenValidator bean.
-        RATE_LIMIT_REQUESTS_PER_MINUTE: process.env.RATE_LIMIT_REQUESTS_PER_MINUTE || '20'
+        RATE_LIMIT_REQUESTS_PER_MINUTE: process.env.RATE_LIMIT_REQUESTS_PER_MINUTE || '20',
+        COMPLAI_DEFAULT_CITY_ID: process.env.COMPLAI_DEFAULT_CITY_ID || 'elprat',
 
       },
       role: lambdaRole,
@@ -330,6 +331,8 @@ export class LambdaStack extends cdk.Stack {
     // NOTE: Unlike API Gateway, Function URLs have no built-in rate limiting.
     // Add AWS WAF in front of the URL if throttling ever becomes a requirement.
     lambdaFn.addFunctionUrl({
+      // TODO: upgrade aws-cdk-lib to >=2.60.0 for InvokeMode.RESPONSE_STREAM if not yet recognized
+      invokeMode: lambda.InvokeMode.RESPONSE_STREAM,
       authType: lambda.FunctionUrlAuthType.NONE,
       cors: {
         // Restrict CORS to the GitHub Pages frontend.

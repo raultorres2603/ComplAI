@@ -31,27 +31,26 @@ public record ResponseCacheKey(
         String cityId,
         long procedureContextHash,
         long eventContextHash,
-        QuestionCategory category) {
+        QuestionCategory category,
+        int questionHash) {
     /**
      * Compact constructor ensures validity.
      * All fields are required and must be non-null.
      */
     public ResponseCacheKey {
-        if (cityId == null || cityId.isBlank()) {
+        if (cityId == null || cityId.isBlank())
             throw new IllegalArgumentException("cityId cannot be null or blank");
-        }
-        if (category == null) {
+        if (category == null)
             throw new IllegalArgumentException("category cannot be null");
-        }
     }
 
     /**
      * Override toString for privacy-safe logging.
-     * Includes cityId and category, but NOT user-specific data.
+     * Includes cityId, category, and question hash, but NOT raw user query text.
      */
     @Override
     public String toString() {
-        return String.format("ResponseCacheKey(city=%s, procHash=%d, eventHash=%d, category=%s)",
-                cityId, procedureContextHash, eventContextHash, category);
+        return String.format("ResponseCacheKey(city=%s, procHash=%d, eventHash=%d, category=%s, qHash=%d)",
+                cityId, procedureContextHash, eventContextHash, category, questionHash);
     }
 }

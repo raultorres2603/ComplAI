@@ -33,7 +33,7 @@ class CommonResponseCacheInitializerTest {
                 "How to get parking permit?",
                 "Visit city hall with documentation...");
 
-        ResponseCacheKey key = new ResponseCacheKey("elprat", 0, 0, QuestionCategory.PARKING);
+        ResponseCacheKey key = new ResponseCacheKey("elprat", 0, 0, QuestionCategory.PARKING, 0);
         cacheService.cacheResponse(key, entry.response());
 
         assertTrue(cacheService.getCachedResponse(key).isPresent());
@@ -54,7 +54,7 @@ class CommonResponseCacheInitializerTest {
             ResponseCacheKey key = new ResponseCacheKey(
                     entry.city() != null ? entry.city() : "global",
                     0, 0,
-                    entry.category());
+                    entry.category(), 0);
             cacheService.cacheResponse(key, entry.response());
         }
 
@@ -70,7 +70,7 @@ class CommonResponseCacheInitializerTest {
                 "Admin?",
                 "Admin answer");
 
-        ResponseCacheKey key = new ResponseCacheKey("global", 0, 0, QuestionCategory.ADMINISTRATION);
+        ResponseCacheKey key = new ResponseCacheKey("global", 0, 0, QuestionCategory.ADMINISTRATION, 0);
         cacheService.cacheResponse(key, entry.response());
 
         assertTrue(cacheService.getCachedResponse(key).isPresent());
@@ -90,7 +90,7 @@ class CommonResponseCacheInitializerTest {
     @DisplayName("should use placeholder hashes for common responses")
     void testCommonResponsesUsePlaceholderHashes() {
         // Common responses should use 0 for both procedure and event hashes
-        ResponseCacheKey commonKey = new ResponseCacheKey("elprat", 0, 0, QuestionCategory.PARKING);
+        ResponseCacheKey commonKey = new ResponseCacheKey("elprat", 0, 0, QuestionCategory.PARKING, 0);
 
         assertEquals(0, commonKey.procedureContextHash());
         assertEquals(0, commonKey.eventContextHash());
@@ -99,8 +99,8 @@ class CommonResponseCacheInitializerTest {
     @Test
     @DisplayName("should maintain cache between multiple initializations")
     void testCacheConsistencyAcrossOperations() {
-        ResponseCacheKey key1 = new ResponseCacheKey("city1", 0, 0, QuestionCategory.PARKING);
-        ResponseCacheKey key2 = new ResponseCacheKey("city1", 111, 222, QuestionCategory.PARKING);
+        ResponseCacheKey key1 = new ResponseCacheKey("city1", 0, 0, QuestionCategory.PARKING, 0);
+        ResponseCacheKey key2 = new ResponseCacheKey("city1", 111, 222, QuestionCategory.PARKING, 0);
 
         cacheService.cacheResponse(key1, "Common response");
         cacheService.cacheResponse(key2, "Specific response");

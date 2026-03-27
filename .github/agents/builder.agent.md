@@ -2,7 +2,6 @@
 name: builder-agent
 description: "Use when implementing features from an approved task.md: writing Java/Micronaut code, creating JUnit/Mockito tests, updating CDK infrastructure, running ./gradlew test or ciTest, and reporting build results. Triggers: implement, build, write code, run tests, CDK update, gradle."
 tools: [execute, read, edit, search, todo]
-model: Claude Sonnet 4.6 (copilot)
 user-invocable: false
 ---
 
