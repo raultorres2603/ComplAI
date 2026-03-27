@@ -145,9 +145,7 @@ export class LambdaStack extends cdk.Stack {
       handler: 'io.micronaut.function.aws.proxy.payload2.APIGatewayV2HTTPEventFunction::handleRequest',
       code,
       memorySize: 1024,
-      snapStart: lambda.SnapStartConf.ON_PUBLISHED_VERSIONS,
       timeout: cdk.Duration.seconds(60),
-      // Enable SnapStart with CRaC for cold start optimization
       // Wire the OpenRouter API key (from CFN parameter) into the Lambda environment.
       // Be aware that environment variables are visible in the Lambda console; using
       // Secrets Manager or SSM Parameter Store with encryption is more secure if available.
@@ -260,11 +258,9 @@ export class LambdaStack extends cdk.Stack {
       handler: 'cat.complai.worker.RedactWorkerHandler::handleRequest',
       code,
       memorySize: 1024,
-      snapStart: lambda.SnapStartConf.ON_PUBLISHED_VERSIONS,
       // Must be ≤ SQS visibility timeout (90s). Lambda extends visibility automatically
       // while running, so using the same duration is the safest choice here.
       timeout: cdk.Duration.seconds(60),
-      // Enable SnapStart with CRaC for cold start optimization
       environment: {
         OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '',
         OPENROUTER_REQUEST_TIMEOUT_SECONDS: process.env.OPENROUTER_REQUEST_TIMEOUT_SECONDS || '60',
@@ -298,7 +294,6 @@ export class LambdaStack extends cdk.Stack {
       handler: 'cat.complai.feedback.worker.FeedbackWorkerHandler::handleRequest',
       code,
       memorySize: 512,  // Feedback processing is lighter than AI redaction
-      snapStart: lambda.SnapStartConf.ON_PUBLISHED_VERSIONS,
       timeout: cdk.Duration.seconds(60),
       // Feedback worker environment
       environment: {

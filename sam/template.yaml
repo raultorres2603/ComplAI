@@ -220,9 +220,6 @@ Resources:
           COMPLAINTS_BUCKET: !Ref ComplaintsBucket
           COMPLAINTS_REGION: !Ref LambdaRegion
 
-      # Enable SnapStart with CRaC for cold start optimization
-      SnapStart:
-        ApplyOn: PublishedVersions
       Events:
         ProxyRoot:
           Type: HttpApi
@@ -257,9 +254,6 @@ Resources:
           PROCEDURES_BUCKET: !Ref ProceduresBucket
           PROCEDURES_REGION: !Ref LambdaRegion
           AWS_ENDPOINT_URL: "http://host.docker.internal:4566"
-      # Enable SnapStart with CRaC for cold start optimization
-      SnapStart:
-        ApplyOn: PublishedVersions
       Events:
         SQSTrigger:
           Type: SQS
