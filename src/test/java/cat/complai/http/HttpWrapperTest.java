@@ -1,6 +1,8 @@
 package cat.complai.http;
 
 import cat.complai.http.dto.HttpDto;
+import cat.complai.http.dto.OpenRouterStreamStartResult;
+import cat.complai.openrouter.dto.OpenRouterErrorCode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpServer;
@@ -20,6 +22,12 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class HttpWrapperTest {
+
+    private static List<String> collectStream(OpenRouterStreamStartResult result) {
+        assertInstanceOf(OpenRouterStreamStartResult.Success.class, result);
+        return Flux.from(((OpenRouterStreamStartResult.Success) result).stream()).collectList()
+                .block(Duration.ofSeconds(5));
+    }
 
     @Test
     public void postToOpenRouterAsync_shouldReturnParsedMessage() throws Exception {
@@ -198,9 +206,9 @@ public class HttpWrapperTest {
             ctx.start();
             HttpWrapper wrapper = ctx.getBean(HttpWrapper.class);
 
-            List<String> lines = Flux.from(wrapper.streamFromOpenRouter(
+                List<String> lines = collectStream(wrapper.streamFromOpenRouter(
                     List.of(Map.of("role", "user", "content", "test"))
-            )).collectList().block(Duration.ofSeconds(5));
+                ));
 
             assertNotNull(lines);
             assertEquals(2, lines.size());
@@ -240,9 +248,9 @@ public class HttpWrapperTest {
             ctx.start();
             HttpWrapper wrapper = ctx.getBean(HttpWrapper.class);
 
-            List<String> lines = Flux.from(wrapper.streamFromOpenRouter(
+                List<String> lines = collectStream(wrapper.streamFromOpenRouter(
                     List.of(Map.of("role", "user", "content", "test"))
-            )).collectList().block(Duration.ofSeconds(5));
+                ));
 
             assertNotNull(lines);
             assertEquals(2, lines.size());
@@ -279,13 +287,47 @@ public class HttpWrapperTest {
             ctx.start();
             HttpWrapper wrapper = ctx.getBean(HttpWrapper.class);
 
-            List<String> lines = Flux.from(wrapper.streamFromOpenRouter(
+            List<String> lines = collectStream(wrapper.streamFromOpenRouter(
                     List.of(Map.of("role", "user", "content", "test"))
-            )).collectList().block(Duration.ofSeconds(5));
+            ));
 
             assertNotNull(lines);
             assertEquals(2, lines.size());
             assertTrue(lines.stream().allMatch(l -> l.startsWith("data:")));
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    public void streamFromOpenRouter_shouldReturnTypedUpstreamErrorOn402Startup() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext("/api/v1/chat/completions", exchange -> {
+            byte[] bytes = "payment required".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(402, bytes.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(bytes);
+            }
+        });
+        server.start();
+
+        Map<String, Object> props = Map.of(
+                "openrouter.url", "http://localhost:" + server.getAddress().getPort(),
+                "OPENROUTER_API_KEY", "test-key",
+                "micronaut.application.name", "complai-test"
+        );
+        try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST).build()) {
+            ctx.registerSingleton(new ObjectMapper());
+            ctx.start();
+            HttpWrapper wrapper = ctx.getBean(HttpWrapper.class);
+
+            OpenRouterStreamStartResult result = wrapper.streamFromOpenRouter(
+                    List.of(Map.of("role", "user", "content", "test")));
+
+            assertInstanceOf(OpenRouterStreamStartResult.Error.class, result);
+            OpenRouterStreamingException failure = ((OpenRouterStreamStartResult.Error) result).failure();
+            assertEquals(OpenRouterErrorCode.UPSTREAM, failure.getErrorCode());
+            assertEquals(402, failure.getUpstreamStatus());
         } finally {
             server.stop(0);
         }

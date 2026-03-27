@@ -4,6 +4,7 @@ import cat.complai.auth.JwtAuthFilter;
 import cat.complai.auth.IdentityTokenValidationException;
 import cat.complai.auth.OidcIdentityTokenValidator;
 import cat.complai.auth.VerifiedCitizenIdentity;
+import cat.complai.openrouter.dto.AskStreamResult;
 import cat.complai.openrouter.dto.ComplainantIdentity;
 import cat.complai.openrouter.dto.OpenRouterErrorCode;
 import cat.complai.openrouter.dto.OpenRouterPublicDto;
@@ -21,7 +22,6 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.sse.Event;
 import org.junit.jupiter.api.Test;
-import org.reactivestreams.Publisher;
 
 import java.util.List;
 import java.util.Optional;
@@ -49,13 +49,12 @@ public class OpenRouterControllerTest {
         }
 
         @Override
-        public Publisher<String> streamAsk(String question, String conversationId, String cityId) {
+        public AskStreamResult streamAsk(String question, String conversationId, String cityId) {
             // Return properly formatted SSE events: chunk, sources, done
-            return reactor.core.publisher.Flux.just(
+            return new AskStreamResult.Success(reactor.core.publisher.Flux.just(
                     "{\"type\":\"chunk\",\"content\":\"OK from AI\"}",
                     "{\"type\":\"sources\",\"sources\":[]}",
-                    "{\"type\":\"done\",\"conversationId\":null}"
-            );
+                    "{\"type\":\"done\",\"conversationId\":null}"));
         }
     }
 
@@ -76,11 +75,10 @@ public class OpenRouterControllerTest {
         }
 
         @Override
-        public Publisher<String> streamAsk(String question, String conversationId, String cityId) {
+        public AskStreamResult streamAsk(String question, String conversationId, String cityId) {
             // Return error event in proper format
-            return reactor.core.publisher.Flux.just(
-                    "{\"type\":\"error\",\"error\":\"Request is not about El Prat de Llobregat.\",\"errorCode\":4}"
-            );
+            return new AskStreamResult.Success(reactor.core.publisher.Flux.just(
+                    "{\"type\":\"error\",\"error\":\"Request is not about El Prat de Llobregat.\",\"errorCode\":4}"));
         }
     }
 
@@ -101,8 +99,13 @@ public class OpenRouterControllerTest {
         }
 
         @Override
-        public Publisher<String> streamAsk(String question, String conversationId, String cityId) {
-            return reactor.core.publisher.Flux.error(new RuntimeException("Missing OPENROUTER_API_KEY"));
+        public AskStreamResult streamAsk(String question, String conversationId, String cityId) {
+            return new AskStreamResult.Error(new OpenRouterResponseDto(
+                    false,
+                    null,
+                    "AI service is temporarily unavailable. Please try again later.",
+                    402,
+                    OpenRouterErrorCode.UPSTREAM));
         }
     }
 
@@ -128,8 +131,8 @@ public class OpenRouterControllerTest {
         }
 
         @Override
-        public Publisher<String> streamAsk(String question, String conversationId, String cityId) {
-            return reactor.core.publisher.Flux.empty();
+        public AskStreamResult streamAsk(String question, String conversationId, String cityId) {
+            return new AskStreamResult.Success(reactor.core.publisher.Flux.empty());
         }
     }
 
@@ -150,8 +153,8 @@ public class OpenRouterControllerTest {
         }
 
         @Override
-        public Publisher<String> streamAsk(String question, String conversationId, String cityId) {
-            return reactor.core.publisher.Flux.empty();
+        public AskStreamResult streamAsk(String question, String conversationId, String cityId) {
+            return new AskStreamResult.Success(reactor.core.publisher.Flux.empty());
         }
     }
 
@@ -211,8 +214,11 @@ public class OpenRouterControllerTest {
     void ask_success_returns200() {
         OpenRouterController c = new OpenRouterController(new FakeServiceSuccess(), ASSERT_NOT_CALLED_PUBLISHER,
                 ASSERT_NOT_CALLED_UPLOADER, null);
-        Publisher<Event<String>> publisher = c.ask(new AskRequest("Is there a recycling center?"),
-                requestWithCity("testcity"));
+        HttpResponse<?> raw = c.ask(new AskRequest("Is there a recycling center?"), requestWithCity("testcity"));
+        @SuppressWarnings("unchecked")
+        org.reactivestreams.Publisher<Event<String>> publisher = (org.reactivestreams.Publisher<Event<String>>) raw
+                .getBody()
+                .orElseThrow();
         List<Event<String>> events = reactor.core.publisher.Flux.from(publisher).collectList().block();
         assertFalse(events.isEmpty());
         assertEquals("{\"type\":\"chunk\",\"content\":\"OK from AI\"}", events.get(0).getData());
@@ -222,8 +228,11 @@ public class OpenRouterControllerTest {
     void ask_refuse_returns422() {
         OpenRouterController c = new OpenRouterController(new FakeServiceRefuse(), ASSERT_NOT_CALLED_PUBLISHER,
                 ASSERT_NOT_CALLED_UPLOADER, null);
-        Publisher<Event<String>> publisher = c.ask(new AskRequest("What's the capital of France?"),
-                requestWithCity("testcity"));
+        HttpResponse<?> raw = c.ask(new AskRequest("What's the capital of France?"), requestWithCity("testcity"));
+        @SuppressWarnings("unchecked")
+        org.reactivestreams.Publisher<Event<String>> publisher = (org.reactivestreams.Publisher<Event<String>>) raw
+                .getBody()
+                .orElseThrow();
         List<Event<String>> events = reactor.core.publisher.Flux.from(publisher).collectList().block();
         assertFalse(events.isEmpty());
         assertTrue(events.get(0).getData().contains("El Prat"));
@@ -233,9 +242,14 @@ public class OpenRouterControllerTest {
     void ask_upstream_returns502() {
         OpenRouterController c = new OpenRouterController(new FakeServiceUpstream(), ASSERT_NOT_CALLED_PUBLISHER,
                 ASSERT_NOT_CALLED_UPLOADER, null);
-        Publisher<Event<String>> publisher = c.ask(new AskRequest("Is there a recycling center?"),
-                requestWithCity("testcity"));
-        assertThrows(Exception.class, () -> reactor.core.publisher.Flux.from(publisher).collectList().block());
+        HttpResponse<?> raw = c.ask(new AskRequest("Is there a recycling center?"), requestWithCity("testcity"));
+        assertEquals(502, raw.getStatus().getCode());
+        Object body = raw.getBody().orElseThrow();
+        assertInstanceOf(OpenRouterPublicDto.class, body);
+        OpenRouterPublicDto publicBody = (OpenRouterPublicDto) body;
+        assertNotNull(publicBody);
+        assertFalse(publicBody.isSuccess());
+        assertEquals(OpenRouterErrorCode.UPSTREAM.getCode(), publicBody.getErrorCode());
     }
 
     // -------------------------------------------------------------------------

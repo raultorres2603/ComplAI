@@ -3,7 +3,9 @@ package cat.complai.openrouter.controllers;
 import cat.complai.openrouter.dto.OpenRouterPublicDto;
 import cat.complai.openrouter.dto.OpenRouterResponseDto;
 import cat.complai.openrouter.dto.OpenRouterErrorCode;
+import cat.complai.openrouter.dto.AskStreamResult;
 import cat.complai.openrouter.dto.RedactAcceptedDto;
+import cat.complai.openrouter.helpers.AskStreamErrorMapper;
 import cat.complai.openrouter.helpers.LanguageDetector;
 import cat.complai.openrouter.interfaces.IOpenRouterService;
 import cat.complai.openrouter.controllers.dto.AskRequest;
@@ -65,8 +67,8 @@ public class OpenRouterController {
     }
 
     @Post("/ask")
-    @Produces(MediaType.TEXT_EVENT_STREAM)
-    public Publisher<Event<String>> ask(@Body AskRequest request, HttpRequest<?> httpRequest) {
+        @Produces({ MediaType.TEXT_EVENT_STREAM, MediaType.APPLICATION_JSON })
+        public HttpResponse<?> ask(@Body AskRequest request, HttpRequest<?> httpRequest) {
         String cityId = httpRequest.getAttribute(JwtAuthFilter.CITY_ATTRIBUTE, String.class)
                 .orElseThrow(() -> new IllegalStateException(
                         "city attribute missing from request — JWT filter should have set it"));
@@ -78,9 +80,28 @@ public class OpenRouterController {
 
         String questionText = request != null ? request.getText() : null;
 
-        Publisher<String> eventStream = service.streamAsk(questionText, conversationId, cityId);
+        AskStreamResult streamResult = service.streamAsk(questionText, conversationId, cityId);
+        if (streamResult instanceof AskStreamResult.Error error) {
+            OpenRouterResponseDto dto = error.errorResponse();
+            long latency = System.currentTimeMillis() - start;
+            OpenRouterErrorCode errorCode = dto != null ? dto.getErrorCode() : OpenRouterErrorCode.INTERNAL;
+            AuditLogger.log("/complai/ask",
+                    AuditLogger.hashText(questionText),
+                    errorCode.getCode(), latency, null, null);
+            if (errorCode == OpenRouterErrorCode.UPSTREAM || errorCode == OpenRouterErrorCode.TIMEOUT) {
+                logger.warning(() -> "POST /complai/ask rejected before stream start — conversationId="
+                        + conversationId + " errorCode=" + errorCode + " latencyMs=" + latency
+                        + " upstreamStatus=" + (dto != null ? dto.getStatusCode() : null));
+            } else {
+                logger.log(Level.SEVERE, "POST /complai/ask failed before stream start — conversationId="
+                        + conversationId + " latencyMs=" + latency);
+            }
+            return errorToHttpResponse(dto, "ask");
+        }
 
-        return Flux.from(eventStream)
+        Publisher<String> eventStream = ((AskStreamResult.Success) streamResult).stream();
+
+        Publisher<Event<String>> responseBody = Flux.from(eventStream)
                 .map(Event::of)  // Event stream emits JSON strings; wrap directly without escaping
                 .doOnComplete(() -> {
                     long latency = System.currentTimeMillis() - start;
@@ -92,12 +113,15 @@ public class OpenRouterController {
                 })
                 .doOnError(e -> {
                     long latency = System.currentTimeMillis() - start;
+                    OpenRouterErrorCode errorCode = AskStreamErrorMapper.resolveErrorCode(e);
                     AuditLogger.log("/complai/ask",
                             AuditLogger.hashText(questionText),
-                            OpenRouterErrorCode.INTERNAL.getCode(), latency, null, null);
-                    logger.log(Level.SEVERE, "POST /complai/ask (stream) error — conversationId="
-                            + conversationId + " latencyMs=" + latency, e);
+                            errorCode.getCode(), latency, null, null);
+                    Level logLevel = errorCode == OpenRouterErrorCode.INTERNAL ? Level.SEVERE : Level.WARNING;
+                    logger.log(logLevel, "POST /complai/ask (stream) error — conversationId="
+                            + conversationId + " latencyMs=" + latency + " errorCode=" + errorCode, e);
                 });
+        return HttpResponse.ok(responseBody).contentType(MediaType.TEXT_EVENT_STREAM_TYPE);
     }
 
     @Post("/redact")

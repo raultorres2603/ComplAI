@@ -1,5 +1,9 @@
 package cat.complai.openrouter.controllers;
 
+import cat.complai.http.HttpWrapper;
+import cat.complai.http.OpenRouterStreamingException;
+import cat.complai.http.dto.HttpDto;
+import cat.complai.http.dto.OpenRouterStreamStartResult;
 import cat.complai.openrouter.dto.ComplainantIdentity;
 import cat.complai.openrouter.dto.OpenRouterErrorCode;
 import cat.complai.openrouter.dto.OpenRouterPublicDto;
@@ -38,11 +42,7 @@ import cat.complai.s3.S3PdfUploader;
 import cat.complai.sqs.SqsComplaintPublisher;
 import cat.complai.sqs.dto.RedactSqsMessage;
 
-import cat.complai.http.HttpWrapper;
-import cat.complai.http.dto.HttpDto;
-
 import cat.complai.openrouter.helpers.ProcedureRagHelperRegistry;
-import org.reactivestreams.Publisher;
 import javax.crypto.SecretKey;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -51,6 +51,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.logging.Handler;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -108,7 +111,8 @@ public class OpenRouterControllerIntegrationTest {
 
     @Test
     void integration_ask_success() {
-        // The streaming SSE endpoint is tested via integration_ask_upstream().
+        // The streaming SSE endpoint is covered by the dedicated ask-stream tests
+        // below.
         // Sync ask() is used here to verify service-level correctness with the mock
         // HttpWrapper.
         OpenRouterResponseDto result = openRouterService.ask("Is there a recycling center?", null, "elprat");
@@ -153,19 +157,69 @@ public class OpenRouterControllerIntegrationTest {
 
     @Test
     void integration_ask_upstream() throws Exception {
-        // With SSE streaming, an upstream error causes the stream to error before
-        // emitting data.
-        // Micronaut returns 500 Internal Server Error when the Publisher errors.
-        AskRequest req = new AskRequest("Is there a recycling center? [UPSTREAM]");
+        AskRequest req = new AskRequest("Is there a recycling center? [UPSTREAM_402]");
         HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
                 .header("Authorization", authHeader);
         try {
-            client.toBlocking().exchange(httpReq, String.class);
-            fail("Expected HttpClientResponseException for upstream error");
+            client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
+            fail("Expected HttpClientResponseException for upstream startup error");
         } catch (HttpClientResponseException e) {
-            assertTrue(e.getStatus().getCode() >= 500,
-                    "Expected 5xx for upstream streaming error, got: " + e.getStatus().getCode());
+            assertEquals(502, e.getStatus().getCode());
+            String bodyJson = e.getResponse().getBody(String.class).orElse("{}");
+            JsonNode node = mapper.readTree(bodyJson);
+            assertEquals(OpenRouterErrorCode.UPSTREAM.getCode(), node.path("errorCode").asInt());
+            assertFalse(node.path("success").asBoolean(true));
         }
+    }
+
+    @Test
+    void integration_ask_upstream429_mapsTo502() throws Exception {
+        AskRequest req = new AskRequest("Is there a recycling center? [UPSTREAM_429]");
+        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
+                .header("Authorization", authHeader);
+        try {
+            client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
+            fail("Expected HttpClientResponseException for upstream startup error");
+        } catch (HttpClientResponseException e) {
+            assertEquals(502, e.getStatus().getCode());
+            String bodyJson = e.getResponse().getBody(String.class).orElse("{}");
+            JsonNode node = mapper.readTree(bodyJson);
+            assertEquals(OpenRouterErrorCode.UPSTREAM.getCode(), node.path("errorCode").asInt());
+        }
+    }
+
+    @Test
+    void integration_ask_upstream402_auditLogRecordsUpstreamCode() throws Exception {
+        Logger auditLogger = Logger.getLogger("AuditLogger");
+        List<String> messages = new ArrayList<>();
+        Handler handler = new Handler() {
+            @Override
+            public void publish(LogRecord record) {
+                messages.add(record.getMessage());
+            }
+
+            @Override
+            public void flush() {
+            }
+
+            @Override
+            public void close() {
+            }
+        };
+        auditLogger.addHandler(handler);
+        try {
+            AskRequest req = new AskRequest("Is there a recycling center? [UPSTREAM_402]");
+            HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
+                    .header("Authorization", authHeader);
+            assertThrows(HttpClientResponseException.class,
+                    () -> client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class));
+        } finally {
+            auditLogger.removeHandler(handler);
+        }
+
+        assertTrue(messages.stream().anyMatch(message -> message.contains("\"endpoint\":\"/complai/ask\"")
+                && message.contains("\"errorCode\":3")));
+        assertTrue(messages.stream().noneMatch(message -> message.contains("UPSTREAM_402")));
     }
 
     @Test
@@ -456,7 +510,8 @@ public class OpenRouterControllerIntegrationTest {
 
     @Test
     void integration_ask_streamReceivesAllEventTypes() throws Exception {
-        // Test that /complai/ask SSE stream emits all 4 event types in correct sequence.
+        // Test that /complai/ask SSE stream emits all 4 event types in correct
+        // sequence.
         // We mock the HTTP wrapper to return streaming chunks, and verify the
         // controller properly processes them and emits chunk/sources/done events.
         AskRequest req = new AskRequest("Is there a recycling center? [SSE_MULTIEXENT]");
@@ -475,7 +530,7 @@ public class OpenRouterControllerIntegrationTest {
         List<String> events = new ArrayList<>();
         for (String line : lines) {
             if (line.startsWith("data:")) {
-                events.add(line.substring(5).trim());  // Remove "data:" prefix
+                events.add(line.substring(5).trim()); // Remove "data:" prefix
             }
         }
 
@@ -509,24 +564,24 @@ public class OpenRouterControllerIntegrationTest {
         // Verify done event (last)
         JsonNode lastEvent = mapper.readTree(events.get(events.size() - 1));
         assertEquals("done", lastEvent.path("type").asText());
-        assertTrue(lastEvent.path("conversationId").isNull() || 
-                   !lastEvent.path("conversationId").asText().isEmpty(),
-                   "done event should have conversationId or be null");
+        assertTrue(lastEvent.path("conversationId").isNull() ||
+                !lastEvent.path("conversationId").asText().isEmpty(),
+                "done event should have conversationId or be null");
     }
 
     @Test
     void integration_ask_streamEmitsErrorOnValidationFailure() throws Exception {
         // Test that validation errors are emitted as SSE error events.
-        AskRequest req = new AskRequest("");  // Empty question triggers validation error
+        AskRequest req = new AskRequest(""); // Empty question triggers validation error
         HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
                 .header("Authorization", authHeader);
 
         HttpResponse<String> resp = client.toBlocking().exchange(httpReq, String.class);
-        assertEquals(200, resp.getStatus().getCode());  // Stream initiated
-        
+        assertEquals(200, resp.getStatus().getCode()); // Stream initiated
+
         String streamContent = resp.getBody().orElse("");
         String[] lines = streamContent.split("\n\n");
-        
+
         String errorEventJson = null;
         for (String line : lines) {
             if (line.startsWith("data:")) {
@@ -544,7 +599,7 @@ public class OpenRouterControllerIntegrationTest {
     @Test
     void integration_ask_streamIncludesConversationIdInDoneEvent() throws Exception {
         // Test that the done event includes the conversationId if provided.
-        AskRequest req = new AskRequest("Is there a recycling center? [SSE_MULTIEXENT_CONVID]", 
+        AskRequest req = new AskRequest("Is there a recycling center? [SSE_MULTIEXENT_CONVID]",
                 "test-conversation-xyz");
         HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
                 .header("Authorization", authHeader);
@@ -554,7 +609,7 @@ public class OpenRouterControllerIntegrationTest {
 
         String streamContent = resp.getBody().orElse("");
         String[] lines = streamContent.split("\n\n");
-        
+
         JsonNode doneEvent = null;
         for (String line : lines) {
             if (line.startsWith("data:")) {
@@ -619,6 +674,33 @@ public class OpenRouterControllerIntegrationTest {
         }
 
         assertNotNull(errorEvent, "Expected SSE error event after malformed upstream chunk");
+        assertEquals(OpenRouterErrorCode.UPSTREAM.getCode(), errorEvent.path("errorCode").asInt());
+    }
+
+    @Test
+    void integration_ask_streamUpstreamAfterFirstChunk_emitsSseErrorEvent() throws Exception {
+        AskRequest req = new AskRequest("Is there a recycling center? [SSE_UPSTREAM_AFTER_CHUNK]");
+        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
+                .header("Authorization", authHeader);
+
+        HttpResponse<String> resp = client.toBlocking().exchange(httpReq, String.class);
+        assertEquals(200, resp.getStatus().getCode());
+
+        String streamContent = resp.getBody().orElse("");
+        String[] lines = streamContent.split("\n\n");
+
+        JsonNode errorEvent = null;
+        for (String line : lines) {
+            if (line.startsWith("data:")) {
+                JsonNode event = mapper.readTree(line.substring(5).trim());
+                if ("error".equals(event.path("type").asText())) {
+                    errorEvent = event;
+                    break;
+                }
+            }
+        }
+
+        assertNotNull(errorEvent, "Expected SSE error event after upstream failure");
         assertEquals(OpenRouterErrorCode.UPSTREAM.getCode(), errorEvent.path("errorCode").asInt());
     }
 
@@ -702,52 +784,72 @@ public class OpenRouterControllerIntegrationTest {
             }
 
             @Override
-            public Publisher<String> streamFromOpenRouter(List<Map<String, Object>> messages) {
+            public OpenRouterStreamStartResult streamFromOpenRouter(List<Map<String, Object>> messages) {
                 String userPrompt = messages == null ? null
                         : messages.stream()
                                 .filter(m -> "user".equals(m.get("role")))
                                 .reduce((first, second) -> second)
                                 .map(m -> (String) m.get("content"))
                                 .orElse(null);
-                if (userPrompt != null && userPrompt.contains("[UPSTREAM]")) {
-                    return reactor.core.publisher.Flux.error(new RuntimeException("Upstream error"));
+                if (userPrompt != null && userPrompt.contains("[UPSTREAM_402]")) {
+                    return new OpenRouterStreamStartResult.Error(new OpenRouterStreamingException(
+                            OpenRouterErrorCode.UPSTREAM,
+                            "OpenRouter stream startup failed.",
+                            402));
+                }
+                if (userPrompt != null && userPrompt.contains("[UPSTREAM_429]")) {
+                    return new OpenRouterStreamStartResult.Error(new OpenRouterStreamingException(
+                            OpenRouterErrorCode.UPSTREAM,
+                            "OpenRouter stream startup failed.",
+                            429));
                 }
                 if (userPrompt != null && userPrompt.contains("[REFUSE]")) {
                     String content = "I'm sorry, I can't help with that request because it's not about El Prat de Llobregat.";
-                    return reactor.core.publisher.Flux.just(
+                    return new OpenRouterStreamStartResult.Success(reactor.core.publisher.Flux.just(
                             "data: {\"choices\":[{\"delta\":{\"content\":\"" + content.replace("\"", "\\\"") + "\"}}]}",
-                            "data: [DONE]");
+                            "data: [DONE]"));
                 }
                 if (userPrompt != null && userPrompt.contains("[SSE_MULTIEXENT]")) {
                     // Mock SSE stream with multiple events for testing
                     String chunk1 = "data: {\"choices\":[{\"delta\":{\"content\":\"Response \"}}]}";
                     String chunk2 = "data: {\"choices\":[{\"delta\":{\"content\":\"with sources\"}}]}";
                     String done = "data: [DONE]";
-                    return reactor.core.publisher.Flux.just(chunk1, chunk2, done);
+                    return new OpenRouterStreamStartResult.Success(
+                            reactor.core.publisher.Flux.just(chunk1, chunk2, done));
                 }
                 if (userPrompt != null && userPrompt.contains("[SSE_MULTIEXENT_CONVID]")) {
                     // Same as above
                     String chunk1 = "data: {\"choices\":[{\"delta\":{\"content\":\"Test \"}}]}";
                     String chunk2 = "data: {\"choices\":[{\"delta\":{\"content\":\"response\"}}]}";
                     String done = "data: [DONE]";
-                    return reactor.core.publisher.Flux.just(chunk1, chunk2, done);
+                    return new OpenRouterStreamStartResult.Success(
+                            reactor.core.publisher.Flux.just(chunk1, chunk2, done));
                 }
                 if (userPrompt != null && userPrompt.contains("[SSE_COMMENT_EMPTY]")) {
                     String comment = ": OPENROUTER PROCESSING";
                     String empty = "";
                     String data = "data: {\"choices\":[{\"delta\":{\"content\":\"Heartbeat-safe response\"}}]}";
                     String done = "data: [DONE]";
-                    return reactor.core.publisher.Flux.just(comment, empty, "   ", data, done);
+                    return new OpenRouterStreamStartResult.Success(
+                            reactor.core.publisher.Flux.just(comment, empty, "   ", data, done));
                 }
                 if (userPrompt != null && userPrompt.contains("[SSE_MALFORMED]")) {
                     String chunk1 = "data: {\"choices\":[{\"delta\":{\"content\":\"Before malformed\"}}]}";
                     String malformed = "data: {not-json";
-                    return reactor.core.publisher.Flux.just(chunk1, malformed);
+                    return new OpenRouterStreamStartResult.Success(reactor.core.publisher.Flux.just(chunk1, malformed));
+                }
+                if (userPrompt != null && userPrompt.contains("[SSE_UPSTREAM_AFTER_CHUNK]")) {
+                    String chunk1 = "data: {\"choices\":[{\"delta\":{\"content\":\"Before upstream\"}}]}";
+                    return new OpenRouterStreamStartResult.Success(reactor.core.publisher.Flux.just(chunk1)
+                            .concatWith(reactor.core.publisher.Flux.error(new OpenRouterStreamingException(
+                                    OpenRouterErrorCode.UPSTREAM,
+                                    "OpenRouter streaming failed.",
+                                    null))));
                 }
                 // Default: successful streaming response
-                return reactor.core.publisher.Flux.just(
+                return new OpenRouterStreamStartResult.Success(reactor.core.publisher.Flux.just(
                         "data: {\"choices\":[{\"delta\":{\"content\":\"OK from AI (integration)\"}}]}",
-                        "data: [DONE]");
+                        "data: [DONE]"));
             }
         };
     }

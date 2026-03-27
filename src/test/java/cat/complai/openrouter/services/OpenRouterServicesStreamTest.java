@@ -1,6 +1,9 @@
 package cat.complai.openrouter.services;
 
 import cat.complai.http.HttpWrapper;
+import cat.complai.http.OpenRouterStreamingException;
+import cat.complai.http.dto.OpenRouterStreamStartResult;
+import cat.complai.openrouter.dto.AskStreamResult;
 import cat.complai.openrouter.dto.OpenRouterErrorCode;
 import cat.complai.openrouter.dto.OpenRouterResponseDto;
 import cat.complai.openrouter.dto.Source;
@@ -27,6 +30,7 @@ import java.util.concurrent.CompletableFuture;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
+
 class OpenRouterServicesStreamTest {
 
     private OpenRouterServices service;
@@ -62,8 +66,12 @@ class OpenRouterServicesStreamTest {
                 procedureContextService,
                 promptBuilder,
                 httpWrapper,
-                objectMapper
-        );
+                objectMapper);
+    }
+
+    private List<String> collectStream(AskStreamResult result) {
+        assertInstanceOf(AskStreamResult.Success.class, result);
+        return Flux.from(((AskStreamResult.Success) result).stream()).collectList().block();
     }
 
     @Test
@@ -76,8 +84,7 @@ class OpenRouterServicesStreamTest {
         // Setup RAG with sources
         List<Source> sources = List.of(
                 new Source("http://example.com/proc1", "Procedure 1"),
-                new Source("http://example.com/event1", "Event 1")
-        );
+                new Source("http://example.com/event1", "Event 1"));
         ProcedureContextResult procCtx = new ProcedureContextResult("Procedure context", sources);
 
         when(procedureContextService.questionNeedsProcedureContext(anyString(), anyString()))
@@ -95,12 +102,10 @@ class OpenRouterServicesStreamTest {
         String doneChunk = "data: [DONE]";
 
         when(httpWrapper.streamFromOpenRouter(anyList()))
-                .thenReturn(Flux.just(chunk1, chunk2, doneChunk));
+                .thenReturn(new OpenRouterStreamStartResult.Success(Flux.just(chunk1, chunk2, doneChunk)));
 
         // Execute and collect
-        List<String> emitted = reactor.core.publisher.Flux.from(service.streamAsk("What is a recycling center?", "conv-123", "elprat"))
-                .collectList()
-                .block();
+        List<String> emitted = collectStream(service.streamAsk("What is a recycling center?", "conv-123", "elprat"));
 
         // Verify sequence
         assertEquals(4, emitted.size(), "Should emit 4 events: chunk1, chunk2, sources, done");
@@ -145,12 +150,10 @@ class OpenRouterServicesStreamTest {
         String doneChunk = "data: [DONE]";
 
         when(httpWrapper.streamFromOpenRouter(anyList()))
-                .thenReturn(Flux.just(chunk1, doneChunk));
+                .thenReturn(new OpenRouterStreamStartResult.Success(Flux.just(chunk1, doneChunk)));
 
         // Execute
-        List<String> emitted = reactor.core.publisher.Flux.from(service.streamAsk("Question?", null, "elprat"))
-                .collectList()
-                .block();
+        List<String> emitted = collectStream(service.streamAsk("Question?", null, "elprat"));
 
         // Verify sources event has empty array
         assertEquals(3, emitted.size(), "Should emit 3 events: chunk, sources, done");
@@ -167,9 +170,7 @@ class OpenRouterServicesStreamTest {
         when(validationService.validateQuestion(anyString())).thenReturn(Optional.of(validationError));
 
         // Execute
-        List<String> emitted = reactor.core.publisher.Flux.from(service.streamAsk("", null, "elprat"))
-                .collectList()
-                .block();
+        List<String> emitted = collectStream(service.streamAsk("", null, "elprat"));
 
         // Verify error event
         assertEquals(1, emitted.size());
@@ -180,7 +181,7 @@ class OpenRouterServicesStreamTest {
     }
 
     @Test
-    void streamAsk_OnStreamError_ConvertsExceptionToErrorEvent() throws Exception {
+    void streamAsk_PreStreamUpstream402_ReturnsTypedErrorResult() {
         // Setup
         when(validationService.validateQuestion(anyString())).thenReturn(Optional.empty());
         when(promptBuilder.getSystemMessage(eq("elprat"), anyString())).thenReturn("System");
@@ -195,23 +196,51 @@ class OpenRouterServicesStreamTest {
         when(procedureContextService.buildEventContextResultAsync(anyString(), anyString()))
                 .thenReturn(CompletableFuture.completedFuture(null));
 
-        // Mock stream that fails
+        when(httpWrapper.streamFromOpenRouter(anyList()))
+                .thenReturn(new OpenRouterStreamStartResult.Error(new OpenRouterStreamingException(
+                        OpenRouterErrorCode.UPSTREAM,
+                        "OpenRouter stream startup failed.",
+                        402)));
+
+        AskStreamResult result = service.streamAsk("Question?", null, "elprat");
+
+        assertInstanceOf(AskStreamResult.Error.class, result);
+        OpenRouterResponseDto dto = ((AskStreamResult.Error) result).errorResponse();
+        assertEquals(OpenRouterErrorCode.UPSTREAM, dto.getErrorCode());
+        assertEquals(402, dto.getStatusCode());
+        assertEquals("AI service is temporarily unavailable. Please try again later.", dto.getError());
+    }
+
+    @Test
+    void streamAsk_OnMidStreamUpstreamError_ConvertsExceptionToErrorEvent() throws Exception {
+        when(validationService.validateQuestion(anyString())).thenReturn(Optional.empty());
+        when(promptBuilder.getSystemMessage(eq("elprat"), anyString())).thenReturn("System");
+        when(conversationService.getConversationHistory(anyString())).thenReturn(List.of());
+
+        when(procedureContextService.questionNeedsProcedureContext(anyString(), anyString()))
+                .thenReturn(false);
+        when(procedureContextService.questionNeedsEventContext(anyString(), anyString()))
+                .thenReturn(false);
+        when(procedureContextService.buildProcedureContextResultAsync(anyString(), anyString()))
+                .thenReturn(CompletableFuture.completedFuture(null));
+        when(procedureContextService.buildEventContextResultAsync(anyString(), anyString()))
+                .thenReturn(CompletableFuture.completedFuture(null));
+
         String chunk = "data: {\"choices\":[{\"delta\":{\"content\":\"Test\"}}]}";
         when(httpWrapper.streamFromOpenRouter(anyList()))
-                .thenReturn(Flux.just(chunk)
-                        .concatWith(Flux.error(new RuntimeException("OpenRouter connection failed"))));
+                .thenReturn(new OpenRouterStreamStartResult.Success(Flux.just(chunk)
+                        .concatWith(Flux.error(new OpenRouterStreamingException(
+                                OpenRouterErrorCode.UPSTREAM,
+                                "OpenRouter streaming failed.",
+                                null)))));
 
-        // Execute
-        List<String> emitted = reactor.core.publisher.Flux.from(service.streamAsk("Question?", null, "elprat"))
-                .collectList()
-                .block();
+        List<String> emitted = collectStream(service.streamAsk("Question?", null, "elprat"));
 
-        // Verify error event was emitted
-        assertEquals(2, emitted.size()); // chunk + error event
+        assertEquals(2, emitted.size());
         SseErrorEvent errorEvent = objectMapper.readValue(emitted.get(1), SseErrorEvent.class);
         assertEquals("error", errorEvent.type());
-        assertTrue(errorEvent.error().contains("OpenRouter connection failed"));
         assertEquals(OpenRouterErrorCode.UPSTREAM.getCode(), (int) errorEvent.errorCode());
+        assertEquals("AI service is temporarily unavailable. Please try again later.", errorEvent.error());
     }
 
     @Test
@@ -234,12 +263,10 @@ class OpenRouterServicesStreamTest {
         String done = "data: [DONE]";
 
         when(httpWrapper.streamFromOpenRouter(anyList()))
-                .thenReturn(Flux.just(chunk, done));
+                .thenReturn(new OpenRouterStreamStartResult.Success(Flux.just(chunk, done)));
 
         // Execute
-        List<String> emitted = reactor.core.publisher.Flux.from(service.streamAsk("Q?", "conv-abc-123", "elprat"))
-                .collectList()
-                .block();
+        List<String> emitted = collectStream(service.streamAsk("Q?", "conv-abc-123", "elprat"));
 
         // Verify done event includes conversationId
         assertEquals(3, emitted.size()); // chunk, sources, done
@@ -264,12 +291,11 @@ class OpenRouterServicesStreamTest {
                 .thenReturn(CompletableFuture.completedFuture(null));
 
         when(httpWrapper.streamFromOpenRouter(anyList()))
-                .thenReturn(Flux.just("data: {\"choices\":[{\"delta\":{\"content\":\"x\"}}]}", "data: [DONE]"));
+                .thenReturn(new OpenRouterStreamStartResult.Success(
+                        Flux.just("data: {\"choices\":[{\"delta\":{\"content\":\"x\"}}]}", "data: [DONE]")));
 
         // Execute
-        List<String> emitted = reactor.core.publisher.Flux.from(service.streamAsk("Q", null, "elprat"))
-                .collectList()
-                .block();
+        List<String> emitted = collectStream(service.streamAsk("Q", null, "elprat"));
 
         // Verify all events have correct type field
         for (String eventJson : emitted) {
@@ -295,16 +321,14 @@ class OpenRouterServicesStreamTest {
                 .thenReturn(CompletableFuture.completedFuture(null));
 
         when(httpWrapper.streamFromOpenRouter(anyList()))
-                .thenReturn(Flux.just(
+                .thenReturn(new OpenRouterStreamStartResult.Success(Flux.just(
                         ": OPENROUTER PROCESSING",
                         "",
                         "   ",
                         "data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"}}]}",
-                        "data: [DONE]"));
+                        "data: [DONE]")));
 
-        List<String> emitted = reactor.core.publisher.Flux.from(service.streamAsk("Question?", null, "elprat"))
-                .collectList()
-                .block();
+        List<String> emitted = collectStream(service.streamAsk("Question?", null, "elprat"));
 
         assertEquals(3, emitted.size(), "Should emit chunk, sources, done");
         SseChunkEvent chunkEvent = objectMapper.readValue(emitted.get(0), SseChunkEvent.class);
@@ -328,18 +352,16 @@ class OpenRouterServicesStreamTest {
                 .thenReturn(CompletableFuture.completedFuture(null));
 
         when(httpWrapper.streamFromOpenRouter(anyList()))
-                .thenReturn(Flux.just(
+                .thenReturn(new OpenRouterStreamStartResult.Success(Flux.just(
                         "data: {\"choices\":[{\"delta\":{\"content\":\"Start\"}}]}",
-                        "data: {not-json"));
+                        "data: {not-json")));
 
-        List<String> emitted = reactor.core.publisher.Flux.from(service.streamAsk("Question?", null, "elprat"))
-                .collectList()
-                .block();
+        List<String> emitted = collectStream(service.streamAsk("Question?", null, "elprat"));
 
         assertEquals(2, emitted.size(), "Should emit first chunk and then mapped error event");
         SseErrorEvent errorEvent = objectMapper.readValue(emitted.get(1), SseErrorEvent.class);
         assertEquals("error", errorEvent.type());
         assertEquals(OpenRouterErrorCode.UPSTREAM.getCode(), (int) errorEvent.errorCode());
-        assertTrue(errorEvent.error().toLowerCase().contains("malformed upstream stream"));
+        assertEquals("AI service is temporarily unavailable. Please try again later.", errorEvent.error());
     }
 }

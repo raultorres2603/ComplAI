@@ -1,12 +1,14 @@
 package cat.complai.openrouter.services;
 
 import cat.complai.http.HttpWrapper;
+import cat.complai.http.dto.OpenRouterStreamStartResult;
 import cat.complai.openrouter.services.validation.InputValidationService;
 import cat.complai.openrouter.services.conversation.ConversationManagementService;
 import cat.complai.openrouter.services.ai.AiResponseProcessingService;
 import cat.complai.openrouter.services.procedure.ProcedureContextService;
 import cat.complai.openrouter.services.procedure.ProcedureContextService.ProcedureContextResult;
 import cat.complai.openrouter.interfaces.IOpenRouterService;
+import cat.complai.openrouter.dto.AskStreamResult;
 import cat.complai.openrouter.dto.OpenRouterResponseDto;
 import cat.complai.openrouter.dto.OpenRouterErrorCode;
 import cat.complai.openrouter.dto.Source;
@@ -15,6 +17,7 @@ import cat.complai.openrouter.dto.sse.SseSources;
 import cat.complai.openrouter.dto.sse.SseSourcesEvent;
 import cat.complai.openrouter.dto.sse.SseDoneEvent;
 import cat.complai.openrouter.dto.sse.SseErrorEvent;
+import cat.complai.openrouter.helpers.AskStreamErrorMapper;
 import cat.complai.openrouter.helpers.LanguageDetector;
 import cat.complai.openrouter.helpers.RedactPromptBuilder;
 import cat.complai.openrouter.helpers.SseChunkParser;
@@ -29,7 +32,6 @@ import reactor.core.publisher.Flux;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -349,7 +351,7 @@ public class OpenRouterServices implements IOpenRouterService {
     }
 
     @Override
-    public Publisher<String> streamAsk(String question, String conversationId, String cityId) {
+    public AskStreamResult streamAsk(String question, String conversationId, String cityId) {
         // 1. Validate input — emit error event if invalid
         var validationError = validationService.validateQuestion(question);
         if (validationError.isPresent()) {
@@ -358,10 +360,10 @@ public class OpenRouterServices implements IOpenRouterService {
             try {
                 SseErrorEvent errorEvent = new SseErrorEvent(errorText, OpenRouterErrorCode.VALIDATION.getCode());
                 String json = objectMapper.writeValueAsString(errorEvent);
-                return Flux.just(json);
+                return new AskStreamResult.Success(Flux.just(json));
             } catch (Exception e) {
                 logger.log(Level.SEVERE, "streamAsk() failed to serialize validation error", e);
-                return Flux.error(e);
+                return new AskStreamResult.Error(AskStreamErrorMapper.toResponseDto(e));
             }
         }
 
@@ -425,10 +427,18 @@ public class OpenRouterServices implements IOpenRouterService {
         // Verify objectMapper is not null before proceeding
         if (objectMapper == null) {
             logger.severe("streamAsk() ERROR: objectMapper is null! This should never happen.");
-            return Flux.error(new IllegalStateException("ObjectMapper is not properly injected"));
+            return new AskStreamResult.Error(AskStreamErrorMapper.toResponseDto(
+                    new IllegalStateException("ObjectMapper is not properly injected")));
         }
 
-        return Flux.from(httpWrapper.streamFromOpenRouter(messages))
+        OpenRouterStreamStartResult streamStartResult = httpWrapper.streamFromOpenRouter(messages);
+        if (streamStartResult instanceof OpenRouterStreamStartResult.Error error) {
+            return new AskStreamResult.Error(AskStreamErrorMapper.toResponseDto(error.failure()));
+        }
+
+        Publisher<String> stream = ((OpenRouterStreamStartResult.Success) streamStartResult).stream();
+
+        return new AskStreamResult.Success(Flux.from(stream)
                 .doOnSubscribe(sub -> {
                 }) // Signal subscription start (debugging removed)
                 .handle((raw, sink) -> {
@@ -485,14 +495,14 @@ public class OpenRouterServices implements IOpenRouterService {
                         return Flux.error(e);
                     }
                     try {
-                        SseErrorEvent errorEvent = buildErrorEvent(e);
+                        SseErrorEvent errorEvent = AskStreamErrorMapper.toSseErrorEvent(e);
                         String json = objectMapper.writeValueAsString(errorEvent);
                         return Flux.just(json);
                     } catch (Exception serEx) {
                         logger.log(Level.SEVERE, "streamAsk() failed to serialize streaming error event", serEx);
                         return Flux.empty();
                     }
-                });
+                }));
     }
 
     /**
@@ -521,26 +531,6 @@ public class OpenRouterServices implements IOpenRouterService {
             logger.log(Level.SEVERE, "produceSourcesAndDone() EXCEPTION: Failed to serialize sources or done event", e);
             return Flux.error(e);
         }
-    }
-
-    /**
-     * Maps an exception to an SSE error event with appropriate error code.
-     */
-    private SseErrorEvent buildErrorEvent(Throwable ex) {
-        String message = ex.getMessage() != null ? ex.getMessage() : "Unknown error";
-        OpenRouterErrorCode errorCode = OpenRouterErrorCode.INTERNAL;
-
-        if (ex instanceof TimeoutException) {
-            errorCode = OpenRouterErrorCode.TIMEOUT;
-        } else if (message.toLowerCase().contains("validation")) {
-            errorCode = OpenRouterErrorCode.VALIDATION;
-        } else if (message.toLowerCase().contains("openrouter") || message.toLowerCase().contains("upstream")) {
-            errorCode = OpenRouterErrorCode.UPSTREAM;
-        } else if (message.toLowerCase().contains("malformed upstream stream")) {
-            errorCode = OpenRouterErrorCode.UPSTREAM;
-        }
-
-        return new SseErrorEvent(message, errorCode.getCode());
     }
 
 }
