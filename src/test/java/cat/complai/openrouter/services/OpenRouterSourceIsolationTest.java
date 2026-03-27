@@ -54,7 +54,7 @@ public class OpenRouterSourceIsolationTest {
         ProcedureContextService procedureContextService = new ProcedureContextService(wrapper.ragRegistry,
                 new EventRagHelperRegistry(), new RedactPromptBuilder());
         return new OpenRouterServices(validationService, conversationService, aiResponseService,
-                procedureContextService, new RedactPromptBuilder());
+                procedureContextService, new RedactPromptBuilder(), wrapper);
     }
 
     /**

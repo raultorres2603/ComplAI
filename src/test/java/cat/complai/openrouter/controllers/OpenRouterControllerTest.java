@@ -19,8 +19,11 @@ import cat.complai.sqs.dto.RedactSqsMessage;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.sse.Event;
 import org.junit.jupiter.api.Test;
+import org.reactivestreams.Publisher;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -44,6 +47,11 @@ public class OpenRouterControllerTest {
         public Optional<OpenRouterResponseDto> validateRedactInput(String complaint) {
             return Optional.empty();
         }
+
+        @Override
+        public Publisher<String> streamAsk(String question, String conversationId, String cityId) {
+            return reactor.core.publisher.Flux.just("OK from AI");
+        }
     }
 
     static class FakeServiceRefuse implements IOpenRouterService {
@@ -61,6 +69,11 @@ public class OpenRouterControllerTest {
         public Optional<OpenRouterResponseDto> validateRedactInput(String complaint) {
             return Optional.empty();
         }
+
+        @Override
+        public Publisher<String> streamAsk(String question, String conversationId, String cityId) {
+            return reactor.core.publisher.Flux.just("Request is not about El Prat de Llobregat.");
+        }
     }
 
     static class FakeServiceUpstream implements IOpenRouterService {
@@ -77,6 +90,11 @@ public class OpenRouterControllerTest {
 
         public Optional<OpenRouterResponseDto> validateRedactInput(String complaint) {
             return Optional.empty();
+        }
+
+        @Override
+        public Publisher<String> streamAsk(String question, String conversationId, String cityId) {
+            return reactor.core.publisher.Flux.error(new RuntimeException("Missing OPENROUTER_API_KEY"));
         }
     }
 
@@ -100,6 +118,11 @@ public class OpenRouterControllerTest {
             }
             return Optional.empty();
         }
+
+        @Override
+        public Publisher<String> streamAsk(String question, String conversationId, String cityId) {
+            return reactor.core.publisher.Flux.empty();
+        }
     }
 
     static class FakeServiceRequestsIdentity implements IOpenRouterService {
@@ -116,6 +139,11 @@ public class OpenRouterControllerTest {
 
         public Optional<OpenRouterResponseDto> validateRedactInput(String complaint) {
             return Optional.empty();
+        }
+
+        @Override
+        public Publisher<String> streamAsk(String question, String conversationId, String cityId) {
+            return reactor.core.publisher.Flux.empty();
         }
     }
 
@@ -175,30 +203,31 @@ public class OpenRouterControllerTest {
     void ask_success_returns200() {
         OpenRouterController c = new OpenRouterController(new FakeServiceSuccess(), ASSERT_NOT_CALLED_PUBLISHER,
                 ASSERT_NOT_CALLED_UPLOADER, null);
-        HttpResponse<OpenRouterPublicDto> resp = c.ask(new AskRequest("Is there a recycling center?"),
+        Publisher<Event<String>> publisher = c.ask(new AskRequest("Is there a recycling center?"),
                 requestWithCity("testcity"));
-        assertEquals(200, resp.getStatus().getCode());
-        assertTrue(resp.getBody().get().isSuccess());
-        assertEquals("OK from AI", resp.getBody().get().getMessage());
+        List<Event<String>> events = reactor.core.publisher.Flux.from(publisher).collectList().block();
+        assertFalse(events.isEmpty());
+        assertEquals("OK from AI", events.get(0).getData());
     }
 
     @Test
     void ask_refuse_returns422() {
         OpenRouterController c = new OpenRouterController(new FakeServiceRefuse(), ASSERT_NOT_CALLED_PUBLISHER,
                 ASSERT_NOT_CALLED_UPLOADER, null);
-        HttpResponse<OpenRouterPublicDto> resp = c.ask(new AskRequest("What's the capital of France?"),
+        Publisher<Event<String>> publisher = c.ask(new AskRequest("What's the capital of France?"),
                 requestWithCity("testcity"));
-        assertEquals(422, resp.getStatus().getCode());
-        assertFalse(resp.getBody().get().isSuccess());
+        List<Event<String>> events = reactor.core.publisher.Flux.from(publisher).collectList().block();
+        assertFalse(events.isEmpty());
+        assertTrue(events.get(0).getData().contains("El Prat"));
     }
 
     @Test
     void ask_upstream_returns502() {
         OpenRouterController c = new OpenRouterController(new FakeServiceUpstream(), ASSERT_NOT_CALLED_PUBLISHER,
                 ASSERT_NOT_CALLED_UPLOADER, null);
-        HttpResponse<OpenRouterPublicDto> resp = c.ask(new AskRequest("Is there a recycling center?"),
+        Publisher<Event<String>> publisher = c.ask(new AskRequest("Is there a recycling center?"),
                 requestWithCity("testcity"));
-        assertEquals(502, resp.getStatus().getCode());
+        assertThrows(Exception.class, () -> reactor.core.publisher.Flux.from(publisher).collectList().block());
     }
 
     // -------------------------------------------------------------------------

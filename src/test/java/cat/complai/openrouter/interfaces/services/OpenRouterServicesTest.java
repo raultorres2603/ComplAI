@@ -42,7 +42,7 @@ public class OpenRouterServicesTest {
         ProcedureContextService procedureContextService = new ProcedureContextService(wrapper.ragRegistry,
                 new EventRagHelperRegistry(), new RedactPromptBuilder());
         return new OpenRouterServices(validationService, conversationService, aiResponseService,
-                procedureContextService, new RedactPromptBuilder());
+                procedureContextService, new RedactPromptBuilder(), wrapper);
     }
 
     // Flexible fake wrapper that simulates all test scenarios based on the last
@@ -253,7 +253,7 @@ public class OpenRouterServicesTest {
         ProcedureContextService procedureContextService = new ProcedureContextService(wrapper.ragRegistry,
                 new EventRagHelperRegistry(), new RedactPromptBuilder());
         OpenRouterServices svc = new OpenRouterServices(validationService, conversationService, aiResponseService,
-                procedureContextService, new RedactPromptBuilder());
+                procedureContextService, new RedactPromptBuilder(), wrapper);
 
         OpenRouterResponseDto out = svc.redactComplaint("   ", OutputFormat.JSON, null, null, "testcity");
         assertFalse(out.isSuccess());

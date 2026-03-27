@@ -42,6 +42,7 @@ import cat.complai.http.HttpWrapper;
 import cat.complai.http.dto.HttpDto;
 
 import cat.complai.openrouter.helpers.ProcedureRagHelperRegistry;
+import org.reactivestreams.Publisher;
 import javax.crypto.SecretKey;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -108,39 +109,23 @@ public class OpenRouterControllerIntegrationTest {
 
     @Test
     void integration_ask_success() {
-        AskRequest req = new AskRequest("Is there a recycling center?");
-        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
-                .header("Authorization", authHeader);
-        HttpResponse<OpenRouterPublicDto> resp = client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
-        assertEquals(200, resp.getStatus().getCode());
-        Optional<OpenRouterPublicDto> bodyOpt = resp.getBody();
-        assertTrue(bodyOpt.isPresent());
-        OpenRouterPublicDto body = bodyOpt.get();
-        assertTrue(body.isSuccess());
-        assertEquals("OK from AI (integration)", body.getMessage());
+        // The streaming SSE endpoint is tested via integration_ask_upstream().
+        // Sync ask() is used here to verify service-level correctness with the mock
+        // HttpWrapper.
+        OpenRouterResponseDto result = openRouterService.ask("Is there a recycling center?", null, "elprat");
+        assertTrue(result.isSuccess());
+        assertEquals("OK from AI (integration)", result.getMessage());
     }
 
     @Test
     void integration_ask_includesSources_whenProceduresMatch() throws Exception {
-        // Prepare fake procedures with URLs
-        // Since we can't inject procedures via the public API, we rely on the mock
-        // HttpWrapper
-        // to simulate a scenario where the AI would receive procedure context.
-        AskRequest req = new AskRequest("recycling center");
-        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
-                .header("Authorization", authHeader);
-        HttpResponse<OpenRouterPublicDto> resp = client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
-        assertEquals(200, resp.getStatus().getCode());
-        Optional<OpenRouterPublicDto> bodyOpt = resp.getBody();
-        assertTrue(bodyOpt.isPresent());
-        OpenRouterPublicDto body = bodyOpt.get();
-        assertTrue(body.isSuccess());
-        assertEquals("OK from AI (integration)", body.getMessage());
-        // In this test setup, no real procedures are loaded, so sources should be
-        // empty.
-        // This test ensures the field is present and does not error.
-        assertNotNull(body.getSources());
-        assertTrue(body.getSources().isEmpty());
+        // Sources are included in the sync ask() response DTO.
+        // Tested at service level — the SSE stream does not carry sources metadata.
+        OpenRouterResponseDto result = openRouterService.ask("recycling center", null, "elprat");
+        assertTrue(result.isSuccess());
+        assertEquals("OK from AI (integration)", result.getMessage());
+        assertNotNull(result.getSources());
+        assertTrue(result.getSources().isEmpty());
     }
 
     @Test
@@ -159,35 +144,28 @@ public class OpenRouterControllerIntegrationTest {
 
     @Test
     void integration_ask_refusal() throws Exception {
-        AskRequest req = new AskRequest("Tell me about France [REFUSE]");
-        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
-                .header("Authorization", authHeader);
-        try {
-            client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
-            fail("Expected HttpClientResponseException for 422");
-        } catch (HttpClientResponseException e) {
-            assertEquals(422, e.getStatus().getCode());
-            String bodyJson = e.getResponse().getBody(String.class).orElse("{}");
-            JsonNode node = mapper.readTree(bodyJson);
-            assertNotNull(node);
-            assertEquals(OpenRouterErrorCode.REFUSAL.getCode(), node.path("errorCode").asInt());
-        }
+        // Refusal detection runs through AiResponseProcessingService in the sync ask()
+        // path.
+        // Tested at service level with the mock HttpWrapper.
+        OpenRouterResponseDto result = openRouterService.ask("Tell me about France [REFUSE]", null, "elprat");
+        assertFalse(result.isSuccess());
+        assertEquals(OpenRouterErrorCode.REFUSAL, result.getErrorCode());
     }
 
     @Test
     void integration_ask_upstream() throws Exception {
+        // With SSE streaming, an upstream error causes the stream to error before
+        // emitting data.
+        // Micronaut returns 500 Internal Server Error when the Publisher errors.
         AskRequest req = new AskRequest("Is there a recycling center? [UPSTREAM]");
         HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
                 .header("Authorization", authHeader);
         try {
-            client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
-            fail("Expected HttpClientResponseException for 502");
+            client.toBlocking().exchange(httpReq, String.class);
+            fail("Expected HttpClientResponseException for upstream error");
         } catch (HttpClientResponseException e) {
-            assertEquals(502, e.getStatus().getCode());
-            String bodyJson = e.getResponse().getBody(String.class).orElse("{}");
-            JsonNode node = mapper.readTree(bodyJson);
-            assertNotNull(node);
-            assertEquals(OpenRouterErrorCode.UPSTREAM.getCode(), node.path("errorCode").asInt());
+            assertTrue(e.getStatus().getCode() >= 500,
+                    "Expected 5xx for upstream streaming error, got: " + e.getStatus().getCode());
         }
     }
 
@@ -324,49 +302,24 @@ public class OpenRouterControllerIntegrationTest {
     @Test
     void integration_ask_withProcedureMatches_limitsToProcedureMax() throws Exception {
         // Test that procedure context building respects MAX_RESULTS = 3 limit.
-        // This is a full HTTP integration test with mock HttpWrapper.
-        // The service will call RAG search, which is limited to 3 results at Lucene
-        // level.
-
-        // Using a broad query that would match multiple procedures in a real scenario
-        AskRequest req = new AskRequest("How do I apply for any permit or license at the municipal center?");
-        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
-                .header("Authorization", authHeader);
-        HttpResponse<OpenRouterPublicDto> resp = client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
-
-        assertEquals(200, resp.getStatus().getCode(), "Expected successful response");
-        Optional<OpenRouterPublicDto> bodyOpt = resp.getBody();
-        assertTrue(bodyOpt.isPresent());
-        OpenRouterPublicDto body = bodyOpt.get();
-        assertTrue(body.isSuccess());
-
-        // Verify sources list is present and respects limits
-        assertNotNull(body.getSources());
-        assertTrue(body.getSources().size() <= 3,
+        // Tested at service level — sync ask() returns sources metadata in the DTO.
+        OpenRouterResponseDto result = openRouterService.ask(
+                "How do I apply for any permit or license at the municipal center?", null, "elprat");
+        assertTrue(result.isSuccess(), "Expected successful response");
+        assertNotNull(result.getSources());
+        assertTrue(result.getSources().size() <= 3,
                 "Procedure context should contain at most 3 sources");
     }
 
     @Test
     void integration_ask_withEventMatches_limitsToEventMax() throws Exception {
         // Test that event context building respects MAX_RESULTS = 3 limit.
-        // The service will call RAG search, which is limited to 3 results at Lucene
-        // level.
-
-        // Using a broad query that would match multiple events
-        AskRequest req = new AskRequest("What events and activities are happening in the coming weeks?");
-        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
-                .header("Authorization", authHeader);
-        HttpResponse<OpenRouterPublicDto> resp = client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
-
-        assertEquals(200, resp.getStatus().getCode(), "Expected successful response");
-        Optional<OpenRouterPublicDto> bodyOpt = resp.getBody();
-        assertTrue(bodyOpt.isPresent());
-        OpenRouterPublicDto body = bodyOpt.get();
-        assertTrue(body.isSuccess());
-
-        // Verify sources list is present and respects limits
-        assertNotNull(body.getSources());
-        assertTrue(body.getSources().size() <= 3,
+        // Tested at service level — sync ask() returns sources metadata in the DTO.
+        OpenRouterResponseDto result = openRouterService.ask(
+                "What events and activities are happening in the coming weeks?", null, "elprat");
+        assertTrue(result.isSuccess(), "Expected successful response");
+        assertNotNull(result.getSources());
+        assertTrue(result.getSources().size() <= 3,
                 "Event context should contain at most 3 sources");
     }
 
@@ -578,6 +531,29 @@ public class OpenRouterControllerIntegrationTest {
                 // Fallback: simulate a generic successful redact response
                 return CompletableFuture.completedFuture(new HttpDto("Redacted (integration)", 200, "POST", null));
             }
+
+            @Override
+            public Publisher<String> streamFromOpenRouter(List<Map<String, Object>> messages) {
+                String userPrompt = messages == null ? null
+                        : messages.stream()
+                                .filter(m -> "user".equals(m.get("role")))
+                                .reduce((first, second) -> second)
+                                .map(m -> (String) m.get("content"))
+                                .orElse(null);
+                if (userPrompt != null && userPrompt.contains("[UPSTREAM]")) {
+                    return reactor.core.publisher.Flux.error(new RuntimeException("Upstream error"));
+                }
+                if (userPrompt != null && userPrompt.contains("[REFUSE]")) {
+                    String content = "I'm sorry, I can't help with that request because it's not about El Prat de Llobregat.";
+                    return reactor.core.publisher.Flux.just(
+                            "data: {\"choices\":[{\"delta\":{\"content\":\"" + content.replace("\"", "\\\"") + "\"}}]}",
+                            "data: [DONE]");
+                }
+                // Default: successful streaming response
+                return reactor.core.publisher.Flux.just(
+                        "data: {\"choices\":[{\"delta\":{\"content\":\"OK from AI (integration)\"}}]}",
+                        "data: [DONE]");
+            }
         };
     }
 
@@ -617,7 +593,7 @@ public class OpenRouterControllerIntegrationTest {
                     new ProcedureRagHelperRegistry(), new EventRagHelperRegistry(),
                     new cat.complai.openrouter.helpers.RedactPromptBuilder());
             return new OpenRouterServices(validationService, conversationService, aiResponseService,
-                    procedureContextService, new cat.complai.openrouter.helpers.RedactPromptBuilder());
+                    procedureContextService, new cat.complai.openrouter.helpers.RedactPromptBuilder(), httpWrapper);
         }
 
         @Singleton
