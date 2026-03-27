@@ -3,11 +3,18 @@ package cat.complai.openrouter.interfaces;
 import cat.complai.openrouter.dto.ComplainantIdentity;
 import cat.complai.openrouter.dto.OpenRouterResponseDto;
 import cat.complai.openrouter.dto.OutputFormat;
+import org.reactivestreams.Publisher;
 
 import java.util.Optional;
 
 public interface IOpenRouterService {
     OpenRouterResponseDto ask(String question, String conversationId, String cityId);
+
+    /**
+     * Streams an answer to {@code question} as raw text deltas via SSE.
+     * After the stream completes, the assembled response is saved to conversation history.
+     */
+    Publisher<String> streamAsk(String question, String conversationId, String cityId);
 
     /**
      * Validates a redact complaint input at the boundary (null/blank, length, anonymity).

@@ -1,5 +1,6 @@
 package cat.complai.openrouter.services;
 
+import cat.complai.http.HttpWrapper;
 import cat.complai.openrouter.services.validation.InputValidationService;
 import cat.complai.openrouter.services.conversation.ConversationManagementService;
 import cat.complai.openrouter.services.ai.AiResponseProcessingService;
@@ -8,11 +9,14 @@ import cat.complai.openrouter.services.procedure.ProcedureContextService.Procedu
 import cat.complai.openrouter.interfaces.IOpenRouterService;
 import cat.complai.openrouter.dto.OpenRouterResponseDto;
 import cat.complai.openrouter.dto.Source;
+import cat.complai.openrouter.helpers.LanguageDetector;
 import cat.complai.openrouter.helpers.RedactPromptBuilder;
+import cat.complai.openrouter.helpers.SseChunkParser;
 import cat.complai.openrouter.dto.ComplainantIdentity;
 import cat.complai.openrouter.dto.OutputFormat;
 import jakarta.inject.Singleton;
 import jakarta.inject.Inject;
+import org.reactivestreams.Publisher;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -29,6 +33,7 @@ public class OpenRouterServices implements IOpenRouterService {
     private final AiResponseProcessingService aiResponseService;
     private final ProcedureContextService procedureContextService;
     private final RedactPromptBuilder promptBuilder;
+    private final HttpWrapper httpWrapper;
 
     /**
      * Estimates token count for text using OpenAI's rule of thumb: ~1 token per 4
@@ -79,12 +84,14 @@ public class OpenRouterServices implements IOpenRouterService {
             ConversationManagementService conversationService,
             AiResponseProcessingService aiResponseService,
             ProcedureContextService procedureContextService,
-            RedactPromptBuilder promptBuilder) {
+            RedactPromptBuilder promptBuilder,
+            HttpWrapper httpWrapper) {
         this.validationService = validationService;
         this.conversationService = conversationService;
         this.aiResponseService = aiResponseService;
         this.procedureContextService = procedureContextService;
         this.promptBuilder = promptBuilder;
+        this.httpWrapper = httpWrapper;
     }
 
     // -------------------------------------------------------------------------
@@ -110,7 +117,8 @@ public class OpenRouterServices implements IOpenRouterService {
         }
 
         List<Map<String, Object>> messages = new ArrayList<>();
-        messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage(cityId)));
+        String detectedLanguage = cat.complai.openrouter.helpers.LanguageDetector.detect(question);
+        messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage(cityId, detectedLanguage)));
 
         // Parallelize RAG searches for procedure and event context
         // Start both searches concurrently to reduce latency
@@ -325,6 +333,71 @@ public class OpenRouterServices implements IOpenRouterService {
         }
 
         return processedResponse;
+    }
+
+    @Override
+    public Publisher<String> streamAsk(String question, String conversationId, String cityId) {
+        // 1. Validate input
+        var validationError = validationService.validateQuestion(question);
+        if (validationError.isPresent()) {
+            String errorText = validationError.get().getError();
+            return reactor.core.publisher.Flux.just(errorText != null ? errorText : "Invalid input.");
+        }
+
+        // 2. Single-language system message + RAG (same pattern as ask())
+        String detectedLanguage = LanguageDetector.detect(question);
+        List<Map<String, Object>> messages = new ArrayList<>();
+        messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage(cityId, detectedLanguage)));
+
+        // 3. Parallelize RAG — blocking join is acceptable (Lucene in-memory, fast)
+        CompletableFuture<ProcedureContextResult> procFuture =
+                procedureContextService.questionNeedsProcedureContext(question, cityId)
+                        ? procedureContextService.buildProcedureContextResultAsync(question, cityId)
+                        : CompletableFuture.completedFuture(null);
+        CompletableFuture<ProcedureContextService.EventContextResult> eventFuture =
+                procedureContextService.questionNeedsEventContext(question, cityId)
+                        ? procedureContextService.buildEventContextResultAsync(question, cityId)
+                        : CompletableFuture.completedFuture(null);
+
+        ProcedureContextResult procCtx = null;
+        ProcedureContextService.EventContextResult eventCtx = null;
+        try {
+            CompletableFuture.allOf(procFuture, eventFuture).join();
+            procCtx = procFuture.get();
+            eventCtx = eventFuture.get();
+        } catch (Exception e) {
+            logger.log(Level.WARNING, "streamAsk() RAG failed — conversationId=" + conversationId, e);
+        }
+
+        if (procCtx != null && procCtx.getContextBlock() != null)
+            messages.add(Map.of("role", "system", "content", procCtx.getContextBlock()));
+        if (eventCtx != null && eventCtx.getContextBlock() != null)
+            messages.add(Map.of("role", "system", "content", eventCtx.getContextBlock()));
+
+        var history = conversationService.getConversationHistory(conversationId);
+        conversationService.addToMessages(messages, history);
+        messages.add(Map.of("role", "user", "content", question != null ? question.trim() : ""));
+
+        // 4. Stream — accumulate full text as side effect for conversation history
+        final String capturedQuestion = question;
+        final String capturedCityId = cityId;
+        final String capturedConvId = conversationId;
+        final StringBuilder assembled = new StringBuilder();
+
+        return reactor.core.publisher.Flux.from(httpWrapper.streamFromOpenRouter(messages))
+                .map(SseChunkParser::parseDelta)
+                .filter(delta -> delta != null && !delta.isEmpty())
+                .doOnNext(assembled::append)
+                .doOnComplete(() -> {
+                    String fullText = assembled.toString();
+                    if (capturedConvId != null && !capturedConvId.isBlank() && !fullText.isBlank()) {
+                        conversationService.updateConversationHistory(capturedConvId, capturedQuestion, fullText);
+                    }
+                    logger.info(() -> "streamAsk() completed — conversationId=" + capturedConvId
+                            + " assembledLength=" + fullText.length() + " city=" + capturedCityId);
+                })
+                .doOnError(e -> logger.log(Level.SEVERE,
+                        "streamAsk() OpenRouter stream error — conversationId=" + capturedConvId, e));
     }
 
 }

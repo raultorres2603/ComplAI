@@ -28,7 +28,10 @@ import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.sse.Event;
 import jakarta.inject.Inject;
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
 
 import java.time.Instant;
 import java.util.List;
@@ -62,42 +65,39 @@ public class OpenRouterController {
     }
 
     @Post("/ask")
-    public HttpResponse<OpenRouterPublicDto> ask(@Body AskRequest request, HttpRequest<?> httpRequest) {
+    @Produces(MediaType.TEXT_EVENT_STREAM)
+    public Publisher<Event<String>> ask(@Body AskRequest request, HttpRequest<?> httpRequest) {
         String cityId = httpRequest.getAttribute(JwtAuthFilter.CITY_ATTRIBUTE, String.class)
                 .orElseThrow(() -> new IllegalStateException(
                         "city attribute missing from request — JWT filter should have set it"));
         String conversationId = request != null ? request.getConversationId() : null;
         int inputLength = request != null && request.getText() != null ? request.getText().length() : 0;
-        logger.info(() -> "POST /complai/ask received — conversationId=" + conversationId + " inputLength="
-                + inputLength + " city=" + cityId);
+        logger.info(() -> "POST /complai/ask (stream) received — conversationId=" + conversationId
+                + " inputLength=" + inputLength + " city=" + cityId);
         long start = System.currentTimeMillis();
-        try {
-            OpenRouterResponseDto dto;
-            if (request != null) {
-                dto = service.ask(request.getText(), request.getConversationId(), cityId);
-            } else {
-                dto = null;
-            }
-            long latency = System.currentTimeMillis() - start;
-            AuditLogger.log("/complai/ask", AuditLogger.hashText(request != null ? request.getText() : null),
-                    dto != null ? dto.getErrorCode().getCode() : -1, latency, null, null);
-            MutableHttpResponse<OpenRouterPublicDto> response = errorToHttpResponse(dto, "ask");
-            logger.info(() -> "POST /complai/ask completed — httpStatus=" + response.status().getCode()
-                    + " errorCode=" + (dto != null ? dto.getErrorCode() : "null")
-                    + " latencyMs=" + latency + " conversationId=" + conversationId);
-            return response;
-        } catch (Exception e) {
-            long latency = System.currentTimeMillis() - start;
-            AuditLogger.log("/complai/ask",
-                    AuditLogger.hashText(request != null ? request.getText() : null),
-                    OpenRouterErrorCode.INTERNAL.getCode(), latency, null, null);
-            logger.log(Level.SEVERE, "POST /complai/ask failed — httpStatus=500"
-                    + " latencyMs=" + latency + " conversationId=" + conversationId, e);
-            OpenRouterPublicDto err = new OpenRouterPublicDto(false, null,
-                    "An internal error occurred. Please try again later.",
-                    OpenRouterErrorCode.INTERNAL.getCode(), List.of());
-            return HttpResponse.serverError(err);
-        }
+
+        String questionText = request != null ? request.getText() : null;
+
+        Publisher<String> deltaStream = service.streamAsk(questionText, conversationId, cityId);
+
+        return Flux.from(deltaStream)
+                .map(Event::of)
+                .doOnComplete(() -> {
+                    long latency = System.currentTimeMillis() - start;
+                    AuditLogger.log("/complai/ask",
+                            AuditLogger.hashText(questionText),
+                            OpenRouterErrorCode.NONE.getCode(), latency, null, null);
+                    logger.info(() -> "POST /complai/ask (stream) completed — conversationId="
+                            + conversationId + " latencyMs=" + latency);
+                })
+                .doOnError(e -> {
+                    long latency = System.currentTimeMillis() - start;
+                    AuditLogger.log("/complai/ask",
+                            AuditLogger.hashText(questionText),
+                            OpenRouterErrorCode.INTERNAL.getCode(), latency, null, null);
+                    logger.log(Level.SEVERE, "POST /complai/ask (stream) error — conversationId="
+                            + conversationId + " latencyMs=" + latency, e);
+                });
     }
 
     @Post("/redact")

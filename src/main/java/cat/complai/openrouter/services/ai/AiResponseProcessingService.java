@@ -57,9 +57,10 @@ public class AiResponseProcessingService {
         // Extract the actual user question from messages for category detection
         String userQuestion = extractUserQuestion(messages);
         QuestionCategory category = QuestionCategoryDetector.detectCategory(userQuestion);
+        int questionHash = hashQuestion(userQuestion);
 
-        // Build cache key: cityId + context hashes + category (no user query text!)
-        ResponseCacheKey cacheKey = new ResponseCacheKey(cityId, procContextHash, eventContextHash, category);
+        // Build cache key: cityId + context hashes + category + question hash (no raw user query text!)
+        ResponseCacheKey cacheKey = new ResponseCacheKey(cityId, procContextHash, eventContextHash, category, questionHash);
 
         // Check cache first
         Optional<String> cachedResponse = responseCacheService.getCachedResponse(cacheKey);
@@ -72,16 +73,22 @@ public class AiResponseProcessingService {
         logger.fine(() -> "CACHE MISS — Calling OpenRouter for " + cacheKey);
         OpenRouterResponseDto response = callOpenRouterInternal(messages, cityId);
 
-        // Cache successful responses only when RAG context is present.
-        // When both hashes are 0, the response depends entirely on the question text,
-        // which is not part of the cache key — caching these would return wrong answers
-        // for different questions that share the same (city, 0, 0, category) key.
-        boolean hasRagContext = procContextHash != 0 || eventContextHash != 0;
-        if (response.isSuccess() && response.getMessage() != null && hasRagContext) {
+        // Cache all successful responses — the questionHash field in the cache key ensures
+        // that different questions with identical city/hashes/category are not confused.
+        if (response.isSuccess() && response.getMessage() != null) {
             responseCacheService.cacheResponse(cacheKey, response.getMessage());
         }
 
         return response;
+    }
+
+    /**
+     * Normalizes and hashes a question for use in the cache key.
+     * One-way hash: the raw question text is never stored in the cache key.
+     */
+    private static int hashQuestion(String question) {
+        if (question == null || question.isBlank()) return 0;
+        return question.strip().toLowerCase(java.util.Locale.ROOT).hashCode();
     }
 
     /**

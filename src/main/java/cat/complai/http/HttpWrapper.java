@@ -16,6 +16,8 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.reactivestreams.Publisher;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -354,6 +356,31 @@ public class HttpWrapper {
         } catch (Exception e) {
             return "https://openrouter.ai";
         }
+    }
+
+    /**
+     * Streams a chat completion response from OpenRouter using Server-Sent Events.
+     * Each emission is one raw SSE line (e.g. {@code data: {...}} or {@code data: [DONE]}).
+     *
+     * @param messages the full messages list (system + history + user)
+     * @return reactive stream of raw SSE lines
+     */
+    public Publisher<String> streamFromOpenRouter(List<Map<String, Object>> messages) {
+        String authValue = resolveAuthHeader();
+        if (authValue == null) {
+            logger.warning("streamFromOpenRouter — OPENROUTER_API_KEY is not configured");
+            return reactor.core.publisher.Flux.error(new IllegalStateException("Missing OPENROUTER_API_KEY"));
+        }
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("model", openRouterModel);
+        payload.put("messages", messages);
+        payload.put("stream", true);
+
+        return openRouterClient.streamChatCompletions(
+                payload,
+                authValue,
+                headers.getOrDefault("HTTP-Referer", "https://complai.cat"),
+                headers.getOrDefault("X-Title", "Complai"));
     }
 }
 // Timeout is configurable via OPENROUTER_REQUEST_TIMEOUT_SECONDS (default 60s).
