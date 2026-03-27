@@ -431,18 +431,18 @@ public class OpenRouterServices implements IOpenRouterService {
         return Flux.from(httpWrapper.streamFromOpenRouter(messages))
                 .doOnSubscribe(sub -> {
                 }) // Signal subscription start (debugging removed)
-                .filter(raw -> !raw.contains("[DONE]")) // Filter out [DONE] sentinel BEFORE parsing
-                .map(raw -> {
-                    // Parse the delta safely - returns "" for empty/unparseable
-                    try {
-                        String parsed = SseChunkParser.parseDelta(raw);
-                        return parsed;
-                    } catch (Exception parseErr) {
-                        logger.warning("Failed to parse delta: " + parseErr.getMessage());
-                        return "";
+                .handle((raw, sink) -> {
+                    SseChunkParser.ParseResult parsed = SseChunkParser.parseLine(raw);
+                    if (parsed.state() == SseChunkParser.ParseState.MALFORMED) {
+                        sink.error(new IllegalStateException("Malformed upstream stream chunk"));
+                        return;
+                    }
+                    if (parsed.state() == SseChunkParser.ParseState.DELTA && parsed.delta() != null
+                            && !parsed.delta().isEmpty()) {
+                        sink.next(parsed.delta());
                     }
                 })
-                .filter(delta -> delta != null && !delta.isEmpty())
+                .cast(String.class)
                 .doOnNext(delta -> {
                     assembled.append(delta);
                     hasEmitted.set(true);
@@ -535,6 +535,8 @@ public class OpenRouterServices implements IOpenRouterService {
         } else if (message.toLowerCase().contains("validation")) {
             errorCode = OpenRouterErrorCode.VALIDATION;
         } else if (message.toLowerCase().contains("openrouter") || message.toLowerCase().contains("upstream")) {
+            errorCode = OpenRouterErrorCode.UPSTREAM;
+        } else if (message.toLowerCase().contains("malformed upstream stream")) {
             errorCode = OpenRouterErrorCode.UPSTREAM;
         }
 

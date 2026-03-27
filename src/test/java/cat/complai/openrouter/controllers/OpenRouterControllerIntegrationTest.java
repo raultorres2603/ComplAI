@@ -570,6 +570,58 @@ public class OpenRouterControllerIntegrationTest {
                 "done event should include the provided conversationId");
     }
 
+    @Test
+    void integration_ask_streamIgnoresCommentAndEmptyFrames() throws Exception {
+        AskRequest req = new AskRequest("Is there a recycling center? [SSE_COMMENT_EMPTY]");
+        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
+                .header("Authorization", authHeader);
+
+        HttpResponse<String> resp = client.toBlocking().exchange(httpReq, String.class);
+        assertEquals(200, resp.getStatus().getCode());
+
+        String streamContent = resp.getBody().orElse("");
+        String[] lines = streamContent.split("\n\n");
+
+        List<JsonNode> events = new ArrayList<>();
+        for (String line : lines) {
+            if (line.startsWith("data:")) {
+                events.add(mapper.readTree(line.substring(5).trim()));
+            }
+        }
+
+        assertTrue(events.size() >= 3, "Expected chunk + sources + done events");
+        assertEquals("chunk", events.get(0).path("type").asText());
+        assertEquals("Heartbeat-safe response", events.get(0).path("content").asText());
+        assertEquals("done", events.get(events.size() - 1).path("type").asText());
+    }
+
+    @Test
+    void integration_ask_streamMalformedAfterFirstChunk_emitsSseErrorEvent() throws Exception {
+        AskRequest req = new AskRequest("Is there a recycling center? [SSE_MALFORMED]");
+        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
+                .header("Authorization", authHeader);
+
+        HttpResponse<String> resp = client.toBlocking().exchange(httpReq, String.class);
+        assertEquals(200, resp.getStatus().getCode());
+
+        String streamContent = resp.getBody().orElse("");
+        String[] lines = streamContent.split("\n\n");
+
+        JsonNode errorEvent = null;
+        for (String line : lines) {
+            if (line.startsWith("data:")) {
+                JsonNode event = mapper.readTree(line.substring(5).trim());
+                if ("error".equals(event.path("type").asText())) {
+                    errorEvent = event;
+                    break;
+                }
+            }
+        }
+
+        assertNotNull(errorEvent, "Expected SSE error event after malformed upstream chunk");
+        assertEquals(OpenRouterErrorCode.UPSTREAM.getCode(), errorEvent.path("errorCode").asInt());
+    }
+
     @MockBean(HttpWrapper.class)
     @Replaces(HttpWrapper.class)
     HttpWrapper openRouterHttpWrapper() {
@@ -679,6 +731,18 @@ public class OpenRouterControllerIntegrationTest {
                     String chunk2 = "data: {\"choices\":[{\"delta\":{\"content\":\"response\"}}]}";
                     String done = "data: [DONE]";
                     return reactor.core.publisher.Flux.just(chunk1, chunk2, done);
+                }
+                if (userPrompt != null && userPrompt.contains("[SSE_COMMENT_EMPTY]")) {
+                    String comment = ": OPENROUTER PROCESSING";
+                    String empty = "";
+                    String data = "data: {\"choices\":[{\"delta\":{\"content\":\"Heartbeat-safe response\"}}]}";
+                    String done = "data: [DONE]";
+                    return reactor.core.publisher.Flux.just(comment, empty, "   ", data, done);
+                }
+                if (userPrompt != null && userPrompt.contains("[SSE_MALFORMED]")) {
+                    String chunk1 = "data: {\"choices\":[{\"delta\":{\"content\":\"Before malformed\"}}]}";
+                    String malformed = "data: {not-json";
+                    return reactor.core.publisher.Flux.just(chunk1, malformed);
                 }
                 // Default: successful streaming response
                 return reactor.core.publisher.Flux.just(

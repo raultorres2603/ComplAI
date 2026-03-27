@@ -60,4 +60,16 @@ class SseChunkParserTest {
         String line = "  data: {\"choices\":[{\"delta\":{\"content\":\"World\"},\"finish_reason\":null}]}";
         assertEquals("World", SseChunkParser.parseDelta(line));
     }
+
+    @Test
+    void parseLine_commentFrame_isIgnored() {
+        SseChunkParser.ParseResult result = SseChunkParser.parseLine(": OPENROUTER PROCESSING");
+        assertEquals(SseChunkParser.ParseState.IGNORE, result.state());
+    }
+
+    @Test
+    void parseLine_malformedData_isMarkedMalformed() {
+        SseChunkParser.ParseResult result = SseChunkParser.parseLine("data: {invalid-json");
+        assertEquals(SseChunkParser.ParseState.MALFORMED, result.state());
+    }
 }

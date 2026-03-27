@@ -278,4 +278,68 @@ class OpenRouterServicesStreamTest {
             assertTrue(eventJson.contains("\"type\":"));
         }
     }
+
+    @Test
+    void streamAsk_ignoresCommentAndEmptyChunks() throws Exception {
+        when(validationService.validateQuestion(anyString())).thenReturn(Optional.empty());
+        when(promptBuilder.getSystemMessage(eq("elprat"), anyString())).thenReturn("System");
+        when(conversationService.getConversationHistory(anyString())).thenReturn(List.of());
+
+        when(procedureContextService.questionNeedsProcedureContext(anyString(), anyString()))
+                .thenReturn(false);
+        when(procedureContextService.questionNeedsEventContext(anyString(), anyString()))
+                .thenReturn(false);
+        when(procedureContextService.buildProcedureContextResultAsync(anyString(), anyString()))
+                .thenReturn(CompletableFuture.completedFuture(null));
+        when(procedureContextService.buildEventContextResultAsync(anyString(), anyString()))
+                .thenReturn(CompletableFuture.completedFuture(null));
+
+        when(httpWrapper.streamFromOpenRouter(anyList()))
+                .thenReturn(Flux.just(
+                        ": OPENROUTER PROCESSING",
+                        "",
+                        "   ",
+                        "data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"}}]}",
+                        "data: [DONE]"));
+
+        List<String> emitted = reactor.core.publisher.Flux.from(service.streamAsk("Question?", null, "elprat"))
+                .collectList()
+                .block();
+
+        assertEquals(3, emitted.size(), "Should emit chunk, sources, done");
+        SseChunkEvent chunkEvent = objectMapper.readValue(emitted.get(0), SseChunkEvent.class);
+        assertEquals("chunk", chunkEvent.type());
+        assertEquals("Hi", chunkEvent.content());
+    }
+
+    @Test
+    void streamAsk_malformedChunk_afterData_emitsMappedErrorEvent() throws Exception {
+        when(validationService.validateQuestion(anyString())).thenReturn(Optional.empty());
+        when(promptBuilder.getSystemMessage(eq("elprat"), anyString())).thenReturn("System");
+        when(conversationService.getConversationHistory(anyString())).thenReturn(List.of());
+
+        when(procedureContextService.questionNeedsProcedureContext(anyString(), anyString()))
+                .thenReturn(false);
+        when(procedureContextService.questionNeedsEventContext(anyString(), anyString()))
+                .thenReturn(false);
+        when(procedureContextService.buildProcedureContextResultAsync(anyString(), anyString()))
+                .thenReturn(CompletableFuture.completedFuture(null));
+        when(procedureContextService.buildEventContextResultAsync(anyString(), anyString()))
+                .thenReturn(CompletableFuture.completedFuture(null));
+
+        when(httpWrapper.streamFromOpenRouter(anyList()))
+                .thenReturn(Flux.just(
+                        "data: {\"choices\":[{\"delta\":{\"content\":\"Start\"}}]}",
+                        "data: {not-json"));
+
+        List<String> emitted = reactor.core.publisher.Flux.from(service.streamAsk("Question?", null, "elprat"))
+                .collectList()
+                .block();
+
+        assertEquals(2, emitted.size(), "Should emit first chunk and then mapped error event");
+        SseErrorEvent errorEvent = objectMapper.readValue(emitted.get(1), SseErrorEvent.class);
+        assertEquals("error", errorEvent.type());
+        assertEquals(OpenRouterErrorCode.UPSTREAM.getCode(), (int) errorEvent.errorCode());
+        assertTrue(errorEvent.error().toLowerCase().contains("malformed upstream stream"));
+    }
 }
