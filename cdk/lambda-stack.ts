@@ -144,7 +144,7 @@ export class LambdaStack extends cdk.Stack {
       // our CDK HttpApi integration.
       handler: 'io.micronaut.function.aws.proxy.payload2.APIGatewayV2HTTPEventFunction::handleRequest',
       code,
-      memorySize: 1024,
+      memorySize: 2048,
       timeout: cdk.Duration.seconds(60),
       // Wire the OpenRouter API key (from CFN parameter) into the Lambda environment.
       // Be aware that environment variables are visible in the Lambda console; using
