@@ -4,7 +4,6 @@ import cat.complai.http.dto.HttpDto;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import io.micronaut.context.annotation.Value;
-import io.micronaut.http.HttpRequest;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
@@ -51,7 +50,6 @@ public class HttpWrapper {
 
     // HttpClient and ObjectMapper are fields to allow injection and easier testing
     private final OpenRouterClient openRouterClient;
-    private final StreamingHttpClient streamingClient;
     private final HttpClient rawStreamingHttpClient;
     private final Scheduler streamScheduler;
     private final ObjectMapper mapper;
@@ -69,7 +67,6 @@ public class HttpWrapper {
     protected HttpWrapper() {
         this.openRouterUrl = "";
         this.openRouterClient = null; // Will be null for test instances
-        this.streamingClient = null;
         this.rawStreamingHttpClient = HttpClient.newBuilder().build();
         this.streamScheduler = Schedulers.newSingle("openrouter-stream-test");
         this.mapper = new ObjectMapper();
@@ -88,7 +85,6 @@ public class HttpWrapper {
             @Value("${OPENROUTER_MODEL:openrouter/free}") String openRouterModel,
             @Value("${OPENROUTER_MAX_RETRIES:3}") int maxRetries) {
         this.openRouterClient = openRouterClient;
-        this.streamingClient = streamingClient;
         this.openRouterUrl = normalizeOpenRouterBaseUrl(openRouterUrl);
         this.requestTimeoutSeconds = (requestTimeoutSeconds > 0) ? requestTimeoutSeconds : 20; // fallback to 20s if
                                                                                                   // invalid
