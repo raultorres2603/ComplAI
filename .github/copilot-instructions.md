@@ -1,7 +1,7 @@
 # ComplAI - Project Instructions & Tech Stack
 
 ## Tech Stack
-- **Backend Framework**: Java 21 with Micronaut
+- **Backend Framework**: Java 25 with Micronaut
 - **Build Tool**: Gradle
 - **Infrastructure as Code (IaC)**: AWS CDK (TypeScript)
 - **AWS Services**: SQS (Worker Poller, Complaint Publisher), S3 (PDF Uploader), Lambda

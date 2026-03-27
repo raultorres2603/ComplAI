@@ -50,14 +50,14 @@ dependencies {
 
 
 java {
-    // Ensure Gradle compiles with Java 21 for both toolchain and source/target compatibility.
-    // This makes the build deterministic and matches the Lambda runtime (JAVA_21).
+    // Ensure Gradle compiles with Java 25 for both toolchain and source/target compatibility.
+    // This makes the build deterministic and matches the Lambda runtime (java25).
     toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(25)
     }
 
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
 }
 
 
