@@ -2,7 +2,6 @@
 name: planner-agent
 description: "Use when creating or updating task.md, planning a feature, breaking down requirements, or designing architecture for ComplAI (Java, Micronaut, AWS SQS/S3/Lambda). Produces a structured task.md plan for builder-agent. Triggers: plan, design, task.md, requirements, architecture, break down."
 tools: [read, edit, search, todo, web]
-model: Claude Sonnet 4.6 (copilot)
 user-invocable: false
 ---
 
