@@ -10,6 +10,8 @@ import * as logs from 'aws-cdk-lib/aws-logs';
 import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
 import { DeploymentEnvironment } from './deployment-environment';
 
+const JAVA_25 = new lambda.Runtime('java25', lambda.RuntimeFamily.JAVA);
+
 export interface LambdaStackProps extends cdk.StackProps {
   // Identifies which environment this stack owns. Every AWS resource is suffixed
   // with this value so the two stacks can coexist in the same AWS account without
@@ -133,7 +135,8 @@ export class LambdaStack extends cdk.Stack {
     });
 
     const lambdaFn = new lambda.Function(this, `ComplAILambda-${environment}`, {
-      runtime: lambda.Runtime.JAVA_21,
+      runtime: JAVA_25,
+      architecture: lambda.Architecture.ARM_64,
       // The project uses the Micronaut APIGateway V2 runtime; use the Micronaut
       // APIGateway v2 HTTP event function handler which the Micronaut build
       // packages in the shadow JAR.
@@ -142,9 +145,7 @@ export class LambdaStack extends cdk.Stack {
       handler: 'io.micronaut.function.aws.proxy.payload2.APIGatewayV2HTTPEventFunction::handleRequest',
       code,
       memorySize: 1024,
-      snapStart: lambda.SnapStartConf.ON_PUBLISHED_VERSIONS,
       timeout: cdk.Duration.seconds(60),
-      // Enable SnapStart with CRaC for cold start optimization
       // Wire the OpenRouter API key (from CFN parameter) into the Lambda environment.
       // Be aware that environment variables are visible in the Lambda console; using
       // Secrets Manager or SSM Parameter Store with encryption is more secure if available.
@@ -182,7 +183,6 @@ export class LambdaStack extends cdk.Stack {
         // is bundled in oidc-mapping.json — enabled per city, no env var needed.
         // The worker Lambda does not receive JWT_SECRET and therefore never loads the
         // OidcIdentityTokenValidator bean.
-        JAVA_TOOL_OPTIONS: '--add-modules=jdk.incubator.vector',
         RATE_LIMIT_REQUESTS_PER_MINUTE: process.env.RATE_LIMIT_REQUESTS_PER_MINUTE || '20'
 
       },
@@ -252,16 +252,15 @@ export class LambdaStack extends cdk.Stack {
     });
 
     const workerFn = new lambda.Function(this, `ComplAIRedactorLambda-${environment}`, {
-      runtime: lambda.Runtime.JAVA_21,
+      runtime: JAVA_25,
+      architecture: lambda.Architecture.ARM_64,
       // Same shadow JAR, different handler class — no separate build needed.
       handler: 'cat.complai.worker.RedactWorkerHandler::handleRequest',
       code,
       memorySize: 1024,
-      snapStart: lambda.SnapStartConf.ON_PUBLISHED_VERSIONS,
       // Must be ≤ SQS visibility timeout (90s). Lambda extends visibility automatically
       // while running, so using the same duration is the safest choice here.
       timeout: cdk.Duration.seconds(60),
-      // Enable SnapStart with CRaC for cold start optimization
       environment: {
         OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '',
         OPENROUTER_REQUEST_TIMEOUT_SECONDS: process.env.OPENROUTER_REQUEST_TIMEOUT_SECONDS || '60',
@@ -282,28 +281,26 @@ export class LambdaStack extends cdk.Stack {
         // Response caching configuration for OpenRouter API responses
         RESPONSE_CACHE_ENABLED: process.env.RESPONSE_CACHE_ENABLED || 'true',
         RESPONSE_CACHE_TTL_MINUTES: process.env.RESPONSE_CACHE_TTL_MINUTES || '10',
-        RESPONSE_CACHE_MAX_ENTRIES: process.env.RESPONSE_CACHE_MAX_ENTRIES || '500',
-        JAVA_TOOL_OPTIONS: '--add-modules=jdk.incubator.vector'
+        RESPONSE_CACHE_MAX_ENTRIES: process.env.RESPONSE_CACHE_MAX_ENTRIES || '500'
       },
       role: workerRole,
       logGroup: workerLogGroup
     });
 
     const feedbackWorkerFn = new lambda.Function(this, `ComplAIFeedbackWorkerLambda-${environment}`, {
-      runtime: lambda.Runtime.JAVA_21,
+      runtime: JAVA_25,
+      architecture: lambda.Architecture.ARM_64,
       // Handler must match the feedback worker: FeedbackWorkerHandler::handleRequest
       handler: 'cat.complai.feedback.worker.FeedbackWorkerHandler::handleRequest',
       code,
       memorySize: 512,  // Feedback processing is lighter than AI redaction
-      snapStart: lambda.SnapStartConf.ON_PUBLISHED_VERSIONS,
       timeout: cdk.Duration.seconds(60),
       // Feedback worker environment
       environment: {
         FEEDBACK_QUEUE_URL: feedbackQueue.queueUrl,
         FEEDBACK_BUCKET_NAME: feedbackBucket.bucketName,
         FEEDBACK_QUEUE_REGION: this.region,
-        ...(process.env.AWS_ENDPOINT_URL ? { AWS_ENDPOINT_URL: process.env.AWS_ENDPOINT_URL } : {}),
-        JAVA_TOOL_OPTIONS: '--add-modules=jdk.incubator.vector'
+        ...(process.env.AWS_ENDPOINT_URL ? { AWS_ENDPOINT_URL: process.env.AWS_ENDPOINT_URL } : {})
       },
       role: feedbackWorkerRole,
       logGroup: feedbackWorkerLogGroup

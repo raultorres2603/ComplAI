@@ -28,13 +28,12 @@ Globals:
   Function:
     Timeout: 60
     MemorySize: 1024
-    Runtime: java21
+    Runtime: java25
     Environment:
       Variables:
         OPENROUTER_API_KEY: !Ref OpenRouterApiKey
         AWS_ENDPOINT_URL: "http://localhost:4566"
         COMPLAINTS_REGION: !Ref LambdaRegion
-        JAVA_TOOL_OPTIONS: "--add-modules=jdk.incubator.vector"
 
 Resources:
   ComplAILambdaRole:
@@ -199,7 +198,8 @@ Resources:
     Properties:
       CodeUri: ../build/libs/complai-all.jar
       Handler: io.micronaut.function.aws.proxy.payload2.APIGatewayV2HTTPEventFunction::handleRequest
-      Runtime: java21
+      Runtime: java25
+      Architectures: [arm64]
       MemorySize: 1024
       Timeout: 60
       Role: !GetAtt ComplAILambdaRole.Arn
@@ -219,10 +219,7 @@ Resources:
           FEEDBACK_QUEUE_REGION: !Ref LambdaRegion
           COMPLAINTS_BUCKET: !Ref ComplaintsBucket
           COMPLAINTS_REGION: !Ref LambdaRegion
-          JAVA_TOOL_OPTIONS: "--add-modules=jdk.incubator.vector -XX:+UnlockDiagnosticVMOptions -XX:+EnableVectorReboxing"
-      # Enable SnapStart with CRaC for cold start optimization
-      SnapStart:
-        ApplyOn: PublishedVersions
+
       Events:
         ProxyRoot:
           Type: HttpApi
@@ -240,7 +237,8 @@ Resources:
     Properties:
       CodeUri: ../build/libs/complai-all.jar
       Handler: cat.complai.worker.RedactWorkerHandler::handleRequest
-      Runtime: java21
+      Runtime: java25
+      Architectures: [arm64]
       MemorySize: 1024
       Timeout: 60
       Role: !GetAtt ComplAIWorkerRole.Arn
@@ -256,10 +254,6 @@ Resources:
           PROCEDURES_BUCKET: !Ref ProceduresBucket
           PROCEDURES_REGION: !Ref LambdaRegion
           AWS_ENDPOINT_URL: "http://host.docker.internal:4566"
-          JAVA_TOOL_OPTIONS: "--add-modules=jdk.incubator.vector -XX:+UnlockDiagnosticVMOptions -XX:+EnableVectorReboxing"
-      # Enable SnapStart with CRaC for cold start optimization
-      SnapStart:
-        ApplyOn: PublishedVersions
       Events:
         SQSTrigger:
           Type: SQS
@@ -274,7 +268,8 @@ Resources:
     Properties:
       CodeUri: ../build/libs/complai-all.jar
       Handler: cat.complai.feedback.worker.FeedbackWorkerHandler::handleRequest
-      Runtime: java21
+      Runtime: java25
+      Architectures: [arm64]
       MemorySize: 512
       Timeout: 60
       Role: !GetAtt ComplAIWorkerRole.Arn
@@ -284,7 +279,6 @@ Resources:
           FEEDBACK_BUCKET_NAME: !Ref FeedbackBucket
           FEEDBACK_QUEUE_REGION: !Ref LambdaRegion
           AWS_ENDPOINT_URL: "http://host.docker.internal:4566"
-          JAVA_TOOL_OPTIONS: "--add-modules=jdk.incubator.vector"
       Events:
         SQSTrigger:
           Type: SQS
