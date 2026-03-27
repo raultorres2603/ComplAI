@@ -371,12 +371,12 @@ public class OpenRouterServices implements IOpenRouterService {
         messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage(cityId, detectedLanguage)));
 
         // 3. Parallelize RAG — blocking join is acceptable (Lucene in-memory, fast)
-        CompletableFuture<ProcedureContextResult> procFuture =
-                procedureContextService.questionNeedsProcedureContext(question, cityId)
+        CompletableFuture<ProcedureContextResult> procFuture = procedureContextService
+                .questionNeedsProcedureContext(question, cityId)
                         ? procedureContextService.buildProcedureContextResultAsync(question, cityId)
                         : CompletableFuture.completedFuture(null);
-        CompletableFuture<ProcedureContextService.EventContextResult> eventFuture =
-                procedureContextService.questionNeedsEventContext(question, cityId)
+        CompletableFuture<ProcedureContextService.EventContextResult> eventFuture = procedureContextService
+                .questionNeedsEventContext(question, cityId)
                         ? procedureContextService.buildEventContextResultAsync(question, cityId)
                         : CompletableFuture.completedFuture(null);
 
@@ -417,8 +417,10 @@ public class OpenRouterServices implements IOpenRouterService {
         final String capturedCityId = cityId;
         final String capturedConvId = conversationId;
         final StringBuilder assembled = new StringBuilder();
+        final java.util.concurrent.atomic.AtomicBoolean hasEmitted = new java.util.concurrent.atomic.AtomicBoolean(false);
 
-        logger.fine(() -> "streamAsk() preparing to stream — conversationId=" + capturedConvId + " sources=" + allSources.size());
+        logger.fine(() -> "streamAsk() preparing to stream — conversationId=" + capturedConvId + " sources="
+                + allSources.size());
 
         // Verify objectMapper is not null before proceeding
         if (objectMapper == null) {
@@ -427,8 +429,9 @@ public class OpenRouterServices implements IOpenRouterService {
         }
 
         return Flux.from(httpWrapper.streamFromOpenRouter(messages))
-                .doOnSubscribe(sub -> {})  // Signal subscription start (debugging removed)
-                .filter(raw -> !raw.contains("[DONE]"))  // Filter out [DONE] sentinel BEFORE parsing
+                .doOnSubscribe(sub -> {
+                }) // Signal subscription start (debugging removed)
+                .filter(raw -> !raw.contains("[DONE]")) // Filter out [DONE] sentinel BEFORE parsing
                 .map(raw -> {
                     // Parse the delta safely - returns "" for empty/unparseable
                     try {
@@ -442,6 +445,7 @@ public class OpenRouterServices implements IOpenRouterService {
                 .filter(delta -> delta != null && !delta.isEmpty())
                 .doOnNext(delta -> {
                     assembled.append(delta);
+                    hasEmitted.set(true);
                     logger.fine(() -> "streamAsk() chunk delta processed");
                 })
                 .map(delta -> {
@@ -469,16 +473,24 @@ public class OpenRouterServices implements IOpenRouterService {
                     logger.info(() -> "streamAsk() completed — conversationId=" + capturedConvId
                             + " assembledLength=" + fullText.length() + " city=" + capturedCityId);
                 })
+                .doOnError(e -> {
+                    logger.log(Level.SEVERE, "streamAsk() error during streaming — conversationId=" + capturedConvId,
+                            e);
+                })
                 .onErrorResume(e -> {
-                    // Convert exception to error event JSON
+                    // Only convert to SSE error event if data has already been emitted.
+                    // If nothing was emitted yet, let the error propagate so Micronaut
+                    // can return an HTTP 5xx response (no headers committed yet).
+                    if (!hasEmitted.get()) {
+                        return Flux.error(e);
+                    }
                     try {
                         SseErrorEvent errorEvent = buildErrorEvent(e);
-                        String errorJson = objectMapper.writeValueAsString(errorEvent);
-                        logger.log(Level.SEVERE, "streamAsk() error — conversationId=" + capturedConvId, e);
-                        return Flux.just(errorJson);
-                    } catch (Exception serializationError) {
-                        logger.log(Level.SEVERE, "Failed to serialize error event", serializationError);
-                        return Flux.error(serializationError);
+                        String json = objectMapper.writeValueAsString(errorEvent);
+                        return Flux.just(json);
+                    } catch (Exception serEx) {
+                        logger.log(Level.SEVERE, "streamAsk() failed to serialize streaming error event", serEx);
+                        return Flux.empty();
                     }
                 });
     }

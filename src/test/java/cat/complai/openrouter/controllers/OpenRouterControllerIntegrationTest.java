@@ -479,6 +479,12 @@ public class OpenRouterControllerIntegrationTest {
             }
         }
 
+        // Debug: Print all received events
+        System.out.println("DEBUG: Number of events received: " + events.size());
+        for (int i = 0; i < events.size(); i++) {
+            System.out.println("DEBUG: Event " + i + ": " + events.get(i));
+        }
+
         // Should have at least 3 events: chunk(s), sources, done
         assertTrue(events.size() >= 3, "Expected at least 3 SSE events, got " + events.size());
 
