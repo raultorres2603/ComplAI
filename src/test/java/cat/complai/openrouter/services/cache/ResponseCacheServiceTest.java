@@ -109,6 +109,7 @@ class ResponseCacheServiceTest {
         assertFalse(cacheService.getCachedResponse(key1).isPresent());
         assertFalse(cacheService.getCachedResponse(key2).isPresent());
         assertTrue(cacheService.getCachedResponse(key3).isPresent(), "Other city should not be affected");
+        assertEquals(2, cacheService.getStats().invalidationCount());
     }
 
     @Test
@@ -124,6 +125,7 @@ class ResponseCacheServiceTest {
 
         assertFalse(cacheService.getCachedResponse(key1).isPresent());
         assertFalse(cacheService.getCachedResponse(key2).isPresent());
+        assertEquals(2, cacheService.getStats().invalidationCount());
     }
 
     @Test
@@ -134,11 +136,15 @@ class ResponseCacheServiceTest {
         cacheService.cacheResponse(key, "Response");
         cacheService.getCachedResponse(key); // Cache hit
         cacheService.getCachedResponse(new ResponseCacheKey("testcity", 999, 999, QuestionCategory.OTHER, 0)); // Cache
-                                                                                                            // miss
+                                                                                                               // miss
 
-        Object stats = cacheService.getStats();
+        ResponseCacheService.CacheStatsSnapshot stats = cacheService.getStats();
 
-        assertNotNull(stats, "Cache stats should be available when caching is enabled");
+        assertTrue(stats.enabled());
+        assertEquals(1, stats.hitCount());
+        assertEquals(1, stats.missCount());
+        assertEquals(1, stats.putCount());
+        assertEquals(1, stats.estimatedSize());
     }
 
     @Test
@@ -163,6 +169,8 @@ class ResponseCacheServiceTest {
         Optional<String> retrieved = disabledCache.getCachedResponse(key);
 
         assertFalse(retrieved.isPresent(), "Cache should be disabled");
+        assertFalse(disabledCache.getStats().enabled());
+        assertEquals(0, disabledCache.getStats().putCount());
     }
 
     @Test
@@ -213,6 +221,7 @@ class ResponseCacheServiceTest {
         // asserting the exact size limit is respected
         assertTrue(finalSize > 0, "Cache should have entries after adding items");
         assertTrue(finalSize >= 5, "Cache should have at least the max entries or more due to timing");
+        assertTrue(smallCache.getStats().putCount() >= 10);
     }
 
     @Test

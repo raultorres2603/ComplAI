@@ -65,18 +65,19 @@ public class AiResponseProcessingService {
         // Check cache first
         Optional<String> cachedResponse = responseCacheService.getCachedResponse(cacheKey);
         if (cachedResponse.isPresent()) {
-            logger.info(() -> "CACHE HIT — Using cached response for " + cacheKey);
+            logCacheObservation("CACHE HIT", cacheKey);
             return new OpenRouterResponseDto(true, cachedResponse.get(), null, 200, OpenRouterErrorCode.NONE);
         }
 
         // Cache miss: call OpenRouter
-        logger.fine(() -> "CACHE MISS — Calling OpenRouter for " + cacheKey);
+        logCacheObservation("CACHE MISS", cacheKey);
         OpenRouterResponseDto response = callOpenRouterInternal(messages, cityId);
 
         // Cache all successful responses — the questionHash field in the cache key ensures
         // that different questions with identical city/hashes/category are not confused.
         if (response.isSuccess() && response.getMessage() != null) {
             responseCacheService.cacheResponse(cacheKey, response.getMessage());
+            logCacheObservation("CACHE STORE", cacheKey);
         }
 
         return response;
@@ -291,5 +292,17 @@ public class AiResponseProcessingService {
         }
 
         return false;
+    }
+
+    private void logCacheObservation(String event, ResponseCacheKey cacheKey) {
+        ResponseCacheService.CacheStatsSnapshot stats = responseCacheService.getStats();
+        logger.fine(() -> event + " — key=" + cacheKey
+                + " enabled=" + stats.enabled()
+                + " hits=" + stats.hitCount()
+                + " misses=" + stats.missCount()
+                + " puts=" + stats.putCount()
+                + " evictions=" + stats.evictionCount()
+                + " invalidations=" + stats.invalidationCount()
+                + " size=" + stats.estimatedSize());
     }
 }

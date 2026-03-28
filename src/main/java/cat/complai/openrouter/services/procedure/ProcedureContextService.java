@@ -10,19 +10,53 @@ import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 @Singleton
 public class ProcedureContextService {
 
+    private static final Set<String> TITLE_STOP_WORDS = Set.of(
+        "a", "an", "and", "d", "de", "del", "el", "els", "en", "for", "i", "la", "las",
+        "les", "lo", "los", "of", "the", "y");
+
+    private static final List<String> PROCEDURE_KEYWORDS = List.of(
+        "how to", "how do i", "what is the process", "procedure", "tramit", "tràmit",
+        "requirement", "requirements", "document", "documents", "apply", "application",
+        "form", "forms", "permit", "license", "request", "complaint", "claim",
+        "where can i", "how can i", "steps", "step by step", "process",
+        "recycling", "waste", "garbage", "trash", "center", "collection");
+
+    private static final List<String> MUNICIPAL_SERVICE_KEYWORDS = List.of(
+        "ajuntament", "city hall", "municipal", "council");
+
+    private static final List<String> EVENT_KEYWORDS = List.of(
+        "event", "events", "agenda", "activity", "activities", "activitat", "activitats",
+        "festival", "concert", "exhibition", "exposició", "theater", "teatre",
+        "cinema", "sports", "esports", "culture", "cultura", "celebration", "celebració",
+        "what's on", "what's happening", "què passa", "agenda cultural", "program",
+        "this weekend", "upcoming");
+
+    private static final List<String> CONVERSATIONAL_SHORT_CIRCUITS = List.of(
+        "hello", "hi", "hey", "good morning", "good afternoon", "good evening",
+        "hola", "bon dia", "bona tarda", "how are you", "what is the weather", "weather",
+        "tell me a joke", "who are you", "what's your name", "thank you", "thanks");
+
     private final ProcedureRagHelperRegistry ragRegistry;
     private final EventRagHelperRegistry eventRagRegistry;
     private final RedactPromptBuilder promptBuilder;
     private final Logger logger = Logger.getLogger(ProcedureContextService.class.getName());
+    private final ConcurrentHashMap<String, CityDetectionIndex> detectionIndexByCity = new ConcurrentHashMap<>();
 
     @Inject
     public ProcedureContextService(ProcedureRagHelperRegistry ragRegistry, EventRagHelperRegistry eventRagRegistry,
@@ -76,53 +110,146 @@ public class ProcedureContextService {
         }
     }
 
+    public static final class ContextRequirements {
+        private static final ContextRequirements NONE = new ContextRequirements(false, false);
+
+        private final boolean needsProcedureContext;
+        private final boolean needsEventContext;
+
+        public ContextRequirements(boolean needsProcedureContext, boolean needsEventContext) {
+            this.needsProcedureContext = needsProcedureContext;
+            this.needsEventContext = needsEventContext;
+        }
+
+        public static ContextRequirements none() {
+            return NONE;
+        }
+
+        public boolean needsProcedureContext() {
+            return needsProcedureContext;
+        }
+
+        public boolean needsEventContext() {
+            return needsEventContext;
+        }
+    }
+
+    private record CityDetectionIndex(TitleMatcher procedureMatcher, TitleMatcher eventMatcher,
+            int procedureTitleCount, int eventTitleCount) {
+    }
+
+    private static final class TitleMatcher {
+        private final Map<String, List<String>> titlesByToken;
+        private final List<String> fallbackTitles;
+
+        private TitleMatcher(Map<String, List<String>> titlesByToken, List<String> fallbackTitles) {
+            this.titlesByToken = titlesByToken;
+            this.fallbackTitles = fallbackTitles;
+        }
+
+        private static TitleMatcher fromTitles(List<String> normalizedTitles) {
+            Map<String, LinkedHashSet<String>> byToken = new LinkedHashMap<>();
+            List<String> fallbackTitles = new ArrayList<>();
+
+            for (String normalizedTitle : normalizedTitles) {
+                Set<String> tokens = tokenize(normalizedTitle);
+                if (tokens.isEmpty()) {
+                    fallbackTitles.add(normalizedTitle);
+                    continue;
+                }
+                for (String token : tokens) {
+                    byToken.computeIfAbsent(token, ignored -> new LinkedHashSet<>()).add(normalizedTitle);
+                }
+            }
+
+            Map<String, List<String>> immutableIndex = new LinkedHashMap<>();
+            byToken.forEach((token, titles) -> immutableIndex.put(token, List.copyOf(titles)));
+            return new TitleMatcher(Map.copyOf(immutableIndex), List.copyOf(fallbackTitles));
+        }
+
+        private boolean matches(String normalizedQuestion) {
+            if (normalizedQuestion == null || normalizedQuestion.isBlank()) {
+                return false;
+            }
+
+            LinkedHashSet<String> candidates = new LinkedHashSet<>();
+            for (String token : tokenize(normalizedQuestion)) {
+                List<String> titles = titlesByToken.get(token);
+                if (titles != null) {
+                    candidates.addAll(titles);
+                }
+            }
+
+            if (candidates.isEmpty()) {
+                candidates.addAll(fallbackTitles);
+            }
+
+            for (String candidate : candidates) {
+                if (normalizedQuestion.contains(candidate)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
     /**
      * Determines if a question likely needs procedure/municipal information.
      * This avoids expensive RAG searches for conversational queries.
      * Checks against actual procedure titles for more accurate detection.
      */
     public boolean questionNeedsProcedureContext(String question, String cityId) {
-        if (question == null || question.isBlank())
-            return false;
+        return detectContextRequirements(question, cityId).needsProcedureContext();
+    }
 
-        String lower = question.toLowerCase();
-
-        // First, check against actual procedure titles for this city (most accurate)
-        try {
-            ProcedureRagHelper helper = ragRegistry.getForCity(cityId);
-            List<ProcedureRagHelper.Procedure> procedures = helper.getAllProcedures();
-            for (ProcedureRagHelper.Procedure proc : procedures) {
-                if (lower.contains(proc.title.toLowerCase())) {
-                    return true;
-                }
-            }
-        } catch (Exception e) {
-            // Fallback to keyword detection if procedure loading fails
-            logger.fine(() -> "Failed to load procedures for title checking: " + e.getMessage());
+    public ContextRequirements detectContextRequirements(String question, String cityId) {
+        if (question == null || question.isBlank()) {
+            return ContextRequirements.none();
         }
 
-        // Keywords that indicate user wants procedural/municipal information
-        String[] proceduralKeywords = {
-                "how to", "how do i", "what is the process", "procedure", "tramit", "tràmit",
-                "requirement", "requirements", "document", "documents", "apply", "application",
-                "form", "forms", "permit", "license", "request", "complaint", "claim",
-                "where can i", "how can i", "steps", "step by step", "process",
-                "recycling", "waste", "garbage", "trash", "center", "collection",
-                "event", "events", "agenda", "activity", "activities", "activitat", "activitats",
-                "festival", "concert", "exhibition", "exposició", "theater", "teatre",
-                "cinema", "sports", "esports", "culture", "cultura", "celebration", "celebració",
-                "what's on", "what's happening", "què passa", "agenda cultural", "program"
-        };
+        String normalizedQuestion = normalize(question);
+        long startNanos = System.nanoTime();
 
-        for (String keyword : proceduralKeywords) {
-            if (lower.contains(keyword)) {
-                return true;
-            }
+        boolean needsProcedure = containsAny(normalizedQuestion, PROCEDURE_KEYWORDS)
+                || containsAny(normalizedQuestion, MUNICIPAL_SERVICE_KEYWORDS);
+        boolean needsEvent = containsAny(normalizedQuestion, EVENT_KEYWORDS);
+
+        if (!needsProcedure && !needsEvent && isClearlyConversational(normalizedQuestion)) {
+            logger.fine(() -> "Context detection short-circuited conversational query — city=" + cityId);
+            return ContextRequirements.none();
         }
 
-        // Questions about specific municipal services
-        return lower.contains("ajuntament") || lower.contains("city hall") ||
-                lower.contains("municipal") || lower.contains("council");
+        if (needsProcedure ^ needsEvent) {
+            boolean finalNeedsProcedure = needsProcedure;
+            boolean finalNeedsEvent = needsEvent;
+            long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
+            logger.fine(() -> "Context detection short-circuited keyword query — city=" + cityId
+                    + " procedure=" + finalNeedsProcedure
+                    + " event=" + finalNeedsEvent
+                    + " durationMs=" + durationMs);
+            return new ContextRequirements(finalNeedsProcedure, finalNeedsEvent);
+        }
+
+        if (needsProcedure && needsEvent) {
+            long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
+            logger.fine(() -> "Context detection completed from keyword path — city=" + cityId
+                    + " procedure=true event=true durationMs=" + durationMs);
+            return new ContextRequirements(true, true);
+        }
+
+        CityDetectionIndex detectionIndex = getOrCreateDetectionIndex(cityId);
+        needsProcedure = detectionIndex.procedureMatcher().matches(normalizedQuestion);
+        needsEvent = detectionIndex.eventMatcher().matches(normalizedQuestion);
+        long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
+        boolean finalNeedsProcedure = needsProcedure;
+        boolean finalNeedsEvent = needsEvent;
+        logger.fine(() -> "Context detection completed — city=" + cityId
+                + " procedure=" + finalNeedsProcedure
+                + " event=" + finalNeedsEvent
+                + " durationMs=" + durationMs
+                + " procedureTitles=" + detectionIndex.procedureTitleCount()
+                + " eventTitles=" + detectionIndex.eventTitleCount());
+        return new ContextRequirements(finalNeedsProcedure, finalNeedsEvent);
     }
 
     public ProcedureContextResult buildProcedureContextResult(String query, String cityId) {
@@ -151,41 +278,7 @@ public class ProcedureContextService {
      * Checks against actual event titles for more accurate detection.
      */
     public boolean questionNeedsEventContext(String question, String cityId) {
-        if (question == null || question.isBlank())
-            return false;
-
-        String lower = question.toLowerCase();
-
-        // First, check against actual event titles for this city (most accurate)
-        try {
-            EventRagHelper helper = eventRagRegistry.getForCity(cityId);
-            List<EventRagHelper.Event> events = helper.getAllEvents();
-            for (EventRagHelper.Event event : events) {
-                if (lower.contains(event.title.toLowerCase())) {
-                    return true;
-                }
-            }
-        } catch (Exception e) {
-            // Fallback to keyword detection if event loading fails
-            logger.fine(() -> "Failed to load events for title checking: " + e.getMessage());
-        }
-
-        // Keywords that indicate user wants event information
-        String[] eventKeywords = {
-                "event", "events", "agenda", "activity", "activities", "activitat", "activitats",
-                "festival", "concert", "exhibition", "exposició", "theater", "teatre",
-                "cinema", "sports", "esports", "culture", "cultura", "celebration", "celebració",
-                "what's on", "what's happening", "què passa", "agenda cultural", "program",
-                "this weekend", "next week", "today", "tomorrow", "upcoming"
-        };
-
-        for (String keyword : eventKeywords) {
-            if (lower.contains(keyword)) {
-                return true;
-            }
-        }
-
-        return false;
+        return detectContextRequirements(question, cityId).needsEventContext();
     }
 
     public EventContextResult buildEventContextResult(String query, String cityId) {
@@ -248,20 +341,28 @@ public class ProcedureContextService {
 
     /**
      * Async variant of buildProcedureContextResult.
-     * Wraps synchronous logic in CompletableFuture.supplyAsync() for parallel
-     * execution.
+     * Uses the supplied executor when bounded parallelism is required.
      */
+    public CompletableFuture<ProcedureContextResult> buildProcedureContextResultAsync(String query, String cityId,
+            Executor executor) {
+        return CompletableFuture.supplyAsync(() -> buildProcedureContextResult(query, cityId), executor);
+    }
+
     public CompletableFuture<ProcedureContextResult> buildProcedureContextResultAsync(String query, String cityId) {
-        return CompletableFuture.supplyAsync(() -> buildProcedureContextResult(query, cityId));
+        return CompletableFuture.completedFuture(buildProcedureContextResult(query, cityId));
     }
 
     /**
      * Async variant of buildEventContextResult.
-     * Wraps synchronous logic in CompletableFuture.supplyAsync() for parallel
-     * execution.
+     * Uses the supplied executor when bounded parallelism is required.
      */
+    public CompletableFuture<EventContextResult> buildEventContextResultAsync(String query, String cityId,
+            Executor executor) {
+        return CompletableFuture.supplyAsync(() -> buildEventContextResult(query, cityId), executor);
+    }
+
     public CompletableFuture<EventContextResult> buildEventContextResultAsync(String query, String cityId) {
-        return CompletableFuture.supplyAsync(() -> buildEventContextResult(query, cityId));
+        return CompletableFuture.completedFuture(buildEventContextResult(query, cityId));
     }
 
     /**
@@ -277,5 +378,90 @@ public class ProcedureContextService {
             }
         }
         return List.copyOf(deduped);
+    }
+
+    private CityDetectionIndex getOrCreateDetectionIndex(String cityId) {
+        return detectionIndexByCity.computeIfAbsent(cityId, this::buildDetectionIndex);
+    }
+
+    private CityDetectionIndex buildDetectionIndex(String cityId) {
+        List<String> normalizedProcedureTitles = loadNormalizedProcedureTitles(cityId);
+        List<String> normalizedEventTitles = loadNormalizedEventTitles(cityId);
+
+        logger.info(() -> "Context detection index initialized — city=" + cityId
+                + " procedureTitles=" + normalizedProcedureTitles.size()
+                + " eventTitles=" + normalizedEventTitles.size());
+
+        return new CityDetectionIndex(
+                TitleMatcher.fromTitles(normalizedProcedureTitles),
+                TitleMatcher.fromTitles(normalizedEventTitles),
+                normalizedProcedureTitles.size(),
+                normalizedEventTitles.size());
+    }
+
+    private List<String> loadNormalizedProcedureTitles(String cityId) {
+        try {
+            ProcedureRagHelper helper = ragRegistry.getForCity(cityId);
+            return helper.getAllProcedures().stream()
+                    .map(procedure -> normalize(procedure.title))
+                    .filter(title -> !title.isBlank())
+                    .distinct()
+                    .toList();
+        } catch (Exception e) {
+            logger.fine(() -> "Failed to initialize procedure detection titles for city=" + cityId
+                    + " error=" + e.getMessage());
+            return List.of();
+        }
+    }
+
+    private List<String> loadNormalizedEventTitles(String cityId) {
+        try {
+            EventRagHelper helper = eventRagRegistry.getForCity(cityId);
+            return helper.getAllEvents().stream()
+                    .map(event -> normalize(event.title))
+                    .filter(title -> !title.isBlank())
+                    .distinct()
+                    .toList();
+        } catch (Exception e) {
+            logger.fine(() -> "Failed to initialize event detection titles for city=" + cityId
+                    + " error=" + e.getMessage());
+            return List.of();
+        }
+    }
+
+    private static String normalize(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.strip().toLowerCase(Locale.ROOT);
+    }
+
+    private static boolean containsAny(String normalizedQuestion, List<String> keywords) {
+        for (String keyword : keywords) {
+            if (normalizedQuestion.contains(keyword)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isClearlyConversational(String normalizedQuestion) {
+        return containsAny(normalizedQuestion, CONVERSATIONAL_SHORT_CIRCUITS);
+    }
+
+    private static Set<String> tokenize(String normalizedValue) {
+        if (normalizedValue == null || normalizedValue.isBlank()) {
+            return Set.of();
+        }
+
+        LinkedHashSet<String> tokens = new LinkedHashSet<>();
+        String[] rawTokens = normalizedValue.replaceAll("[^\\p{L}\\p{Nd}]+", " ").trim().split("\\s+");
+        for (String token : rawTokens) {
+            if (token.length() < 3 || TITLE_STOP_WORDS.contains(token)) {
+                continue;
+            }
+            tokens.add(token);
+        }
+        return tokens;
     }
 }

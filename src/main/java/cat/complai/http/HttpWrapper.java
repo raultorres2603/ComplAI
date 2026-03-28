@@ -20,9 +20,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.stream.Stream;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -210,12 +212,17 @@ public class HttpWrapper {
             int attemptsLeft) {
         int attemptNumber = maxRetries - attemptsLeft + 1;
 
-        // Use a recursive callback to handle retries properly with async futures
         return performAsyncRequest(payload, authValue, attemptNumber, attemptsLeft);
     }
 
     private CompletableFuture<HttpDto> performAsyncRequest(Map<String, Object> payload, String authValue,
             int attemptNumber, int attemptsLeft) {
+        return executeRequestAsync(payload, authValue, attemptNumber)
+                .thenCompose(dto -> handleRetryIfNeeded(dto, payload, authValue, attemptNumber, attemptsLeft));
+    }
+
+    protected CompletableFuture<HttpDto> executeRequestAsync(Map<String, Object> payload, String authValue,
+            int attemptNumber) {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 String responseBody = openRouterClient.chatCompletions(
@@ -245,27 +252,6 @@ public class HttpWrapper {
                         + " attempt=" + attemptNumber + "/" + maxRetries
                         + " url=" + openRouterUrl);
 
-                if ((status == 429 || status >= 500) && attemptsLeft > 1) {
-                    String reason = status == 429 ? "rate-limited" : "server error";
-                    long baseDelayMs = 250L;
-                    long expDelayMs = baseDelayMs * (1L << Math.min(attemptNumber - 1, 3));
-                    long jitterMs = ThreadLocalRandom.current().nextLong(0, 150);
-                    long delayMs = Math.min(2000L, expDelayMs + jitterMs);
-                    logger.warning(() -> "OpenRouter " + reason + " — httpStatus=" + status
-                            + " retrying attempt=" + (attemptNumber + 1) + "/" + maxRetries
-                            + " backoffMs=" + delayMs
-                            + " url=" + openRouterUrl);
-
-                    try {
-                        Thread.sleep(delayMs);
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                        return new HttpDto(null, null, "POST", "Request interrupted during retry");
-                    }
-                    // Return a special marker to signal retry needed
-                    return new HttpDto(null, null, "__RETRY__", null);
-                }
-
                 logger.warning(() -> "OpenRouter non-2xx response — httpStatus=" + status
                         + " attempt=" + attemptNumber + "/" + maxRetries
                         + " url=" + openRouterUrl);
@@ -276,18 +262,47 @@ public class HttpWrapper {
                         + " url=" + openRouterUrl + " error=" + e.getMessage(), e);
                 return new HttpDto(null, null, "POST", e.getMessage());
             }
-        }).thenCompose(dto -> handleRetryLogic(dto, payload, authValue, attemptNumber, attemptsLeft));
+        }, requestExecutor());
     }
 
-    private CompletionStage<HttpDto> handleRetryLogic(HttpDto dto, Map<String, Object> payload,
+    private CompletableFuture<HttpDto> handleRetryIfNeeded(HttpDto dto, Map<String, Object> payload,
             String authValue, int attemptNumber, int attemptsLeft) {
-        // If retry is needed, recursively call with reduced attempts
-        if ("__RETRY__".equals(dto.method()) && attemptsLeft > 1) {
-            int nextAttempt = attemptNumber + 1;
-            return performAsyncRequest(payload, authValue, nextAttempt, attemptsLeft - 1);
+        if (shouldRetry(dto, attemptsLeft)) {
+            int status = dto.statusCode();
+            String reason = status == 429 ? "rate-limited" : "server error";
+            long delayMs = computeRetryDelayMillis(attemptNumber);
+            logger.warning(() -> "OpenRouter " + reason + " — httpStatus=" + status
+                    + " retrying attempt=" + (attemptNumber + 1) + "/" + maxRetries
+                    + " backoffMs=" + delayMs
+                    + " url=" + openRouterUrl);
+
+            return CompletableFuture.runAsync(() -> {
+            }, retryDelayExecutor(delayMs))
+                    .thenCompose(ignored -> performAsyncRequest(payload, authValue, attemptNumber + 1, attemptsLeft - 1));
         }
-        // Otherwise return the result
         return CompletableFuture.completedFuture(dto);
+    }
+
+    protected Executor requestExecutor() {
+        return ForkJoinPool.commonPool();
+    }
+
+    protected Executor retryDelayExecutor(long delayMs) {
+        return CompletableFuture.delayedExecutor(delayMs, TimeUnit.MILLISECONDS);
+    }
+
+    protected long computeRetryDelayMillis(int attemptNumber) {
+        long baseDelayMs = 250L;
+        long expDelayMs = baseDelayMs * (1L << Math.min(attemptNumber - 1, 3));
+        long jitterMs = ThreadLocalRandom.current().nextLong(0, 150);
+        return Math.min(2000L, expDelayMs + jitterMs);
+    }
+
+    private boolean shouldRetry(HttpDto dto, int attemptsLeft) {
+        return dto != null
+                && dto.statusCode() != null
+                && (dto.statusCode() == 429 || dto.statusCode() >= 500)
+                && attemptsLeft > 1;
     }
 
     /**
@@ -298,7 +313,7 @@ public class HttpWrapper {
      * @return the full "Bearer …" auth value, or {@code null} if no key is
      *         available.
      */
-    private String resolveAuthHeader() {
+    protected String resolveAuthHeader() {
         String authValue = headers.get("Authorization");
         if (authValue == null || authValue.isBlank()) {
             logger.warning(

@@ -3,10 +3,12 @@ package cat.complai.openrouter.services.cache;
 import cat.complai.openrouter.cache.ResponseCacheKey;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.stats.CacheStats;
 import io.micronaut.context.annotation.Value;
 import jakarta.inject.Singleton;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.logging.Logger;
 
 /**
@@ -35,10 +37,27 @@ import java.util.logging.Logger;
 @Singleton
 public class ResponseCacheService {
 
+    public record CacheStatsSnapshot(
+            boolean enabled,
+            long hitCount,
+            long missCount,
+            long requestCount,
+            long putCount,
+            long evictionCount,
+            long invalidationCount,
+            long estimatedSize) {
+
+        public static CacheStatsSnapshot disabled() {
+            return new CacheStatsSnapshot(false, 0, 0, 0, 0, 0, 0, 0);
+        }
+    }
+
     private static final Logger LOGGER = Logger.getLogger(ResponseCacheService.class.getName());
 
     private final Cache<ResponseCacheKey, String> cache;
     private final boolean cacheEnabled;
+    private final LongAdder putCount = new LongAdder();
+    private final LongAdder invalidationCount = new LongAdder();
 
     public ResponseCacheService(
             @Value("${response.cache.enabled:true}") boolean cacheEnabled,
@@ -48,6 +67,7 @@ public class ResponseCacheService {
 
         if (cacheEnabled) {
             this.cache = Caffeine.newBuilder()
+                    .recordStats()
                     .maximumSize(maxEntries)
                     .expireAfterWrite(ttlMinutes, TimeUnit.MINUTES)
                     .build();
@@ -97,6 +117,7 @@ public class ResponseCacheService {
         }
 
         cache.put(key, aiResponse);
+        putCount.increment();
         LOGGER.fine(() -> "CACHE STORED: " + key + " (size=" + aiResponse.length() + " chars)");
     }
 
@@ -119,6 +140,7 @@ public class ResponseCacheService {
 
         long afterSize = cache.asMap().size();
         long removedCount = beforeSize - afterSize;
+        invalidationCount.add(removedCount);
         LOGGER.info(() -> String.format("Invalidated %d cache entries for city=%s", removedCount, cityId));
     }
 
@@ -133,6 +155,7 @@ public class ResponseCacheService {
 
         long beforeSize = cache.asMap().size();
         cache.invalidateAll();
+        invalidationCount.add(beforeSize);
         LOGGER.info(() -> String.format("Invalidated all %d cache entries", beforeSize));
     }
 
@@ -148,11 +171,20 @@ public class ResponseCacheService {
      * 
      * @return Cache stats object, or null if disabled
      */
-    public Object getStats() {
+    public CacheStatsSnapshot getStats() {
         if (!cacheEnabled || cache == null) {
-            return null;
+            return CacheStatsSnapshot.disabled();
         }
-        return cache.stats();
+        CacheStats stats = cache.stats();
+        return new CacheStatsSnapshot(
+                true,
+                stats.hitCount(),
+                stats.missCount(),
+                stats.requestCount(),
+                putCount.sum(),
+                stats.evictionCount(),
+                invalidationCount.sum(),
+                cache.estimatedSize());
     }
 
     /**
@@ -165,5 +197,9 @@ public class ResponseCacheService {
             return 0;
         }
         return cache.asMap().size();
+    }
+
+    public boolean isEnabled() {
+        return cacheEnabled;
     }
 }

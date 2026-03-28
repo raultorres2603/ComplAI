@@ -51,6 +51,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Handler;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
@@ -66,6 +67,7 @@ public class OpenRouterControllerIntegrationTest {
     // by the JwtValidator that the test Micronaut context instantiates.
     private static final String TEST_SECRET_B64 = "hEmatrRKbxfC/9PxZ14VsYksRkTZHMpqRScBUhshYzQ=";
     private static final String ISSUER = "complai";
+    private static final AtomicInteger OPENROUTER_POST_CALLS = new AtomicInteger();
 
     @Inject
     @Client("/")
@@ -90,23 +92,29 @@ public class OpenRouterControllerIntegrationTest {
 
     @BeforeEach
     void mintTestToken() {
+        OPENROUTER_POST_CALLS.set(0);
+
         // Clear the response cache before each test to prevent pollution from previous
         // tests.
         // ResponseCacheService is a @Singleton that persists across tests, so we must
         // invalidate it to ensure each test gets fresh mock responses.
         cacheService.invalidateAll();
 
+        authHeader = mintAuthHeader("elprat");
+    }
+
+    private String mintAuthHeader(String cityId) {
         byte[] keyBytes = Base64.getDecoder().decode(TEST_SECRET_B64);
         SecretKey key = Keys.hmacShaKeyFor(keyBytes);
         String token = Jwts.builder()
-                .subject("integration-test")
+                .subject("integration-test-" + UUID.randomUUID())
                 .issuer(ISSUER)
                 .issuedAt(new Date())
                 .expiration(Date.from(Instant.now().plus(1, ChronoUnit.HOURS)))
-                .claim("city", "elprat")
+                .claim("city", cityId)
                 .signWith(key)
                 .compact();
-        authHeader = "Bearer " + token;
+        return "Bearer " + token;
     }
 
     @Test
@@ -118,6 +126,31 @@ public class OpenRouterControllerIntegrationTest {
         OpenRouterResponseDto result = openRouterService.ask("Is there a recycling center?", null, "elprat");
         assertTrue(result.isSuccess());
         assertEquals("OK from AI (integration)", result.getMessage());
+    }
+
+    @Test
+    void integration_ask_repeatedEquivalentRequests_reuseResponseCachePath() {
+        // /complai/ask is stream-first. Validate cache reuse through the sync service
+        // seam that still exercises AiResponseProcessingService + ResponseCacheService.
+        OpenRouterResponseDto firstResponse = openRouterService.ask("Is there a recycling center?", null, "elprat");
+        OpenRouterResponseDto secondResponse = openRouterService.ask("Is there a recycling center?", null, "elprat");
+
+        assertTrue(firstResponse.isSuccess());
+        assertTrue(secondResponse.isSuccess());
+        assertEquals(1, OPENROUTER_POST_CALLS.get(),
+                "Repeated equivalent ask requests should reuse the cached response path");
+    }
+
+    @Test
+    void integration_ask_cacheRemainsCityScoped() {
+        // City scoping is a cache-key concern. Test it via sync ask service seam.
+        OpenRouterResponseDto firstResponse = openRouterService.ask("Is there a recycling center?", null, "elprat");
+        OpenRouterResponseDto secondResponse = openRouterService.ask("Is there a recycling center?", null, "testcity");
+
+        assertTrue(firstResponse.isSuccess());
+        assertTrue(secondResponse.isSuccess());
+        assertEquals(2, OPENROUTER_POST_CALLS.get(),
+                "The response cache must remain city-scoped across authenticated ask requests");
     }
 
     @Test
@@ -710,6 +743,7 @@ public class OpenRouterControllerIntegrationTest {
         return new HttpWrapper() {
             @Override
             public CompletableFuture<HttpDto> postToOpenRouterAsync(List<Map<String, Object>> messages) {
+                OPENROUTER_POST_CALLS.incrementAndGet();
                 // Extract the content of the last user message to determine which scenario to
                 // run.
                 String userPrompt = messages == null ? null
@@ -852,6 +886,12 @@ public class OpenRouterControllerIntegrationTest {
                         "data: [DONE]"));
             }
         };
+    }
+
+    @MockBean(ResponseCacheService.class)
+    @Replaces(ResponseCacheService.class)
+    ResponseCacheService enabledResponseCacheService() {
+        return new ResponseCacheService(true, 10, 500);
     }
 
     @MockBean(SqsComplaintPublisher.class)
