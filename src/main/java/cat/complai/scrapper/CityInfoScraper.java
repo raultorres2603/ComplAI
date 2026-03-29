@@ -257,11 +257,19 @@ public class CityInfoScraper {
 
     static String extractFieldValue(Document doc, ProcedureScraper.FieldExtractionRule rule) {
         String selector = Objects.requireNonNull(rule.selector, "Field selector");
+        boolean isMetaTag = selector.contains("meta[");
+        
         if (rule.multiple) {
             Elements elements = doc.select(selector);
             StringBuilder sb = new StringBuilder();
             for (Element el : elements) {
-                String text = el.text().trim();
+                String text;
+                if (isMetaTag) {
+                    text = el.attr("content");
+                } else {
+                    text = el.text();
+                }
+                text = text.trim();
                 if (!text.isEmpty()) {
                     if (!sb.isEmpty()) {
                         sb.append("\n");
@@ -273,7 +281,15 @@ public class CityInfoScraper {
         }
 
         Element element = doc.selectFirst(selector);
-        return element != null ? element.text().trim() : "";
+        if (element == null) {
+            return "";
+        }
+        
+        if (isMetaTag) {
+            return element.attr("content").trim();
+        }
+        
+        return element.text().trim();
     }
 
     static boolean matchesUrlFilters(String url, List<String> includePatterns, List<String> excludePatterns) {
