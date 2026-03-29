@@ -20,6 +20,8 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -65,6 +67,10 @@ class OpenRouterServicesOrchestrationTest {
                                 new ObjectMapper());
 
                 when(validationService.validateQuestion(anyString())).thenReturn(Optional.empty());
+                when(procedureContextService.requiresEventDateWindowClarification(anyString(), eq("elprat")))
+                                .thenReturn(false);
+                when(procedureContextService.deDuplicateAndOrderSources(anyList()))
+                                .thenAnswer(invocation -> invocation.getArgument(0));
                 when(promptBuilder.getSystemMessage(eq("elprat"), anyString())).thenReturn("system");
                 when(conversationService.getConversationHistory(any())).thenReturn(List.of());
                 when(aiResponseService.callOpenRouterAndExtract(anyList(), eq("elprat"), any(Long.class),
@@ -102,6 +108,8 @@ class OpenRouterServicesOrchestrationTest {
                 OpenRouterResponseDto response = service.ask("procedure question", null, "elprat");
 
                 assertTrue(response.isSuccess());
+                assertFalse(response.getSources().isEmpty());
+                assertEquals("https://example.com/procedure", response.getSources().getFirst().getUrl());
                 verify(procedureContextService).buildProcedureContextResult(anyString(), eq("elprat"));
                 verify(procedureContextService, never()).buildEventContextResult(anyString(), anyString());
                 verify(procedureContextService, never()).buildProcedureContextResultAsync(anyString(), anyString(),
@@ -124,6 +132,8 @@ class OpenRouterServicesOrchestrationTest {
                 OpenRouterResponseDto response = service.ask("event question", null, "elprat");
 
                 assertTrue(response.isSuccess());
+                assertFalse(response.getSources().isEmpty());
+                assertEquals("https://example.com/event", response.getSources().getFirst().getUrl());
                 verify(procedureContextService).buildEventContextResult(anyString(), eq("elprat"));
                 verify(procedureContextService, never()).buildProcedureContextResult(anyString(), anyString());
                 verify(procedureContextService, never()).buildEventContextResultAsync(anyString(), anyString(),
@@ -225,6 +235,8 @@ class OpenRouterServicesOrchestrationTest {
                 OpenRouterResponseDto response = service.ask("Latest news about recycling", null, "elprat");
 
                 assertTrue(response.isSuccess());
+                assertFalse(response.getSources().isEmpty());
+                assertEquals("https://example.com/news", response.getSources().getFirst().getUrl());
                 verify(aiResponseService).callOpenRouterAndExtract(anyList(), eq("elprat"), eq(0L), anyLong());
         }
 }

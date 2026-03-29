@@ -44,7 +44,8 @@ public class ProcedureContextService {
             "ajuntament", "city hall", "municipal", "council");
 
     private static final List<String> EVENT_KEYWORDS = List.of(
-            "event", "events", "agenda", "activity", "activities", "activitat", "activitats",
+            "event", "events", "evento", "eventos", "esdeveniment", "esdeveniments",
+            "agenda", "activity", "activities", "activitat", "activitats",
             "festival", "concert", "exhibition", "exposició", "theater", "teatre",
             "cinema", "sports", "esports", "culture", "cultura", "celebration", "celebració",
             "what's on", "what's happening", "què passa", "agenda cultural", "program",

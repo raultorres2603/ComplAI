@@ -54,6 +54,9 @@ export class LambdaStack extends cdk.Stack {
     const eventsBucket = s3.Bucket.fromBucketName(
       this, `EventsBucketRef-${environment}`, `complai-events-${environment}`
     );
+    const newsBucket = s3.Bucket.fromBucketName(
+      this, `NewsBucketRef-${environment}`, `complai-news-${environment}`
+    );
     const complaintsBucket = s3.Bucket.fromBucketName(
       this, `ComplaintsBucketRef-${environment}`, `complai-complaints-${environment}`
     );
@@ -158,6 +161,8 @@ export class LambdaStack extends cdk.Stack {
         PROCEDURES_REGION: this.region,
         EVENTS_BUCKET: eventsBucket.bucketName,
         EVENTS_REGION: this.region,
+        NEWS_BUCKET: newsBucket.bucketName,
+        NEWS_REGION: this.region,
         OPENROUTER_MODEL: process.env.OPENROUTER_MODEL || 'openrouter/free',
         JWT_SECRET: process.env.JWT_SECRET || '',
         // Async redact flow: queue URL for publishing + bucket details for pre-signed URLs.
@@ -201,6 +206,7 @@ export class LambdaStack extends cdk.Stack {
     complaintsBucket.grantRead(lambdaRole);
     proceduresBucket.grantRead(lambdaRole);
     eventsBucket.grantRead(lambdaRole);
+    newsBucket.grantRead(lambdaRole);
 
     // -------------------------------------------------------------------------
     // Worker Lambda — processes SQS messages and uploads generated PDFs to S3.
@@ -222,6 +228,8 @@ export class LambdaStack extends cdk.Stack {
     proceduresBucket.grantRead(workerRole);
     // Worker needs events access for event context in the AI prompt.
     eventsBucket.grantRead(workerRole);
+    // Worker keeps parity with API runtime context loading (news helpers).
+    newsBucket.grantRead(workerRole);
 
     // Feedback Worker Role — separate from redact worker for least privilege
     const feedbackWorkerRole = new iam.Role(this, `ComplAIFeedbackWorkerRole-${environment}`, {
@@ -274,6 +282,8 @@ export class LambdaStack extends cdk.Stack {
         PROCEDURES_REGION: this.region,
         EVENTS_BUCKET: eventsBucket.bucketName,
         EVENTS_REGION: this.region,
+        NEWS_BUCKET: newsBucket.bucketName,
+        NEWS_REGION: this.region,
         // HTTP Client configuration for Micronaut (operational flexibility)
         HTTP_CLIENT_CONNECT_TIMEOUT: process.env.HTTP_CLIENT_CONNECT_TIMEOUT || '10s',
         HTTP_CLIENT_READ_TIMEOUT: process.env.HTTP_CLIENT_READ_TIMEOUT || '60s',

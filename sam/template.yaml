@@ -125,6 +125,25 @@ Resources:
             ExpirationInDays: 365
       DeletionPolicy: Retain
 
+  NewsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub complai-news-${Environment}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Status: Enabled
+            ExpirationInDays: 365
+      DeletionPolicy: Retain
+
   ComplaintsBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -208,6 +227,8 @@ Resources:
           OPENROUTER_API_KEY: !Ref OpenRouterApiKey
           PROCEDURES_BUCKET: !Ref ProceduresBucket
           PROCEDURES_REGION: !Ref LambdaRegion
+          NEWS_BUCKET: !Ref NewsBucket
+          NEWS_REGION: !Ref LambdaRegion
           AWS_ENDPOINT_URL: "http://host.docker.internal:4566"
           OPENROUTER_REQUEST_TIMEOUT_SECONDS: "60"
           OPENROUTER_OVERALL_TIMEOUT_SECONDS: "60"
@@ -254,6 +275,8 @@ Resources:
           COMPLAINTS_REGION: !Ref LambdaRegion
           PROCEDURES_BUCKET: !Ref ProceduresBucket
           PROCEDURES_REGION: !Ref LambdaRegion
+          NEWS_BUCKET: !Ref NewsBucket
+          NEWS_REGION: !Ref LambdaRegion
           AWS_ENDPOINT_URL: "http://host.docker.internal:4566"
       Events:
         SQSTrigger:
@@ -308,3 +331,6 @@ Outputs:
   ComplAIFeedbackBucketName:
     Description: S3 bucket for user feedback JSON files
     Value: !Ref FeedbackBucket
+  ComplAINewsBucketName:
+    Description: S3 bucket for city news corpus
+    Value: !Ref NewsBucket

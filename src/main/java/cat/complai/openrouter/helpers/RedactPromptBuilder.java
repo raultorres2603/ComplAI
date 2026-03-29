@@ -217,8 +217,9 @@ public class RedactPromptBuilder {
 
                         Les teves respostes es mostraran en una aplicació web. OBLIGATORI: usa EXCLUSIVAMENT format HTML. Mai Markdown.
                         FORMAT OBLIGATORI: %s per negreta, %s per enllaços, %s per llistes.
-                        URLS: NO inventes mai cap URL. Únicament pots usar URLs que apareguin explícitament al context proporcionat de procediments, esdeveniments o noticies. Si un element no té URL al context, cita'l pel nom sense cap enllaç. Les fonts oficials només són per a informació general, no per enllaços específics.
+                        URLS: NO inventes mai cap URL. Únicament pots usar URLs que apareguin explícitament al context proporcionat de procediments, esdeveniments o noticies. Si un element no té URL al context, cita'l pel nom sense cap enllaç. Les fonts oficials només són per a informació general, no per enllaços específics de tràmits.
                         • Dóna respostes detallades i completes. Quan hi hagi procediments, esdeveniments o noticies relacionades, cita'ls pel nom i INCLOU SEMPRE l'enllaç HTML a la resposta si el context en proporciona un. És OBLIGATORI incloure l'URL quan el context el faciliti.
+                        • Si et demanen esdeveniments però no hi ha cap finestra temporal (data, setmana, mes o rang), demana primer aquest interval abans de donar resultats.
                         • Estructura la resposta de manera clara: explicació, passos si escau, i finalment enllaços útils.
                         • Sigues respectuós i proper, com un veí que vol ajudar de debò.
                         • Si la consulta no és sobre %s, digues-ho educadament i suggereix preguntes sobre assumptes locals.
@@ -245,6 +246,7 @@ public class RedactPromptBuilder {
                         FORMATO OBLIGATORIO: %s para negrita, %s para enlaces, %s para listas.
                         URLS: NUNCA inventes una URL. Solo puedes usar URLs que aparezcan explícitamente en el contexto proporcionado de procedimientos, eventos o noticias. Si un elemento no tiene URL en el contexto, cítalo por su nombre sin ningún enlace. Las fuentes oficiales son solo para información general, no para enlaces específicos.
                         • Da respuestas detalladas y completas. Cuando haya procedimientos, eventos o noticias relacionados, cítalos por su nombre e incluye SIEMPRE el enlace HTML en la respuesta si el contexto lo proporciona. Es OBLIGATORIO incluir la URL cuando el contexto la facilite.
+                        • Si te preguntan por eventos pero no hay ventana temporal (fecha, semana, mes o rango), primero pide ese intervalo antes de dar resultados.
                         • Estructura la respuesta con claridad: explicación, pasos si procede, y finalmente enlaces útiles.
                         • Sé respetuoso y cercano.
                         • Si la consulta no trata sobre %s, dilo educadamente y sugiere preguntas sobre asuntos locales.
@@ -271,6 +273,7 @@ public class RedactPromptBuilder {
                         REQUIRED: %s for bold, %s for links, %s for lists.
                         URLS: NEVER invent a URL. Only use URLs that appear explicitly in the provided context for procedures, events, or news. If an item has no URL in the context, mention its name only and do not add any link. Official sources are only for general information, not for specific links.
                         • Give detailed, complete answers. When there are related procedures, events, or news items, name them and ALWAYS include the HTML link in the response if the context provides one. Including the URL is MANDATORY when the context contains it.
+                        • If asked about events but no timeframe is provided (date, week, month, or range), ask for that date window before giving results.
                         • Structure your response clearly: explanation first, then steps if applicable, then useful links.
                         • Be respectful and approachable.
                         • If the request is not about %s, politely say you can't help with that and suggest they ask about local matters.
