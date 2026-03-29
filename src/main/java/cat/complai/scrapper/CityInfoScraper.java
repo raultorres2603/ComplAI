@@ -60,9 +60,12 @@ public class CityInfoScraper {
         String s3Key = "cityinfo-" + cityId + ".json";
 
         Map<String, String> themeUrls = discoverThemeLinks(mapping.cityInfo);
+        logger.info("Theme discovery found " + themeUrls.size() + " URLs");
         logger.info("Found " + themeUrls.size() + " city-info theme URLs - city=" + cityId);
 
+        logger.info("Starting crawl of " + themeUrls.size() + " themes...");
         Map<String, String> detailUrlsByTheme = crawlDetailUrls(themeUrls, mapping.cityInfo);
+        logger.info("Crawl complete: " + detailUrlsByTheme.size() + " detail URLs found");
         logger.info("Found " + detailUrlsByTheme.size() + " city-info detail URLs - city=" + cityId);
 
         List<Map<String, Object>> cityInfo = scrapeCityInfo(detailUrlsByTheme, mapping.cityInfo);
@@ -161,11 +164,14 @@ public class CityInfoScraper {
                     detailUrls.putIfAbsent(current.url(), themeName);
                 }
 
+                logger.fine("Attempting to fetch page " + current.url() + " - depth=" + current.depth() 
+                        + " visitedCount=" + visitedPages.size() + " pendingCount=" + pending.size());
                 try {
                     Document doc = connect(current.url());
                     Elements menuLinks = doc.select(
                             Objects.requireNonNull(cityInfoConfig.crawl.themeMenuSelector,
                                     "cityInfo.crawl.themeMenuSelector"));
+                    logger.fine("Matched " + menuLinks.size() + " links from themeMenuSelector on page " + current.url());
                     for (Element link : menuLinks) {
                         String candidate = canonicalizeUrl(link.absUrl("href"));
                         if (candidate == null) {
@@ -359,6 +365,7 @@ public class CityInfoScraper {
             } catch (SocketTimeoutException | ConnectException e) {
                 lastException = e;
                 if (attempt < maxAttempts) {
+                    logger.info("Retry " + attempt + "/3 for " + url + " after timeout - will wait 2s");
                     logger.info("Connection attempt " + attempt + " failed for " + url + " - " + e.getMessage()
                             + " - retrying in 2 seconds");
                     try {
