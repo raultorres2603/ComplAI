@@ -1,0 +1,220 @@
+{
+    "queries": [
+        {
+            "id": "proc-tune-1",
+            "domain": "procedure",
+            "query": "recycling",
+            "relevantIds": [
+                "p1"
+            ],
+            "split": "tune"
+        },
+        {
+            "id": "proc-tune-2",
+            "domain": "procedure",
+            "query": "recycling procedure",
+            "relevantIds": [
+                "p1"
+            ],
+            "split": "tune"
+        },
+        {
+            "id": "proc-tune-3",
+            "domain": "procedure",
+            "query": "tramit recycling",
+            "relevantIds": [
+                "p1"
+            ],
+            "split": "tune"
+        },
+        {
+            "id": "proc-tune-4",
+            "domain": "procedure",
+            "query": "waste",
+            "relevantIds": [
+                "p2"
+            ],
+            "split": "tune"
+        },
+        {
+            "id": "proc-tune-5",
+            "domain": "procedure",
+            "query": "waste procedure",
+            "relevantIds": [
+                "p2"
+            ],
+            "split": "tune"
+        },
+        {
+            "id": "proc-tune-6",
+            "domain": "procedure",
+            "query": "municipal waste",
+            "relevantIds": [
+                "p2"
+            ],
+            "split": "tune"
+        },
+        {
+            "id": "proc-tune-7",
+            "domain": "procedure",
+            "query": "recycling center",
+            "relevantIds": [
+                "p1"
+            ],
+            "split": "tune"
+        },
+        {
+            "id": "proc-tune-8",
+            "domain": "procedure",
+            "query": "waste collection",
+            "relevantIds": [
+                "p2"
+            ],
+            "split": "tune"
+        },
+        {
+            "id": "proc-tune-9",
+            "domain": "procedure",
+            "query": "recycling request",
+            "relevantIds": [
+                "p1"
+            ],
+            "split": "tune"
+        },
+        {
+            "id": "proc-holdout-1",
+            "domain": "procedure",
+            "query": "how to handle recycling",
+            "relevantIds": [
+                "p1"
+            ],
+            "split": "holdout"
+        },
+        {
+            "id": "proc-holdout-2",
+            "domain": "procedure",
+            "query": "waste management",
+            "relevantIds": [
+                "p2"
+            ],
+            "split": "holdout"
+        },
+        {
+            "id": "proc-holdout-3",
+            "domain": "procedure",
+            "query": "recycling steps",
+            "relevantIds": [
+                "p1"
+            ],
+            "split": "holdout"
+        },
+        {
+            "id": "event-tune-1",
+            "domain": "event",
+            "query": "film festival",
+            "relevantIds": [
+                "ev-001"
+            ],
+            "split": "tune"
+        },
+        {
+            "id": "event-tune-2",
+            "domain": "event",
+            "query": "short films",
+            "relevantIds": [
+                "ev-001"
+            ],
+            "split": "tune"
+        },
+        {
+            "id": "event-tune-3",
+            "domain": "event",
+            "query": "summer beats concert",
+            "relevantIds": [
+                "ev-002"
+            ],
+            "split": "tune"
+        },
+        {
+            "id": "event-tune-4",
+            "domain": "event",
+            "query": "local bands concert",
+            "relevantIds": [
+                "ev-002"
+            ],
+            "split": "tune"
+        },
+        {
+            "id": "event-tune-5",
+            "domain": "event",
+            "query": "cultural dance theatre",
+            "relevantIds": [
+                "ev-003"
+            ],
+            "split": "tune"
+        },
+        {
+            "id": "event-tune-6",
+            "domain": "event",
+            "query": "classic films cinema",
+            "relevantIds": [
+                "ev-004"
+            ],
+            "split": "tune"
+        },
+        {
+            "id": "event-tune-7",
+            "domain": "event",
+            "query": "children orchestra concert",
+            "relevantIds": [
+                "ev-005"
+            ],
+            "split": "tune"
+        },
+        {
+            "id": "event-tune-8",
+            "domain": "event",
+            "query": "cinema night",
+            "relevantIds": [
+                "ev-004"
+            ],
+            "split": "tune"
+        },
+        {
+            "id": "event-tune-9",
+            "domain": "event",
+            "query": "kids concert",
+            "relevantIds": [
+                "ev-005"
+            ],
+            "split": "tune"
+        },
+        {
+            "id": "event-holdout-1",
+            "domain": "event",
+            "query": "international short films",
+            "relevantIds": [
+                "ev-001"
+            ],
+            "split": "holdout"
+        },
+        {
+            "id": "event-holdout-2",
+            "domain": "event",
+            "query": "contemporary dance theatre",
+            "relevantIds": [
+                "ev-003"
+            ],
+            "split": "holdout"
+        },
+        {
+            "id": "event-holdout-3",
+            "domain": "event",
+            "query": "interactive concert children",
+            "relevantIds": [
+                "ev-005"
+            ],
+            "split": "holdout"
+        }
+    ]
+}

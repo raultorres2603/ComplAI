@@ -14,7 +14,7 @@ class ProcedureRagHelperTest {
 
     @BeforeEach
     void setup() throws IOException {
-        // Use testcity which has procedures-testcity.json
+        // Use testcity which currently ships 2 procedures in procedures-testcity.json
         procedureRagHelper = new ProcedureRagHelper("testcity");
     }
 
@@ -53,8 +53,8 @@ class ProcedureRagHelperTest {
     void getAllProcedures_returnsFull() {
         List<ProcedureRagHelper.Procedure> allProcedures = procedureRagHelper.getAllProcedures();
 
-        // Should return all procedures (unrestricted)
-        assertEquals(10, allProcedures.size(), "getAllProcedures() should return all procedures");
+        // Should return all procedures from the current test fixture (unrestricted)
+        assertEquals(2, allProcedures.size(), "getAllProcedures() should return all procedures");
     }
 
     @Test

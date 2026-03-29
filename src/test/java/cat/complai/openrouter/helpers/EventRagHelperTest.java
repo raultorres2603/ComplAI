@@ -14,7 +14,7 @@ class EventRagHelperTest {
 
     @BeforeEach
     void setup() throws IOException {
-        // Use testcity which has events-testcity.json with 10 events
+        // Use testcity which currently ships 5 events in events-testcity.json
         eventRagHelper = new EventRagHelper("testcity");
     }
 
@@ -56,8 +56,8 @@ class EventRagHelperTest {
     void getAllEvents_returnsFull() {
         List<EventRagHelper.Event> allEvents = eventRagHelper.getAllEvents();
 
-        // Should return all 10 events (unrestricted)
-        assertEquals(10, allEvents.size(), "getAllEvents() should return all events");
+        // Should return all events from the current test fixture (unrestricted)
+        assertEquals(5, allEvents.size(), "getAllEvents() should return all events");
     }
 
     @Test
