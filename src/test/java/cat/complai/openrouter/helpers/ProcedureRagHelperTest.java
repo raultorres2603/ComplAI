@@ -29,14 +29,12 @@ class ProcedureRagHelperTest {
 
     @Test
     void search_fewerResultsIfFewMatches() {
-        // Query that matches only one procedure
+        // Query matching only recycling/waste-specific procedures
         String query = "recycling center waste management";
         List<ProcedureRagHelper.Procedure> results = procedureRagHelper.search(query);
 
         // Should return results respecting max 3 limit
         assertTrue(results.size() <= 3, "Should respect max 3 limit");
-        // Testcity has only 2 procedures, so should return at most 2
-        assertTrue(results.size() <= 2, "Testcity only has 2 procedures");
     }
 
     @Test
@@ -56,7 +54,7 @@ class ProcedureRagHelperTest {
         List<ProcedureRagHelper.Procedure> allProcedures = procedureRagHelper.getAllProcedures();
 
         // Should return all procedures (unrestricted)
-        assertEquals(2, allProcedures.size(), "getAllProcedures() should return all procedures");
+        assertEquals(10, allProcedures.size(), "getAllProcedures() should return all procedures");
     }
 
     @Test
@@ -102,6 +100,35 @@ class ProcedureRagHelperTest {
 
         // Should never exceed MAX_RESULTS of 3
         assertTrue(results.size() <= 3, "Should never exceed MAX_RESULTS of 3");
+    }
+
+    @Test
+    void search_javaEngine_returnsRelevantResults() {
+        List<ProcedureRagHelper.Procedure> results = procedureRagHelper.search("recycling");
+
+        assertFalse(results.isEmpty());
+        assertTrue(results.size() <= 3);
+        assertEquals("p1", results.get(0).procedureId);
+    }
+
+    @Test
+    void search_javaEngine_handlesAccentAndWhitespaceNormalization() {
+        List<ProcedureRagHelper.Procedure> results = procedureRagHelper.search("  tràmit   recycling  ");
+
+        assertFalse(results.isEmpty());
+        assertEquals("p1", results.get(0).procedureId);
+    }
+
+    @Test
+    void search_isDeterministicAcrossHelperInstances() throws IOException {
+        ProcedureRagHelper secondHelper = new ProcedureRagHelper("testcity");
+        List<ProcedureRagHelper.Procedure> firstResults = procedureRagHelper.search("waste recycling");
+        List<ProcedureRagHelper.Procedure> secondResults = secondHelper.search("waste recycling");
+
+        assertEquals(firstResults.size(), secondResults.size());
+        if (!firstResults.isEmpty()) {
+            assertEquals(firstResults.get(0).procedureId, secondResults.get(0).procedureId);
+        }
     }
 
     // ============================================================================

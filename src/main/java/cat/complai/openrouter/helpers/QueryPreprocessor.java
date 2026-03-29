@@ -1,5 +1,7 @@
 package cat.complai.openrouter.helpers;
 
+import cat.complai.openrouter.helpers.rag.TokenNormalizer;
+
 import java.util.*;
 
 /**
@@ -90,19 +92,7 @@ public class QueryPreprocessor {
      * @return normalized query string, or empty string if input is null/blank
      */
     public static String preprocess(String query) {
-        if (query == null || query.isBlank()) {
-            return "";
-        }
-
-        String cleaned = query
-                .toLowerCase()
-                .trim()
-                .replaceAll("\\s+", " "); // Collapse multiple spaces to single space
-
-        // Remove accents for cross-dialect matching
-        cleaned = removeAccents(cleaned);
-
-        return cleaned;
+        return TokenNormalizer.normalizeForSearch(query);
     }
 
     /**
@@ -134,30 +124,4 @@ public class QueryPreprocessor {
         return result.isEmpty() ? query : result;
     }
 
-    /**
-     * Removes accents from Latin characters.
-     * Examples: é→e, à→a, ç→c, ñ→n, ü→u, etc.
-     * 
-     * @param text the text to process
-     * @return text with accents removed
-     */
-    private static String removeAccents(String text) {
-        if (text == null)
-            return null;
-
-        // Map accented characters to their base forms
-        text = text.replaceAll("[éèêë]", "e");
-        text = text.replaceAll("[àáâäã]", "a");
-        text = text.replaceAll("[íìîï]", "i");
-        text = text.replaceAll("[óòôöõ]", "o");
-        text = text.replaceAll("[úùûü]", "u");
-        text = text.replaceAll("[ýŷÿ]", "y");
-        text = text.replaceAll("[ç]", "c");
-        text = text.replaceAll("[ñ]", "n");
-        text = text.replaceAll("[ß]", "ss");
-        text = text.replaceAll("[æ]", "ae");
-        text = text.replaceAll("[œ]", "oe");
-
-        return text;
-    }
 }
