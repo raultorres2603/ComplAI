@@ -3,6 +3,8 @@ package cat.complai.openrouter.services.procedure;
 import cat.complai.openrouter.dto.Source;
 import cat.complai.openrouter.helpers.EventRagHelper;
 import cat.complai.openrouter.helpers.EventRagHelperRegistry;
+import cat.complai.openrouter.helpers.NewsRagHelper;
+import cat.complai.openrouter.helpers.NewsRagHelperRegistry;
 import cat.complai.openrouter.helpers.ProcedureRagHelper;
 import cat.complai.openrouter.helpers.ProcedureRagHelperRegistry;
 import cat.complai.openrouter.helpers.RedactPromptBuilder;
@@ -100,6 +102,25 @@ class ProcedureContextServiceTest {
         }
 
         @Test
+        void questionNeedsNewsContext_detects_keywords() {
+                assertTrue(procedureContextService.questionNeedsNewsContext("Any latest news in the city?",
+                                "testcity"));
+                assertTrue(procedureContextService.questionNeedsNewsContext("Que diu l'actualitat municipal?",
+                                "testcity"));
+                assertFalse(procedureContextService.questionNeedsNewsContext("How do I apply for a permit?",
+                                "testcity"));
+        }
+
+        @Test
+        void buildNewsContextResult_returnsEmpty_whenNoMatches() {
+                ProcedureContextService.NewsContextResult result = procedureContextService
+                                .buildNewsContextResult("martian taxation", "testcity");
+
+                assertNotNull(result);
+                assertTrue(result.getSources().isEmpty());
+        }
+
+        @Test
         void detectContextRequirements_reusesNormalizedProcedureTitlesPerCity() throws Exception {
                 CountingProcedureRagHelper procedureHelper = new CountingProcedureRagHelper(
                                 List.of(new ProcedureRagHelper.Procedure("p1", "Resident Parking Badge Renewal", "", "",
@@ -108,6 +129,7 @@ class ProcedureContextServiceTest {
                 ProcedureContextService service = new ProcedureContextService(
                                 new TestProcedureRegistry(Map.of("city-a", procedureHelper)),
                                 new TestEventRegistry(Map.of("city-a", new CountingEventRagHelper(List.of()))),
+                                new TestNewsRegistry(Map.of("city-a", new CountingNewsRagHelper(List.of()))),
                                 new RedactPromptBuilder());
 
                 assertTrue(service.questionNeedsProcedureContext("Need resident parking badge renewal today",
@@ -126,6 +148,7 @@ class ProcedureContextServiceTest {
                 ProcedureContextService service = new ProcedureContextService(
                                 new TestProcedureRegistry(Map.of("city-a", new CountingProcedureRagHelper(List.of()))),
                                 new TestEventRegistry(Map.of("city-a", eventHelper)),
+                                new TestNewsRegistry(Map.of("city-a", new CountingNewsRagHelper(List.of()))),
                                 new RedactPromptBuilder());
 
                 assertTrue(service.questionNeedsEventContext("Can I join the neighborhood meetup tonight?", "city-a"));
@@ -145,6 +168,7 @@ class ProcedureContextServiceTest {
                 ProcedureContextService service = new ProcedureContextService(
                                 new TestProcedureRegistry(Map.of("city-a", procedureHelper)),
                                 new TestEventRegistry(Map.of("city-a", eventHelper)),
+                                new TestNewsRegistry(Map.of("city-a", new CountingNewsRagHelper(List.of()))),
                                 new RedactPromptBuilder());
 
                 ProcedureContextService.ContextRequirements keywordRequirements = service
@@ -154,8 +178,10 @@ class ProcedureContextServiceTest {
 
                 assertTrue(keywordRequirements.needsProcedureContext());
                 assertFalse(keywordRequirements.needsEventContext());
+                assertFalse(keywordRequirements.needsNewsContext());
                 assertFalse(conversationalRequirements.needsProcedureContext());
                 assertFalse(conversationalRequirements.needsEventContext());
+                assertFalse(conversationalRequirements.needsNewsContext());
                 assertEquals(0, procedureHelper.getAllProceduresCalls.get());
                 assertEquals(0, eventHelper.getAllEventsCalls.get());
         }
@@ -175,6 +201,9 @@ class ProcedureContextServiceTest {
                                 new TestEventRegistry(Map.of(
                                                 "city-a", new CountingEventRagHelper(List.of()),
                                                 "city-b", new CountingEventRagHelper(List.of()))),
+                                new TestNewsRegistry(Map.of(
+                                                "city-a", new CountingNewsRagHelper(List.of()),
+                                                "city-b", new CountingNewsRagHelper(List.of()))),
                                 new RedactPromptBuilder());
 
                 assertTrue(service.questionNeedsProcedureContext("Need resident parking badge renewal today",
@@ -196,6 +225,7 @@ class ProcedureContextServiceTest {
                 ProcedureContextService service = new ProcedureContextService(
                                 new TestProcedureRegistry(Map.of("city-a", procedureHelper)),
                                 new TestEventRegistry(Map.of("city-a", eventHelper)),
+                                new TestNewsRegistry(Map.of("city-a", new CountingNewsRagHelper(List.of()))),
                                 new RedactPromptBuilder());
 
                 ProcedureContextService.ContextRequirements procedureRequirements = service
@@ -205,8 +235,10 @@ class ProcedureContextServiceTest {
 
                 assertTrue(procedureRequirements.needsProcedureContext());
                 assertFalse(procedureRequirements.needsEventContext());
+                assertFalse(procedureRequirements.needsNewsContext());
                 assertFalse(eventRequirements.needsProcedureContext());
                 assertTrue(eventRequirements.needsEventContext());
+                assertFalse(eventRequirements.needsNewsContext());
         }
 
         @Test
@@ -221,6 +253,7 @@ class ProcedureContextServiceTest {
                 ProcedureContextService service = new ProcedureContextService(
                                 new TestProcedureRegistry(Map.of("city-a", procedureHelper)),
                                 new TestEventRegistry(Map.of("city-a", eventHelper)),
+                                new TestNewsRegistry(Map.of("city-a", new CountingNewsRagHelper(List.of()))),
                                 new RedactPromptBuilder());
 
                 ProcedureContextService.ContextRequirements requirements = service
@@ -228,8 +261,38 @@ class ProcedureContextServiceTest {
 
                 assertTrue(requirements.needsProcedureContext());
                 assertFalse(requirements.needsEventContext());
+                assertFalse(requirements.needsNewsContext());
                 assertEquals(1, procedureHelper.getAllProceduresCalls.get());
                 assertEquals(1, eventHelper.getAllEventsCalls.get());
+        }
+
+        @Test
+        void detectContextRequirements_newsIntent_skipsProcedureAndEventTitleIndexes() throws Exception {
+                CountingProcedureRagHelper procedureHelper = new CountingProcedureRagHelper(List.of(
+                                new ProcedureRagHelper.Procedure("p1", "Resident Parking Badge Renewal", "", "", "",
+                                                "https://example.com/procedure")));
+                CountingEventRagHelper eventHelper = new CountingEventRagHelper(List.of(
+                                new EventRagHelper.Event("e1", "Moonlight Concert", "", "", "", "", "", "", "",
+                                                "https://example.com/event")));
+                CountingNewsRagHelper newsHelper = new CountingNewsRagHelper(List.of(
+                                new NewsRagHelper.News("n1", "Latest municipal recycling update", "", "", "", "", "",
+                                                "https://example.com/news")));
+
+                ProcedureContextService service = new ProcedureContextService(
+                                new TestProcedureRegistry(Map.of("city-a", procedureHelper)),
+                                new TestEventRegistry(Map.of("city-a", eventHelper)),
+                                new TestNewsRegistry(Map.of("city-a", newsHelper)),
+                                new RedactPromptBuilder());
+
+                ProcedureContextService.ContextRequirements requirements = service
+                                .detectContextRequirements("Any latest news in the city?", "city-a");
+
+                assertFalse(requirements.needsProcedureContext());
+                assertFalse(requirements.needsEventContext());
+                assertTrue(requirements.needsNewsContext());
+                assertEquals(0, procedureHelper.getAllProceduresCalls.get());
+                assertEquals(0, eventHelper.getAllEventsCalls.get());
+                assertEquals(0, newsHelper.getAllNewsCalls.get());
         }
 
         private static final class TestProcedureRegistry extends ProcedureRagHelperRegistry {
@@ -254,6 +317,19 @@ class ProcedureContextServiceTest {
 
                 @Override
                 public EventRagHelper getForCity(String cityId) {
+                        return helpersByCity.get(cityId);
+                }
+        }
+
+        private static final class TestNewsRegistry extends NewsRagHelperRegistry {
+                private final Map<String, NewsRagHelper> helpersByCity;
+
+                private TestNewsRegistry(Map<String, NewsRagHelper> helpersByCity) {
+                        this.helpersByCity = helpersByCity;
+                }
+
+                @Override
+                public NewsRagHelper getForCity(String cityId) {
                         return helpersByCity.get(cityId);
                 }
         }
@@ -297,6 +373,27 @@ class ProcedureContextServiceTest {
                 @Override
                 public List<EventRagHelper.Event> search(String query) {
                         return events;
+                }
+        }
+
+        private static final class CountingNewsRagHelper extends NewsRagHelper {
+                private final List<NewsRagHelper.News> news;
+                private final AtomicInteger getAllNewsCalls = new AtomicInteger();
+
+                private CountingNewsRagHelper(List<NewsRagHelper.News> news) {
+                        super("testcity");
+                        this.news = news;
+                }
+
+                @Override
+                public List<NewsRagHelper.News> getAllNews() {
+                        getAllNewsCalls.incrementAndGet();
+                        return news;
+                }
+
+                @Override
+                public List<NewsRagHelper.News> search(String query) {
+                        return news;
                 }
         }
 }

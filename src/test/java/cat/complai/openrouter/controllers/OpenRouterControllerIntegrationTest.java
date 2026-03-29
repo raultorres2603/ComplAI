@@ -684,6 +684,63 @@ public class OpenRouterControllerIntegrationTest {
     }
 
     @Test
+    void integration_ask_newsIntent_withCityScopedNewsContext_usesNewsBranch() throws Exception {
+        String testCityAuthHeader = mintAuthHeader("testcity");
+        AskRequest req = new AskRequest("latest news about recycling [SSE_NEWS_CONTEXT]");
+        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
+                .header("Authorization", testCityAuthHeader);
+
+        HttpResponse<String> resp = client.toBlocking().exchange(httpReq, String.class);
+        assertEquals(200, resp.getStatus().getCode());
+
+        String streamContent = resp.getBody().orElse("");
+        String[] lines = streamContent.split("\n\n");
+
+        JsonNode firstChunk = null;
+        for (String line : lines) {
+            if (line.startsWith("data:")) {
+                JsonNode event = mapper.readTree(line.substring(5).trim());
+                if ("chunk".equals(event.path("type").asText())) {
+                    firstChunk = event;
+                    break;
+                }
+            }
+        }
+
+        assertNotNull(firstChunk);
+        assertEquals("NEWS CONTEXT USED", firstChunk.path("content").asText());
+    }
+
+    @Test
+    void integration_ask_newsIntent_withoutRelatedNews_returnsExplicitFallbackMessage() throws Exception {
+        String testCityAuthHeader = mintAuthHeader("testcity");
+        AskRequest req = new AskRequest("Any recent news about martian taxation in the city?");
+        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
+                .header("Authorization", testCityAuthHeader);
+
+        HttpResponse<String> resp = client.toBlocking().exchange(httpReq, String.class);
+        assertEquals(200, resp.getStatus().getCode());
+
+        String streamContent = resp.getBody().orElse("");
+        String[] lines = streamContent.split("\n\n");
+
+        JsonNode firstChunk = null;
+        for (String line : lines) {
+            if (line.startsWith("data:")) {
+                JsonNode event = mapper.readTree(line.substring(5).trim());
+                if ("chunk".equals(event.path("type").asText())) {
+                    firstChunk = event;
+                    break;
+                }
+            }
+        }
+
+        assertNotNull(firstChunk);
+        assertEquals("I could not find related recent news about that in testcity.",
+                firstChunk.path("content").asText());
+    }
+
+    @Test
     void integration_ask_streamMalformedAfterFirstChunk_emitsSseErrorEvent() throws Exception {
         AskRequest req = new AskRequest("Is there a recycling center? [SSE_MALFORMED]");
         HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
@@ -825,11 +882,22 @@ public class OpenRouterControllerIntegrationTest {
                                 .reduce((first, second) -> second)
                                 .map(m -> (String) m.get("content"))
                                 .orElse(null);
+                boolean hasNewsContext = messages != null && messages.stream()
+                        .filter(m -> "system".equals(m.get("role")))
+                        .map(m -> (String) m.get("content"))
+                        .filter(Objects::nonNull)
+                        .anyMatch(content -> content.contains("CONTEXT FROM CITY NEWS"));
                 if (userPrompt != null && userPrompt.contains("[UPSTREAM_402]")) {
                     return new OpenRouterStreamStartResult.Error(new OpenRouterStreamingException(
                             OpenRouterErrorCode.UPSTREAM,
                             "OpenRouter stream startup failed.",
                             402));
+                }
+                if (userPrompt != null && userPrompt.contains("[SSE_NEWS_CONTEXT]")) {
+                    String content = hasNewsContext ? "NEWS CONTEXT USED" : "NEWS CONTEXT MISSING";
+                    return new OpenRouterStreamStartResult.Success(reactor.core.publisher.Flux.just(
+                            "data: {\"choices\":[{\"delta\":{\"content\":\"" + content + "\"}}]}",
+                            "data: [DONE]"));
                 }
                 if (userPrompt != null && userPrompt.contains("[UPSTREAM_429]")) {
                     return new OpenRouterStreamStartResult.Error(new OpenRouterStreamingException(

@@ -8,6 +8,7 @@ import cat.complai.openrouter.services.ai.AiResponseProcessingService;
 import cat.complai.openrouter.services.procedure.ProcedureContextService;
 import cat.complai.openrouter.services.procedure.ProcedureContextService.ContextRequirements;
 import cat.complai.openrouter.services.procedure.ProcedureContextService.ProcedureContextResult;
+import cat.complai.openrouter.services.procedure.ProcedureContextService.NewsContextResult;
 import cat.complai.openrouter.interfaces.IOpenRouterService;
 import cat.complai.openrouter.dto.AskStreamResult;
 import cat.complai.openrouter.dto.OpenRouterResponseDto;
@@ -150,6 +151,17 @@ public class OpenRouterServices implements IOpenRouterService {
         RagContexts ragContexts = buildRagContexts(question, cityId, conversationId, "ask()");
         ProcedureContextResult procCtx = ragContexts.procedureContext();
         ProcedureContextService.EventContextResult eventCtx = ragContexts.eventContext();
+        NewsContextResult newsCtx = ragContexts.newsContext();
+
+        if (ragContexts.newsIntent() && (newsCtx == null || newsCtx.getSources().isEmpty())) {
+            String fallbackMessage = buildNoNewsFoundMessage(detectedLanguage, cityId);
+            if (conversationId != null && !conversationId.isBlank()) {
+                conversationService.updateConversationHistory(conversationId, question, fallbackMessage);
+            }
+            logger.info(() -> "ask() news fallback used - conversationId=" + conversationId + " city=" + cityId);
+            return new OpenRouterResponseDto(true, fallbackMessage, null, 200, OpenRouterErrorCode.NONE, null,
+                    List.of());
+        }
 
         // Add procedure context if available
         if (procCtx != null && procCtx.getContextBlock() != null) {
@@ -159,6 +171,10 @@ public class OpenRouterServices implements IOpenRouterService {
         // Add event context if available
         if (eventCtx != null && eventCtx.getContextBlock() != null) {
             messages.add(Map.of("role", "system", "content", eventCtx.getContextBlock()));
+        }
+
+        if (newsCtx != null && newsCtx.getContextBlock() != null) {
+            messages.add(Map.of("role", "system", "content", newsCtx.getContextBlock()));
         }
 
         // Add conversation history
@@ -210,7 +226,14 @@ public class OpenRouterServices implements IOpenRouterService {
 
         // Calculate context hashes for caching (deterministic, reproducible)
         long procContextHash = computeSourcesHash(procCtx != null ? procCtx.getSources() : List.of());
-        long eventContextHash = computeSourcesHash(eventCtx != null ? eventCtx.getSources() : List.of());
+        List<Source> eventAndNewsSourcesForHash = new ArrayList<>();
+        if (eventCtx != null && eventCtx.getSources() != null) {
+            eventAndNewsSourcesForHash.addAll(eventCtx.getSources());
+        }
+        if (newsCtx != null && newsCtx.getSources() != null) {
+            eventAndNewsSourcesForHash.addAll(newsCtx.getSources());
+        }
+        long eventContextHash = computeSourcesHash(eventAndNewsSourcesForHash);
 
         OpenRouterResponseDto response = aiResponseService.callOpenRouterAndExtract(messages, cityId, procContextHash,
                 eventContextHash);
@@ -223,6 +246,9 @@ public class OpenRouterServices implements IOpenRouterService {
         }
         if (eventCtx != null && !eventCtx.getSources().isEmpty()) {
             mergedSources.addAll(eventCtx.getSources());
+        }
+        if (newsCtx != null && !newsCtx.getSources().isEmpty()) {
+            mergedSources.addAll(newsCtx.getSources());
         }
 
         // Deduplicate ONCE after all sources are collected
@@ -361,11 +387,20 @@ public class OpenRouterServices implements IOpenRouterService {
         RagContexts ragContexts = buildRagContexts(question, cityId, conversationId, "streamAsk()");
         ProcedureContextResult procCtx = ragContexts.procedureContext();
         ProcedureContextService.EventContextResult eventCtx = ragContexts.eventContext();
+        NewsContextResult newsCtx = ragContexts.newsContext();
+
+        if (ragContexts.newsIntent() && (newsCtx == null || newsCtx.getSources().isEmpty())) {
+            String fallbackMessage = buildNoNewsFoundMessage(detectedLanguage, cityId);
+            logger.info(() -> "streamAsk() news fallback used - conversationId=" + conversationId + " city=" + cityId);
+            return buildFallbackStreamResult(fallbackMessage, conversationId, question);
+        }
 
         if (procCtx != null && procCtx.getContextBlock() != null)
             messages.add(Map.of("role", "system", "content", procCtx.getContextBlock()));
         if (eventCtx != null && eventCtx.getContextBlock() != null)
             messages.add(Map.of("role", "system", "content", eventCtx.getContextBlock()));
+        if (newsCtx != null && newsCtx.getContextBlock() != null)
+            messages.add(Map.of("role", "system", "content", newsCtx.getContextBlock()));
 
         var history = conversationService.getConversationHistory(conversationId);
         conversationService.addToMessages(messages, history);
@@ -383,13 +418,19 @@ public class OpenRouterServices implements IOpenRouterService {
                     .map(s -> new SseSources(s.getTitle(), s.getUrl()))
                     .collect(Collectors.toList()));
         }
+        if (newsCtx != null && newsCtx.getSources() != null) {
+            allSources.addAll(newsCtx.getSources().stream()
+                    .map(s -> new SseSources(s.getTitle(), s.getUrl()))
+                    .collect(Collectors.toList()));
+        }
 
         // 5. Stream chunks, then emit sources, then done
         final String capturedQuestion = question;
         final String capturedCityId = cityId;
         final String capturedConvId = conversationId;
         final StringBuilder assembled = new StringBuilder();
-        final java.util.concurrent.atomic.AtomicBoolean hasEmitted = new java.util.concurrent.atomic.AtomicBoolean(false);
+        final java.util.concurrent.atomic.AtomicBoolean hasEmitted = new java.util.concurrent.atomic.AtomicBoolean(
+                false);
 
         logger.fine(() -> "streamAsk() preparing to stream — conversationId=" + capturedConvId + " sources="
                 + allSources.size());
@@ -511,10 +552,22 @@ public class OpenRouterServices implements IOpenRouterService {
         logger.fine(() -> operationName + " context detection — conversationId=" + conversationId
                 + " procedure=" + requirements.needsProcedureContext()
                 + " event=" + requirements.needsEventContext()
+                + " news=" + requirements.needsNewsContext()
                 + " durationMs=" + detectionDurationMs);
 
-        if (!requirements.needsProcedureContext() && !requirements.needsEventContext()) {
-            return new RagContexts(null, null);
+        if (!requirements.needsProcedureContext() && !requirements.needsEventContext()
+                && !requirements.needsNewsContext()) {
+            return new RagContexts(null, null, null, false);
+        }
+
+        if (requirements.needsNewsContext()) {
+            NewsContextResult newsContext = safelyBuildNewsContext(question, cityId, conversationId, operationName);
+            logger.fine(() -> operationName + " news retrieval completed — conversationId=" + conversationId
+                    + " city=" + cityId
+                    + " hitCount=" + (newsContext != null && newsContext.getSources() != null
+                            ? newsContext.getSources().size()
+                            : 0));
+            return new RagContexts(null, null, newsContext, true);
         }
 
         if (requirements.needsProcedureContext() && requirements.needsEventContext()) {
@@ -538,18 +591,33 @@ public class OpenRouterServices implements IOpenRouterService {
             long ragDurationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - ragStart);
             logger.fine(() -> operationName + " RAG build completed — conversationId=" + conversationId
                     + " mode=bounded-parallel durationMs=" + ragDurationMs);
-            return new RagContexts(procedureContext, eventContext);
+            return new RagContexts(procedureContext, eventContext, null, false);
         }
 
         if (requirements.needsProcedureContext()) {
             ProcedureContextResult procedureContext = safelyBuildProcedureContext(question, cityId, conversationId,
                     operationName);
-            return new RagContexts(procedureContext, null);
+            return new RagContexts(procedureContext, null, null, false);
         }
 
         ProcedureContextService.EventContextResult eventContext = safelyBuildEventContext(question, cityId,
                 conversationId, operationName);
-        return new RagContexts(null, eventContext);
+        return new RagContexts(null, eventContext, null, false);
+    }
+
+    private NewsContextResult safelyBuildNewsContext(String question, String cityId, String conversationId,
+            String operationName) {
+        long start = System.nanoTime();
+        try {
+            NewsContextResult result = procedureContextService.buildNewsContextResult(question, cityId);
+            long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+            logger.fine(() -> operationName + " RAG build completed — conversationId=" + conversationId
+                    + " mode=news-only durationMs=" + durationMs);
+            return result;
+        } catch (Exception e) {
+            logRagFailure(operationName, conversationId, cityId, "news", e);
+            return null;
+        }
     }
 
     private ProcedureContextResult safelyBuildProcedureContext(String question, String cityId, String conversationId,
@@ -571,7 +639,8 @@ public class OpenRouterServices implements IOpenRouterService {
             String conversationId, String operationName) {
         long start = System.nanoTime();
         try {
-            ProcedureContextService.EventContextResult result = procedureContextService.buildEventContextResult(question,
+            ProcedureContextService.EventContextResult result = procedureContextService.buildEventContextResult(
+                    question,
                     cityId);
             long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
             logger.fine(() -> operationName + " RAG build completed — conversationId=" + conversationId
@@ -603,8 +672,42 @@ public class OpenRouterServices implements IOpenRouterService {
         });
     }
 
+    private AskStreamResult buildFallbackStreamResult(String fallbackMessage, String conversationId, String question) {
+        try {
+            SseChunkEvent chunk = new SseChunkEvent(fallbackMessage);
+            SseSourcesEvent sourcesEvent = new SseSourcesEvent(List.of());
+            SseDoneEvent doneEvent = new SseDoneEvent(conversationId);
+
+            String chunkJson = objectMapper.writeValueAsString(chunk);
+            String sourcesJson = objectMapper.writeValueAsString(sourcesEvent);
+            String doneJson = objectMapper.writeValueAsString(doneEvent);
+
+            if (conversationId != null && !conversationId.isBlank()) {
+                conversationService.updateConversationHistory(conversationId, question, fallbackMessage);
+            }
+
+            return new AskStreamResult.Success(Flux.just(chunkJson, sourcesJson, doneJson));
+        } catch (Exception e) {
+            logger.log(Level.SEVERE, "streamAsk() failed to serialize fallback news response", e);
+            return new AskStreamResult.Error(AskStreamErrorMapper.toResponseDto(e));
+        }
+    }
+
+    private String buildNoNewsFoundMessage(String detectedLanguage, String cityId) {
+        String cityDisplayName = RedactPromptBuilder.resolveCityDisplayName(cityId);
+        if ("CA".equals(detectedLanguage)) {
+            return "No he trobat noticies recents relacionades amb aquesta consulta a " + cityDisplayName + ".";
+        }
+        if ("ES".equals(detectedLanguage)) {
+            return "No he encontrado noticias recientes relacionadas con esa consulta en " + cityDisplayName + ".";
+        }
+        return "I could not find related recent news about that in " + cityDisplayName + ".";
+    }
+
     private record RagContexts(ProcedureContextResult procedureContext,
-            ProcedureContextService.EventContextResult eventContext) {
+            ProcedureContextService.EventContextResult eventContext,
+            NewsContextResult newsContext,
+            boolean newsIntent) {
     }
 
 }

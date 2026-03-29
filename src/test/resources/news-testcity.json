@@ -1,0 +1,42 @@
+{
+    "source": "https://news.testcity.example",
+    "news": [
+        {
+            "newsId": "n-1",
+            "title": "TestCity launches new recycling campaign",
+            "summary": "The city announced a campaign to improve recycling participation.",
+            "body": "Residents can join workshops and use new neighborhood recycling points.",
+            "publishedAt": "2026-03-20",
+            "categories": [
+                "environment",
+                "city"
+            ],
+            "author": "City Desk",
+            "url": "https://news.testcity.example/recycling-campaign"
+        },
+        {
+            "newsId": "n-2",
+            "title": "Public transport fares updated in TestCity",
+            "summary": "Updated fare system for buses and metro starts next month.",
+            "body": "The municipality introduced discounts for students and seniors.",
+            "publishedAt": "2026-03-21",
+            "categories": [
+                "mobility"
+            ],
+            "author": "Mobility Reporter",
+            "url": "https://news.testcity.example/transport-fares"
+        },
+        {
+            "newsId": "n-3",
+            "title": "Cultural week opens downtown",
+            "summary": "Music and theatre events start this weekend.",
+            "body": "Several venues will host activities supported by local associations.",
+            "publishedAt": "2026-03-22",
+            "categories": [
+                "culture"
+            ],
+            "author": "Culture Team",
+            "url": "https://news.testcity.example/cultural-week"
+        }
+    ]
+}

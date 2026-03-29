@@ -28,6 +28,8 @@ import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class OpenRouterServicesStreamTest {
@@ -87,7 +89,7 @@ class OpenRouterServicesStreamTest {
                 ProcedureContextResult procCtx = new ProcedureContextResult("Procedure context", sources);
 
                 when(procedureContextService.detectContextRequirements(anyString(), anyString()))
-                                .thenReturn(new ProcedureContextService.ContextRequirements(true, false));
+                                .thenReturn(new ProcedureContextService.ContextRequirements(true, false, false));
                 when(procedureContextService.buildProcedureContextResult(anyString(), anyString()))
                                 .thenReturn(procCtx);
 
@@ -151,6 +153,33 @@ class OpenRouterServicesStreamTest {
                 SseSourcesEvent sourcesEvent = objectMapper.readValue(emitted.get(1), SseSourcesEvent.class);
                 assertEquals("sources", sourcesEvent.type());
                 assertTrue(sourcesEvent.sources().isEmpty());
+        }
+
+        @Test
+        void streamAsk_newsIntentWithoutMatches_emitsFallbackChunkSourcesDone() throws Exception {
+                when(validationService.validateQuestion(anyString())).thenReturn(Optional.empty());
+                when(promptBuilder.getSystemMessage(eq("elprat"), anyString())).thenReturn("System");
+                when(procedureContextService.detectContextRequirements(anyString(), anyString()))
+                                .thenReturn(new ProcedureContextService.ContextRequirements(false, false, true));
+                when(procedureContextService.buildNewsContextResult(anyString(), anyString()))
+                                .thenReturn(new ProcedureContextService.NewsContextResult(null, List.of()));
+
+                List<String> emitted = collectStream(
+                                service.streamAsk("Any recent news about martians?", "conv-news", "elprat"));
+
+                assertEquals(3, emitted.size(), "Should emit fallback chunk, sources, and done");
+
+                SseChunkEvent chunkEvent = objectMapper.readValue(emitted.get(0), SseChunkEvent.class);
+                assertEquals("chunk", chunkEvent.type());
+                assertTrue(chunkEvent.content().contains("I could not find related recent news"));
+
+                SseSourcesEvent sourcesEvent = objectMapper.readValue(emitted.get(1), SseSourcesEvent.class);
+                assertTrue(sourcesEvent.sources().isEmpty());
+
+                SseDoneEvent doneEvent = objectMapper.readValue(emitted.get(2), SseDoneEvent.class);
+                assertEquals("conv-news", doneEvent.conversationId());
+
+                verify(httpWrapper, never()).streamFromOpenRouter(anyList());
         }
 
         @Test
