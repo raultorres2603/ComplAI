@@ -20,7 +20,7 @@ class QueryPreprocessorTest {
     @DisplayName("preprocess collapses multiple spaces to single space")
     void test_preprocess_collapseWhitespace() {
         String result = QueryPreprocessor.preprocess("quan    tanca    la    biblioteca?");
-        assertEquals("quan tanca la biblioteca?", result.trim());
+        assertEquals("quan tanca la biblioteca", result.trim());
     }
 
     @Test

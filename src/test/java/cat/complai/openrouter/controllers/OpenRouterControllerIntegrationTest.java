@@ -51,6 +51,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Handler;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
@@ -66,6 +67,7 @@ public class OpenRouterControllerIntegrationTest {
     // by the JwtValidator that the test Micronaut context instantiates.
     private static final String TEST_SECRET_B64 = "hEmatrRKbxfC/9PxZ14VsYksRkTZHMpqRScBUhshYzQ=";
     private static final String ISSUER = "complai";
+    private static final AtomicInteger OPENROUTER_POST_CALLS = new AtomicInteger();
 
     @Inject
     @Client("/")
@@ -90,23 +92,29 @@ public class OpenRouterControllerIntegrationTest {
 
     @BeforeEach
     void mintTestToken() {
+        OPENROUTER_POST_CALLS.set(0);
+
         // Clear the response cache before each test to prevent pollution from previous
         // tests.
         // ResponseCacheService is a @Singleton that persists across tests, so we must
         // invalidate it to ensure each test gets fresh mock responses.
         cacheService.invalidateAll();
 
+        authHeader = mintAuthHeader("elprat");
+    }
+
+    private String mintAuthHeader(String cityId) {
         byte[] keyBytes = Base64.getDecoder().decode(TEST_SECRET_B64);
         SecretKey key = Keys.hmacShaKeyFor(keyBytes);
         String token = Jwts.builder()
-                .subject("integration-test")
+                .subject("integration-test-" + UUID.randomUUID())
                 .issuer(ISSUER)
                 .issuedAt(new Date())
                 .expiration(Date.from(Instant.now().plus(1, ChronoUnit.HOURS)))
-                .claim("city", "elprat")
+                .claim("city", cityId)
                 .signWith(key)
                 .compact();
-        authHeader = "Bearer " + token;
+        return "Bearer " + token;
     }
 
     @Test
@@ -118,6 +126,31 @@ public class OpenRouterControllerIntegrationTest {
         OpenRouterResponseDto result = openRouterService.ask("Is there a recycling center?", null, "elprat");
         assertTrue(result.isSuccess());
         assertEquals("OK from AI (integration)", result.getMessage());
+    }
+
+    @Test
+    void integration_ask_repeatedEquivalentRequests_reuseResponseCachePath() {
+        // /complai/ask is stream-first. Validate cache reuse through the sync service
+        // seam that still exercises AiResponseProcessingService + ResponseCacheService.
+        OpenRouterResponseDto firstResponse = openRouterService.ask("Is there a recycling center?", null, "elprat");
+        OpenRouterResponseDto secondResponse = openRouterService.ask("Is there a recycling center?", null, "elprat");
+
+        assertTrue(firstResponse.isSuccess());
+        assertTrue(secondResponse.isSuccess());
+        assertEquals(1, OPENROUTER_POST_CALLS.get(),
+                "Repeated equivalent ask requests should reuse the cached response path");
+    }
+
+    @Test
+    void integration_ask_cacheRemainsCityScoped() {
+        // City scoping is a cache-key concern. Test it via sync ask service seam.
+        OpenRouterResponseDto firstResponse = openRouterService.ask("Is there a recycling center?", null, "elprat");
+        OpenRouterResponseDto secondResponse = openRouterService.ask("Is there a recycling center?", null, "testcity");
+
+        assertTrue(firstResponse.isSuccess());
+        assertTrue(secondResponse.isSuccess());
+        assertEquals(2, OPENROUTER_POST_CALLS.get(),
+                "The response cache must remain city-scoped across authenticated ask requests");
     }
 
     @Test
@@ -651,6 +684,109 @@ public class OpenRouterControllerIntegrationTest {
     }
 
     @Test
+    void integration_ask_newsIntent_withCityScopedNewsContext_usesNewsBranch() throws Exception {
+        String testCityAuthHeader = mintAuthHeader("testcity");
+        AskRequest req = new AskRequest("latest news about recycling [SSE_NEWS_CONTEXT]");
+        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
+                .header("Authorization", testCityAuthHeader);
+
+        HttpResponse<String> resp = client.toBlocking().exchange(httpReq, String.class);
+        assertEquals(200, resp.getStatus().getCode());
+
+        String streamContent = resp.getBody().orElse("");
+        String[] lines = streamContent.split("\n\n");
+
+        JsonNode firstChunk = null;
+        for (String line : lines) {
+            if (line.startsWith("data:")) {
+                JsonNode event = mapper.readTree(line.substring(5).trim());
+                if ("chunk".equals(event.path("type").asText())) {
+                    firstChunk = event;
+                    break;
+                }
+            }
+        }
+
+        assertNotNull(firstChunk);
+        assertEquals("NEWS CONTEXT USED", firstChunk.path("content").asText());
+    }
+
+    @Test
+    void integration_ask_newsIntent_withoutRelatedNews_returnsExplicitFallbackMessage() throws Exception {
+        String testCityAuthHeader = mintAuthHeader("testcity");
+        AskRequest req = new AskRequest("Any recent news about martian taxation in the city?");
+        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
+                .header("Authorization", testCityAuthHeader);
+
+        HttpResponse<String> resp = client.toBlocking().exchange(httpReq, String.class);
+        assertEquals(200, resp.getStatus().getCode());
+
+        String streamContent = resp.getBody().orElse("");
+        String[] lines = streamContent.split("\n\n");
+
+        JsonNode firstChunk = null;
+        for (String line : lines) {
+            if (line.startsWith("data:")) {
+                JsonNode event = mapper.readTree(line.substring(5).trim());
+                if ("chunk".equals(event.path("type").asText())) {
+                    firstChunk = event;
+                    break;
+                }
+            }
+        }
+
+        assertNotNull(firstChunk);
+        assertEquals("I could not find related recent news about that in testcity.",
+                firstChunk.path("content").asText());
+    }
+
+    @Test
+    void integration_ask_eventIntent_withoutDateWindow_returnsClarificationBeforeRetrieval() throws Exception {
+        String testCityAuthHeader = mintAuthHeader("testcity");
+        AskRequest req = new AskRequest("Que eventos hay en la ciudad?");
+        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
+                .header("Authorization", testCityAuthHeader);
+
+        HttpResponse<String> resp = client.toBlocking().exchange(httpReq, String.class);
+        assertEquals(200, resp.getStatus().getCode());
+
+        String streamContent = resp.getBody().orElse("");
+        String[] lines = streamContent.split("\n\n");
+
+        JsonNode firstChunk = null;
+        JsonNode sourcesEvent = null;
+        for (String line : lines) {
+            if (line.startsWith("data:")) {
+                JsonNode event = mapper.readTree(line.substring(5).trim());
+                if ("chunk".equals(event.path("type").asText()) && firstChunk == null) {
+                    firstChunk = event;
+                }
+                if ("sources".equals(event.path("type").asText())) {
+                    sourcesEvent = event;
+                }
+            }
+        }
+
+        assertNotNull(firstChunk);
+        String clarification = firstChunk.path("content").asText();
+        assertTrue(clarification.contains("rango de fechas")
+                || clarification.contains("date window")
+                || clarification.contains("interval de dates"));
+        assertNotNull(sourcesEvent);
+        assertTrue(sourcesEvent.path("sources").isArray());
+        assertEquals(0, sourcesEvent.path("sources").size());
+    }
+
+    @Test
+    void integration_ask_procedureEventNewsIncludeSourceUrlsInSourcesEvent() throws Exception {
+        String testCityAuthHeader = mintAuthHeader("testcity");
+
+        assertSourcesEventContainsUrl(testCityAuthHeader, "Recycling procedure in testcity");
+        assertSourcesEventContainsUrl(testCityAuthHeader, "Film Festival events this week in testcity");
+        assertSourcesEventContainsUrl(testCityAuthHeader, "latest news about recycling campaign [SSE_NEWS_CONTEXT]");
+    }
+
+    @Test
     void integration_ask_streamMalformedAfterFirstChunk_emitsSseErrorEvent() throws Exception {
         AskRequest req = new AskRequest("Is there a recycling center? [SSE_MALFORMED]");
         HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
@@ -704,12 +840,52 @@ public class OpenRouterControllerIntegrationTest {
         assertEquals(OpenRouterErrorCode.UPSTREAM.getCode(), errorEvent.path("errorCode").asInt());
     }
 
+    private void assertSourcesEventContainsUrl(String bearerToken, String question) throws Exception {
+        AskRequest req = new AskRequest(question);
+        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
+                .header("Authorization", bearerToken);
+
+        HttpResponse<String> resp = client.toBlocking().exchange(httpReq, String.class);
+        assertEquals(200, resp.getStatus().getCode());
+
+        String streamContent = resp.getBody().orElse("");
+        String[] lines = streamContent.split("\n\n");
+        JsonNode sourcesEvent = null;
+        for (String line : lines) {
+            if (!line.startsWith("data:")) {
+                continue;
+            }
+            JsonNode event = mapper.readTree(line.substring(5).trim());
+            if ("sources".equals(event.path("type").asText())) {
+                sourcesEvent = event;
+                break;
+            }
+        }
+
+        assertNotNull(sourcesEvent, "Expected sources event for question: " + question);
+        JsonNode sources = sourcesEvent.path("sources");
+        assertTrue(sources.isArray(), "sources must be an array");
+        assertTrue(sources.size() > 0, "Expected at least one source for question: " + question);
+
+        boolean hasValidUrl = false;
+        for (JsonNode sourceNode : sources) {
+            String url = sourceNode.path("url").asText("");
+            if (url.startsWith("http://") || url.startsWith("https://")) {
+                hasValidUrl = true;
+                break;
+            }
+        }
+
+        assertTrue(hasValidUrl, "Expected at least one HTTP/HTTPS source URL for question: " + question);
+    }
+
     @MockBean(HttpWrapper.class)
     @Replaces(HttpWrapper.class)
     HttpWrapper openRouterHttpWrapper() {
         return new HttpWrapper() {
             @Override
             public CompletableFuture<HttpDto> postToOpenRouterAsync(List<Map<String, Object>> messages) {
+                OPENROUTER_POST_CALLS.incrementAndGet();
                 // Extract the content of the last user message to determine which scenario to
                 // run.
                 String userPrompt = messages == null ? null
@@ -791,11 +967,22 @@ public class OpenRouterControllerIntegrationTest {
                                 .reduce((first, second) -> second)
                                 .map(m -> (String) m.get("content"))
                                 .orElse(null);
+                boolean hasNewsContext = messages != null && messages.stream()
+                        .filter(m -> "system".equals(m.get("role")))
+                        .map(m -> (String) m.get("content"))
+                        .filter(Objects::nonNull)
+                        .anyMatch(content -> content.contains("CONTEXT FROM CITY NEWS"));
                 if (userPrompt != null && userPrompt.contains("[UPSTREAM_402]")) {
                     return new OpenRouterStreamStartResult.Error(new OpenRouterStreamingException(
                             OpenRouterErrorCode.UPSTREAM,
                             "OpenRouter stream startup failed.",
                             402));
+                }
+                if (userPrompt != null && userPrompt.contains("[SSE_NEWS_CONTEXT]")) {
+                    String content = hasNewsContext ? "NEWS CONTEXT USED" : "NEWS CONTEXT MISSING";
+                    return new OpenRouterStreamStartResult.Success(reactor.core.publisher.Flux.just(
+                            "data: {\"choices\":[{\"delta\":{\"content\":\"" + content + "\"}}]}",
+                            "data: [DONE]"));
                 }
                 if (userPrompt != null && userPrompt.contains("[UPSTREAM_429]")) {
                     return new OpenRouterStreamStartResult.Error(new OpenRouterStreamingException(
@@ -852,6 +1039,12 @@ public class OpenRouterControllerIntegrationTest {
                         "data: [DONE]"));
             }
         };
+    }
+
+    @MockBean(ResponseCacheService.class)
+    @Replaces(ResponseCacheService.class)
+    ResponseCacheService enabledResponseCacheService() {
+        return new ResponseCacheService(true, 10, 500);
     }
 
     @MockBean(SqsComplaintPublisher.class)

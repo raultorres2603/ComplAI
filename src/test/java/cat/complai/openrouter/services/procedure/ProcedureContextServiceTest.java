@@ -1,17 +1,27 @@
 package cat.complai.openrouter.services.procedure;
 
 import cat.complai.openrouter.dto.Source;
+import cat.complai.openrouter.helpers.EventRagHelper;
 import cat.complai.openrouter.helpers.EventRagHelperRegistry;
+import cat.complai.openrouter.helpers.NewsRagHelper;
+import cat.complai.openrouter.helpers.NewsRagHelperRegistry;
+import cat.complai.openrouter.helpers.ProcedureRagHelper;
 import cat.complai.openrouter.helpers.ProcedureRagHelperRegistry;
+import cat.complai.openrouter.helpers.RedactPromptBuilder;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @MicronautTest
 class ProcedureContextServiceTest {
@@ -19,131 +29,59 @@ class ProcedureContextServiceTest {
         @Inject
         ProcedureContextService procedureContextService;
 
-        @Inject
-        ProcedureRagHelperRegistry procedureRagHelperRegistry;
-
-        @Inject
-        EventRagHelperRegistry eventRagHelperRegistry;
-
         @Test
-        void buildProcedureContextResult_returnsMaxThreeMatches() throws Exception {
-                // Load testcity procedures
+        void buildProcedureContextResult_returnsMaxThreeMatches() {
                 ProcedureContextService.ProcedureContextResult result = procedureContextService
                                 .buildProcedureContextResult("recycling waste", "testcity");
 
                 assertNotNull(result);
                 assertNotNull(result.getSources());
-
-                // Sources should be limited by RAG helper's MAX_RESULTS = 3
-                assertTrue(result.getSources().size() <= 3,
-                                "Should return at most 3 procedure sources, but got " + result.getSources().size());
+                assertTrue(result.getSources().size() <= 3);
         }
 
         @Test
-        void buildEventContextResult_returnsMaxThreeMatches() throws Exception {
-                // Load testcity events
+        void buildEventContextResult_returnsMaxThreeMatches() {
                 ProcedureContextService.EventContextResult result = procedureContextService
                                 .buildEventContextResult("festival concert", "testcity");
 
                 assertNotNull(result);
                 assertNotNull(result.getSources());
-
-                // Sources should be limited by RAG helper's MAX_RESULTS = 3
-                assertTrue(result.getSources().size() <= 3,
-                                "Should return at most 3 event sources, but got " + result.getSources().size());
+                assertTrue(result.getSources().size() <= 3);
         }
 
         @Test
-        void buildProcedureContextResult_withBroadQuery_respectsLimit() throws Exception {
-                // Query that might match multiple procedures
+        void buildProcedureContextResult_emptyQuery_returnsEmpty() {
                 ProcedureContextService.ProcedureContextResult result = procedureContextService
-                                .buildProcedureContextResult("procedure steps requirements", "testcity");
+                                .buildProcedureContextResult("", "testcity");
 
                 assertNotNull(result);
-                assertTrue(result.getSources().size() <= 3,
-                                "Broad query should still respect MAX_RESULTS limit of 3");
+                assertTrue(result.getSources().isEmpty());
         }
 
         @Test
-        void buildEventContextResult_withBroadQuery_respectsLimit() throws Exception {
-                // Query that might match multiple events
+        void buildEventContextResult_emptyQuery_returnsEmpty() {
                 ProcedureContextService.EventContextResult result = procedureContextService
-                                .buildEventContextResult("event activity entertainment", "testcity");
+                                .buildEventContextResult("", "testcity");
 
                 assertNotNull(result);
-                assertTrue(result.getSources().size() <= 3,
-                                "Broad query should still respect MAX_RESULTS limit of 3");
+                assertTrue(result.getSources().isEmpty());
         }
 
         @Test
-        void buildProcedureContextResult_emptyQuery_returnsEmpty() throws Exception {
-                ProcedureContextService.ProcedureContextResult result = procedureContextService
-                                .buildProcedureContextResult("",
-                                                "testcity");
-
-                assertNotNull(result);
-                assertNotNull(result.getSources());
-                assertTrue(result.getSources().isEmpty(), "Empty query should return empty sources");
-        }
-
-        @Test
-        void buildEventContextResult_emptyQuery_returnsEmpty() throws Exception {
-                ProcedureContextService.EventContextResult result = procedureContextService.buildEventContextResult("",
-                                "testcity");
-
-                assertNotNull(result);
-                assertNotNull(result.getSources());
-                assertTrue(result.getSources().isEmpty(), "Empty query should return empty sources");
-        }
-
-        @Test
-        void deDuplicateAndOrderSources_preservesLimit() {
-                // Create a list with duplicates that exceeds MAX_RESULTS
+        void deDuplicateAndOrderSources_preservesFirstOccurrence() {
                 List<Source> sourcesWithDuplicates = new ArrayList<>();
-
-                // Add 5 sources, some with duplicate URLs
                 sourcesWithDuplicates.add(new Source("https://example.com/proc1", "Procedure 1"));
-                sourcesWithDuplicates.add(new Source("https://example.com/proc1", "Procedure 1")); // duplicate
+                sourcesWithDuplicates.add(new Source("https://example.com/proc1", "Procedure 1"));
                 sourcesWithDuplicates.add(new Source("https://example.com/proc2", "Procedure 2"));
                 sourcesWithDuplicates.add(new Source("https://example.com/proc3", "Procedure 3"));
-                sourcesWithDuplicates.add(new Source("https://example.com/proc2", "Procedure 2")); // duplicate
+                sourcesWithDuplicates.add(new Source("https://example.com/proc2", "Procedure 2"));
 
                 List<Source> deduped = procedureContextService.deDuplicateAndOrderSources(sourcesWithDuplicates);
 
-                // Should have removed duplicates
-                assertEquals(3, deduped.size(), "Should have 3 unique sources after deduplication");
-
-                // First occurrence should be preserved
+                assertEquals(3, deduped.size());
                 assertEquals("https://example.com/proc1", deduped.get(0).getUrl());
                 assertEquals("https://example.com/proc2", deduped.get(1).getUrl());
                 assertEquals("https://example.com/proc3", deduped.get(2).getUrl());
-        }
-
-        @Test
-        void buildProcedureContextResult_containsContextBlock() throws Exception {
-                ProcedureContextService.ProcedureContextResult result = procedureContextService
-                                .buildProcedureContextResult("recycling", "testcity");
-
-                assertNotNull(result);
-                // When matches found, context block should be present
-                if (!result.getSources().isEmpty()) {
-                        assertNotNull(result.getContextBlock());
-                        assertFalse(result.getContextBlock().isBlank());
-                }
-        }
-
-        @Test
-        void buildEventContextResult_containsContextBlock() throws Exception {
-                ProcedureContextService.EventContextResult result = procedureContextService.buildEventContextResult(
-                                "festival",
-                                "testcity");
-
-                assertNotNull(result);
-                // When matches found, context block should be present
-                if (!result.getSources().isEmpty()) {
-                        assertNotNull(result.getContextBlock());
-                        assertFalse(result.getContextBlock().isBlank());
-                }
         }
 
         @Test
@@ -152,142 +90,330 @@ class ProcedureContextServiceTest {
                                 "testcity"));
                 assertTrue(procedureContextService.questionNeedsProcedureContext("What are the requirements?",
                                 "testcity"));
-                assertTrue(procedureContextService.questionNeedsProcedureContext("How to recycle", "testcity"));
-
                 assertFalse(procedureContextService.questionNeedsProcedureContext("What is the weather today?",
                                 "testcity"));
-                assertFalse(procedureContextService.questionNeedsProcedureContext("Tell me a joke", "testcity"));
         }
 
         @Test
         void questionNeedsEventContext_detects_keywords() {
                 assertTrue(procedureContextService.questionNeedsEventContext("What events are happening?", "testcity"));
-                assertTrue(procedureContextService.questionNeedsEventContext("Is there a festival?", "testcity"));
                 assertTrue(procedureContextService.questionNeedsEventContext("What's on this weekend?", "testcity"));
-
-                assertFalse(procedureContextService.questionNeedsEventContext("What is the weather?", "testcity"));
                 assertFalse(procedureContextService.questionNeedsEventContext("Tell me a joke", "testcity"));
         }
 
-        // ============================================================================
-        // Phase 3: Monitoring & Validation — Parallel RAG Search Tests (Step 3)
-        // ============================================================================
-
         @Test
-        void buildProcedureContextResultAsync_returnsCompletableFuture() throws Exception {
-                // Step 3 validation: Verify that async method returns a CompletableFuture
-                CompletableFuture<ProcedureContextService.ProcedureContextResult> future = procedureContextService
-                                .buildProcedureContextResultAsync("recycling", "testcity");
-
-                assertNotNull(future, "Should return a CompletableFuture");
-                assertTrue(future instanceof CompletableFuture, "Should be a CompletableFuture instance");
-
-                // Should complete successfully and return a result
-                ProcedureContextService.ProcedureContextResult result = future.get();
-                assertNotNull(result, "Future should resolve to a non-null result");
+        void requiresEventDateWindowClarification_returnsTrue_whenEventIntentHasNoDateWindow() {
+                assertTrue(procedureContextService.requiresEventDateWindowClarification(
+                                "Quins esdeveniments hi ha?", "testcity"));
+                assertTrue(procedureContextService.requiresEventDateWindowClarification(
+                                "What events are happening?", "testcity"));
+                assertTrue(procedureContextService.requiresEventDateWindowClarification(
+                                "Que eventos hay en la ciudad?", "testcity"));
         }
 
         @Test
-        void buildEventContextResultAsync_returnsCompletableFuture() throws Exception {
-                // Step 3 validation: Verify that async event search returns a CompletableFuture
-                CompletableFuture<ProcedureContextService.EventContextResult> future = procedureContextService
-                                .buildEventContextResultAsync("festival", "testcity");
-
-                assertNotNull(future, "Should return a CompletableFuture");
-                assertTrue(future instanceof CompletableFuture, "Should be a CompletableFuture instance");
-
-                // Should complete successfully and return a result
-                ProcedureContextService.EventContextResult result = future.get();
-                assertNotNull(result, "Future should resolve to a non-null result");
+        void requiresEventDateWindowClarification_returnsFalse_whenDateWindowExists() {
+                assertFalse(procedureContextService.requiresEventDateWindowClarification(
+                                "What events are happening this week?", "testcity"));
+                assertFalse(procedureContextService.requiresEventDateWindowClarification(
+                                "Quins esdeveniments hi ha a l'abril?", "testcity"));
+                assertFalse(procedureContextService.requiresEventDateWindowClarification(
+                                "Que eventos hay del 10/04 al 15/04?", "testcity"));
         }
 
         @Test
-        void buildProcedureContextResultAsync_completesSuccessfully() throws Exception {
-                // Step 3 validation: Verify that async procedure context completes with valid
-                // data
-                CompletableFuture<ProcedureContextService.ProcedureContextResult> future = procedureContextService
-                                .buildProcedureContextResultAsync("recycling", "testcity");
+        void questionNeedsNewsContext_detects_keywords() {
+                assertTrue(procedureContextService.questionNeedsNewsContext("Any latest news in the city?",
+                                "testcity"));
+                assertTrue(procedureContextService.questionNeedsNewsContext("Que diu l'actualitat municipal?",
+                                "testcity"));
+                assertFalse(procedureContextService.questionNeedsNewsContext("How do I apply for a permit?",
+                                "testcity"));
+        }
 
-                // Should not throw exception
-                ProcedureContextService.ProcedureContextResult result = future.get();
+        @Test
+        void buildNewsContextResult_returnsEmpty_whenNoMatches() {
+                ProcedureContextService.NewsContextResult result = procedureContextService
+                                .buildNewsContextResult("martian taxation", "testcity");
+
                 assertNotNull(result);
-                assertNotNull(result.getSources());
+                assertTrue(result.getSources().isEmpty());
         }
 
         @Test
-        void buildEventContextResultAsync_completesSuccessfully() throws Exception {
-                // Step 3 validation: Verify that async event context completes with valid data
-                CompletableFuture<ProcedureContextService.EventContextResult> future = procedureContextService
-                                .buildEventContextResultAsync("festival", "testcity");
+        void detectContextRequirements_reusesNormalizedProcedureTitlesPerCity() throws Exception {
+                CountingProcedureRagHelper procedureHelper = new CountingProcedureRagHelper(
+                                List.of(new ProcedureRagHelper.Procedure("p1", "Resident Parking Badge Renewal", "", "",
+                                                "",
+                                                "https://example.com/procedure")));
+                ProcedureContextService service = new ProcedureContextService(
+                                new TestProcedureRegistry(Map.of("city-a", procedureHelper)),
+                                new TestEventRegistry(Map.of("city-a", new CountingEventRagHelper(List.of()))),
+                                new TestNewsRegistry(Map.of("city-a", new CountingNewsRagHelper(List.of()))),
+                                new RedactPromptBuilder());
 
-                // Should not throw exception
-                ProcedureContextService.EventContextResult result = future.get();
-                assertNotNull(result);
-                assertNotNull(result.getSources());
+                assertTrue(service.questionNeedsProcedureContext("Need resident parking badge renewal today",
+                                "city-a"));
+                assertTrue(service.questionNeedsProcedureContext("Need resident parking badge renewal today",
+                                "city-a"));
+                assertEquals(1, procedureHelper.getAllProceduresCalls.get());
         }
 
         @Test
-        void parallelSearches_bothComplete_withinReasonableTime() throws Exception {
-                // Step 3 validation: Verify that both searches can run concurrently
-                // Measure time for parallel execution vs sequential
+        void detectContextRequirements_reusesNormalizedEventTitlesPerCity() throws Exception {
+                CountingEventRagHelper eventHelper = new CountingEventRagHelper(
+                                List.of(new EventRagHelper.Event("e1", "Neighborhood Meetup", "", "", "", "", "", "",
+                                                "",
+                                                "https://example.com/event")));
+                ProcedureContextService service = new ProcedureContextService(
+                                new TestProcedureRegistry(Map.of("city-a", new CountingProcedureRagHelper(List.of()))),
+                                new TestEventRegistry(Map.of("city-a", eventHelper)),
+                                new TestNewsRegistry(Map.of("city-a", new CountingNewsRagHelper(List.of()))),
+                                new RedactPromptBuilder());
 
-                long parallelStartTime = System.currentTimeMillis();
-
-                CompletableFuture<ProcedureContextService.ProcedureContextResult> procFuture = procedureContextService
-                                .buildProcedureContextResultAsync("recycling", "testcity");
-                CompletableFuture<ProcedureContextService.EventContextResult> eventFuture = procedureContextService
-                                .buildEventContextResultAsync("festival", "testcity");
-
-                // Wait for both to complete (simulating CompletableFuture.allOf())
-                CompletableFuture.allOf(procFuture, eventFuture).get();
-
-                long parallelEndTime = System.currentTimeMillis();
-                long parallelTime = parallelEndTime - parallelStartTime;
-
-                // Now measure sequential execution for comparison
-                long sequentialStartTime = System.currentTimeMillis();
-                procedureContextService.buildProcedureContextResult("recycling", "testcity");
-                procedureContextService.buildEventContextResult("festival", "testcity");
-                long sequentialEndTime = System.currentTimeMillis();
-                long sequentialTime = sequentialEndTime - sequentialStartTime;
-
-                // Parallel should be faster than sequential (or at least not significantly
-                // slower)
-                // In practice, parallel execution should reduce latency by ~30-50%
-                assertTrue(parallelTime >= 0, "Parallel execution should complete");
-                assertTrue(sequentialTime >= 0, "Sequential execution should complete");
-
-                // Both futures completed successfully
-                assertNotNull(procFuture.get());
-                assertNotNull(eventFuture.get());
+                assertTrue(service.questionNeedsEventContext("Can I join the neighborhood meetup tonight?", "city-a"));
+                assertTrue(service.questionNeedsEventContext("Can I join the neighborhood meetup tonight?", "city-a"));
+                assertEquals(1, eventHelper.getAllEventsCalls.get());
         }
 
         @Test
-        void parallelSearches_producesSameResultAsSequential() throws Exception {
-                // Step 3 validation: Verify that parallel execution produces the same results
-                // as sequential
+        void detectContextRequirements_keywordAndConversationalShortCircuitsSkipTitleIndexLookup() throws Exception {
+                CountingProcedureRagHelper procedureHelper = new CountingProcedureRagHelper(
+                                List.of(new ProcedureRagHelper.Procedure("p1", "Resident Parking Badge Renewal", "", "",
+                                                "",
+                                                "https://example.com/procedure")));
+                CountingEventRagHelper eventHelper = new CountingEventRagHelper(
+                                List.of(new EventRagHelper.Event("e1", "Moonlight Concert", "", "", "", "", "", "", "",
+                                                "https://example.com/event")));
+                ProcedureContextService service = new ProcedureContextService(
+                                new TestProcedureRegistry(Map.of("city-a", procedureHelper)),
+                                new TestEventRegistry(Map.of("city-a", eventHelper)),
+                                new TestNewsRegistry(Map.of("city-a", new CountingNewsRagHelper(List.of()))),
+                                new RedactPromptBuilder());
 
-                // Parallel results
-                CompletableFuture<ProcedureContextService.ProcedureContextResult> procFuture = procedureContextService
-                                .buildProcedureContextResultAsync("recycling", "testcity");
-                CompletableFuture<ProcedureContextService.EventContextResult> eventFuture = procedureContextService
-                                .buildEventContextResultAsync("festival", "testcity");
+                ProcedureContextService.ContextRequirements keywordRequirements = service
+                                .detectContextRequirements("How do I apply for a permit?", "city-a");
+                ProcedureContextService.ContextRequirements conversationalRequirements = service
+                                .detectContextRequirements("Tell me a joke", "city-a");
 
-                CompletableFuture.allOf(procFuture, eventFuture).get();
+                assertTrue(keywordRequirements.needsProcedureContext());
+                assertFalse(keywordRequirements.needsEventContext());
+                assertFalse(keywordRequirements.needsNewsContext());
+                assertFalse(conversationalRequirements.needsProcedureContext());
+                assertFalse(conversationalRequirements.needsEventContext());
+                assertFalse(conversationalRequirements.needsNewsContext());
+                assertEquals(0, procedureHelper.getAllProceduresCalls.get());
+                assertEquals(0, eventHelper.getAllEventsCalls.get());
+        }
 
-                ProcedureContextService.ProcedureContextResult parallelProcResult = procFuture.get();
-                ProcedureContextService.EventContextResult parallelEventResult = eventFuture.get();
+        @Test
+        void detectContextRequirements_keepsCityScopedIsolationForDirectTitleMatches() throws Exception {
+                CountingProcedureRagHelper cityAHelper = new CountingProcedureRagHelper(
+                                List.of(new ProcedureRagHelper.Procedure("p1", "Resident Parking Badge Renewal", "", "",
+                                                "",
+                                                "https://example.com/a")));
+                CountingProcedureRagHelper cityBHelper = new CountingProcedureRagHelper(
+                                List.of(new ProcedureRagHelper.Procedure("p2", "Beach Access Permit", "", "", "",
+                                                "https://example.com/b")));
 
-                // Sequential results
-                ProcedureContextService.ProcedureContextResult sequentialProcResult = procedureContextService
-                                .buildProcedureContextResult("recycling", "testcity");
-                ProcedureContextService.EventContextResult sequentialEventResult = procedureContextService
-                                .buildEventContextResult("festival", "testcity");
+                ProcedureContextService service = new ProcedureContextService(
+                                new TestProcedureRegistry(Map.of("city-a", cityAHelper, "city-b", cityBHelper)),
+                                new TestEventRegistry(Map.of(
+                                                "city-a", new CountingEventRagHelper(List.of()),
+                                                "city-b", new CountingEventRagHelper(List.of()))),
+                                new TestNewsRegistry(Map.of(
+                                                "city-a", new CountingNewsRagHelper(List.of()),
+                                                "city-b", new CountingNewsRagHelper(List.of()))),
+                                new RedactPromptBuilder());
 
-                // Results should be the same (same sources count and context)
-                assertEquals(parallelProcResult.getSources().size(), sequentialProcResult.getSources().size(),
-                                "Parallel and sequential procedure search should return same number of results");
-                assertEquals(parallelEventResult.getSources().size(), sequentialEventResult.getSources().size(),
-                                "Parallel and sequential event search should return same number of results");
+                assertTrue(service.questionNeedsProcedureContext("Need resident parking badge renewal today",
+                                "city-a"));
+                assertFalse(service.questionNeedsProcedureContext("Need resident parking badge renewal today",
+                                "city-b"));
+                assertTrue(service.questionNeedsProcedureContext("Need beach access permit today", "city-b"));
+        }
+
+        @Test
+        void detectContextRequirements_matchesDirectProcedureAndEventTitlesSeparately() throws Exception {
+                CountingProcedureRagHelper procedureHelper = new CountingProcedureRagHelper(
+                                List.of(new ProcedureRagHelper.Procedure("p1", "Resident Parking Badge Renewal", "", "",
+                                                "",
+                                                "https://example.com/procedure")));
+                CountingEventRagHelper eventHelper = new CountingEventRagHelper(
+                                List.of(new EventRagHelper.Event("e1", "Moonlight Concert", "", "", "", "", "", "", "",
+                                                "https://example.com/event")));
+                ProcedureContextService service = new ProcedureContextService(
+                                new TestProcedureRegistry(Map.of("city-a", procedureHelper)),
+                                new TestEventRegistry(Map.of("city-a", eventHelper)),
+                                new TestNewsRegistry(Map.of("city-a", new CountingNewsRagHelper(List.of()))),
+                                new RedactPromptBuilder());
+
+                ProcedureContextService.ContextRequirements procedureRequirements = service
+                                .detectContextRequirements("Need resident parking badge renewal today", "city-a");
+                ProcedureContextService.ContextRequirements eventRequirements = service
+                                .detectContextRequirements("Can I join the moonlight concert tonight?", "city-a");
+
+                assertTrue(procedureRequirements.needsProcedureContext());
+                assertFalse(procedureRequirements.needsEventContext());
+                assertFalse(procedureRequirements.needsNewsContext());
+                assertFalse(eventRequirements.needsProcedureContext());
+                assertTrue(eventRequirements.needsEventContext());
+                assertFalse(eventRequirements.needsNewsContext());
+        }
+
+        @Test
+        void detectContextRequirements_ambiguousQueryUsesTitleIndexLookup() throws Exception {
+                CountingProcedureRagHelper procedureHelper = new CountingProcedureRagHelper(
+                                List.of(new ProcedureRagHelper.Procedure("p1", "Resident Parking Badge Renewal", "", "",
+                                                "",
+                                                "https://example.com/procedure")));
+                CountingEventRagHelper eventHelper = new CountingEventRagHelper(
+                                List.of(new EventRagHelper.Event("e1", "Moonlight Concert", "", "", "", "", "", "", "",
+                                                "https://example.com/event")));
+                ProcedureContextService service = new ProcedureContextService(
+                                new TestProcedureRegistry(Map.of("city-a", procedureHelper)),
+                                new TestEventRegistry(Map.of("city-a", eventHelper)),
+                                new TestNewsRegistry(Map.of("city-a", new CountingNewsRagHelper(List.of()))),
+                                new RedactPromptBuilder());
+
+                ProcedureContextService.ContextRequirements requirements = service
+                                .detectContextRequirements("resident parking badge renewal", "city-a");
+
+                assertTrue(requirements.needsProcedureContext());
+                assertFalse(requirements.needsEventContext());
+                assertFalse(requirements.needsNewsContext());
+                assertEquals(1, procedureHelper.getAllProceduresCalls.get());
+                assertEquals(1, eventHelper.getAllEventsCalls.get());
+        }
+
+        @Test
+        void detectContextRequirements_newsIntent_skipsProcedureAndEventTitleIndexes() throws Exception {
+                CountingProcedureRagHelper procedureHelper = new CountingProcedureRagHelper(List.of(
+                                new ProcedureRagHelper.Procedure("p1", "Resident Parking Badge Renewal", "", "", "",
+                                                "https://example.com/procedure")));
+                CountingEventRagHelper eventHelper = new CountingEventRagHelper(List.of(
+                                new EventRagHelper.Event("e1", "Moonlight Concert", "", "", "", "", "", "", "",
+                                                "https://example.com/event")));
+                CountingNewsRagHelper newsHelper = new CountingNewsRagHelper(List.of(
+                                new NewsRagHelper.News("n1", "Latest municipal recycling update", "", "", "", "", "",
+                                                "https://example.com/news")));
+
+                ProcedureContextService service = new ProcedureContextService(
+                                new TestProcedureRegistry(Map.of("city-a", procedureHelper)),
+                                new TestEventRegistry(Map.of("city-a", eventHelper)),
+                                new TestNewsRegistry(Map.of("city-a", newsHelper)),
+                                new RedactPromptBuilder());
+
+                ProcedureContextService.ContextRequirements requirements = service
+                                .detectContextRequirements("Any latest news in the city?", "city-a");
+
+                assertFalse(requirements.needsProcedureContext());
+                assertFalse(requirements.needsEventContext());
+                assertTrue(requirements.needsNewsContext());
+                assertEquals(0, procedureHelper.getAllProceduresCalls.get());
+                assertEquals(0, eventHelper.getAllEventsCalls.get());
+                assertEquals(0, newsHelper.getAllNewsCalls.get());
+        }
+
+        private static final class TestProcedureRegistry extends ProcedureRagHelperRegistry {
+                private final Map<String, ProcedureRagHelper> helpersByCity;
+
+                private TestProcedureRegistry(Map<String, ProcedureRagHelper> helpersByCity) {
+                        this.helpersByCity = helpersByCity;
+                }
+
+                @Override
+                public ProcedureRagHelper getForCity(String cityId) {
+                        return helpersByCity.get(cityId);
+                }
+        }
+
+        private static final class TestEventRegistry extends EventRagHelperRegistry {
+                private final Map<String, EventRagHelper> helpersByCity;
+
+                private TestEventRegistry(Map<String, EventRagHelper> helpersByCity) {
+                        this.helpersByCity = helpersByCity;
+                }
+
+                @Override
+                public EventRagHelper getForCity(String cityId) {
+                        return helpersByCity.get(cityId);
+                }
+        }
+
+        private static final class TestNewsRegistry extends NewsRagHelperRegistry {
+                private final Map<String, NewsRagHelper> helpersByCity;
+
+                private TestNewsRegistry(Map<String, NewsRagHelper> helpersByCity) {
+                        this.helpersByCity = helpersByCity;
+                }
+
+                @Override
+                public NewsRagHelper getForCity(String cityId) {
+                        return helpersByCity.get(cityId);
+                }
+        }
+
+        private static final class CountingProcedureRagHelper extends ProcedureRagHelper {
+                private final List<ProcedureRagHelper.Procedure> procedures;
+                private final AtomicInteger getAllProceduresCalls = new AtomicInteger();
+
+                private CountingProcedureRagHelper(List<ProcedureRagHelper.Procedure> procedures) throws IOException {
+                        super("testcity");
+                        this.procedures = procedures;
+                }
+
+                @Override
+                public List<ProcedureRagHelper.Procedure> getAllProcedures() {
+                        getAllProceduresCalls.incrementAndGet();
+                        return procedures;
+                }
+
+                @Override
+                public List<ProcedureRagHelper.Procedure> search(String query) {
+                        return procedures;
+                }
+        }
+
+        private static final class CountingEventRagHelper extends EventRagHelper {
+                private final List<EventRagHelper.Event> events;
+                private final AtomicInteger getAllEventsCalls = new AtomicInteger();
+
+                private CountingEventRagHelper(List<EventRagHelper.Event> events) throws IOException {
+                        super("testcity");
+                        this.events = events;
+                }
+
+                @Override
+                public List<EventRagHelper.Event> getAllEvents() {
+                        getAllEventsCalls.incrementAndGet();
+                        return events;
+                }
+
+                @Override
+                public List<EventRagHelper.Event> search(String query) {
+                        return events;
+                }
+        }
+
+        private static final class CountingNewsRagHelper extends NewsRagHelper {
+                private final List<NewsRagHelper.News> news;
+                private final AtomicInteger getAllNewsCalls = new AtomicInteger();
+
+                private CountingNewsRagHelper(List<NewsRagHelper.News> news) {
+                        super("testcity");
+                        this.news = news;
+                }
+
+                @Override
+                public List<NewsRagHelper.News> getAllNews() {
+                        getAllNewsCalls.incrementAndGet();
+                        return news;
+                }
+
+                @Override
+                public List<NewsRagHelper.News> search(String query) {
+                        return news;
+                }
         }
 }

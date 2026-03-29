@@ -7,7 +7,7 @@
     "https://tramits.pratespais.com/Ciutadania/"
   ],
   "newsSources": [
-    "https://www.instagram.com/elprataldia/"
+    "https://elprataldia.es/"
   ],
   "baseUrl": "https://tramits.pratespais.com/Ciutadania/TramitsTemes.aspx",
   "s3Region": "eu-west-1",
@@ -38,6 +38,73 @@
     "whenTitleEmptyOrEquals": [
       "Portal de Tràmits"
     ]
+  },
+  "news": {
+    "baseUrl": "https://elprataldia.es/",
+    "discovery": {
+      "categoryLinkSelector": "nav.et-menu-nav a[href*='https://elprataldia.es/category/'], .et_mobile_menu a[href*='https://elprataldia.es/category/']",
+      "categoryIncludePatterns": [
+        "^https://elprataldia\\.es/category/[^/?#]+/?$"
+      ],
+      "categoryExcludePatterns": [
+        "/feed/?$"
+      ]
+    },
+    "crawl": {
+      "articleLinkSelector": ".dg-blog-grid article h2.dg_bm_title a[href], .dg-blog-grid article a.featured-image-link[href], article .entry-title a[href]",
+      "articleIncludePatterns": [
+        "^https://elprataldia\\.es/(?!category/|tag/|author/|wp-json/|wp-content/|wp-admin/|feed/)[^?#]+/?$"
+      ],
+      "articleExcludePatterns": [
+        "/feed/?$",
+        "#respond$",
+        "#comments$"
+      ],
+      "paginationLinkSelector": "a.next.page-numbers[href], .pagination a.next[href], .pagination a.page-numbers[href], a[rel='next'][href]"
+    },
+    "seedCategoryUrls": [
+      "https://elprataldia.es/category/actualitat/",
+      "https://elprataldia.es/category/agenda/",
+      "https://elprataldia.es/category/al-dia-tv/",
+      "https://elprataldia.es/category/el-prat-en-imatges/",
+      "https://elprataldia.es/category/esports/",
+      "https://elprataldia.es/category/opinio/",
+      "https://elprataldia.es/category/politica-local/",
+      "https://elprataldia.es/category/pratencs/",
+      "https://elprataldia.es/category/praticipa/"
+    ],
+    "fields": {
+      "title": {
+        "selector": ".et_pb_section_0_tb_body .et_pb_text_0_tb_body .et_pb_text_inner, .entry-title, h1",
+        "multiple": false
+      },
+      "summary": {
+        "selector": ".et_pb_post_content_0_tb_body p strong, .et_pb_post_content p strong, article .entry-content p strong",
+        "multiple": false
+      },
+      "body": {
+        "selector": ".et_pb_post_content_0_tb_body p, .et_pb_post_content p, article .entry-content p",
+        "multiple": true
+      },
+      "publishedAt": {
+        "selector": ".et_pb_text_2_tb_body .et_pb_text_inner, time.published, .post-meta .published",
+        "multiple": false
+      },
+      "categories": {
+        "selector": ".et_pb_text_1_tb_body .et_pb_text_inner a[href*='/category/'], a[rel='category tag'], .post-meta .categories a",
+        "multiple": true
+      },
+      "author": {
+        "selector": ".post-meta .author, .author a, [rel='author']",
+        "multiple": false
+      }
+    },
+    "skip": {
+      "whenTitleEmptyOrEquals": [
+        "0 comentarios"
+      ],
+      "whenBodyEmpty": true
+    }
   },
   "events": {
     "baseUrl": "https://www.elprat.cat/la-ciutat/guia-agenda",

@@ -15,8 +15,11 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -47,9 +50,9 @@ public class HttpWrapperTest {
         Map<String, Object> props = Map.of(
                 "openrouter.url", "http://localhost:" + server.getAddress().getPort(),
                 "OPENROUTER_API_KEY", "test-key",
-                "micronaut.application.name", "complai-test"
-        );
-        try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST).build()) {
+                "micronaut.application.name", "complai-test");
+        try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST)
+                .build()) {
             ctx.registerSingleton(new ObjectMapper());
             ctx.start();
             HttpWrapper httpWrapper = ctx.getBean(HttpWrapper.class);
@@ -82,9 +85,9 @@ public class HttpWrapperTest {
 
         Map<String, Object> props = Map.of(
                 "openrouter.url", "http://localhost:" + server.getAddress().getPort(),
-                "OPENROUTER_API_KEY", "test-key"
-        );
-        try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST).build()) {
+                "OPENROUTER_API_KEY", "test-key");
+        try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST)
+                .build()) {
             ctx.registerSingleton(new ObjectMapper());
             ctx.start();
             HttpWrapper wrapper = ctx.getBean(HttpWrapper.class);
@@ -118,9 +121,9 @@ public class HttpWrapperTest {
 
         Map<String, Object> props = Map.of(
                 "openrouter.url", "http://localhost:" + server.getAddress().getPort(),
-                "OPENROUTER_API_KEY", "test-key"
-        );
-        try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST).build()) {
+                "OPENROUTER_API_KEY", "test-key");
+        try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST)
+                .build()) {
             ctx.registerSingleton(new ObjectMapper());
             ctx.start();
             HttpWrapper wrapper = ctx.getBean(HttpWrapper.class);
@@ -158,9 +161,9 @@ public class HttpWrapperTest {
         Map<String, Object> props = Map.of(
                 "openrouter.url", "http://localhost:" + server.getAddress().getPort(),
                 // Put a plain token so wrapper prefixes Bearer
-                "OPENROUTER_API_KEY", "plain-token"
-        );
-        try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST).build()) {
+                "OPENROUTER_API_KEY", "plain-token");
+        try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST)
+                .build()) {
             ctx.registerSingleton(new ObjectMapper());
             ctx.start();
             HttpWrapper wrapper = ctx.getBean(HttpWrapper.class);
@@ -188,7 +191,8 @@ public class HttpWrapperTest {
         server.createContext("/api/v1/chat/completions", exchange -> {
             byte[] bytes = sseBody.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "text/event-stream");
-            // Use 0 for chunked transfer encoding so Micronaut's dataStream() receives HttpContent chunks
+            // Use 0 for chunked transfer encoding so Micronaut's dataStream() receives
+            // HttpContent chunks
             exchange.sendResponseHeaders(200, 0);
             try (OutputStream os = exchange.getResponseBody()) {
                 os.write(bytes);
@@ -199,16 +203,15 @@ public class HttpWrapperTest {
         Map<String, Object> props = Map.of(
                 "openrouter.url", "http://localhost:" + server.getAddress().getPort(),
                 "OPENROUTER_API_KEY", "test-key",
-                "micronaut.application.name", "complai-test"
-        );
-        try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST).build()) {
+                "micronaut.application.name", "complai-test");
+        try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST)
+                .build()) {
             ctx.registerSingleton(new ObjectMapper());
             ctx.start();
             HttpWrapper wrapper = ctx.getBean(HttpWrapper.class);
 
-                List<String> lines = collectStream(wrapper.streamFromOpenRouter(
-                    List.of(Map.of("role", "user", "content", "test"))
-                ));
+            List<String> lines = collectStream(wrapper.streamFromOpenRouter(
+                    List.of(Map.of("role", "user", "content", "test"))));
 
             assertNotNull(lines);
             assertEquals(2, lines.size());
@@ -241,16 +244,15 @@ public class HttpWrapperTest {
         Map<String, Object> props = Map.of(
                 "openrouter.url", "http://localhost:" + server.getAddress().getPort(),
                 "OPENROUTER_API_KEY", "test-key",
-                "micronaut.application.name", "complai-test"
-        );
-        try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST).build()) {
+                "micronaut.application.name", "complai-test");
+        try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST)
+                .build()) {
             ctx.registerSingleton(new ObjectMapper());
             ctx.start();
             HttpWrapper wrapper = ctx.getBean(HttpWrapper.class);
 
-                List<String> lines = collectStream(wrapper.streamFromOpenRouter(
-                    List.of(Map.of("role", "user", "content", "test"))
-                ));
+            List<String> lines = collectStream(wrapper.streamFromOpenRouter(
+                    List.of(Map.of("role", "user", "content", "test"))));
 
             assertNotNull(lines);
             assertEquals(2, lines.size());
@@ -269,7 +271,8 @@ public class HttpWrapperTest {
         server.createContext("/api/v1/chat/completions", exchange -> {
             byte[] bytes = sseBody.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "text/event-stream");
-            // Use 0 for chunked transfer encoding so Micronaut's dataStream() receives HttpContent chunks
+            // Use 0 for chunked transfer encoding so Micronaut's dataStream() receives
+            // HttpContent chunks
             exchange.sendResponseHeaders(200, 0);
             try (OutputStream os = exchange.getResponseBody()) {
                 os.write(bytes);
@@ -280,16 +283,15 @@ public class HttpWrapperTest {
         Map<String, Object> props = Map.of(
                 "openrouter.url", "http://localhost:" + server.getAddress().getPort(),
                 "OPENROUTER_API_KEY", "test-key",
-                "micronaut.application.name", "complai-test"
-        );
-        try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST).build()) {
+                "micronaut.application.name", "complai-test");
+        try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST)
+                .build()) {
             ctx.registerSingleton(new ObjectMapper());
             ctx.start();
             HttpWrapper wrapper = ctx.getBean(HttpWrapper.class);
 
             List<String> lines = collectStream(wrapper.streamFromOpenRouter(
-                    List.of(Map.of("role", "user", "content", "test"))
-            ));
+                    List.of(Map.of("role", "user", "content", "test"))));
 
             assertNotNull(lines);
             assertEquals(2, lines.size());
@@ -314,9 +316,9 @@ public class HttpWrapperTest {
         Map<String, Object> props = Map.of(
                 "openrouter.url", "http://localhost:" + server.getAddress().getPort(),
                 "OPENROUTER_API_KEY", "test-key",
-                "micronaut.application.name", "complai-test"
-        );
-        try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST).build()) {
+                "micronaut.application.name", "complai-test");
+        try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST)
+                .build()) {
             ctx.registerSingleton(new ObjectMapper());
             ctx.start();
             HttpWrapper wrapper = ctx.getBean(HttpWrapper.class);
@@ -331,5 +333,41 @@ public class HttpWrapperTest {
         } finally {
             server.stop(0);
         }
+    }
+
+    @Test
+    public void postToOpenRouterAsync_retryUsesDelayedExecutorWithoutBlockingSleep() throws Exception {
+        class ImmediateRetryWrapper extends HttpWrapper {
+            private final List<HttpDto> responses = new ArrayList<>(List.of(
+                    new HttpDto(null, 429, "POST", "OpenRouter non-2xx response: 429"),
+                    new HttpDto("retried-ok", 200, "POST", null)));
+            private final List<Long> recordedDelays = new ArrayList<>();
+
+            @Override
+            protected String resolveAuthHeader() {
+                return "Bearer test-key";
+            }
+
+            @Override
+            protected CompletableFuture<HttpDto> executeRequestAsync(Map<String, Object> payload, String authValue,
+                    int attemptNumber) {
+                return CompletableFuture.completedFuture(responses.remove(0));
+            }
+
+            @Override
+            protected Executor retryDelayExecutor(long delayMs) {
+                recordedDelays.add(delayMs);
+                return Runnable::run;
+            }
+        }
+
+        ImmediateRetryWrapper wrapper = new ImmediateRetryWrapper();
+        HttpDto dto = wrapper.postToOpenRouterAsync(List.of(Map.of("role", "user", "content", "prompt")))
+                .get(1, TimeUnit.SECONDS);
+
+        assertEquals(200, dto.statusCode());
+        assertEquals("retried-ok", dto.message());
+        assertEquals(1, wrapper.recordedDelays.size());
+        assertTrue(wrapper.recordedDelays.get(0) > 0);
     }
 }

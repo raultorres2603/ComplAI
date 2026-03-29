@@ -1,21 +1,19 @@
 package cat.complai.openrouter.helpers;
 
+import cat.complai.openrouter.helpers.rag.DeterministicQueryExpansion;
+import cat.complai.openrouter.helpers.rag.InMemoryLexicalIndex;
+import cat.complai.openrouter.helpers.rag.RagJavaCalibration;
+import cat.complai.openrouter.helpers.rag.SearchResult;
+import cat.complai.openrouter.helpers.rag.TokenNormalizer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
-import org.apache.lucene.document.*;
-import org.apache.lucene.index.*;
-import org.apache.lucene.queryparser.classic.MultiFieldQueryParser;
-import org.apache.lucene.queryparser.classic.ParseException;
-import org.apache.lucene.search.*;
-import org.apache.lucene.store.ByteBuffersDirectory;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -39,21 +37,18 @@ public class ProcedureRagHelper {
         }
     }
 
-    private static final String[] SEARCH_FIELDS = { "title", "description" };
-    private static final float[] SEARCH_FIELD_BOOSTS = { 2.0f, 1.0f };
     private static final int MAX_RESULTS = 3;
-    private static final float MIN_RELEVANCE_SCORE = 0.5f;
     private static final String ENV_PROCEDURES_BUCKET = "PROCEDURES_BUCKET";
     private static final String ENV_PROCEDURES_REGION = "PROCEDURES_REGION";
     private static final Logger logger = Logger.getLogger(ProcedureRagHelper.class.getName());
 
     private final String cityId;
     private final List<Procedure> procedures;
-    private final ByteBuffersDirectory ramDirectory;
-    private final Analyzer analyzer;
+    private final InMemoryLexicalIndex<Procedure> javaIndex;
+    private final RagJavaCalibration.DomainSettings javaCalibration;
 
     /**
-     * Builds an in-memory Lucene index for the given city's procedures.
+        * Builds an in-memory index for the given city's procedures.
      *
      * <p>
      * Procedures are loaded from S3 when {@code PROCEDURES_BUCKET} and
@@ -63,12 +58,17 @@ public class ProcedureRagHelper {
      * tests).
      */
     public ProcedureRagHelper(String cityId) throws IOException {
+        this(cityId, RagJavaCalibration.procedure());
+    }
+
+    ProcedureRagHelper(String cityId, RagJavaCalibration.DomainSettings javaCalibration) throws IOException {
         this.cityId = cityId;
+        this.javaCalibration = javaCalibration;
         this.procedures = loadProcedures();
-        this.analyzer = new StandardAnalyzer();
-        this.ramDirectory = new ByteBuffersDirectory();
-        buildIndex();
-        logger.info(() -> "ProcedureRagHelper initialised — city=" + cityId + " procedureCount=" + procedures.size());
+        this.javaIndex = buildJavaIndex();
+        logger.info(() -> "ProcedureRagHelper initialised — city=" + cityId
+                + " procedureCount=" + procedures.size()
+                + " engine=java");
     }
 
     private InputStream getProceduresInputStream() throws IOException {
@@ -122,86 +122,76 @@ public class ProcedureRagHelper {
 
     private List<Procedure> loadProcedures() throws IOException {
         ObjectMapper mapper = new ObjectMapper();
-        InputStream is = getProceduresInputStream();
-        JsonNode root = mapper.readTree(is);
-        List<Procedure> result = new ArrayList<>();
-        for (JsonNode node : root.get("procedures")) {
-            result.add(new Procedure(
-                    node.path("procedureId").asText(),
-                    node.path("title").asText(),
-                    node.path("description").asText(),
-                    node.path("requirements").asText(),
-                    node.path("steps").asText(),
-                    node.path("url").asText()));
+        try (InputStream is = getProceduresInputStream()) {
+            JsonNode root = mapper.readTree(is);
+            List<Procedure> result = new ArrayList<>();
+            for (JsonNode node : root.get("procedures")) {
+                result.add(new Procedure(
+                        node.path("procedureId").asText(),
+                        node.path("title").asText(),
+                        node.path("description").asText(),
+                        node.path("requirements").asText(),
+                        node.path("steps").asText(),
+                        node.path("url").asText()));
+            }
+            return result;
         }
-        return result;
     }
 
-    private void buildIndex() throws IOException {
-        IndexWriterConfig config = new IndexWriterConfig(analyzer);
-        try (IndexWriter writer = new IndexWriter(ramDirectory, config)) {
-            for (Procedure p : procedures) {
-                Document doc = new Document();
-                doc.add(new StringField("procedureId", p.procedureId, Field.Store.YES));
-                doc.add(new TextField("title", p.title, Field.Store.YES));
-                doc.add(new TextField("description", p.description, Field.Store.YES));
-                // Store but don't index the following fields (not in SEARCH_FIELDS)
-                doc.add(new StringField("requirements", p.requirements, Field.Store.YES));
-                doc.add(new StringField("steps", p.steps, Field.Store.YES));
-                doc.add(new StringField("url", p.url, Field.Store.YES));
-                writer.addDocument(doc);
-            }
-        }
+    private InMemoryLexicalIndex<Procedure> buildJavaIndex() {
+        Map<String, Double> fieldWeights = new LinkedHashMap<>();
+        fieldWeights.put("title", javaCalibration.titleBoost());
+        fieldWeights.put("description", javaCalibration.descriptionBoost());
+
+        return InMemoryLexicalIndex.build(procedures, fieldWeights, procedure -> {
+            Map<String, String> fields = new LinkedHashMap<>();
+            fields.put("title", procedure.title);
+            fields.put("description", procedure.description);
+            return fields;
+        });
     }
 
     public List<Procedure> search(String query) {
         if (query == null || query.isBlank())
             return Collections.emptyList();
 
-        // Preprocess the query to normalize whitespace, remove accents
         String cleanedQuery = QueryPreprocessor.preprocess(query);
-
-        List<Procedure> results = new ArrayList<>();
-        try (DirectoryReader reader = DirectoryReader.open(ramDirectory)) {
-            IndexSearcher searcher = new IndexSearcher(reader);
-            MultiFieldQueryParser parser = new MultiFieldQueryParser(SEARCH_FIELDS, analyzer,
-                    new java.util.HashMap<>() {
-                        {
-                            put("title", SEARCH_FIELD_BOOSTS[0]);
-                            put("description", SEARCH_FIELD_BOOSTS[1]);
-                        }
-                    });
-            Query luceneQuery = parser.parse(cleanedQuery);
-            TopDocs topDocs = searcher.search(luceneQuery, MAX_RESULTS);
-            int[] filteredCountArray = { 0 };
-            float[] maxScoreArray = { 0.0f };
-            for (ScoreDoc sd : topDocs.scoreDocs) {
-                maxScoreArray[0] = Math.max(maxScoreArray[0], sd.score);
-                if (sd.score >= MIN_RELEVANCE_SCORE) {
-                    Document doc = searcher.storedFields().document(sd.doc);
-                    results.add(new Procedure(
-                            doc.get("procedureId"),
-                            doc.get("title"),
-                            doc.get("description"),
-                            doc.get("requirements"),
-                            doc.get("steps"),
-                            doc.get("url")));
-                } else {
-                    filteredCountArray[0]++;
-                    logger.fine(() -> "RAG SEARCH — Filtering low-score result: score=" + sd.score
-                            + " < threshold=" + MIN_RELEVANCE_SCORE);
-                }
-            }
-            final int filteredCount = filteredCountArray[0];
-            final float maxScore = maxScoreArray[0];
-            logger.fine(() -> "RAG SEARCH — type=PROCEDURE cityId=" + cityId + " originalQuery=" + query
-                    + " cleanedQuery=" + cleanedQuery + " resultCount=" + results.size() + " filteredCount="
-                    + filteredCount
-                    + " maxScore=" + maxScore + " minThreshold=" + MIN_RELEVANCE_SCORE);
-        } catch (IOException | ParseException e) {
-            logger.log(Level.WARNING, "RAG search failed — originalQuery=" + query
-                    + " cleanedQuery=" + cleanedQuery + " error=" + e.getMessage(), e);
+        if (cleanedQuery.isBlank()) {
+            return Collections.emptyList();
         }
+
+        return runJavaSearch(cleanedQuery, query.length());
+    }
+
+    private List<Procedure> runJavaSearch(String cleanedQuery, int rawQueryLength) {
+        List<String> queryTokens = TokenNormalizer.tokenize(cleanedQuery);
+        List<String> expandedTokens = DeterministicQueryExpansion.expandProcedureQueryTokens(
+            queryTokens,
+            javaCalibration.expansionEnabled());
+
+        long startNanos = System.nanoTime();
+        InMemoryLexicalIndex.SearchResponse<Procedure> response = javaIndex.search(
+            expandedTokens,
+                MAX_RESULTS,
+            javaCalibration.absoluteFloor(),
+            javaCalibration.relativeFloor());
+        long latencyMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
+
+        List<Procedure> results = response.results().stream()
+                .map(SearchResult::source)
+                .toList();
+
+        logger.fine(() -> "RAG SEARCH — type=PROCEDURE cityId=" + cityId
+                + " engine=java queryLength=" + rawQueryLength
+                + " resultCount=" + results.size()
+                + " candidateCount=" + response.candidateCount()
+                + " filteredCount=" + response.filteredCount()
+                + " bestScore=" + response.bestScore()
+                + " expansionEnabled=" + javaCalibration.expansionEnabled()
+                + " absoluteFloor=" + response.absoluteFloor()
+                + " relativeFloor=" + response.relativeFloor()
+                + " appliedThreshold=" + response.appliedThreshold()
+                + " latencyMs=" + latencyMs);
         return results;
     }
 

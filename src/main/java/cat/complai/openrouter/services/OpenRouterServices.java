@@ -6,7 +6,9 @@ import cat.complai.openrouter.services.validation.InputValidationService;
 import cat.complai.openrouter.services.conversation.ConversationManagementService;
 import cat.complai.openrouter.services.ai.AiResponseProcessingService;
 import cat.complai.openrouter.services.procedure.ProcedureContextService;
+import cat.complai.openrouter.services.procedure.ProcedureContextService.ContextRequirements;
 import cat.complai.openrouter.services.procedure.ProcedureContextService.ProcedureContextResult;
+import cat.complai.openrouter.services.procedure.ProcedureContextService.NewsContextResult;
 import cat.complai.openrouter.interfaces.IOpenRouterService;
 import cat.complai.openrouter.dto.AskStreamResult;
 import cat.complai.openrouter.dto.OpenRouterResponseDto;
@@ -24,6 +26,7 @@ import cat.complai.openrouter.helpers.SseChunkParser;
 import cat.complai.openrouter.dto.ComplainantIdentity;
 import cat.complai.openrouter.dto.OutputFormat;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
 import jakarta.inject.Inject;
 import org.reactivestreams.Publisher;
@@ -31,7 +34,10 @@ import reactor.core.publisher.Flux;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -47,6 +53,7 @@ public class OpenRouterServices implements IOpenRouterService {
     private final RedactPromptBuilder promptBuilder;
     private final HttpWrapper httpWrapper;
     private final ObjectMapper objectMapper;
+    private final ExecutorService ragExecutor;
 
     /**
      * Estimates token count for text using OpenAI's rule of thumb: ~1 token per 4
@@ -107,6 +114,12 @@ public class OpenRouterServices implements IOpenRouterService {
         this.promptBuilder = promptBuilder;
         this.httpWrapper = httpWrapper;
         this.objectMapper = objectMapper;
+        this.ragExecutor = createRagExecutor();
+    }
+
+    @PreDestroy
+    void shutdownRagExecutor() {
+        ragExecutor.shutdown();
     }
 
     // -------------------------------------------------------------------------
@@ -133,37 +146,34 @@ public class OpenRouterServices implements IOpenRouterService {
 
         List<Map<String, Object>> messages = new ArrayList<>();
         String detectedLanguage = cat.complai.openrouter.helpers.LanguageDetector.detect(question);
+
+        if (procedureContextService.requiresEventDateWindowClarification(question, cityId)) {
+            String clarificationMessage = buildEventDateWindowClarificationMessage(detectedLanguage);
+            if (conversationId != null && !conversationId.isBlank()) {
+            conversationService.updateConversationHistory(conversationId, question, clarificationMessage);
+            }
+            logger.info(() -> "ask() event date-window clarification triggered - conversationId=" + conversationId
+                + " city=" + cityId);
+            return new OpenRouterResponseDto(true, clarificationMessage, null, 200, OpenRouterErrorCode.NONE, null,
+                List.of());
+        }
+
         messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage(cityId, detectedLanguage)));
 
-        // Parallelize RAG searches for procedure and event context
-        // Start both searches concurrently to reduce latency
-        long ragStartTime = System.currentTimeMillis();
-        CompletableFuture<ProcedureContextResult> procFuture = procedureContextService
-                .questionNeedsProcedureContext(question, cityId)
-                        ? procedureContextService.buildProcedureContextResultAsync(question, cityId)
-                        : CompletableFuture.completedFuture(null);
+        RagContexts ragContexts = buildRagContexts(question, cityId, conversationId, "ask()");
+        ProcedureContextResult procCtx = ragContexts.procedureContext();
+        ProcedureContextService.EventContextResult eventCtx = ragContexts.eventContext();
+        NewsContextResult newsCtx = ragContexts.newsContext();
 
-        CompletableFuture<ProcedureContextService.EventContextResult> eventFuture = procedureContextService
-                .questionNeedsEventContext(question, cityId)
-                        ? procedureContextService.buildEventContextResultAsync(question, cityId)
-                        : CompletableFuture.completedFuture(null);
-
-        // Wait for both searches to complete
-        ProcedureContextResult procCtx = null;
-        ProcedureContextService.EventContextResult eventCtx = null;
-        try {
-            CompletableFuture.allOf(procFuture, eventFuture).join();
-            procCtx = procFuture.get();
-            eventCtx = eventFuture.get();
-        } catch (InterruptedException | ExecutionException e) {
-            logger.log(Level.WARNING,
-                    "Async RAG search failed — error=" + e.getMessage() + " conversationId=" + conversationId, e);
-            procCtx = null;
-            eventCtx = null;
+        if (ragContexts.newsIntent() && (newsCtx == null || newsCtx.getSources().isEmpty())) {
+            String fallbackMessage = buildNoNewsFoundMessage(detectedLanguage, cityId);
+            if (conversationId != null && !conversationId.isBlank()) {
+                conversationService.updateConversationHistory(conversationId, question, fallbackMessage);
+            }
+            logger.info(() -> "ask() news fallback used - conversationId=" + conversationId + " city=" + cityId);
+            return new OpenRouterResponseDto(true, fallbackMessage, null, 200, OpenRouterErrorCode.NONE, null,
+                    List.of());
         }
-        long ragEndTime = System.currentTimeMillis();
-        logger.fine(() -> "ask() RAG search completed — time=" + (ragEndTime - ragStartTime) + "ms conversationId="
-                + conversationId);
 
         // Add procedure context if available
         if (procCtx != null && procCtx.getContextBlock() != null) {
@@ -173,6 +183,10 @@ public class OpenRouterServices implements IOpenRouterService {
         // Add event context if available
         if (eventCtx != null && eventCtx.getContextBlock() != null) {
             messages.add(Map.of("role", "system", "content", eventCtx.getContextBlock()));
+        }
+
+        if (newsCtx != null && newsCtx.getContextBlock() != null) {
+            messages.add(Map.of("role", "system", "content", newsCtx.getContextBlock()));
         }
 
         // Add conversation history
@@ -224,7 +238,14 @@ public class OpenRouterServices implements IOpenRouterService {
 
         // Calculate context hashes for caching (deterministic, reproducible)
         long procContextHash = computeSourcesHash(procCtx != null ? procCtx.getSources() : List.of());
-        long eventContextHash = computeSourcesHash(eventCtx != null ? eventCtx.getSources() : List.of());
+        List<Source> eventAndNewsSourcesForHash = new ArrayList<>();
+        if (eventCtx != null && eventCtx.getSources() != null) {
+            eventAndNewsSourcesForHash.addAll(eventCtx.getSources());
+        }
+        if (newsCtx != null && newsCtx.getSources() != null) {
+            eventAndNewsSourcesForHash.addAll(newsCtx.getSources());
+        }
+        long eventContextHash = computeSourcesHash(eventAndNewsSourcesForHash);
 
         OpenRouterResponseDto response = aiResponseService.callOpenRouterAndExtract(messages, cityId, procContextHash,
                 eventContextHash);
@@ -237,6 +258,9 @@ public class OpenRouterServices implements IOpenRouterService {
         }
         if (eventCtx != null && !eventCtx.getSources().isEmpty()) {
             mergedSources.addAll(eventCtx.getSources());
+        }
+        if (newsCtx != null && !newsCtx.getSources().isEmpty()) {
+            mergedSources.addAll(newsCtx.getSources());
         }
 
         // Deduplicate ONCE after all sources are collected
@@ -369,33 +393,34 @@ public class OpenRouterServices implements IOpenRouterService {
 
         // 2. Single-language system message + RAG
         String detectedLanguage = LanguageDetector.detect(question);
+
+        if (procedureContextService.requiresEventDateWindowClarification(question, cityId)) {
+            String clarificationMessage = buildEventDateWindowClarificationMessage(detectedLanguage);
+            logger.info(() -> "streamAsk() event date-window clarification triggered - conversationId="
+                + conversationId + " city=" + cityId);
+            return buildFallbackStreamResult(clarificationMessage, conversationId, question);
+        }
+
         List<Map<String, Object>> messages = new ArrayList<>();
         messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage(cityId, detectedLanguage)));
 
-        // 3. Parallelize RAG — blocking join is acceptable (Lucene in-memory, fast)
-        CompletableFuture<ProcedureContextResult> procFuture = procedureContextService
-                .questionNeedsProcedureContext(question, cityId)
-                        ? procedureContextService.buildProcedureContextResultAsync(question, cityId)
-                        : CompletableFuture.completedFuture(null);
-        CompletableFuture<ProcedureContextService.EventContextResult> eventFuture = procedureContextService
-                .questionNeedsEventContext(question, cityId)
-                        ? procedureContextService.buildEventContextResultAsync(question, cityId)
-                        : CompletableFuture.completedFuture(null);
+        RagContexts ragContexts = buildRagContexts(question, cityId, conversationId, "streamAsk()");
+        ProcedureContextResult procCtx = ragContexts.procedureContext();
+        ProcedureContextService.EventContextResult eventCtx = ragContexts.eventContext();
+        NewsContextResult newsCtx = ragContexts.newsContext();
 
-        ProcedureContextResult procCtx = null;
-        ProcedureContextService.EventContextResult eventCtx = null;
-        try {
-            CompletableFuture.allOf(procFuture, eventFuture).join();
-            procCtx = procFuture.get();
-            eventCtx = eventFuture.get();
-        } catch (Exception e) {
-            logger.log(Level.WARNING, "streamAsk() RAG failed — conversationId=" + conversationId, e);
+        if (ragContexts.newsIntent() && (newsCtx == null || newsCtx.getSources().isEmpty())) {
+            String fallbackMessage = buildNoNewsFoundMessage(detectedLanguage, cityId);
+            logger.info(() -> "streamAsk() news fallback used - conversationId=" + conversationId + " city=" + cityId);
+            return buildFallbackStreamResult(fallbackMessage, conversationId, question);
         }
 
         if (procCtx != null && procCtx.getContextBlock() != null)
             messages.add(Map.of("role", "system", "content", procCtx.getContextBlock()));
         if (eventCtx != null && eventCtx.getContextBlock() != null)
             messages.add(Map.of("role", "system", "content", eventCtx.getContextBlock()));
+        if (newsCtx != null && newsCtx.getContextBlock() != null)
+            messages.add(Map.of("role", "system", "content", newsCtx.getContextBlock()));
 
         var history = conversationService.getConversationHistory(conversationId);
         conversationService.addToMessages(messages, history);
@@ -413,13 +438,19 @@ public class OpenRouterServices implements IOpenRouterService {
                     .map(s -> new SseSources(s.getTitle(), s.getUrl()))
                     .collect(Collectors.toList()));
         }
+        if (newsCtx != null && newsCtx.getSources() != null) {
+            allSources.addAll(newsCtx.getSources().stream()
+                    .map(s -> new SseSources(s.getTitle(), s.getUrl()))
+                    .collect(Collectors.toList()));
+        }
 
         // 5. Stream chunks, then emit sources, then done
         final String capturedQuestion = question;
         final String capturedCityId = cityId;
         final String capturedConvId = conversationId;
         final StringBuilder assembled = new StringBuilder();
-        final java.util.concurrent.atomic.AtomicBoolean hasEmitted = new java.util.concurrent.atomic.AtomicBoolean(false);
+        final java.util.concurrent.atomic.AtomicBoolean hasEmitted = new java.util.concurrent.atomic.AtomicBoolean(
+                false);
 
         logger.fine(() -> "streamAsk() preparing to stream — conversationId=" + capturedConvId + " sources="
                 + allSources.size());
@@ -531,6 +562,182 @@ public class OpenRouterServices implements IOpenRouterService {
             logger.log(Level.SEVERE, "produceSourcesAndDone() EXCEPTION: Failed to serialize sources or done event", e);
             return Flux.error(e);
         }
+    }
+
+    private RagContexts buildRagContexts(String question, String cityId, String conversationId, String operationName) {
+        long detectionStart = System.nanoTime();
+        ContextRequirements requirements = procedureContextService.detectContextRequirements(question, cityId);
+        long detectionDurationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - detectionStart);
+
+        logger.fine(() -> operationName + " context detection — conversationId=" + conversationId
+                + " procedure=" + requirements.needsProcedureContext()
+                + " event=" + requirements.needsEventContext()
+                + " news=" + requirements.needsNewsContext()
+                + " durationMs=" + detectionDurationMs);
+
+        if (!requirements.needsProcedureContext() && !requirements.needsEventContext()
+                && !requirements.needsNewsContext()) {
+            return new RagContexts(null, null, null, false);
+        }
+
+        if (requirements.needsNewsContext()) {
+            NewsContextResult newsContext = safelyBuildNewsContext(question, cityId, conversationId, operationName);
+            logger.fine(() -> operationName + " news retrieval completed — conversationId=" + conversationId
+                    + " city=" + cityId
+                    + " hitCount=" + (newsContext != null && newsContext.getSources() != null
+                            ? newsContext.getSources().size()
+                            : 0));
+            return new RagContexts(null, null, newsContext, true);
+        }
+
+        if (requirements.needsProcedureContext() && requirements.needsEventContext()) {
+            long ragStart = System.nanoTime();
+            CompletableFuture<ProcedureContextResult> procedureFuture = procedureContextService
+                    .buildProcedureContextResultAsync(question, cityId, ragExecutor)
+                    .exceptionally(ex -> {
+                        logRagFailure(operationName, conversationId, cityId, "procedure", ex);
+                        return null;
+                    });
+            CompletableFuture<ProcedureContextService.EventContextResult> eventFuture = procedureContextService
+                    .buildEventContextResultAsync(question, cityId, ragExecutor)
+                    .exceptionally(ex -> {
+                        logRagFailure(operationName, conversationId, cityId, "event", ex);
+                        return null;
+                    });
+
+            ProcedureContextResult procedureContext = procedureFuture.join();
+            ProcedureContextService.EventContextResult eventContext = eventFuture.join();
+
+            long ragDurationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - ragStart);
+            logger.fine(() -> operationName + " RAG build completed — conversationId=" + conversationId
+                    + " mode=bounded-parallel durationMs=" + ragDurationMs);
+            return new RagContexts(procedureContext, eventContext, null, false);
+        }
+
+        if (requirements.needsProcedureContext()) {
+            ProcedureContextResult procedureContext = safelyBuildProcedureContext(question, cityId, conversationId,
+                    operationName);
+            return new RagContexts(procedureContext, null, null, false);
+        }
+
+        ProcedureContextService.EventContextResult eventContext = safelyBuildEventContext(question, cityId,
+                conversationId, operationName);
+        return new RagContexts(null, eventContext, null, false);
+    }
+
+    private NewsContextResult safelyBuildNewsContext(String question, String cityId, String conversationId,
+            String operationName) {
+        long start = System.nanoTime();
+        try {
+            NewsContextResult result = procedureContextService.buildNewsContextResult(question, cityId);
+            long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+            logger.fine(() -> operationName + " RAG build completed — conversationId=" + conversationId
+                    + " mode=news-only durationMs=" + durationMs);
+            return result;
+        } catch (Exception e) {
+            logRagFailure(operationName, conversationId, cityId, "news", e);
+            return null;
+        }
+    }
+
+    private ProcedureContextResult safelyBuildProcedureContext(String question, String cityId, String conversationId,
+            String operationName) {
+        long start = System.nanoTime();
+        try {
+            ProcedureContextResult result = procedureContextService.buildProcedureContextResult(question, cityId);
+            long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+            logger.fine(() -> operationName + " RAG build completed — conversationId=" + conversationId
+                    + " mode=procedure-only durationMs=" + durationMs);
+            return result;
+        } catch (Exception e) {
+            logRagFailure(operationName, conversationId, cityId, "procedure", e);
+            return null;
+        }
+    }
+
+    private ProcedureContextService.EventContextResult safelyBuildEventContext(String question, String cityId,
+            String conversationId, String operationName) {
+        long start = System.nanoTime();
+        try {
+            ProcedureContextService.EventContextResult result = procedureContextService.buildEventContextResult(
+                    question,
+                    cityId);
+            long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+            logger.fine(() -> operationName + " RAG build completed — conversationId=" + conversationId
+                    + " mode=event-only durationMs=" + durationMs);
+            return result;
+        } catch (Exception e) {
+            logRagFailure(operationName, conversationId, cityId, "event", e);
+            return null;
+        }
+    }
+
+    private void logRagFailure(String operationName, String conversationId, String cityId, String contextType,
+            Throwable failure) {
+        Throwable rootCause = failure instanceof CompletionException && failure.getCause() != null
+                ? failure.getCause()
+                : failure;
+        logger.log(Level.WARNING,
+                operationName + " RAG build failed — conversationId=" + conversationId
+                        + " city=" + cityId + " contextType=" + contextType
+                        + " error=" + rootCause.getMessage(),
+                rootCause);
+    }
+
+    private ExecutorService createRagExecutor() {
+        return Executors.newFixedThreadPool(2, runnable -> {
+            Thread thread = new Thread(runnable, "openrouter-rag");
+            thread.setDaemon(true);
+            return thread;
+        });
+    }
+
+    private AskStreamResult buildFallbackStreamResult(String fallbackMessage, String conversationId, String question) {
+        try {
+            SseChunkEvent chunk = new SseChunkEvent(fallbackMessage);
+            SseSourcesEvent sourcesEvent = new SseSourcesEvent(List.of());
+            SseDoneEvent doneEvent = new SseDoneEvent(conversationId);
+
+            String chunkJson = objectMapper.writeValueAsString(chunk);
+            String sourcesJson = objectMapper.writeValueAsString(sourcesEvent);
+            String doneJson = objectMapper.writeValueAsString(doneEvent);
+
+            if (conversationId != null && !conversationId.isBlank()) {
+                conversationService.updateConversationHistory(conversationId, question, fallbackMessage);
+            }
+
+            return new AskStreamResult.Success(Flux.just(chunkJson, sourcesJson, doneJson));
+        } catch (Exception e) {
+            logger.log(Level.SEVERE, "streamAsk() failed to serialize fallback news response", e);
+            return new AskStreamResult.Error(AskStreamErrorMapper.toResponseDto(e));
+        }
+    }
+
+    private String buildNoNewsFoundMessage(String detectedLanguage, String cityId) {
+        String cityDisplayName = RedactPromptBuilder.resolveCityDisplayName(cityId);
+        if ("CA".equals(detectedLanguage)) {
+            return "No he trobat noticies recents relacionades amb aquesta consulta a " + cityDisplayName + ".";
+        }
+        if ("ES".equals(detectedLanguage)) {
+            return "No he encontrado noticias recientes relacionadas con esa consulta en " + cityDisplayName + ".";
+        }
+        return "I could not find related recent news about that in " + cityDisplayName + ".";
+    }
+
+    private String buildEventDateWindowClarificationMessage(String detectedLanguage) {
+        if ("CA".equals(detectedLanguage)) {
+            return "Per ajudar-te amb esdeveniments, indica un interval de dates (per exemple: aquesta setmana, abril, o del 10/04 al 15/04).";
+        }
+        if ("ES".equals(detectedLanguage)) {
+            return "Para ayudarte con eventos, indícame un rango de fechas (por ejemplo: esta semana, abril, o del 10/04 al 15/04).";
+        }
+        return "To help with events, please provide a date window (for example: this week, April, or from 10/04 to 15/04).";
+    }
+
+    private record RagContexts(ProcedureContextResult procedureContext,
+            ProcedureContextService.EventContextResult eventContext,
+            NewsContextResult newsContext,
+            boolean newsIntent) {
     }
 
 }

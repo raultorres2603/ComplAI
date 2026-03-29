@@ -1,0 +1,46 @@
+meta {
+  name: Ask includes source urls
+  type: http
+  seq: 11
+  tags: [
+    ask
+    revised
+  ]
+}
+
+post {
+  url: {{complaiPath}}/ask
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "text": "How can I apply for resident parking permit in testcity?",
+    "conversationId": "{{conversationId}}"
+  }
+}
+
+tests {
+  test("HTTP status is successful", () => {
+    expect(res.getStatus()).to.be.lessThan(500);
+  });
+
+  test("SSE output includes sources event", () => {
+    const rawBody = res.getBody();
+    const bodyText = (typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody)).toLowerCase();
+    expect(bodyText.includes('"type":"sources"')).to.equal(true);
+  });
+
+  test("SSE sources include source URLs", () => {
+    const rawBody = res.getBody();
+    const bodyText = (typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody)).toLowerCase();
+    const hasHttpSource = bodyText.includes("http://") || bodyText.includes("https://");
+    expect(hasHttpSource).to.equal(true);
+  });
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

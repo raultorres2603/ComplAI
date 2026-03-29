@@ -1,21 +1,19 @@
 package cat.complai.openrouter.helpers;
 
+import cat.complai.openrouter.helpers.rag.DeterministicQueryExpansion;
+import cat.complai.openrouter.helpers.rag.InMemoryLexicalIndex;
+import cat.complai.openrouter.helpers.rag.RagJavaCalibration;
+import cat.complai.openrouter.helpers.rag.SearchResult;
+import cat.complai.openrouter.helpers.rag.TokenNormalizer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
-import org.apache.lucene.document.*;
-import org.apache.lucene.index.*;
-import org.apache.lucene.queryparser.classic.MultiFieldQueryParser;
-import org.apache.lucene.queryparser.classic.ParseException;
-import org.apache.lucene.search.*;
-import org.apache.lucene.store.ByteBuffersDirectory;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -48,21 +46,18 @@ public class EventRagHelper {
         }
     }
 
-    private static final String[] SEARCH_FIELDS = { "title", "description" };
-    private static final float[] SEARCH_FIELD_BOOSTS = { 2.0f, 1.0f };
     private static final int MAX_RESULTS = 3;
-    private static final float MIN_RELEVANCE_SCORE = 0.5f;
     private static final String ENV_EVENTS_BUCKET = "EVENTS_BUCKET";
     private static final String ENV_EVENTS_REGION = "EVENTS_REGION";
     private static final Logger logger = Logger.getLogger(EventRagHelper.class.getName());
 
     private final String cityId;
     private final List<Event> events;
-    private final ByteBuffersDirectory ramDirectory;
-    private final Analyzer analyzer;
+    private final InMemoryLexicalIndex<Event> javaIndex;
+    private final RagJavaCalibration.DomainSettings javaCalibration;
 
     /**
-     * Builds an in-memory Lucene index for the given city's events.
+        * Builds an in-memory index for the given city's events.
      *
      * <p>
      * Events are loaded from S3 when {@code EVENTS_BUCKET} and
@@ -71,12 +66,16 @@ public class EventRagHelper {
      * {@code /events-<cityId>.json} when S3 env vars are absent (e.g. local tests).
      */
     public EventRagHelper(String cityId) throws IOException {
+        this(cityId, RagJavaCalibration.event());
+    }
+
+    EventRagHelper(String cityId, RagJavaCalibration.DomainSettings javaCalibration) throws IOException {
         this.cityId = cityId;
+        this.javaCalibration = javaCalibration;
         this.events = loadEvents();
-        this.analyzer = new StandardAnalyzer();
-        this.ramDirectory = new ByteBuffersDirectory();
-        buildIndex();
-        logger.info(() -> "EventRagHelper initialised — city=" + cityId + " eventCount=" + events.size());
+        this.javaIndex = buildJavaIndex();
+        logger.info(() -> "EventRagHelper initialised — city=" + cityId + " eventCount=" + events.size()
+                + " engine=java");
     }
 
     private InputStream getEventsInputStream() throws IOException {
@@ -129,98 +128,80 @@ public class EventRagHelper {
 
     private List<Event> loadEvents() throws IOException {
         ObjectMapper mapper = new ObjectMapper();
-        InputStream is = getEventsInputStream();
-        JsonNode root = mapper.readTree(is);
-        List<Event> result = new ArrayList<>();
-        for (JsonNode node : root.get("events")) {
-            result.add(new Event(
-                    node.path("eventId").asText(),
-                    node.path("title").asText(),
-                    node.path("description").asText(),
-                    node.path("eventType").asText(),
-                    node.path("targetAudience").asText(),
-                    node.path("date").asText(),
-                    node.path("time").asText(),
-                    node.path("location").asText(),
-                    node.path("theme").asText(),
-                    node.path("url").asText()));
+        try (InputStream is = getEventsInputStream()) {
+            JsonNode root = mapper.readTree(is);
+            List<Event> result = new ArrayList<>();
+            for (JsonNode node : root.get("events")) {
+                result.add(new Event(
+                        node.path("eventId").asText(),
+                        node.path("title").asText(),
+                        node.path("description").asText(),
+                        node.path("eventType").asText(),
+                        node.path("targetAudience").asText(),
+                        node.path("date").asText(),
+                        node.path("time").asText(),
+                        node.path("location").asText(),
+                        node.path("theme").asText(),
+                        node.path("url").asText()));
+            }
+            return result;
         }
-        return result;
     }
 
-    private void buildIndex() throws IOException {
-        IndexWriterConfig config = new IndexWriterConfig(analyzer);
-        try (IndexWriter writer = new IndexWriter(ramDirectory, config)) {
-            for (Event e : events) {
-                Document doc = new Document();
-                doc.add(new StringField("eventId", e.eventId, Field.Store.YES));
-                doc.add(new TextField("title", e.title, Field.Store.YES));
-                doc.add(new TextField("description", e.description, Field.Store.YES));
-                // Store but don't index the following fields (not in SEARCH_FIELDS)
-                doc.add(new StringField("eventType", e.eventType, Field.Store.YES));
-                doc.add(new StringField("targetAudience", e.targetAudience, Field.Store.YES));
-                doc.add(new StringField("date", e.date, Field.Store.YES));
-                doc.add(new StringField("time", e.time, Field.Store.YES));
-                doc.add(new StringField("location", e.location, Field.Store.YES));
-                doc.add(new StringField("theme", e.theme, Field.Store.YES));
-                doc.add(new StringField("url", e.url, Field.Store.YES));
-                writer.addDocument(doc);
-            }
-        }
+    private InMemoryLexicalIndex<Event> buildJavaIndex() {
+        Map<String, Double> fieldWeights = new LinkedHashMap<>();
+        fieldWeights.put("title", javaCalibration.titleBoost());
+        fieldWeights.put("description", javaCalibration.descriptionBoost());
+
+        return InMemoryLexicalIndex.build(events, fieldWeights, event -> {
+            Map<String, String> fields = new LinkedHashMap<>();
+            fields.put("title", event.title);
+            fields.put("description", event.description);
+            return fields;
+        });
     }
 
     public List<Event> search(String query) {
         if (query == null || query.isBlank())
             return Collections.emptyList();
 
-        // Preprocess the query to normalize whitespace, remove accents
         String cleanedQuery = QueryPreprocessor.preprocess(query);
-
-        List<Event> results = new ArrayList<>();
-        try (DirectoryReader reader = DirectoryReader.open(ramDirectory)) {
-            IndexSearcher searcher = new IndexSearcher(reader);
-            MultiFieldQueryParser parser = new MultiFieldQueryParser(SEARCH_FIELDS, analyzer,
-                    new java.util.HashMap<>() {
-                        {
-                            put("title", SEARCH_FIELD_BOOSTS[0]);
-                            put("description", SEARCH_FIELD_BOOSTS[1]);
-                        }
-                    });
-            Query luceneQuery = parser.parse(cleanedQuery);
-            TopDocs topDocs = searcher.search(luceneQuery, MAX_RESULTS);
-            int[] filteredCountArray = { 0 };
-            float[] maxScoreArray = { 0.0f };
-            for (ScoreDoc sd : topDocs.scoreDocs) {
-                maxScoreArray[0] = Math.max(maxScoreArray[0], sd.score);
-                if (sd.score >= MIN_RELEVANCE_SCORE) {
-                    Document doc = searcher.storedFields().document(sd.doc);
-                    results.add(new Event(
-                            doc.get("eventId"),
-                            doc.get("title"),
-                            doc.get("description"),
-                            doc.get("eventType"),
-                            doc.get("targetAudience"),
-                            doc.get("date"),
-                            doc.get("time"),
-                            doc.get("location"),
-                            doc.get("theme"),
-                            doc.get("url")));
-                } else {
-                    filteredCountArray[0]++;
-                    logger.fine(() -> "RAG SEARCH — Filtering low-score result: score=" + sd.score
-                            + " < threshold=" + MIN_RELEVANCE_SCORE);
-                }
-            }
-            final int filteredCount = filteredCountArray[0];
-            final float maxScore = maxScoreArray[0];
-            logger.fine(() -> "RAG SEARCH — type=EVENT cityId=" + cityId + " originalQuery=" + query
-                    + " cleanedQuery=" + cleanedQuery + " resultCount=" + results.size() + " filteredCount="
-                    + filteredCount
-                    + " maxScore=" + maxScore + " minThreshold=" + MIN_RELEVANCE_SCORE);
-        } catch (IOException | ParseException e) {
-            logger.log(Level.WARNING, "Event RAG search failed — originalQuery=" + query
-                    + " cleanedQuery=" + cleanedQuery + " error=" + e.getMessage(), e);
+        if (cleanedQuery.isBlank()) {
+            return Collections.emptyList();
         }
+
+        return runJavaSearch(cleanedQuery, query.length());
+    }
+
+    private List<Event> runJavaSearch(String cleanedQuery, int rawQueryLength) {
+        List<String> queryTokens = TokenNormalizer.tokenize(cleanedQuery);
+        List<String> expandedTokens = DeterministicQueryExpansion.expandEventQueryTokens(
+            queryTokens,
+            javaCalibration.expansionEnabled());
+
+        long startNanos = System.nanoTime();
+        InMemoryLexicalIndex.SearchResponse<Event> response = javaIndex.search(
+            expandedTokens,
+                MAX_RESULTS,
+            javaCalibration.absoluteFloor(),
+            javaCalibration.relativeFloor());
+        long latencyMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
+
+        List<Event> results = response.results().stream()
+                .map(SearchResult::source)
+                .toList();
+
+        logger.fine(() -> "RAG SEARCH — type=EVENT cityId=" + cityId
+                + " engine=java queryLength=" + rawQueryLength
+                + " resultCount=" + results.size()
+                + " candidateCount=" + response.candidateCount()
+                + " filteredCount=" + response.filteredCount()
+                + " bestScore=" + response.bestScore()
+                + " expansionEnabled=" + javaCalibration.expansionEnabled()
+                + " absoluteFloor=" + response.absoluteFloor()
+                + " relativeFloor=" + response.relativeFloor()
+                + " appliedThreshold=" + response.appliedThreshold()
+                + " latencyMs=" + latencyMs);
         return results;
     }
 

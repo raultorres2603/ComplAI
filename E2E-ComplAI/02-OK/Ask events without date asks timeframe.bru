@@ -1,0 +1,43 @@
+meta {
+  name: Ask events without date asks timeframe
+  type: http
+  seq: 10
+  tags: [
+    ask
+    revised
+  ]
+}
+
+post {
+  url: {{complaiPath}}/ask
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "text": "Que eventos hay en la ciudad?",
+    "conversationId": "{{conversationId}}"
+  }
+}
+
+tests {
+  test("HTTP status is successful", () => {
+    expect(res.getStatus()).to.be.lessThan(500);
+  });
+
+  test("Response asks for date range", () => {
+    const rawBody = res.getBody();
+    const bodyText = (typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody)).toLowerCase();
+    const hasDateWindowHint =
+      bodyText.includes("rango de fechas") ||
+      bodyText.includes("date window") ||
+      bodyText.includes("interval de dates");
+    expect(hasDateWindowHint).to.equal(true);
+  });
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

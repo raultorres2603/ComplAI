@@ -14,7 +14,7 @@ class EventRagHelperTest {
 
     @BeforeEach
     void setup() throws IOException {
-        // Use testcity which has events-testcity.json with 5 events
+        // Use testcity which currently ships 5 events in events-testcity.json
         eventRagHelper = new EventRagHelper("testcity");
     }
 
@@ -56,7 +56,7 @@ class EventRagHelperTest {
     void getAllEvents_returnsFull() {
         List<EventRagHelper.Event> allEvents = eventRagHelper.getAllEvents();
 
-        // Should return all 5 events (unrestricted)
+        // Should return all events from the current test fixture (unrestricted)
         assertEquals(5, allEvents.size(), "getAllEvents() should return all events");
     }
 
@@ -147,9 +147,8 @@ class EventRagHelperTest {
         String query = "event";
         List<EventRagHelper.Event> results = eventRagHelper.search(query);
 
-        // If results are returned, they should all have relevance above the threshold
-        // (We can't directly check Lucene scores, but we can verify results are
-        // reasonable)
+        // If results are returned, they should all be meaningfully related to the
+        // query.
         assertTrue(results.size() <= 3, "Relevance filtering should limit results to MAX_RESULTS=3");
 
         // All results should at least have title or description matching the query
@@ -214,5 +213,37 @@ class EventRagHelperTest {
         // location was removed from SEARCH_FIELDS but stored
         assertNotNull(event.location, "location field should be accessible");
         assertFalse(event.location.isBlank(), "location should have a value");
+    }
+
+    @Test
+    void search_javaEngine_returnsRelevantResults() {
+        List<EventRagHelper.Event> results = eventRagHelper.search("cinema film");
+
+        assertFalse(results.isEmpty());
+        assertTrue(results.size() <= 3);
+        EventRagHelper.Event topResult = results.get(0);
+        assertTrue(topResult.eventType.equalsIgnoreCase("Cinema")
+                || topResult.title.toLowerCase().contains("film")
+                || topResult.description.toLowerCase().contains("cinema"));
+    }
+
+    @Test
+    void search_javaEngine_handlesAccentAndPunctuationNormalization() {
+        List<EventRagHelper.Event> results = eventRagHelper.search("  cinèma, film!  ");
+
+        assertFalse(results.isEmpty());
+        assertTrue(results.stream().anyMatch(event -> event.eventType.equalsIgnoreCase("Cinema")));
+    }
+
+    @Test
+    void search_isDeterministicAcrossHelperInstances() throws IOException {
+        EventRagHelper secondHelper = new EventRagHelper("testcity");
+        List<EventRagHelper.Event> firstResults = eventRagHelper.search("festival concert event");
+        List<EventRagHelper.Event> secondResults = secondHelper.search("festival concert event");
+
+        assertEquals(firstResults.size(), secondResults.size());
+        if (!firstResults.isEmpty()) {
+            assertEquals(firstResults.get(0).eventId, secondResults.get(0).eventId);
+        }
     }
 }

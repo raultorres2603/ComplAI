@@ -11,6 +11,7 @@ export class StorageStack extends cdk.Stack {
   // Exposed so the LambdaStack can wire IAM grants and inject bucket names.
   readonly proceduresBucket: s3.Bucket;
   readonly eventsBucket: s3.Bucket;
+  readonly newsBucket: s3.Bucket;
   readonly complaintsBucket: s3.Bucket;
   readonly feedbackBucket: s3.Bucket;
   // Stores the compiled fat JARs used by both Lambda functions.
@@ -41,6 +42,18 @@ export class StorageStack extends cdk.Stack {
     // survive stack updates or accidental teardowns.
     this.eventsBucket = new s3.Bucket(this, `ComplAIEventsBucket-${environment}`, {
       bucketName: `complai-events-${environment}`,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      versioned: false,
+      lifecycleRules: [{ expiration: cdk.Duration.days(365) }],
+    });
+
+    // News corpus — read by Lambda at startup for news context.
+    // RETAIN in all environments: the file is uploaded out-of-band and must
+    // survive stack updates or accidental teardowns.
+    this.newsBucket = new s3.Bucket(this, `ComplAINewsBucket-${environment}`, {
+      bucketName: `complai-news-${environment}`,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       encryption: s3.BucketEncryption.S3_MANAGED,
@@ -100,6 +113,11 @@ export class StorageStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'ComplAIEventsBucketName', {
       value: this.eventsBucket.bucketName,
       description: `S3 bucket for events corpus (${environment})`,
+    });
+
+    new cdk.CfnOutput(this, 'ComplAINewsBucketName', {
+      value: this.newsBucket.bucketName,
+      description: `S3 bucket for news corpus (${environment})`,
     });
 
     new cdk.CfnOutput(this, 'ComplAIComplaintsBucketName', {

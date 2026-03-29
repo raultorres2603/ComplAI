@@ -1,5 +1,6 @@
 package cat.complai.openrouter.helpers;
 
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 import java.io.IOException;
@@ -11,7 +12,7 @@ import java.util.logging.Logger;
  * Thread-safe cache of per-city {@link ProcedureRagHelper} instances.
  *
  * <p>
- * Building a Lucene index is expensive (S3 I/O + index construction). Each
+ * Building the in-memory retrieval index is expensive (S3 I/O + index construction). Each
  * city's helper is
  * initialised at most once per warm Lambda instance and reused across all
  * subsequent requests.
@@ -33,6 +34,10 @@ public class ProcedureRagHelperRegistry {
     private static final Logger logger = Logger.getLogger(ProcedureRagHelperRegistry.class.getName());
 
     private final ConcurrentHashMap<String, ProcedureRagHelper> helpersByCity = new ConcurrentHashMap<>();
+
+    @Inject
+    public ProcedureRagHelperRegistry() {
+    }
 
     /**
      * Returns a cached {@link ProcedureRagHelper} for the given city, building it
