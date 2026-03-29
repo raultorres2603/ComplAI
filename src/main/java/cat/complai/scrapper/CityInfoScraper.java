@@ -256,7 +256,13 @@ public class CityInfoScraper {
     }
 
     static String extractFieldValue(Document doc, ProcedureScraper.FieldExtractionRule rule) {
-        String selector = Objects.requireNonNull(rule.selector, "Field selector");
+        String selector = rule.selector;
+        
+        // If selector is null or empty, return empty string (nothing to extract)
+        if (selector == null || selector.isBlank()) {
+            return "";
+        }
+        
         boolean isMetaTag = selector.contains("meta[");
         
         if (rule.multiple) {
