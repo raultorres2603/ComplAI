@@ -69,8 +69,8 @@
       "detailExcludePatterns": [
         "(/(search|rss|user|admin)|\\.(pdf|jpg|jpeg|png|gif|zip))(\\?.*)?$"
       ],
-      "maxDepth": 3,
-      "maxPages": 150
+      "maxDepth": 1,
+      "maxPages": 50
     },
     "fields": {
       "title": {
