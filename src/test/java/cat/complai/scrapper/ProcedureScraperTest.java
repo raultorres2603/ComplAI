@@ -17,7 +17,8 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * Network I/O (Jsoup crawl, S3 upload) and the {@code main} entry point are not
  * covered here — those require an integration harness. These tests guard the
- * mapping schema validation and the skip-condition evaluation, which are the most
+ * mapping schema validation and the skip-condition evaluation, which are the
+ * most
  * error-prone parts when adding new city mappings.
  */
 class ProcedureScraperTest {
@@ -200,6 +201,29 @@ class ProcedureScraperTest {
                 "elprat mapping must skip pages titled 'Portal de Tràmits'");
     }
 
+    @Test
+    void elpratMapping_newsSection_loadsSuccessfully() throws IOException {
+        ScraperMapping mapping = ProcedureScraper.loadMapping("elprat");
+
+        assertNotNull(mapping.news, "news config must be present");
+        assertEquals("https://elprataldia.es/", mapping.news.baseUrl);
+        assertNotNull(mapping.news.discovery);
+        assertFalse(mapping.news.discovery.categoryLinkSelector.isBlank());
+        assertNotNull(mapping.news.crawl);
+        assertFalse(mapping.news.crawl.articleLinkSelector.isBlank());
+        assertFalse(mapping.news.crawl.paginationLinkSelector.isBlank());
+
+        assertTrue(mapping.news.fields.containsKey("title"));
+        assertTrue(mapping.news.fields.containsKey("summary"));
+        assertTrue(mapping.news.fields.containsKey("body"));
+        assertTrue(mapping.news.fields.containsKey("publishedAt"));
+        assertTrue(mapping.news.fields.containsKey("categories"));
+
+        assertNotNull(mapping.news.seedCategoryUrls);
+        assertEquals(9, mapping.news.seedCategoryUrls.size(),
+                "seed categories should cover all known elprataldia categories");
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
@@ -221,4 +245,3 @@ class ProcedureScraperTest {
         return mapping;
     }
 }
-

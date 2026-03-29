@@ -306,6 +306,8 @@ public class ProcedureScraper {
         public SkipConfig skip;
         /** Events configuration for scraping city events */
         public EventsConfig events;
+        /** News configuration for scraping city news categories/articles */
+        public NewsConfig news;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -364,5 +366,51 @@ public class ProcedureScraper {
          * = no exclusion.
          */
         public String eventDetailExcludePattern;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static final class NewsConfig {
+        /** Base URL for the news website */
+        public String baseUrl;
+        /** Category discovery configuration */
+        public NewsDiscoveryConfig discovery;
+        /** Crawl configuration for category/article traversal */
+        public NewsCrawlConfig crawl;
+        /** Optional fallback categories used when discovery is incomplete */
+        public List<String> seedCategoryUrls = new ArrayList<>();
+        /** Field extraction rules for article pages */
+        public Map<String, FieldExtractionRule> fields = new LinkedHashMap<>();
+        /** Optional skip rules specific to news pages */
+        public NewsSkipConfig skip;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static final class NewsDiscoveryConfig {
+        /** CSS selector that matches category links from the base page */
+        public String categoryLinkSelector;
+        /** Regex patterns that category URLs must match (any) */
+        public List<String> categoryIncludePatterns = new ArrayList<>();
+        /** Regex patterns that category URLs must not match */
+        public List<String> categoryExcludePatterns = new ArrayList<>();
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static final class NewsCrawlConfig {
+        /** CSS selector that matches article detail page links */
+        public String articleLinkSelector;
+        /** Regex patterns that article URLs must match (any) */
+        public List<String> articleIncludePatterns = new ArrayList<>();
+        /** Regex patterns that article URLs must not match */
+        public List<String> articleExcludePatterns = new ArrayList<>();
+        /** CSS selector that matches pagination links between category pages */
+        public String paginationLinkSelector;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static final class NewsSkipConfig {
+        /** Skip articles when title is blank or equals any listed value */
+        public List<String> whenTitleEmptyOrEquals = new ArrayList<>();
+        /** Skip articles when extracted body is blank */
+        public boolean whenBodyEmpty = true;
     }
 }
