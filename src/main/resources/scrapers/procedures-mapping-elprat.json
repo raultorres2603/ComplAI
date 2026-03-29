@@ -42,7 +42,7 @@
   "cityInfo": {
     "baseUrl": "https://www.elprat.cat/",
     "discovery": {
-      "pratTemesSelector": "#prat-temes a[href]",
+      "pratTemesSelector": "#prat-temes .container .row:last-child a[href]",
       "themeIncludePatterns": [
         "^https?://www\\.elprat\\.cat/(?!user|search|contacte|rss|node/\\d+/edit).*"
       ],
@@ -53,7 +53,7 @@
       ]
     },
     "crawl": {
-      "themeMenuSelector": "nav.menu-turisme a[href]",
+      "themeMenuSelector": "div.menu_categoria div.panel div.panel-heading a[href], div.menu_categoria div.panel div.panel-collapse a[href]",
       "navIncludePatterns": [
         "^https?://www\\.elprat\\.cat/.*"
       ],
