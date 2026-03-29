@@ -224,6 +224,26 @@ class ProcedureScraperTest {
                 "seed categories should cover all known elprataldia categories");
     }
 
+    @Test
+    void elpratMapping_cityInfoSection_loadsSuccessfully() throws IOException {
+        ScraperMapping mapping = ProcedureScraper.loadMapping("elprat");
+
+        assertNotNull(mapping.cityInfo, "cityInfo config must be present");
+        assertEquals("https://www.elprat.cat/", mapping.cityInfo.baseUrl);
+        assertNotNull(mapping.cityInfo.discovery);
+        assertFalse(mapping.cityInfo.discovery.pratTemesSelector.isBlank());
+        assertNotNull(mapping.cityInfo.crawl);
+        assertFalse(mapping.cityInfo.crawl.themeMenuSelector.isBlank());
+
+        assertTrue(mapping.cityInfo.fields.containsKey("title"));
+        assertTrue(mapping.cityInfo.fields.containsKey("summary"));
+        assertTrue(mapping.cityInfo.fields.containsKey("body"));
+        assertTrue(mapping.cityInfo.fields.containsKey("breadcrumbs"));
+
+        assertNotNull(mapping.cityInfo.skip);
+        assertTrue(mapping.cityInfo.skip.whenBodyEmpty);
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------

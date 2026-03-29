@@ -12,6 +12,7 @@ export class StorageStack extends cdk.Stack {
   readonly proceduresBucket: s3.Bucket;
   readonly eventsBucket: s3.Bucket;
   readonly newsBucket: s3.Bucket;
+  readonly cityInfoBucket: s3.Bucket;
   readonly complaintsBucket: s3.Bucket;
   readonly feedbackBucket: s3.Bucket;
   // Stores the compiled fat JARs used by both Lambda functions.
@@ -54,6 +55,16 @@ export class StorageStack extends cdk.Stack {
     // survive stack updates or accidental teardowns.
     this.newsBucket = new s3.Bucket(this, `ComplAINewsBucket-${environment}`, {
       bucketName: `complai-news-${environment}`,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      encryption: s3.BucketEncryption.S3_MANAGED,
+      versioned: false,
+      lifecycleRules: [{ expiration: cdk.Duration.days(365) }],
+    });
+
+    // City-info corpus - read by Lambda at startup for city information fallback context.
+    this.cityInfoBucket = new s3.Bucket(this, `ComplAICityInfoBucket-${environment}`, {
+      bucketName: `complai-cityinfo-${environment}`,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       encryption: s3.BucketEncryption.S3_MANAGED,
@@ -118,6 +129,11 @@ export class StorageStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'ComplAINewsBucketName', {
       value: this.newsBucket.bucketName,
       description: `S3 bucket for news corpus (${environment})`,
+    });
+
+    new cdk.CfnOutput(this, 'ComplAICityInfoBucketName', {
+      value: this.cityInfoBucket.bucketName,
+      description: `S3 bucket for city-info corpus (${environment})`,
     });
 
     new cdk.CfnOutput(this, 'ComplAIComplaintsBucketName', {

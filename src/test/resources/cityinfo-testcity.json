@@ -1,0 +1,23 @@
+{
+    "source": "https://cityinfo.testcity.example",
+    "cityInfo": [
+        {
+            "cityInfoId": "c-1",
+            "theme": "Turisme",
+            "title": "Visit the river park",
+            "summary": "A municipal guide for families and visitors.",
+            "body": "The river park has routes, picnic areas and guided tours.",
+            "breadcrumbs": "Home > Tourism > River Park",
+            "url": "https://cityinfo.testcity.example/river-park"
+        },
+        {
+            "cityInfoId": "c-2",
+            "theme": "Serveis",
+            "title": "Municipal sports centers",
+            "summary": "Opening hours and access information.",
+            "body": "Residents can book courts online and check occupancy.",
+            "breadcrumbs": "Home > Services > Sports",
+            "url": "https://cityinfo.testcity.example/sports-centers"
+        }
+    ]
+}

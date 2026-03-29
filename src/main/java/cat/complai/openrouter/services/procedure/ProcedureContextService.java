@@ -1,6 +1,8 @@
 package cat.complai.openrouter.services.procedure;
 
 import cat.complai.openrouter.dto.Source;
+import cat.complai.openrouter.helpers.CityInfoRagHelper;
+import cat.complai.openrouter.helpers.CityInfoRagHelperRegistry;
 import cat.complai.openrouter.helpers.EventRagHelper;
 import cat.complai.openrouter.helpers.EventRagHelperRegistry;
 import cat.complai.openrouter.helpers.NewsRagHelper;
@@ -51,12 +53,12 @@ public class ProcedureContextService {
             "what's on", "what's happening", "què passa", "agenda cultural", "program",
             "this weekend", "upcoming");
 
-        private static final List<String> EVENT_INTENT_GUARD_KEYWORDS = List.of(
+    private static final List<String> EVENT_INTENT_GUARD_KEYWORDS = List.of(
             "event", "events", "evento", "eventos", "esdeveniment", "esdeveniments",
             "agenda", "activity", "activities", "activitat", "activitats",
             "what's on", "what is on", "what's happening", "que passa", "què passa");
 
-        private static final List<String> DATE_WINDOW_KEYWORDS = List.of(
+    private static final List<String> DATE_WINDOW_KEYWORDS = List.of(
             "today", "tomorrow", "tonight", "this weekend", "next weekend", "weekend",
             "this week", "next week", "this month", "next month",
             "avui", "dema", "demà", "aquesta setmana", "setmana vinent", "cap de setmana", "aquest mes",
@@ -64,7 +66,7 @@ public class ProcedureContextService {
             "hoy", "manana", "mañana", "esta semana", "proxima semana", "próxima semana", "fin de semana",
             "este mes", "proximo mes", "próximo mes");
 
-        private static final List<String> MONTH_KEYWORDS = List.of(
+    private static final List<String> MONTH_KEYWORDS = List.of(
             "january", "february", "march", "april", "may", "june", "july", "august",
             "september", "october", "november", "december",
             "gener", "febrer", "marc", "març", "abril", "maig", "juny", "juliol", "agost",
@@ -72,16 +74,22 @@ public class ProcedureContextService {
             "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
             "septiembre", "octubre", "noviembre", "diciembre");
 
-        private static final List<String> RANGE_CONNECTOR_KEYWORDS = List.of(
+    private static final List<String> RANGE_CONNECTOR_KEYWORDS = List.of(
             "from", "to", "between", "until", "through", "del", "al", "desde", "hasta", "entre");
 
-        private static final Pattern NUMERIC_DATE_PATTERN = Pattern.compile("\\b\\d{1,2}[/-]\\d{1,2}(?:[/-]\\d{2,4})?\\b");
-        private static final Pattern ISO_DATE_PATTERN = Pattern.compile("\\b\\d{4}-\\d{1,2}-\\d{1,2}\\b");
+    private static final Pattern NUMERIC_DATE_PATTERN = Pattern.compile("\\b\\d{1,2}[/-]\\d{1,2}(?:[/-]\\d{2,4})?\\b");
+    private static final Pattern ISO_DATE_PATTERN = Pattern.compile("\\b\\d{4}-\\d{1,2}-\\d{1,2}\\b");
 
     private static final List<String> NEWS_KEYWORDS = List.of(
             "news", "latest news", "recent news", "recent happenings", "current affairs",
             "actuality", "actualitat", "actualidad", "noticies", "notícies", "noticias",
             "ultimes", "últimes", "ultimas", "últimas", "latest", "recent");
+
+    private static final List<String> CITY_INFO_KEYWORDS = List.of(
+            "city", "municipal", "ajuntament", "city hall", "serveis", "serveis municipals",
+            "services", "public service", "public services", "equipaments", "equipamientos",
+            "tourism", "turisme", "turismo", "visit", "visitar", "visita", "informacio",
+            "informació", "informacion", "información");
 
     private static final List<String> CONVERSATIONAL_SHORT_CIRCUITS = List.of(
             "hello", "hi", "hey", "good morning", "good afternoon", "good evening",
@@ -91,6 +99,7 @@ public class ProcedureContextService {
     private final ProcedureRagHelperRegistry ragRegistry;
     private final EventRagHelperRegistry eventRagRegistry;
     private final NewsRagHelperRegistry newsRagRegistry;
+    private final CityInfoRagHelperRegistry cityInfoRagRegistry;
     private final RedactPromptBuilder promptBuilder;
     private final Logger logger = Logger.getLogger(ProcedureContextService.class.getName());
     private final ConcurrentHashMap<String, CityDetectionIndex> detectionIndexByCity = new ConcurrentHashMap<>();
@@ -98,16 +107,19 @@ public class ProcedureContextService {
     @Inject
     public ProcedureContextService(ProcedureRagHelperRegistry ragRegistry, EventRagHelperRegistry eventRagRegistry,
             NewsRagHelperRegistry newsRagRegistry,
+            CityInfoRagHelperRegistry cityInfoRagRegistry,
             RedactPromptBuilder promptBuilder) {
         this.ragRegistry = ragRegistry;
         this.eventRagRegistry = eventRagRegistry;
         this.newsRagRegistry = newsRagRegistry;
+        this.cityInfoRagRegistry = cityInfoRagRegistry;
         this.promptBuilder = promptBuilder;
     }
 
     public ProcedureContextService(ProcedureRagHelperRegistry ragRegistry, EventRagHelperRegistry eventRagRegistry,
             RedactPromptBuilder promptBuilder) {
-        this(ragRegistry, eventRagRegistry, new NewsRagHelperRegistry(), promptBuilder);
+        this(ragRegistry, eventRagRegistry, new NewsRagHelperRegistry(), new CityInfoRagHelperRegistry(),
+                promptBuilder);
     }
 
     /**
@@ -172,17 +184,38 @@ public class ProcedureContextService {
         }
     }
 
+    public static class CityInfoContextResult {
+        private final String contextBlock;
+        private final List<Source> sources;
+
+        public CityInfoContextResult(String contextBlock, List<Source> sources) {
+            this.contextBlock = contextBlock;
+            this.sources = sources == null ? List.of() : Collections.unmodifiableList(new ArrayList<>(sources));
+        }
+
+        public String getContextBlock() {
+            return contextBlock;
+        }
+
+        public List<Source> getSources() {
+            return sources;
+        }
+    }
+
     public static final class ContextRequirements {
-        private static final ContextRequirements NONE = new ContextRequirements(false, false, false);
+        private static final ContextRequirements NONE = new ContextRequirements(false, false, false, false);
 
         private final boolean needsProcedureContext;
         private final boolean needsEventContext;
         private final boolean needsNewsContext;
+        private final boolean needsCityInfoContext;
 
-        public ContextRequirements(boolean needsProcedureContext, boolean needsEventContext, boolean needsNewsContext) {
+        public ContextRequirements(boolean needsProcedureContext, boolean needsEventContext, boolean needsNewsContext,
+                boolean needsCityInfoContext) {
             this.needsProcedureContext = needsProcedureContext;
             this.needsEventContext = needsEventContext;
             this.needsNewsContext = needsNewsContext;
+            this.needsCityInfoContext = needsCityInfoContext;
         }
 
         public static ContextRequirements none() {
@@ -200,10 +233,15 @@ public class ProcedureContextService {
         public boolean needsNewsContext() {
             return needsNewsContext;
         }
+
+        public boolean needsCityInfoContext() {
+            return needsCityInfoContext;
+        }
     }
 
     private record CityDetectionIndex(TitleMatcher procedureMatcher, TitleMatcher eventMatcher,
-            TitleMatcher newsMatcher, int procedureTitleCount, int eventTitleCount, int newsTitleCount) {
+            TitleMatcher newsMatcher, TitleMatcher cityInfoMatcher,
+            int procedureTitleCount, int eventTitleCount, int newsTitleCount, int cityInfoTitleCount) {
     }
 
     private static final class TitleMatcher {
@@ -287,7 +325,7 @@ public class ProcedureContextService {
             long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
             logger.fine(() -> "Context detection completed from news keyword path - city=" + cityId
                     + " procedure=false event=false news=true durationMs=" + durationMs);
-            return new ContextRequirements(false, false, true);
+            return new ContextRequirements(false, false, true, false);
         }
 
         if (!needsProcedure && !needsEvent && isClearlyConversational(normalizedQuestion)) {
@@ -304,14 +342,14 @@ public class ProcedureContextService {
                     + " event=" + finalNeedsEvent
                     + " news=false"
                     + " durationMs=" + durationMs);
-            return new ContextRequirements(finalNeedsProcedure, finalNeedsEvent, false);
+            return new ContextRequirements(finalNeedsProcedure, finalNeedsEvent, false, false);
         }
 
         if (needsProcedure && needsEvent) {
             long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
             logger.fine(() -> "Context detection completed from keyword path — city=" + cityId
                     + " procedure=true event=true news=false durationMs=" + durationMs);
-            return new ContextRequirements(true, true, false);
+            return new ContextRequirements(true, true, false, false);
         }
 
         CityDetectionIndex detectionIndex = getOrCreateDetectionIndex(cityId);
@@ -324,20 +362,29 @@ public class ProcedureContextService {
             logger.fine(() -> "Context detection completed from title path - city=" + cityId
                     + " procedure=false event=false news=true durationMs=" + durationMs
                     + " newsTitles=" + detectionIndex.newsTitleCount());
-            return new ContextRequirements(false, false, true);
+            return new ContextRequirements(false, false, true, false);
+        }
+
+        boolean needsCityInfo = false;
+        if (!needsProcedure && !needsEvent && !needsNews) {
+            needsCityInfo = containsAny(normalizedQuestion, CITY_INFO_KEYWORDS)
+                    || detectionIndex.cityInfoMatcher().matches(normalizedQuestion);
         }
 
         long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
         boolean finalNeedsProcedure = needsProcedure;
         boolean finalNeedsEvent = needsEvent;
+        boolean finalNeedsCityInfo = needsCityInfo;
         logger.fine(() -> "Context detection completed — city=" + cityId
                 + " procedure=" + finalNeedsProcedure
                 + " event=" + finalNeedsEvent
                 + " news=false"
+                + " cityInfo=" + finalNeedsCityInfo
                 + " durationMs=" + durationMs
                 + " procedureTitles=" + detectionIndex.procedureTitleCount()
-                + " eventTitles=" + detectionIndex.eventTitleCount());
-        return new ContextRequirements(finalNeedsProcedure, finalNeedsEvent, false);
+                + " eventTitles=" + detectionIndex.eventTitleCount()
+                + " cityInfoTitles=" + detectionIndex.cityInfoTitleCount());
+        return new ContextRequirements(finalNeedsProcedure, finalNeedsEvent, false, finalNeedsCityInfo);
     }
 
     public ProcedureContextResult buildProcedureContextResult(String query, String cityId) {
@@ -393,6 +440,10 @@ public class ProcedureContextService {
         return detectContextRequirements(question, cityId).needsNewsContext();
     }
 
+    public boolean questionNeedsCityInfoContext(String question, String cityId) {
+        return detectContextRequirements(question, cityId).needsCityInfoContext();
+    }
+
     public boolean requiresEventDateWindowClarification(String question, String cityId) {
         if (question == null || question.isBlank()) {
             return false;
@@ -430,6 +481,28 @@ public class ProcedureContextService {
             logger.log(Level.WARNING, "Failed to build news context result for city=" + cityId
                     + "; returning empty context: " + e.getMessage(), e);
             return new NewsContextResult(null, List.of());
+        }
+    }
+
+    public CityInfoContextResult buildCityInfoContextResult(String query, String cityId) {
+        try {
+            CityInfoRagHelper helper = cityInfoRagRegistry.getForCity(cityId);
+            List<CityInfoRagHelper.CityInfo> matches = helper.search(query);
+            if (matches.isEmpty()) {
+                return new CityInfoContextResult(null, List.of());
+            }
+
+            List<Source> sources = matches.stream()
+                    .map(item -> new Source(item.url, item.title))
+                    .filter(source -> source.getUrl() != null && !source.getUrl().isBlank())
+                    .toList();
+
+            String contextBlock = buildCityInfoContextBlockFromMatches(matches, cityId);
+            return new CityInfoContextResult(contextBlock, sources);
+        } catch (Exception e) {
+            logger.log(Level.WARNING, "Failed to build city-info context result for city=" + cityId
+                    + "; returning empty context: " + e.getMessage(), e);
+            return new CityInfoContextResult(null, List.of());
         }
     }
 
@@ -509,9 +582,46 @@ public class ProcedureContextService {
 
         sb.append("INSTRUCTIONS:\n");
         sb.append("- Base your answer on the events above.\n");
-        sb.append("- MANDATORY: If you mention an event listed above and it has a Source URL, include that URL in your answer.\n");
+        sb.append(
+                "- MANDATORY: If you mention an event listed above and it has a Source URL, include that URL in your answer.\n");
         sb.append("- NEVER invent event URLs.\n");
 
+        return sb.toString();
+    }
+
+    private String buildCityInfoContextBlockFromMatches(List<CityInfoRagHelper.CityInfo> matches, String cityId) {
+        if (matches.isEmpty()) {
+            return "";
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("CITY INFORMATION IN ").append(cityId).append(":\n\n");
+
+        for (int i = 0; i < matches.size(); i++) {
+            CityInfoRagHelper.CityInfo item = matches.get(i);
+            sb.append(i + 1).append(". ").append(item.title).append("\n");
+            if (item.theme != null && !item.theme.isBlank()) {
+                sb.append("   Theme: ").append(item.theme).append("\n");
+            }
+            if (item.breadcrumbs != null && !item.breadcrumbs.isBlank()) {
+                sb.append("   Breadcrumbs: ").append(item.breadcrumbs).append("\n");
+            }
+            if (item.summary != null && !item.summary.isBlank()) {
+                sb.append("   Summary: ").append(item.summary).append("\n");
+            }
+            if (item.body != null && !item.body.isBlank()) {
+                sb.append("   Details: ").append(item.body).append("\n");
+            }
+            if (item.url != null && !item.url.isBlank()) {
+                sb.append("   Source URL: ").append(item.url).append("\n");
+            }
+            sb.append("\n");
+        }
+
+        sb.append("INSTRUCTIONS:\n");
+        sb.append("- Base your answer on the city-info context above.\n");
+        sb.append("- Do not invent city-info items or URLs.\n");
+        sb.append("- MANDATORY: If you cite an item and it has a Source URL, include that URL in your answer.\n");
         return sb.toString();
     }
 
@@ -550,6 +660,15 @@ public class ProcedureContextService {
         return CompletableFuture.completedFuture(buildNewsContextResult(query, cityId));
     }
 
+    public CompletableFuture<CityInfoContextResult> buildCityInfoContextResultAsync(String query, String cityId,
+            Executor executor) {
+        return CompletableFuture.supplyAsync(() -> buildCityInfoContextResult(query, cityId), executor);
+    }
+
+    public CompletableFuture<CityInfoContextResult> buildCityInfoContextResultAsync(String query, String cityId) {
+        return CompletableFuture.completedFuture(buildCityInfoContextResult(query, cityId));
+    }
+
     /**
      * De-duplicates sources by URL and preserves order: first occurrence wins,
      * stable ordering.
@@ -573,19 +692,23 @@ public class ProcedureContextService {
         List<String> normalizedProcedureTitles = loadNormalizedProcedureTitles(cityId);
         List<String> normalizedEventTitles = loadNormalizedEventTitles(cityId);
         List<String> normalizedNewsTitles = loadNormalizedNewsTitles(cityId);
+        List<String> normalizedCityInfoTitles = loadNormalizedCityInfoTitles(cityId);
 
         logger.info(() -> "Context detection index initialized — city=" + cityId
                 + " procedureTitles=" + normalizedProcedureTitles.size()
                 + " eventTitles=" + normalizedEventTitles.size()
-                + " newsTitles=" + normalizedNewsTitles.size());
+                + " newsTitles=" + normalizedNewsTitles.size()
+                + " cityInfoTitles=" + normalizedCityInfoTitles.size());
 
         return new CityDetectionIndex(
                 TitleMatcher.fromTitles(normalizedProcedureTitles),
                 TitleMatcher.fromTitles(normalizedEventTitles),
                 TitleMatcher.fromTitles(normalizedNewsTitles),
+                TitleMatcher.fromTitles(normalizedCityInfoTitles),
                 normalizedProcedureTitles.size(),
                 normalizedEventTitles.size(),
-                normalizedNewsTitles.size());
+                normalizedNewsTitles.size(),
+                normalizedCityInfoTitles.size());
     }
 
     private List<String> loadNormalizedProcedureTitles(String cityId) {
@@ -628,6 +751,21 @@ public class ProcedureContextService {
                     .toList();
         } catch (Exception e) {
             logger.fine(() -> "Failed to initialize news detection titles for city=" + cityId
+                    + " error=" + e.getMessage());
+            return List.of();
+        }
+    }
+
+    private List<String> loadNormalizedCityInfoTitles(String cityId) {
+        try {
+            CityInfoRagHelper helper = cityInfoRagRegistry.getForCity(cityId);
+            return helper.getAllCityInfo().stream()
+                    .map(item -> normalize(item.title))
+                    .filter(title -> !title.isBlank())
+                    .distinct()
+                    .toList();
+        } catch (Exception e) {
+            logger.fine(() -> "Failed to initialize city-info detection titles for city=" + cityId
                     + " error=" + e.getMessage());
             return List.of();
         }

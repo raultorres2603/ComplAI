@@ -1,6 +1,8 @@
 package cat.complai.openrouter.services.procedure;
 
 import cat.complai.openrouter.dto.Source;
+import cat.complai.openrouter.helpers.CityInfoRagHelper;
+import cat.complai.openrouter.helpers.CityInfoRagHelperRegistry;
 import cat.complai.openrouter.helpers.EventRagHelper;
 import cat.complai.openrouter.helpers.EventRagHelperRegistry;
 import cat.complai.openrouter.helpers.NewsRagHelper;
@@ -150,6 +152,7 @@ class ProcedureContextServiceTest {
                                 new TestProcedureRegistry(Map.of("city-a", procedureHelper)),
                                 new TestEventRegistry(Map.of("city-a", new CountingEventRagHelper(List.of()))),
                                 new TestNewsRegistry(Map.of("city-a", new CountingNewsRagHelper(List.of()))),
+                                new TestCityInfoRegistry(Map.of("city-a", new CountingCityInfoRagHelper(List.of()))),
                                 new RedactPromptBuilder());
 
                 assertTrue(service.questionNeedsProcedureContext("Need resident parking badge renewal today",
@@ -169,6 +172,7 @@ class ProcedureContextServiceTest {
                                 new TestProcedureRegistry(Map.of("city-a", new CountingProcedureRagHelper(List.of()))),
                                 new TestEventRegistry(Map.of("city-a", eventHelper)),
                                 new TestNewsRegistry(Map.of("city-a", new CountingNewsRagHelper(List.of()))),
+                                new TestCityInfoRegistry(Map.of("city-a", new CountingCityInfoRagHelper(List.of()))),
                                 new RedactPromptBuilder());
 
                 assertTrue(service.questionNeedsEventContext("Can I join the neighborhood meetup tonight?", "city-a"));
@@ -189,6 +193,7 @@ class ProcedureContextServiceTest {
                                 new TestProcedureRegistry(Map.of("city-a", procedureHelper)),
                                 new TestEventRegistry(Map.of("city-a", eventHelper)),
                                 new TestNewsRegistry(Map.of("city-a", new CountingNewsRagHelper(List.of()))),
+                                new TestCityInfoRegistry(Map.of("city-a", new CountingCityInfoRagHelper(List.of()))),
                                 new RedactPromptBuilder());
 
                 ProcedureContextService.ContextRequirements keywordRequirements = service
@@ -224,6 +229,9 @@ class ProcedureContextServiceTest {
                                 new TestNewsRegistry(Map.of(
                                                 "city-a", new CountingNewsRagHelper(List.of()),
                                                 "city-b", new CountingNewsRagHelper(List.of()))),
+                                new TestCityInfoRegistry(Map.of(
+                                                "city-a", new CountingCityInfoRagHelper(List.of()),
+                                                "city-b", new CountingCityInfoRagHelper(List.of()))),
                                 new RedactPromptBuilder());
 
                 assertTrue(service.questionNeedsProcedureContext("Need resident parking badge renewal today",
@@ -246,6 +254,7 @@ class ProcedureContextServiceTest {
                                 new TestProcedureRegistry(Map.of("city-a", procedureHelper)),
                                 new TestEventRegistry(Map.of("city-a", eventHelper)),
                                 new TestNewsRegistry(Map.of("city-a", new CountingNewsRagHelper(List.of()))),
+                                new TestCityInfoRegistry(Map.of("city-a", new CountingCityInfoRagHelper(List.of()))),
                                 new RedactPromptBuilder());
 
                 ProcedureContextService.ContextRequirements procedureRequirements = service
@@ -274,6 +283,7 @@ class ProcedureContextServiceTest {
                                 new TestProcedureRegistry(Map.of("city-a", procedureHelper)),
                                 new TestEventRegistry(Map.of("city-a", eventHelper)),
                                 new TestNewsRegistry(Map.of("city-a", new CountingNewsRagHelper(List.of()))),
+                                new TestCityInfoRegistry(Map.of("city-a", new CountingCityInfoRagHelper(List.of()))),
                                 new RedactPromptBuilder());
 
                 ProcedureContextService.ContextRequirements requirements = service
@@ -302,6 +312,7 @@ class ProcedureContextServiceTest {
                                 new TestProcedureRegistry(Map.of("city-a", procedureHelper)),
                                 new TestEventRegistry(Map.of("city-a", eventHelper)),
                                 new TestNewsRegistry(Map.of("city-a", newsHelper)),
+                                new TestCityInfoRegistry(Map.of("city-a", new CountingCityInfoRagHelper(List.of()))),
                                 new RedactPromptBuilder());
 
                 ProcedureContextService.ContextRequirements requirements = service
@@ -310,9 +321,33 @@ class ProcedureContextServiceTest {
                 assertFalse(requirements.needsProcedureContext());
                 assertFalse(requirements.needsEventContext());
                 assertTrue(requirements.needsNewsContext());
+                assertFalse(requirements.needsCityInfoContext());
                 assertEquals(0, procedureHelper.getAllProceduresCalls.get());
                 assertEquals(0, eventHelper.getAllEventsCalls.get());
                 assertEquals(0, newsHelper.getAllNewsCalls.get());
+        }
+
+        @Test
+        void detectContextRequirements_cityInfoFallback_triggersWhenNoProcedureEventNewsMatch() throws Exception {
+                CountingCityInfoRagHelper cityInfoHelper = new CountingCityInfoRagHelper(List.of(
+                                new CityInfoRagHelper.CityInfo("c1", "Turisme", "Punts d'interès", "", "", "",
+                                                "https://example.com/cityinfo")));
+
+                ProcedureContextService service = new ProcedureContextService(
+                                new TestProcedureRegistry(Map.of("city-a", new CountingProcedureRagHelper(List.of()))),
+                                new TestEventRegistry(Map.of("city-a", new CountingEventRagHelper(List.of()))),
+                                new TestNewsRegistry(Map.of("city-a", new CountingNewsRagHelper(List.of()))),
+                                new TestCityInfoRegistry(Map.of("city-a", cityInfoHelper)),
+                                new RedactPromptBuilder());
+
+                ProcedureContextService.ContextRequirements requirements = service
+                                .detectContextRequirements("Punts d'interès local", "city-a");
+
+                assertFalse(requirements.needsProcedureContext());
+                assertFalse(requirements.needsEventContext());
+                assertFalse(requirements.needsNewsContext());
+                assertTrue(requirements.needsCityInfoContext());
+                assertEquals(1, cityInfoHelper.getAllCityInfoCalls.get());
         }
 
         private static final class TestProcedureRegistry extends ProcedureRagHelperRegistry {
@@ -350,6 +385,19 @@ class ProcedureContextServiceTest {
 
                 @Override
                 public NewsRagHelper getForCity(String cityId) {
+                        return helpersByCity.get(cityId);
+                }
+        }
+
+        private static final class TestCityInfoRegistry extends CityInfoRagHelperRegistry {
+                private final Map<String, CityInfoRagHelper> helpersByCity;
+
+                private TestCityInfoRegistry(Map<String, CityInfoRagHelper> helpersByCity) {
+                        this.helpersByCity = helpersByCity;
+                }
+
+                @Override
+                public CityInfoRagHelper getForCity(String cityId) {
                         return helpersByCity.get(cityId);
                 }
         }
@@ -414,6 +462,27 @@ class ProcedureContextServiceTest {
                 @Override
                 public List<NewsRagHelper.News> search(String query) {
                         return news;
+                }
+        }
+
+        private static final class CountingCityInfoRagHelper extends CityInfoRagHelper {
+                private final List<CityInfoRagHelper.CityInfo> cityInfo;
+                private final AtomicInteger getAllCityInfoCalls = new AtomicInteger();
+
+                private CountingCityInfoRagHelper(List<CityInfoRagHelper.CityInfo> cityInfo) {
+                        super("testcity");
+                        this.cityInfo = cityInfo;
+                }
+
+                @Override
+                public List<CityInfoRagHelper.CityInfo> getAllCityInfo() {
+                        getAllCityInfoCalls.incrementAndGet();
+                        return cityInfo;
+                }
+
+                @Override
+                public List<CityInfoRagHelper.CityInfo> search(String query) {
+                        return cityInfo;
                 }
         }
 }

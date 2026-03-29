@@ -308,6 +308,8 @@ public class ProcedureScraper {
         public EventsConfig events;
         /** News configuration for scraping city news categories/articles */
         public NewsConfig news;
+        /** City-info configuration for scraping municipal information pages */
+        public CityInfoConfig cityInfo;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -411,6 +413,56 @@ public class ProcedureScraper {
         /** Skip articles when title is blank or equals any listed value */
         public List<String> whenTitleEmptyOrEquals = new ArrayList<>();
         /** Skip articles when extracted body is blank */
+        public boolean whenBodyEmpty = true;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static final class CityInfoConfig {
+        /** Base URL for city information discovery */
+        public String baseUrl;
+        /** Discovery configuration from landing page */
+        public CityInfoDiscoveryConfig discovery;
+        /** Crawl configuration for nested menu traversal */
+        public CityInfoCrawlConfig crawl;
+        /** Field extraction rules for city-info pages */
+        public Map<String, FieldExtractionRule> fields = new LinkedHashMap<>();
+        /** Optional skip rules specific to city-info pages */
+        public CityInfoSkipConfig skip;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static final class CityInfoDiscoveryConfig {
+        /** CSS selector for #prat-temes theme links */
+        public String pratTemesSelector;
+        /** Regex patterns that discovered theme URLs must match (any) */
+        public List<String> themeIncludePatterns = new ArrayList<>();
+        /** Regex patterns that discovered theme URLs must not match */
+        public List<String> themeExcludePatterns = new ArrayList<>();
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static final class CityInfoCrawlConfig {
+        /** CSS selector for nested/direct links within the tourism menu */
+        public String themeMenuSelector;
+        /** Regex patterns that nav traversal URLs must match (any) */
+        public List<String> navIncludePatterns = new ArrayList<>();
+        /** Regex patterns that nav traversal URLs must not match */
+        public List<String> navExcludePatterns = new ArrayList<>();
+        /** Regex patterns that detail URLs must match (any) */
+        public List<String> detailIncludePatterns = new ArrayList<>();
+        /** Regex patterns that detail URLs must not match */
+        public List<String> detailExcludePatterns = new ArrayList<>();
+        /** Max traversal depth from each theme page */
+        public int maxDepth = 3;
+        /** Max visited pages from each theme page */
+        public int maxPages = 120;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static final class CityInfoSkipConfig {
+        /** Skip entries when title is blank or equals any listed value */
+        public List<String> whenTitleEmptyOrEquals = new ArrayList<>();
+        /** Skip entries when extracted body is blank */
         public boolean whenBodyEmpty = true;
     }
 }

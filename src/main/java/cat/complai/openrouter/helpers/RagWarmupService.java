@@ -13,13 +13,16 @@ public class RagWarmupService {
 
     private final ProcedureRagHelperRegistry procedureRegistry;
     private final EventRagHelperRegistry eventRegistry;
+    private final CityInfoRagHelperRegistry cityInfoRegistry;
     private final String defaultCityId;
 
     public RagWarmupService(ProcedureRagHelperRegistry procedureRegistry,
-                            EventRagHelperRegistry eventRegistry,
-                            @Value("${complai.default-city-id:elprat}") String defaultCityId) {
+            EventRagHelperRegistry eventRegistry,
+            CityInfoRagHelperRegistry cityInfoRegistry,
+            @Value("${complai.default-city-id:elprat}") String defaultCityId) {
         this.procedureRegistry = procedureRegistry;
         this.eventRegistry = eventRegistry;
+        this.cityInfoRegistry = cityInfoRegistry;
         this.defaultCityId = defaultCityId;
     }
 
@@ -34,13 +37,15 @@ public class RagWarmupService {
         try {
             procedureRegistry.getForCity(defaultCityId);
             eventRegistry.getForCity(defaultCityId);
+            cityInfoRegistry.getForCity(defaultCityId);
             logger.info("RagWarmupService — pre-warm complete for city=" + defaultCityId
                     + " latencyMs=" + (System.currentTimeMillis() - start));
         } catch (Exception e) {
             // Log and swallow — a warmup failure must never prevent startup.
             logger.log(Level.WARNING,
                     "RagWarmupService — pre-warm failed for city=" + defaultCityId
-                            + "; first request will pay the cost: " + e.getMessage(), e);
+                            + "; first request will pay the cost: " + e.getMessage(),
+                    e);
         }
     }
 }

@@ -39,6 +39,65 @@
       "Portal de Tràmits"
     ]
   },
+  "cityInfo": {
+    "baseUrl": "https://www.elprat.cat/",
+    "discovery": {
+      "pratTemesSelector": "#prat-temes a[href]",
+      "themeIncludePatterns": [
+        "^https?://www\\.elprat\\.cat/(?!user|search|contacte|rss|node/\\d+/edit).*"
+      ],
+      "themeExcludePatterns": [
+        "/feed/?$",
+        "\\.(pdf|jpg|jpeg|png|gif|zip)(\\?.*)?$",
+        "#"
+      ]
+    },
+    "crawl": {
+      "themeMenuSelector": "nav.menu-turisme a[href]",
+      "navIncludePatterns": [
+        "^https?://www\\.elprat\\.cat/.*"
+      ],
+      "navExcludePatterns": [
+        "(/(search|rss|user|admin)|\\.(pdf|jpg|jpeg|png|gif|zip))(\\?.*)?$",
+        "mailto:",
+        "tel:",
+        "javascript:"
+      ],
+      "detailIncludePatterns": [
+        "^https?://www\\.elprat\\.cat/.*"
+      ],
+      "detailExcludePatterns": [
+        "(/(search|rss|user|admin)|\\.(pdf|jpg|jpeg|png|gif|zip))(\\?.*)?$"
+      ],
+      "maxDepth": 3,
+      "maxPages": 150
+    },
+    "fields": {
+      "title": {
+        "selector": "h1, .page-header h1, .title-slim, .node-title",
+        "multiple": false
+      },
+      "summary": {
+        "selector": "meta[name='description'], .introduccio, .lead, .field--name-field-subtitle",
+        "multiple": false
+      },
+      "body": {
+        "selector": "article p, .field-name-body p, .field--name-body p, .region-content p",
+        "multiple": true
+      },
+      "breadcrumbs": {
+        "selector": ".breadcrumb li, nav.breadcrumb li, .breadcrumbs li",
+        "multiple": true
+      }
+    },
+    "skip": {
+      "whenTitleEmptyOrEquals": [
+        "El Prat",
+        "Ajuntament del Prat"
+      ],
+      "whenBodyEmpty": true
+    }
+  },
   "news": {
     "baseUrl": "https://elprataldia.es/",
     "discovery": {
