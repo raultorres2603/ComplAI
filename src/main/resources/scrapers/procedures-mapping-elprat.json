@@ -42,7 +42,7 @@
   "cityInfo": {
     "baseUrl": "https://www.elprat.cat/",
     "discovery": {
-      "pratTemesSelector": "#prat-temes a[href]",
+      "pratTemesSelector": "#prat-temes .col-md-6:first-child a[href], #prat-temes .col-md-6:last-child a[href]",
       "themeIncludePatterns": [
         "^https?://www\\.elprat\\.cat/(?!user|search|contacte|rss|node/\\d+/edit).*"
       ],
