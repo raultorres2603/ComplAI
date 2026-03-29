@@ -102,6 +102,26 @@ class ProcedureContextServiceTest {
         }
 
         @Test
+        void requiresEventDateWindowClarification_returnsTrue_whenEventIntentHasNoDateWindow() {
+                assertTrue(procedureContextService.requiresEventDateWindowClarification(
+                                "Quins esdeveniments hi ha?", "testcity"));
+                assertTrue(procedureContextService.requiresEventDateWindowClarification(
+                                "What events are happening?", "testcity"));
+                assertTrue(procedureContextService.requiresEventDateWindowClarification(
+                                "Que eventos hay en la ciudad?", "testcity"));
+        }
+
+        @Test
+        void requiresEventDateWindowClarification_returnsFalse_whenDateWindowExists() {
+                assertFalse(procedureContextService.requiresEventDateWindowClarification(
+                                "What events are happening this week?", "testcity"));
+                assertFalse(procedureContextService.requiresEventDateWindowClarification(
+                                "Quins esdeveniments hi ha a l'abril?", "testcity"));
+                assertFalse(procedureContextService.requiresEventDateWindowClarification(
+                                "Que eventos hay del 10/04 al 15/04?", "testcity"));
+        }
+
+        @Test
         void questionNeedsNewsContext_detects_keywords() {
                 assertTrue(procedureContextService.questionNeedsNewsContext("Any latest news in the city?",
                                 "testcity"));

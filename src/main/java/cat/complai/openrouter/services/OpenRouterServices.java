@@ -146,6 +146,18 @@ public class OpenRouterServices implements IOpenRouterService {
 
         List<Map<String, Object>> messages = new ArrayList<>();
         String detectedLanguage = cat.complai.openrouter.helpers.LanguageDetector.detect(question);
+
+        if (procedureContextService.requiresEventDateWindowClarification(question, cityId)) {
+            String clarificationMessage = buildEventDateWindowClarificationMessage(detectedLanguage);
+            if (conversationId != null && !conversationId.isBlank()) {
+            conversationService.updateConversationHistory(conversationId, question, clarificationMessage);
+            }
+            logger.info(() -> "ask() event date-window clarification triggered - conversationId=" + conversationId
+                + " city=" + cityId);
+            return new OpenRouterResponseDto(true, clarificationMessage, null, 200, OpenRouterErrorCode.NONE, null,
+                List.of());
+        }
+
         messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage(cityId, detectedLanguage)));
 
         RagContexts ragContexts = buildRagContexts(question, cityId, conversationId, "ask()");
@@ -381,6 +393,14 @@ public class OpenRouterServices implements IOpenRouterService {
 
         // 2. Single-language system message + RAG
         String detectedLanguage = LanguageDetector.detect(question);
+
+        if (procedureContextService.requiresEventDateWindowClarification(question, cityId)) {
+            String clarificationMessage = buildEventDateWindowClarificationMessage(detectedLanguage);
+            logger.info(() -> "streamAsk() event date-window clarification triggered - conversationId="
+                + conversationId + " city=" + cityId);
+            return buildFallbackStreamResult(clarificationMessage, conversationId, question);
+        }
+
         List<Map<String, Object>> messages = new ArrayList<>();
         messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage(cityId, detectedLanguage)));
 
@@ -702,6 +722,16 @@ public class OpenRouterServices implements IOpenRouterService {
             return "No he encontrado noticias recientes relacionadas con esa consulta en " + cityDisplayName + ".";
         }
         return "I could not find related recent news about that in " + cityDisplayName + ".";
+    }
+
+    private String buildEventDateWindowClarificationMessage(String detectedLanguage) {
+        if ("CA".equals(detectedLanguage)) {
+            return "Per ajudar-te amb esdeveniments, indica un interval de dates (per exemple: aquesta setmana, abril, o del 10/04 al 15/04).";
+        }
+        if ("ES".equals(detectedLanguage)) {
+            return "Para ayudarte con eventos, indícame un rango de fechas (por ejemplo: esta semana, abril, o del 10/04 al 15/04).";
+        }
+        return "To help with events, please provide a date window (for example: this week, April, or from 10/04 to 15/04).";
     }
 
     private record RagContexts(ProcedureContextResult procedureContext,

@@ -114,6 +114,8 @@ class OpenRouterServicesOrchestrationTest {
                 ProcedureContextService.EventContextResult eventContext = new ProcedureContextService.EventContextResult(
                                 "event-context",
                                 List.of(new Source("https://example.com/event", "Event")));
+                when(procedureContextService.requiresEventDateWindowClarification(anyString(), eq("elprat")))
+                                .thenReturn(false);
                 when(procedureContextService.detectContextRequirements(anyString(), eq("elprat")))
                                 .thenReturn(new ProcedureContextService.ContextRequirements(false, true, false));
                 when(procedureContextService.buildEventContextResult(anyString(), eq("elprat")))
@@ -127,6 +129,23 @@ class OpenRouterServicesOrchestrationTest {
                 verify(procedureContextService, never()).buildEventContextResultAsync(anyString(), anyString(),
                                 any(Executor.class));
                 verify(aiResponseService).callOpenRouterAndExtract(anyList(), eq("elprat"), eq(0L), any(Long.class));
+        }
+
+        @Test
+        void ask_eventIntentWithoutDateWindow_returnsClarificationAndSkipsRetrieval() {
+                when(procedureContextService.requiresEventDateWindowClarification(anyString(), eq("elprat")))
+                                .thenReturn(true);
+
+                OpenRouterResponseDto response = service.ask("What events are happening?", "conv-1", "elprat");
+
+                assertTrue(response.isSuccess());
+                assertTrue(response.getMessage().contains("date window")
+                                || response.getMessage().contains("rango de fechas")
+                                || response.getMessage().contains("interval de dates"));
+                verify(procedureContextService, never()).detectContextRequirements(anyString(), anyString());
+                verify(procedureContextService, never()).buildEventContextResult(anyString(), anyString());
+                verify(aiResponseService, never()).callOpenRouterAndExtract(anyList(), anyString(), anyLong(),
+                                anyLong());
         }
 
         @Test

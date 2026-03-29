@@ -22,6 +22,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -48,6 +49,33 @@ public class ProcedureContextService {
             "cinema", "sports", "esports", "culture", "cultura", "celebration", "celebració",
             "what's on", "what's happening", "què passa", "agenda cultural", "program",
             "this weekend", "upcoming");
+
+        private static final List<String> EVENT_INTENT_GUARD_KEYWORDS = List.of(
+            "event", "events", "evento", "eventos", "esdeveniment", "esdeveniments",
+            "agenda", "activity", "activities", "activitat", "activitats",
+            "what's on", "what is on", "what's happening", "que passa", "què passa");
+
+        private static final List<String> DATE_WINDOW_KEYWORDS = List.of(
+            "today", "tomorrow", "tonight", "this weekend", "next weekend", "weekend",
+            "this week", "next week", "this month", "next month",
+            "avui", "dema", "demà", "aquesta setmana", "setmana vinent", "cap de setmana", "aquest mes",
+            "mes vinent",
+            "hoy", "manana", "mañana", "esta semana", "proxima semana", "próxima semana", "fin de semana",
+            "este mes", "proximo mes", "próximo mes");
+
+        private static final List<String> MONTH_KEYWORDS = List.of(
+            "january", "february", "march", "april", "may", "june", "july", "august",
+            "september", "october", "november", "december",
+            "gener", "febrer", "marc", "març", "abril", "maig", "juny", "juliol", "agost",
+            "setembre", "octubre", "novembre", "desembre",
+            "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
+            "septiembre", "octubre", "noviembre", "diciembre");
+
+        private static final List<String> RANGE_CONNECTOR_KEYWORDS = List.of(
+            "from", "to", "between", "until", "through", "del", "al", "desde", "hasta", "entre");
+
+        private static final Pattern NUMERIC_DATE_PATTERN = Pattern.compile("\\b\\d{1,2}[/-]\\d{1,2}(?:[/-]\\d{2,4})?\\b");
+        private static final Pattern ISO_DATE_PATTERN = Pattern.compile("\\b\\d{4}-\\d{1,2}-\\d{1,2}\\b");
 
     private static final List<String> NEWS_KEYWORDS = List.of(
             "news", "latest news", "recent news", "recent happenings", "current affairs",
@@ -364,6 +392,24 @@ public class ProcedureContextService {
         return detectContextRequirements(question, cityId).needsNewsContext();
     }
 
+    public boolean requiresEventDateWindowClarification(String question, String cityId) {
+        if (question == null || question.isBlank()) {
+            return false;
+        }
+
+        ContextRequirements requirements = detectContextRequirements(question, cityId);
+        if (!requirements.needsEventContext() || requirements.needsNewsContext()) {
+            return false;
+        }
+
+        String normalizedQuestion = normalize(question);
+        if (!containsAny(normalizedQuestion, EVENT_INTENT_GUARD_KEYWORDS)) {
+            return false;
+        }
+
+        return !hasDateWindow(normalizedQuestion, question);
+    }
+
     public NewsContextResult buildNewsContextResult(String query, String cityId) {
         try {
             NewsRagHelper helper = newsRagRegistry.getForCity(cityId);
@@ -418,7 +464,7 @@ public class ProcedureContextService {
         sb.append("INSTRUCTIONS:\n");
         sb.append("- Base your answer on the news context above.\n");
         sb.append("- Do not invent news items or URLs.\n");
-        sb.append("- If you cite an item, include its source URL when available.\n");
+        sb.append("- MANDATORY: If you cite a news item and it has a Source URL, include that URL in your answer.\n");
         return sb.toString();
     }
 
@@ -454,8 +500,16 @@ public class ProcedureContextService {
             if (event.theme != null && !event.theme.isBlank()) {
                 sb.append("   Theme: ").append(event.theme).append("\n");
             }
+            if (event.url != null && !event.url.isBlank()) {
+                sb.append("   Source URL: ").append(event.url).append("\n");
+            }
             sb.append("\n");
         }
+
+        sb.append("INSTRUCTIONS:\n");
+        sb.append("- Base your answer on the events above.\n");
+        sb.append("- MANDATORY: If you mention an event listed above and it has a Source URL, include that URL in your answer.\n");
+        sb.append("- NEVER invent event URLs.\n");
 
         return sb.toString();
     }
@@ -596,6 +650,37 @@ public class ProcedureContextService {
 
     private static boolean isClearlyConversational(String normalizedQuestion) {
         return containsAny(normalizedQuestion, CONVERSATIONAL_SHORT_CIRCUITS);
+    }
+
+    private static boolean hasDateWindow(String normalizedQuestion, String originalQuestion) {
+        if (containsAny(normalizedQuestion, DATE_WINDOW_KEYWORDS)) {
+            return true;
+        }
+
+        if (containsAny(normalizedQuestion, MONTH_KEYWORDS)) {
+            return true;
+        }
+
+        if (NUMERIC_DATE_PATTERN.matcher(originalQuestion).find()) {
+            return true;
+        }
+
+        if (ISO_DATE_PATTERN.matcher(originalQuestion).find()) {
+            return true;
+        }
+
+        return hasRangeExpressionWithDateTokens(normalizedQuestion, originalQuestion);
+    }
+
+    private static boolean hasRangeExpressionWithDateTokens(String normalizedQuestion, String originalQuestion) {
+        if (!containsAny(normalizedQuestion, RANGE_CONNECTOR_KEYWORDS)) {
+            return false;
+        }
+
+        return NUMERIC_DATE_PATTERN.matcher(originalQuestion).find()
+                || ISO_DATE_PATTERN.matcher(originalQuestion).find()
+                || containsAny(normalizedQuestion, MONTH_KEYWORDS)
+                || containsAny(normalizedQuestion, DATE_WINDOW_KEYWORDS);
     }
 
     private static Set<String> tokenize(String normalizedValue) {

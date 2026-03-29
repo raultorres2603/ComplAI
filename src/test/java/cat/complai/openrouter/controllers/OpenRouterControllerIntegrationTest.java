@@ -741,6 +741,52 @@ public class OpenRouterControllerIntegrationTest {
     }
 
     @Test
+    void integration_ask_eventIntent_withoutDateWindow_returnsClarificationBeforeRetrieval() throws Exception {
+        String testCityAuthHeader = mintAuthHeader("testcity");
+        AskRequest req = new AskRequest("Que eventos hay en la ciudad?");
+        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
+                .header("Authorization", testCityAuthHeader);
+
+        HttpResponse<String> resp = client.toBlocking().exchange(httpReq, String.class);
+        assertEquals(200, resp.getStatus().getCode());
+
+        String streamContent = resp.getBody().orElse("");
+        String[] lines = streamContent.split("\n\n");
+
+        JsonNode firstChunk = null;
+        JsonNode sourcesEvent = null;
+        for (String line : lines) {
+            if (line.startsWith("data:")) {
+                JsonNode event = mapper.readTree(line.substring(5).trim());
+                if ("chunk".equals(event.path("type").asText()) && firstChunk == null) {
+                    firstChunk = event;
+                }
+                if ("sources".equals(event.path("type").asText())) {
+                    sourcesEvent = event;
+                }
+            }
+        }
+
+        assertNotNull(firstChunk);
+        String clarification = firstChunk.path("content").asText();
+        assertTrue(clarification.contains("rango de fechas")
+                || clarification.contains("date window")
+                || clarification.contains("interval de dates"));
+        assertNotNull(sourcesEvent);
+        assertTrue(sourcesEvent.path("sources").isArray());
+        assertEquals(0, sourcesEvent.path("sources").size());
+    }
+
+    @Test
+    void integration_ask_procedureEventNewsIncludeSourceUrlsInSourcesEvent() throws Exception {
+        String testCityAuthHeader = mintAuthHeader("testcity");
+
+        assertSourcesEventContainsUrl(testCityAuthHeader, "Recycling procedure in testcity");
+        assertSourcesEventContainsUrl(testCityAuthHeader, "Film Festival events this week in testcity");
+        assertSourcesEventContainsUrl(testCityAuthHeader, "latest news about recycling campaign [SSE_NEWS_CONTEXT]");
+    }
+
+    @Test
     void integration_ask_streamMalformedAfterFirstChunk_emitsSseErrorEvent() throws Exception {
         AskRequest req = new AskRequest("Is there a recycling center? [SSE_MALFORMED]");
         HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
@@ -792,6 +838,45 @@ public class OpenRouterControllerIntegrationTest {
 
         assertNotNull(errorEvent, "Expected SSE error event after upstream failure");
         assertEquals(OpenRouterErrorCode.UPSTREAM.getCode(), errorEvent.path("errorCode").asInt());
+    }
+
+    private void assertSourcesEventContainsUrl(String bearerToken, String question) throws Exception {
+        AskRequest req = new AskRequest(question);
+        HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
+                .header("Authorization", bearerToken);
+
+        HttpResponse<String> resp = client.toBlocking().exchange(httpReq, String.class);
+        assertEquals(200, resp.getStatus().getCode());
+
+        String streamContent = resp.getBody().orElse("");
+        String[] lines = streamContent.split("\n\n");
+        JsonNode sourcesEvent = null;
+        for (String line : lines) {
+            if (!line.startsWith("data:")) {
+                continue;
+            }
+            JsonNode event = mapper.readTree(line.substring(5).trim());
+            if ("sources".equals(event.path("type").asText())) {
+                sourcesEvent = event;
+                break;
+            }
+        }
+
+        assertNotNull(sourcesEvent, "Expected sources event for question: " + question);
+        JsonNode sources = sourcesEvent.path("sources");
+        assertTrue(sources.isArray(), "sources must be an array");
+        assertTrue(sources.size() > 0, "Expected at least one source for question: " + question);
+
+        boolean hasValidUrl = false;
+        for (JsonNode sourceNode : sources) {
+            String url = sourceNode.path("url").asText("");
+            if (url.startsWith("http://") || url.startsWith("https://")) {
+                hasValidUrl = true;
+                break;
+            }
+        }
+
+        assertTrue(hasValidUrl, "Expected at least one HTTP/HTTPS source URL for question: " + question);
     }
 
     @MockBean(HttpWrapper.class)

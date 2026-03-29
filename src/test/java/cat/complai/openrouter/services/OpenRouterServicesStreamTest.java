@@ -183,6 +183,32 @@ class OpenRouterServicesStreamTest {
         }
 
         @Test
+        void streamAsk_eventWithoutDateWindow_emitsClarificationChunkAndSkipsUpstream() throws Exception {
+                when(validationService.validateQuestion(anyString())).thenReturn(Optional.empty());
+                when(procedureContextService.requiresEventDateWindowClarification(anyString(), eq("elprat")))
+                                .thenReturn(true);
+
+                List<String> emitted = collectStream(
+                                service.streamAsk("What events are happening?", "conv-event", "elprat"));
+
+                assertEquals(3, emitted.size(), "Should emit clarification chunk, sources, and done");
+
+                SseChunkEvent chunkEvent = objectMapper.readValue(emitted.get(0), SseChunkEvent.class);
+                assertEquals("chunk", chunkEvent.type());
+                assertTrue(chunkEvent.content().contains("date window")
+                                || chunkEvent.content().contains("rango de fechas")
+                                || chunkEvent.content().contains("interval de dates"));
+
+                SseSourcesEvent sourcesEvent = objectMapper.readValue(emitted.get(1), SseSourcesEvent.class);
+                assertTrue(sourcesEvent.sources().isEmpty());
+
+                SseDoneEvent doneEvent = objectMapper.readValue(emitted.get(2), SseDoneEvent.class);
+                assertEquals("conv-event", doneEvent.conversationId());
+
+                verify(httpWrapper, never()).streamFromOpenRouter(anyList());
+        }
+
+        @Test
         void streamAsk_OnValidationError_EmitsErrorEvent() throws Exception {
                 // Setup validation error
                 OpenRouterResponseDto validationError = new OpenRouterResponseDto(false, null, "Invalid question", null,
