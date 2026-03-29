@@ -13,6 +13,8 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
@@ -162,8 +164,8 @@ public class CityInfoScraper {
                 try {
                     Document doc = connect(current.url());
                     Elements menuLinks = doc.select(
-                        Objects.requireNonNull(cityInfoConfig.crawl.themeMenuSelector,
-                            "cityInfo.crawl.themeMenuSelector"));
+                            Objects.requireNonNull(cityInfoConfig.crawl.themeMenuSelector,
+                                    "cityInfo.crawl.themeMenuSelector"));
                     for (Element link : menuLinks) {
                         String candidate = canonicalizeUrl(link.absUrl("href"));
                         if (candidate == null) {
@@ -344,10 +346,35 @@ public class CityInfoScraper {
     }
 
     private static Document connect(String url) throws IOException {
-        return Jsoup.connect(Objects.requireNonNull(url, "url"))
-                .userAgent(USER_AGENT)
-                .timeout(15000)
-                .get();
+        Objects.requireNonNull(url, "url");
+        int maxAttempts = 3;
+        IOException lastException = null;
+
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                return Jsoup.connect(url)
+                        .userAgent(USER_AGENT)
+                        .timeout(30000)
+                        .get();
+            } catch (SocketTimeoutException | ConnectException e) {
+                lastException = e;
+                if (attempt < maxAttempts) {
+                    logger.info("Connection attempt " + attempt + " failed for " + url + " - " + e.getMessage()
+                            + " - retrying in 2 seconds");
+                    try {
+                        Thread.sleep(2000);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new IOException("Interrupted during retry backoff", ie);
+                    }
+                } else {
+                    logger.severe("Connection failed after " + maxAttempts + " attempts for " + url
+                            + " - " + e.getMessage());
+                }
+            }
+        }
+
+        throw lastException != null ? lastException : new IOException("Failed to connect to " + url);
     }
 
     private static Map<String, Object> buildRootJson(String sourceUrl, List<Map<String, Object>> cityInfo) {
