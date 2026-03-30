@@ -144,9 +144,13 @@ public class CityInfoScraper {
     static Map<String, String> crawlDetailUrls(Map<String, String> themeUrls,
             ProcedureScraper.CityInfoConfig cityInfoConfig) {
         Map<String, String> detailUrls = new LinkedHashMap<>();
-        for (Map.Entry<String, String> themeEntry : themeUrls.entrySet()) {
+        List<Map.Entry<String, String>> themeList = new ArrayList<>(themeUrls.entrySet());
+        for (int themeIdx = 0; themeIdx < themeList.size(); themeIdx++) {
+            Map.Entry<String, String> themeEntry = themeList.get(themeIdx);
             String themeUrl = themeEntry.getKey();
             String themeName = themeEntry.getValue();
+
+            logger.info("Crawling theme [" + (themeIdx + 1) + "/" + themeList.size() + "]: '" + themeName + "' - " + themeUrl);
 
             Set<String> visitedPages = new LinkedHashSet<>();
             ArrayDeque<CrawlTarget> pending = new ArrayDeque<>();
@@ -158,20 +162,25 @@ public class CityInfoScraper {
                     continue;
                 }
 
+                if (visitedPages.size() % 25 == 0) {
+                    logger.info("  [theme '" + themeName + "'] Visited " + visitedPages.size() + " pages, " + detailUrls.size() + " detail URLs so far, " + pending.size() + " pending");
+                }
+
                 if (matchesUrlFilters(current.url(),
                         cityInfoConfig.crawl.detailIncludePatterns,
                         cityInfoConfig.crawl.detailExcludePatterns)) {
                     detailUrls.putIfAbsent(current.url(), themeName);
                 }
 
-                logger.fine("Attempting to fetch page " + current.url() + " - depth=" + current.depth() 
+                logger.fine("Attempting to fetch page " + current.url() + " - depth=" + current.depth()
                         + " visitedCount=" + visitedPages.size() + " pendingCount=" + pending.size());
                 try {
                     Document doc = connect(current.url());
                     Elements menuLinks = doc.select(
                             Objects.requireNonNull(cityInfoConfig.crawl.themeMenuSelector,
                                     "cityInfo.crawl.themeMenuSelector"));
-                    logger.fine("Matched " + menuLinks.size() + " links from themeMenuSelector on page " + current.url());
+                    logger.fine(
+                            "Matched " + menuLinks.size() + " links from themeMenuSelector on page " + current.url());
                     for (Element link : menuLinks) {
                         String candidate = canonicalizeUrl(link.absUrl("href"));
                         if (candidate == null) {
@@ -195,6 +204,7 @@ public class CityInfoScraper {
                     logger.severe("Failed city-info crawl page: " + current.url() + " - " + e.getMessage());
                 }
             }
+            logger.info("  [theme '" + themeName + "'] Done: visited " + visitedPages.size() + " pages, total detail URLs so far: " + detailUrls.size());
         }
         return detailUrls;
     }
@@ -202,12 +212,20 @@ public class CityInfoScraper {
     static List<Map<String, Object>> scrapeCityInfo(Map<String, String> detailUrlsByTheme,
             ProcedureScraper.CityInfoConfig cityInfoConfig) {
         List<Map<String, Object>> result = new ArrayList<>();
-        for (Map.Entry<String, String> entry : detailUrlsByTheme.entrySet()) {
+        List<Map.Entry<String, String>> entryList = new ArrayList<>(detailUrlsByTheme.entrySet());
+        int total = entryList.size();
+        for (int i = 0; i < total; i++) {
+            Map.Entry<String, String> entry = entryList.get(i);
             String url = entry.getKey();
             String theme = entry.getValue();
+            logger.info("Scraping page [" + (i + 1) + "/" + total + "] theme='" + theme + "' url=" + url);
             try {
                 Optional<Map<String, Object>> item = scrapeCityInfoPage(url, theme, cityInfoConfig);
-                item.ifPresent(result::add);
+                if (item.isPresent()) {
+                    result.add(item.get());
+                } else {
+                    logger.info("  -> Skipped (empty title or body)");
+                }
             } catch (Exception e) {
                 logger.severe("Failed to scrape city-info page: " + url + " - " + e.getMessage());
             }
@@ -257,14 +275,14 @@ public class CityInfoScraper {
 
     static String extractFieldValue(Document doc, ProcedureScraper.FieldExtractionRule rule) {
         String selector = rule.selector;
-        
+
         // If selector is null or empty, return empty string (nothing to extract)
         if (selector == null || selector.isBlank()) {
             return "";
         }
-        
+
         boolean isMetaTag = selector.contains("meta[");
-        
+
         if (rule.multiple) {
             Elements elements = doc.select(selector);
             StringBuilder sb = new StringBuilder();
@@ -290,11 +308,11 @@ public class CityInfoScraper {
         if (element == null) {
             return "";
         }
-        
+
         if (isMetaTag) {
             return element.attr("content").trim();
         }
-        
+
         return element.text().trim();
     }
 
@@ -388,6 +406,7 @@ public class CityInfoScraper {
                         .header("Connection", "keep-alive")
                         .header("Upgrade-Insecure-Requests", "1")
                         .timeout(30000)
+                        .ignoreHttpErrors(true)
                         .get();
             } catch (SocketTimeoutException | ConnectException e) {
                 lastException = e;
