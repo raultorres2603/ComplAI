@@ -337,7 +337,7 @@ class NewsScraperTest {
 
         @Override
         public @NonNull Connection ignoreHttpErrors(boolean ignoreHttpErrors) {
-            throw new UnsupportedOperationException();
+            return this;
         }
 
         @Override
@@ -394,7 +394,7 @@ class NewsScraperTest {
 
         @Override
         public @NonNull Connection header(@NonNull String name, @NonNull String value) {
-            throw new UnsupportedOperationException();
+            return this;
         }
 
         @Override
