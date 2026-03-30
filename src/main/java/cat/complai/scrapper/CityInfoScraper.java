@@ -38,7 +38,7 @@ public class CityInfoScraper {
 
     private static final Logger logger = Logger.getLogger(CityInfoScraper.class.getName());
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36";
+    private static final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
     public static void main(String[] args) throws IOException {
         if (args.length != 1 || args[0].isBlank()) {
@@ -382,6 +382,11 @@ public class CityInfoScraper {
             try {
                 return Jsoup.connect(url)
                         .userAgent(USER_AGENT)
+                        .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
+                        .header("Accept-Language", "ca,es;q=0.8,en-US;q=0.5,en;q=0.3")
+                        .header("Accept-Encoding", "gzip, deflate, br")
+                        .header("Connection", "keep-alive")
+                        .header("Upgrade-Insecure-Requests", "1")
                         .timeout(30000)
                         .get();
             } catch (SocketTimeoutException | ConnectException e) {
