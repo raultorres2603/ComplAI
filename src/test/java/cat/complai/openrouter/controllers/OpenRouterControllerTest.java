@@ -295,7 +295,7 @@ public class OpenRouterControllerTest {
         assertNotNull(body);
         assertFalse(body.isSuccess());
         assertEquals(OpenRouterErrorCode.VALIDATION.getCode(), body.getErrorCode());
-        assertTrue(body.getError().contains("PDF"));
+        assertTrue(body.getError().contains("pdf"));
     }
 
     @Test
@@ -323,22 +323,8 @@ public class OpenRouterControllerTest {
         assertTrue(body.getMessage().contains("first name"));
     }
 
-    @Test
-    void redact_completeIdentity_jsonFormat_usesSyncPath() {
-        // When format is JSON, even complete identity must stay synchronous.
-        OpenRouterController c = new OpenRouterController(new FakeServiceSuccess(), ASSERT_NOT_CALLED_PUBLISHER,
-                ASSERT_NOT_CALLED_UPLOADER, null);
-        RedactRequest req = RedactRequest.fromJson("Noise from the airport", "json", null, "Joan", "Garcia",
-                "12345678A");
-        HttpResponse<?> raw = c.redact(req, requestWithCity("testcity"));
-        assertEquals(200, raw.getStatus().getCode());
-        OpenRouterPublicDto body = (OpenRouterPublicDto) raw.getBody().get();
-        assertNotNull(body);
-        assertTrue(body.isSuccess());
-    }
-
     // -------------------------------------------------------------------------
-    // redact() — async path (complete identity + PDF/AUTO format)
+    // redact() — async path (complete identity + PDF format)
     // -------------------------------------------------------------------------
 
     @Test
@@ -355,20 +341,6 @@ public class OpenRouterControllerTest {
         assertNotNull(body.pdfUrl());
         assertTrue(body.pdfUrl().contains("complaint.pdf"), "pdfUrl must point to a PDF key");
         assertEquals(OpenRouterErrorCode.NONE.getCode(), body.errorCode());
-    }
-
-    @Test
-    void redact_completeIdentityAndAutoFormat_returns202WithPdfUrl() {
-        OpenRouterController c = new OpenRouterController(new FakeServiceSuccess(), NOOP_PUBLISHER, FIXED_URL_UPLOADER,
-                null);
-        RedactRequest req = RedactRequest.fromJson("Noise from the airport", "auto", null, "Joan", "Garcia",
-                "12345678A");
-        HttpResponse<?> raw = c.redact(req, requestWithCity("testcity"));
-        assertEquals(202, raw.getStatus().getCode());
-        RedactAcceptedDto body = (RedactAcceptedDto) raw.getBody().get();
-        assertNotNull(body);
-        assertTrue(body.success());
-        assertNotNull(body.pdfUrl());
     }
 
     @Test
@@ -399,6 +371,46 @@ public class OpenRouterControllerTest {
         assertNotNull(body);
         assertFalse(body.isSuccess());
         assertEquals(OpenRouterErrorCode.VALIDATION.getCode(), body.getErrorCode());
+    }
+
+    @Test
+    void redact_jsonFormat_returns400() {
+        OpenRouterController c = new OpenRouterController(new FakeServiceSuccess(), ASSERT_NOT_CALLED_PUBLISHER,
+                ASSERT_NOT_CALLED_UPLOADER, null);
+        RedactRequest req = RedactRequest.fromJson("Noise from the airport", "json", null, null, null, null);
+        HttpResponse<?> raw = c.redact(req, requestWithCity("testcity"));
+        assertEquals(400, raw.getStatus().getCode());
+        OpenRouterPublicDto body = (OpenRouterPublicDto) raw.getBody().get();
+        assertNotNull(body);
+        assertFalse(body.isSuccess());
+        assertEquals(OpenRouterErrorCode.VALIDATION.getCode(), body.getErrorCode());
+    }
+
+    @Test
+    void redact_autoFormat_returns400() {
+        OpenRouterController c = new OpenRouterController(new FakeServiceSuccess(), ASSERT_NOT_CALLED_PUBLISHER,
+                ASSERT_NOT_CALLED_UPLOADER, null);
+        RedactRequest req = RedactRequest.fromJson("Noise from the airport", "auto", null, null, null, null);
+        HttpResponse<?> raw = c.redact(req, requestWithCity("testcity"));
+        assertEquals(400, raw.getStatus().getCode());
+        OpenRouterPublicDto body = (OpenRouterPublicDto) raw.getBody().get();
+        assertNotNull(body);
+        assertFalse(body.isSuccess());
+        assertEquals(OpenRouterErrorCode.VALIDATION.getCode(), body.getErrorCode());
+    }
+
+    @Test
+    void redact_nullFormat_defaultsToPdfAndRoutes202() {
+        OpenRouterController c = new OpenRouterController(new FakeServiceSuccess(), NOOP_PUBLISHER, FIXED_URL_UPLOADER,
+                null);
+        RedactRequest req = RedactRequest.fromJson("Noise from the airport", null, null, "Joan", "Garcia", "12345678A");
+        HttpResponse<?> raw = c.redact(req, requestWithCity("testcity"));
+        assertEquals(202, raw.getStatus().getCode());
+        RedactAcceptedDto body = (RedactAcceptedDto) raw.getBody().get();
+        assertNotNull(body);
+        assertTrue(body.success());
+        assertNotNull(body.pdfUrl());
+        assertEquals(OpenRouterErrorCode.NONE.getCode(), body.errorCode());
     }
 
     // -------------------------------------------------------------------------
@@ -502,17 +514,17 @@ public class OpenRouterControllerTest {
         OidcIdentityTokenValidator validator = validatorThatReturns(idpIdentity);
 
         OpenRouterController c = new OpenRouterController(
-                new FakeServiceSuccess(), ASSERT_NOT_CALLED_PUBLISHER, ASSERT_NOT_CALLED_UPLOADER, validator);
+                new FakeServiceSuccess(), NOOP_PUBLISHER, FIXED_URL_UPLOADER, validator);
 
-        // Body has complete identity, no X-Identity-Token header, JSON format → sync
+        // Body has complete identity, no X-Identity-Token header, PDF format → async
         // path
-        RedactRequest bodyReq = RedactRequest.fromJson("Noise", "json", null, "Maria", "Garcia", "87654321B");
+        RedactRequest bodyReq = RedactRequest.fromJson("Noise", "pdf", null, "Maria", "Garcia", "87654321B");
         HttpResponse<?> raw = c.redact(bodyReq, requestWithCity("testcity"));
 
-        assertEquals(200, raw.getStatus().getCode());
-        OpenRouterPublicDto body = (OpenRouterPublicDto) raw.getBody().get();
+        assertEquals(202, raw.getStatus().getCode());
+        RedactAcceptedDto body = (RedactAcceptedDto) raw.getBody().get();
         assertNotNull(body);
-        assertTrue(body.isSuccess());
+        assertTrue(body.success());
     }
 
     // -------------------------------------------------------------------------

@@ -27,7 +27,7 @@ public class RedactRequest {
     private final String requesterIdNumber;
 
     public RedactRequest(String text) {
-        this(text, OutputFormat.AUTO, null, null, null, null);
+        this(text, OutputFormat.PDF, null, null, null, null);
     }
 
     public RedactRequest(String text, OutputFormat format) {
@@ -51,7 +51,7 @@ public class RedactRequest {
     /**
      * Jackson deserialization entry point. The format field is received as a raw String so
      * that OutputFormat.fromString can return null for unrecognised values (e.g. "xml"), which
-     * the controller then rejects with a 400. A null/absent format field maps to AUTO.
+     * the controller then rejects with a 400. A null/absent format field maps to PDF.
      */
     @JsonCreator
     public static RedactRequest fromJson(
