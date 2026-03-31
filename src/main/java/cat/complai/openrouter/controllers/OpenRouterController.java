@@ -138,7 +138,7 @@ public class OpenRouterController {
         long start = System.currentTimeMillis();
         try {
             String text = request != null ? request.getText() : null;
-            OutputFormat format = request == null ? OutputFormat.AUTO : request.getFormat();
+            OutputFormat format = request == null ? OutputFormat.PDF : request.getFormat();
             ComplainantIdentity identity = request != null ? request.getComplainantIdentity() : null;
 
             if (!OutputFormat.isSupportedClientFormat(format)) {
@@ -148,7 +148,7 @@ public class OpenRouterController {
                 logger.info(() -> "POST /complai/redact rejected — httpStatus=400 reason=unsupportedFormat"
                         + " format=" + format + " latencyMs=" + latency + " conversationId=" + conversationId);
                 OpenRouterPublicDto err = new OpenRouterPublicDto(false, null,
-                        "Unsupported format. Only 'pdf', 'json', or 'auto' are accepted. Documents are always produced as PDF.",
+                        "Unsupported format. Only 'pdf' is accepted.",
                         OpenRouterErrorCode.VALIDATION.getCode(), List.of());
                 return HttpResponse.badRequest(err).contentType(MediaType.APPLICATION_JSON);
             }
@@ -186,7 +186,7 @@ public class OpenRouterController {
 
             boolean identityComplete = identity != null && identity.isComplete();
 
-            if (identityComplete && format != OutputFormat.JSON) {
+            if (identityComplete) {
                 return handleAsyncRedact(text, format, conversationId, identity, cityId, start);
             }
 

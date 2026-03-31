@@ -527,16 +527,20 @@ public class OpenRouterControllerIntegrationTest {
     }
 
     @Test
-    void integration_redact_completeIdentityAndJsonFormat_returnsSyncPath200() {
-        // JSON format with complete identity must stay synchronous (200, not 202).
+    void integration_redact_jsonFormat_returns400() throws Exception {
         RedactRequest req = RedactRequest.fromJson(
                 "Noise from the airport", "json", null, "Joan", "Garcia", "12345678A");
         HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req)
                 .header("Authorization", authHeader);
-        HttpResponse<OpenRouterPublicDto> resp = client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
-        assertEquals(200, resp.getStatus().getCode());
-        assertTrue(resp.getBody().isPresent());
-        assertTrue(resp.getBody().get().isSuccess());
+        try {
+            client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
+            fail("Expected HttpClientResponseException for 400");
+        } catch (HttpClientResponseException e) {
+            assertEquals(400, e.getStatus().getCode());
+            String bodyJson = e.getResponse().getBody(String.class).orElse("{}");
+            JsonNode node = mapper.readTree(bodyJson);
+            assertEquals(OpenRouterErrorCode.VALIDATION.getCode(), node.path("errorCode").asInt());
+        }
     }
 
     // ---- SSE Multi-Event Streaming Tests ----
