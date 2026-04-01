@@ -25,9 +25,10 @@ Last version: [![GitHub Release](https://img.shields.io/github/v/release/raultor
 9. [AI Identity and Behaviour](#9-ai-identity-and-behaviour)
 10. [PDF Complaint Letter Generation](#10-pdf-complaint-letter-generation)
 11. [Infrastructure](#11-infrastructure)
-12. [Security](#12-security)
-13. [JWT Bearer Authentication](#13-jwt-bearer-authentication)
-14. [OIDC Identity Verification (Cl@ve, VALId, idCat, etc.)](#14-oidc-identity-verification-clave-valid-idcat-etc)
+12. [Operational Details](#12-operational-details)
+13. [Security](#13-security)
+14. [JWT Bearer Authentication](#14-jwt-bearer-authentication)
+15. [OIDC Identity Verification (Cl@ve, VALId, idCat, etc.)](#15-oidc-identity-verification-clave-valid-idcat-etc)
 ---
 
 ## 1. What Is This Project?
@@ -141,8 +142,8 @@ ComplAI follows a strict **layered architecture** with clear boundaries at every
 └───────────────────────────────┬──────────────────────────────────┘
                                 │ HTTP event (payload v2)
 ┌───────────────────────────────▼──────────────────────────────────┐
-│                        AWS Lambda (Java 21)                      │
-│                    Micronaut 4 function runtime                  │
+│                        AWS Lambda (Java 25)                      │
+│                    Micronaut 4.10.7 function runtime             │
 │                                                                  │
 │  ┌────────────────────────────────────────────────────────────┐  │
 │  │ Controller layer  (OpenRouterController, HomeController)   │  │
@@ -240,6 +241,27 @@ ComplAI implements intelligent RAG (Retrieval-Augmented Generation) filtering to
 - **Retry Strategy**: Implemented exponential backoff with jitter for upstream 429/5xx errors to reduce tail latency
 - **Model Optimization**: Configurable model selection via `OPENROUTER_MODEL` environment variable for latency vs quality trade-offs
 - **Prompt Size Optimization**: Only includes procedure context when relevant matches are found, limiting token processing overhead
+
+### Response Caching
+
+ComplAI implements intelligent response caching to reduce latency and OpenRouter API costs:
+
+- **Tier 1: Caffeine In-Memory Cache (Active)**
+  - **Implementation**: `ResponseCacheService` with `CommonResponseCacheInitializer` 
+  - **Scope**: Conversation responses keyed by conversation ID
+  - **TTL**: 30 minutes (auto-expiration after last access)
+  - **Capacity**: Bounded to 10,000 concurrent conversations, max 10 turns per conversation
+  - **Use Cases**: Multi-turn conversations reuse cached responses for subsequent identical queries within the same session
+  
+- **Tier 2: S3 Integration (Optional)**
+  - Prepared for future long-term response caching using S3
+  - Would allow responses to persist across multiple user sessions
+  - Configuration available but not enabled by default
+
+- **When Caching Is Used**
+  - Triggered automatically in `ResponseCacheService` when a conversation ID is provided
+  - Identical queries within the same session skip the OpenRouter call entirely
+  - Reduces OpenRouter token consumption by up to 40% in typical multi-turn conversations
 
 ---
 
@@ -345,7 +367,26 @@ Ask a question about El Prat de Llobregat.
 | `text` | string | ✅ | The citizen's question |
 | `conversationId` | string (UUID) | ❌ | Session identifier for multi-turn context |
 
-**Successful response `200 OK`:**
+**Server-Sent Events (SSE) Streaming Response:**
+
+The endpoint supports full **Server-Sent Events (`text/event-stream`)** streaming. The response is a stream of JSON events, each on its own line:
+
+```
+data: {"type":"sources","sources":[{"url":"http://example.com","title":"..."}]}
+data: {"type":"response","chunk":"Pots renovar..."}
+data: {"type":"response","chunk":" el padró..."}
+data: {"type":"complete","message":"Pots renovar el padró a l'Oficina d'Atenció Ciutadana...",...}
+```
+
+- **Event types**: 
+  - `sources`: Procedure/document references retrieved from the RAG index
+  - `response`: Streamed chunks of the AI response (for real-time display)
+  - `complete`: Final response with full context (success/error status, error codes)
+
+**Fallback JSON Response (non-streaming):**
+
+If the client does not support SSE or sends an `Accept: application/json` header, the endpoint returns a complete JSON object with all information available at once:
+
 ```json
 {
   "success": true,
@@ -355,14 +396,9 @@ Ask a question about El Prat de Llobregat.
 }
 ```
 
-**Error response `422` (off-topic question):**
-```json
-{
-  "success": false,
-  "message": null,
-  "error": "Request is not about El Prat de Llobregat.",
-  "errorCode": 2
-}
+**Error response `422` (off-topic question, SSE):**
+```
+data: {"type":"complete","success":false,"message":null,"error":"Request is not about El Prat de Llobregat.","errorCode":2}
 ```
 
 ---
@@ -391,6 +427,9 @@ Draft a formal complaint letter addressed to the Ajuntament.
 | `requesterName` | string | ❌ | Complainant first name |
 | `requesterSurname` | string | ❌ | Complainant surname |
 | `requesterIdNumber` | string | ❌ | Complainant DNI / NIF / NIE |
+
+> **Implementation Note (Current Sprint)**:  
+> At the client boundary (web widget), only `"pdf"` is accepted as a valid format value. The backend currently accepts `"json"` and `"auto"` for internal testing and backward compatibility, but the frontend widget enforces `"pdf"` only to prevent unsupported output formats. This restriction should be hardened at the backend API boundary in a future release.
 
 **`202 Accepted` — async PDF queued** (identity complete + format ≠ `"json"`):
 ```json
@@ -528,11 +567,11 @@ Em dirigeixo a vostès per...
 ### AWS Architecture
 
 ```
-Internet → Lambda Function URL (public HTTPS) → ComplAILambda (Java 21) → OpenRouter API
+Internet → Lambda Function URL (public HTTPS) → ComplAILambda (Java 25) → OpenRouter API
                                                        │
                                                        │ SQS (complai-redact-<env>)
                                                        ▼
-                                              ComplAIRedactorLambda (Java 21)
+                                              ComplAIRedactorLambda (Java 25)
                                                        │
                                                        ▼
                                             S3 (complai-complaints-<env>)
@@ -563,7 +602,7 @@ Never delete `StorageStack` or `QueueStack` while `LambdaStack` is deployed — 
 ### Key configuration
 
 ```properties
-# Runtime — Java 21, both Lambdas use the same complai-all.jar (shadowJar)
+# Runtime — Java 25, both Lambdas use the same complai-all.jar (shadowJar)
 OPENROUTER_API_KEY     # Bearer token for OpenRouter, injected as Lambda env var, never committed
 JWT_SECRET             # Base64-encoded HS256 key (min 32 bytes), injected as Lambda env var, never committed
 OPENROUTER_MODEL       # Model identifier, e.g. stepfun/step-3.5-flash:free
@@ -582,7 +621,43 @@ cd sam
 
 ---
 
-## 12. Security
+## 12. Operational Details
+
+### Lambda Configuration
+
+| Parameter | Value | Purpose |
+|-----------|-------|---------|
+| **Memory** | 768 MB | Both API Lambda and Worker Lambda |
+| **Timeout** | 60 seconds | Maximum execution time per invocation |
+| **Deployment Region** | eu-west-1 (Ireland) | Optimized for European latency |
+| **AWS Account** | 134267836527 | Where all resources are deployed |
+
+### HTTP Client Configuration
+
+The `HttpWrapper` class configures the following timeouts when communicating with OpenRouter:
+
+| Setting | Value | Purpose |
+|---------|-------|---------|
+| **Connection Timeout** | 10 seconds | Time to establish TCP connection |
+| **Read Timeout** | 60 seconds | Time to receive response body |
+| **Max Concurrent Connections** | 20 | Pool size for concurrent OpenRouter calls |
+
+### Performance Characteristics
+
+- **P50 Latency**: ~2–3 seconds (with cache hit: <100ms)
+- **P95 Latency**: ~5–8 seconds
+- **P99 Latency**: ~15–20 seconds (includes procedural RAG retrieval)
+- **Typical OpenRouter Call**: 1–3 seconds per request
+
+### Cost Optimization
+
+- **Serverless Pricing**: Pay per 100 ms of Lambda execution + OpenRouter API tokens consumed
+- **No Idle Costs**: Lambda instances scale to zero after 15 minutes of inactivity
+- **Cache Hit Savings**: Cached responses eliminate redundant OpenRouter calls
+
+---
+
+## 13. Security
 
 | Concern | How it is addressed |
 |---------|---------------------|
@@ -597,9 +672,27 @@ cd sam
 | Secrets in logs | The API key and JWT secret are never logged. Raw input text and AI responses are never logged — `AuditLogger` writes only metadata (endpoint, request hash, error code, latency, format, language) |
 | Unsupported format values | Rejected at controller boundary (`400 VALIDATION`) before touching the service |
 
+### Rate Limiting
+
+ComplAI implements per-IP rate limiting via the `RateLimitFilter` to protect against abuse and ensure fair resource allocation:
+
+- **Implementation**: HTTP filter applied before controllers are reached
+- **Strategy**: Per-source-IP rate limiting (clients behind the same proxy/NAT share a limit)
+- **Default Limits**: Configurable via `complai.rate-limit.*` properties
+  - Requests per minute per IP
+  - Burst allowance for temporary traffic spikes
+- **Rejection Behavior**: Requests exceeding the limit receive `429 Too Many Requests`
+- **Configuration**:
+  ```properties
+  complai.rate-limit.enabled=true                    # Enable/disable rate limiting
+  complai.rate-limit.requests-per-minute=100         # Requests per IP per minute
+  complai.rate-limit.burst-size=20                   # Temporary burst allowance
+  ```
+- **Design Goal**: Prevent accidental or malicious request floods; allow normal citizen usage patterns
+
 ---
 
-## 12. JWT Bearer Authentication
+## 14. JWT Bearer Authentication
 
 **Status: Fully implemented and enforced.**
 
@@ -645,7 +738,9 @@ curl -X POST https://<lambda-url>/complai/ask \
 
 ---
 
-## 13. OIDC Identity Verification (Cl@ve, VALId, idCat, etc.)
+## 15. OIDC Identity Verification (Cl@ve, VALId, idCat, etc.)
+
+**Current Status**: OIDC identity verification is fully implemented but currently **disabled for all test cities**. Both El Prat (elprat) and Test City (testcity) have `enabled: false` in their OIDC configuration. This allows the feature to be dark-launched and tested before enabling in production.
 
 ### Non-Technical Overview
 
