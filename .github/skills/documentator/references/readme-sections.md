@@ -73,7 +73,7 @@ Rows to include (add more if found):
 | Cloud | AWS (Lambda, SQS, S3) | |
 | IaC | AWS CDK (TypeScript) | |
 | AI Integration | OpenRouter | model name from source |
-| Search / RAG | Apache Lucene | |
+| Search / RAG | In-memory lexical RAG (`InMemoryLexicalIndex`) | no external Lucene dependency |
 | Caching | Caffeine | |
 | PDF Generation | Apache PDFBox | |
 | Auth | JJWT + Micronaut Security | |
@@ -182,7 +182,7 @@ Add any environment-specific notes from `cdk/deployment-environment.ts`.
 Two sub-sections derived from codebase search:
 
 **Caffeine Cache**: what is cached (conversations, procedures, events), TTL/max-size if configured.  
-**Lucene RAG**: what is indexed, how queries are formed, where the index lives.
+**In-memory RAG**: what is indexed, how queries are formed (see `InMemoryLexicalIndex`, `LexicalScorer`, `TokenNormalizer`).
 
 ---
 

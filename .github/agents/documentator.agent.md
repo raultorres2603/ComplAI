@@ -54,7 +54,7 @@ Produce a README that follows **current best practices** for open-source and ent
 9. **Infrastructure** — Every AWS resource (Lambda, SQS queues, S3 buckets). CDK stack names and what they provision. Deployment commands.
 10. **Security** — JWT auth flow, OIDC providers (Cl@ve, VALId, idCat), what is and isn't protected.
 11. **Testing** — How to run unit tests (Gradle), integration tests, and E2E tests (Bruno). CI notes if present.
-12. **Performance Optimizations** — Caffeine cache, Lucene RAG, any async patterns visible in code.
+12. **Performance Optimizations** — Caffeine cache, in-memory lexical RAG (`InMemoryLexicalIndex`), any async patterns visible in code.
 13. **Conversation History (Multi-turn)** — How conversation context is stored/retrieved.
 14. **PDF Complaint Generation** — What triggers it, how it works, how to test it.
 15. **OIDC Identity Verification** — Supported providers, validation flow.

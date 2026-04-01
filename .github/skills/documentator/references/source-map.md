@@ -26,7 +26,7 @@ This file tells the Documentator exactly which files to read for each category o
 | `*Repository*.java` or `*Client*.java` | External calls: SQS send/receive, S3 put/get, HTTP client targets |
 | `*Dto*.java` or records | Field names and types used in request/response bodies |
 | `*Cache*.java` or `@Cacheable` usages | What is cached, cache name, TTL if set |
-| `*Lucene*.java` or `IndexSearcher` usages | Index location, query logic, result mapping |
+| `InMemoryLexicalIndex`, `LexicalScorer`, `TokenNormalizer` | In-memory RAG logic, scoring, tokenisation |
 | `*Pdf*.java` or `PDFBox` usages | What triggers PDF creation, where result is stored |
 | `*Jwt*.java` or `JwtValidator` usages | Token validation flow, claim extraction |
 | `*Oidc*.java` or `OidcConfiguration` usages | Supported providers, discovery URL config keys |

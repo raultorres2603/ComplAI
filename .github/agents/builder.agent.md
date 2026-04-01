@@ -18,7 +18,7 @@ Load and follow the [builder skill](./../skills/builder/SKILL.md) for the full s
 - AWS CDK (TypeScript) for infrastructure (`cdk/`)
 - AWS SQS, S3, Lambda
 - JUnit 5 + Mockito for unit and integration tests; Bruno (`.bru` files) for E2E
-- Lucene (RAG), Caffeine (cache), PDFBox, JJWT
+- In-memory lexical RAG (`InMemoryLexicalIndex`), Caffeine (cache), PDFBox, JJWT
 
 ## Constraints
 

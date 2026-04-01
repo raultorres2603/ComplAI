@@ -96,7 +96,7 @@ Read every `.bru` file under `E2E-ComplAI/`:
 ### 2.8 Performance & Caching
 
 - Search for `Caffeine`, `@Cacheable`, `CacheManager` in `src/main/java/**`.
-- Search for `IndexSearcher`, `Analyzer`, `IndexWriter` (Lucene / RAG) in `src/main/java/**`.
+- Search for `InMemoryLexicalIndex`, `LexicalScorer`, `TokenNormalizer` (in-memory lexical RAG — no Lucene dependency) in `src/main/java/**`.
 - Note what is cached and for how long.
 
 ### Quality Check

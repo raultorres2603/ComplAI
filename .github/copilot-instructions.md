@@ -7,7 +7,7 @@
 - **AWS Services**: SQS (Worker Poller, Complaint Publisher), S3 (PDF Uploader), Lambda
 - **Testing**: JUnit 5, Mockito for Unit/Integration tests. Bruno (`.bru` files) for E2E HTTP testing.
 - **External Integrations**: OpenRouter AI (for AI Response Processing), Web Scraping tools.
-- **Core Libraries**: Lucene (RAG search), Caffeine (conversation cache), PDFBox (PDF generation), JJWT (JWT validation).
+- **Core Libraries**: In-memory lexical RAG (`InMemoryLexicalIndex`, no external Lucene dependency), Caffeine (conversation cache), PDFBox (PDF generation), JJWT (JWT validation).
 
 ## Code Style
 - **Java**: Follow standard Java conventions. Use Micronaut's recommended patterns for dependency injection (constructor injection only), configuration, and testing. Adhere to the layered architecture (Controllers, Services, Repositories).

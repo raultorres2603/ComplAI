@@ -21,6 +21,6 @@ ComplAI runs on:
 - AWS CDK (TypeScript) for infrastructure
 - AWS SQS, S3, Lambda
 - JUnit 5 + Mockito for testing; Bruno for E2E
-- Lucene (RAG), Caffeine (cache), PDFBox, JJWT
+- In-memory lexical RAG (`InMemoryLexicalIndex`), Caffeine (cache), PDFBox, JJWT
 
 Always align recommendations with this stack.
