@@ -1,7 +1,7 @@
 ---
 description: "Use when: implementing a feature, writing code, building requirements, executing task.md steps, coding a new endpoint, service, or repository, writing unit tests, writing integration tests, adding CDK infrastructure, fixing bugs, making code changes. Picks up task.md and implements each step following project conventions."
 name: "builder"
-tools: [read, edit, search, execute, todo, agent]
+tools: [read, edit, search, execute, todo]
 argument-hint: "Describe what to build, or point to an existing task.md (e.g. 'Implement task.md' or 'Build the complaint submission endpoint')"
 user-invocable: false
 ---

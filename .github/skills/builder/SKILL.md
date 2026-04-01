@@ -18,7 +18,7 @@ argument-hint: "Point to task.md or describe what to implement (e.g. 'Implement 
 ## Phase 0 — Load the Plan
 
 1. Read `task.md` at the workspace root in full before touching any source file.
-2. If `task.md` does not exist, ask the user for the requirement or invoke the `planner` subagent.
+2. If no `task.md` is present, **stop immediately** and report: 'No task.md found. Ask the orchestrator to run the planner first.'
 3. Extract every checkbox item (`- [ ]`) into a `todo` list. Mark items **in-progress** one at a time.
 
 ---
