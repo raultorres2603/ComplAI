@@ -78,6 +78,11 @@ public class ApiKeyAuthFilter {
             return null;
         }
 
+        if (HttpMethod.OPTIONS.equals(request.getMethod())) {
+            // Allow CORS preflight without authentication
+            return null;
+        }
+
         String apiKey = request.getHeaders().get("X-Api-Key");
         if (apiKey == null || apiKey.isBlank()) {
             logger.warning(() -> "Missing X-Api-Key header — httpStatus=401 method=" + request.getMethod()
