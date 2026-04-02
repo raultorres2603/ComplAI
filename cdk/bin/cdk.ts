@@ -6,6 +6,7 @@ import { DeploymentEnvironment } from '../deployment-environment';
 import { StorageStack } from '../storage-stack';
 import { QueueStack } from '../queue-stack';
 import { LambdaStack } from '../lambda-stack';
+import { WafStack } from '../waf-stack';
 
 const app = new cdk.App();
 
@@ -54,6 +55,15 @@ for (const environment of environments) {
   });
   lambdaStack.addDependency(storageStack);
   lambdaStack.addDependency(queueStack);
+
+  if (environment === 'production') {
+    const wafStack = new WafStack(app, `ComplAIWafStack-${environment}`, {
+      environment,
+      httpApi: lambdaStack.httpApi,
+      env: awsEnv,
+    });
+    wafStack.addDependency(lambdaStack);
+  }
 }
 
 app.synth();

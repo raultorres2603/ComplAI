@@ -9,6 +9,8 @@ import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
 import { DeploymentEnvironment } from './deployment-environment';
+import { HttpApi, HttpMethod, CorsHttpMethod, PayloadFormatVersion, CfnStage } from 'aws-cdk-lib/aws-apigatewayv2';
+import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 
 const JAVA_25 = new lambda.Runtime('java25', lambda.RuntimeFamily.JAVA);
 
@@ -31,6 +33,8 @@ export interface LambdaStackProps extends cdk.StackProps {
 }
 
 export class LambdaStack extends cdk.Stack {
+  readonly httpApi: HttpApi;
+
   constructor(scope: Construct, id: string, props: LambdaStackProps) {
     super(scope, id, props);
 
@@ -190,7 +194,7 @@ export class LambdaStack extends cdk.Stack {
         RESPONSE_CACHE_ENABLED: process.env.RESPONSE_CACHE_ENABLED || 'true',
         RESPONSE_CACHE_TTL_MINUTES: process.env.RESPONSE_CACHE_TTL_MINUTES || '10',
         RESPONSE_CACHE_MAX_ENTRIES: process.env.RESPONSE_CACHE_MAX_ENTRIES || '500',
-        // CORS header injection: disable in production (Lambda Function URL handles CORS).
+        // CORS header injection: disable in production (API Gateway HTTP API handles CORS).
         // Duplicate CORS headers from both app filter and infrastructure cause browser errors.
         COMPLAI_LOCAL_CORS_ENABLED: 'false',
         // OIDC identity verification. Per-city config (issuer, JWKS URI, audience, NIF claim)
@@ -217,6 +221,43 @@ export class LambdaStack extends cdk.Stack {
     eventsBucket.grantRead(lambdaRole);
     newsBucket.grantRead(lambdaRole);
     cityInfoBucket.grantRead(lambdaRole);
+
+    const lambdaIntegration = new HttpLambdaIntegration(
+      `ComplAILambdaIntegration-${environment}`,
+      lambdaFn,
+      { payloadFormatVersion: PayloadFormatVersion.VERSION_2_0 },
+    );
+
+    const httpApi = new HttpApi(this, `ComplAIHttpApi-${environment}`, {
+      apiName: `ComplAIHttpApi-${environment}`,
+      corsPreflight: {
+        allowOrigins: [
+          process.env.COMPLAI_CORS_ALLOWED_ORIGIN || 'https://raultorres2603.github.io',
+        ],
+        allowMethods: [CorsHttpMethod.ANY],
+        allowHeaders: ['*'],
+      },
+    });
+
+    const cfnDefaultStage = httpApi.defaultStage!.node.defaultChild as CfnStage;
+    cfnDefaultStage.addPropertyOverride('DefaultRouteSettings', {
+      ThrottlingRateLimit: 0.33,
+      ThrottlingBurstLimit: 10,
+    });
+
+    httpApi.addRoutes({
+      path: '/',
+      methods: [HttpMethod.ANY],
+      integration: lambdaIntegration,
+    });
+
+    httpApi.addRoutes({
+      path: '/{proxy+}',
+      methods: [HttpMethod.ANY],
+      integration: lambdaIntegration,
+    });
+
+    this.httpApi = httpApi;
 
     // -------------------------------------------------------------------------
     // Worker Lambda — processes SQS messages and uploads generated PDFs to S3.
@@ -348,25 +389,6 @@ export class LambdaStack extends cdk.Stack {
       reportBatchItemFailures: true,
     }));
 
-    // Lambda Function URL: free, no API Gateway needed.
-    // authType NONE makes the URL publicly reachable without IAM signing.
-    // The payload format sent by Lambda Function URLs is identical to API Gateway
-    // HTTP API payload format 2.0, so the Micronaut handler works without changes.
-    // NOTE: Unlike API Gateway, Function URLs have no built-in rate limiting.
-    // Add AWS WAF in front of the URL if throttling ever becomes a requirement.
-    lambdaFn.addFunctionUrl({
-      // TODO: upgrade aws-cdk-lib to >=2.60.0 for InvokeMode.RESPONSE_STREAM if not yet recognized
-      invokeMode: lambda.InvokeMode.RESPONSE_STREAM,
-      authType: lambda.FunctionUrlAuthType.NONE,
-      cors: {
-        // Restrict CORS to the GitHub Pages frontend.
-        // Override with COMPLAI_CORS_ALLOWED_ORIGIN env var if needed.
-        allowedOrigins: [process.env.COMPLAI_CORS_ALLOWED_ORIGIN || 'https://raultorres2603.github.io'],
-        allowedMethods: [lambda.HttpMethod.ALL],
-        allowedHeaders: ['Content-Type', 'Authorization', 'X-Api-Key'],
-      },
-    });
-
     // AuditLogger emits JSON lines like:
     //   {"ts":"...","endpoint":"/complai/ask","requestHash":"...","errorCode":0,"latencyMs":312,"outputFormat":"","language":""}
     // We attach metric filters to the log group to make error rates and slow
@@ -437,6 +459,11 @@ export class LambdaStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'ComplAIFeedbackWorkerLogGroupName', {
       value: feedbackWorkerLogGroup.logGroupName,
       description: `CloudWatch Log Group for the feedback worker Lambda function (${environment})`,
+    });
+
+    new cdk.CfnOutput(this, 'ComplAIApiGatewayEndpoint', {
+      value: httpApi.apiEndpoint,
+      description: `HTTP API Gateway endpoint URL for ComplAI (${environment})`,
     });
   }
 }
