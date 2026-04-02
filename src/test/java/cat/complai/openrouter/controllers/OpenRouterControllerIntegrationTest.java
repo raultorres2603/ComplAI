@@ -24,8 +24,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Replaces;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.annotation.RequestFilter;
+import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
@@ -54,7 +60,7 @@ import java.util.logging.Logger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@MicronautTest
+@MicronautTest(environments = {"test", "openrouter-test"})
 public class OpenRouterControllerIntegrationTest {
 
     // Fixed API keys for integration tests. The mock ApiKeyAuthFilter (defined below)
@@ -1010,11 +1016,67 @@ public class OpenRouterControllerIntegrationTest {
     }
 
     @MockBean(ApiKeyAuthFilter.class)
-    @Replaces(ApiKeyAuthFilter.class)
-    ApiKeyAuthFilter testApiKeyAuthFilter() {
+    ApiKeyAuthFilter testApiKeyAuthFilterBean() {
         return new ApiKeyAuthFilter(Map.of(
                 TEST_API_KEY, "elprat",
                 TEST_API_KEY_TESTCITY, "testcity"));
+    }
+
+    // -----------------------------------------------------------------------
+    // Test Filter Bean — replaces ApiKeyAuthFilter in the HTTP pipeline
+    // -----------------------------------------------------------------------
+
+    @Singleton
+    @ServerFilter("/**")
+    @Replaces(ApiKeyAuthFilter.class)
+    static class TestApiKeyFilterOpenRouter {
+        private static final Logger logger = Logger.getLogger(TestApiKeyFilterOpenRouter.class.getName());
+        private final Map<String, String> apiKeyToCityId = Map.of(
+            "test-api-key", "elprat",
+            "test-api-key-testcity", "testcity"
+        );
+
+        @RequestFilter
+        @Nullable
+        public MutableHttpResponse<?> filter(MutableHttpRequest<?> request) {
+            if (isExcluded(request)) {
+                return null;
+            }
+
+            String apiKey = request.getHeaders().get("X-Api-Key");
+            if (apiKey == null || apiKey.isBlank()) {
+                logger.warning(() -> "Missing X-Api-Key header — httpStatus=401 method=" + request.getMethod()
+                        + " path=" + request.getPath());
+                return unauthorizedResponse("Missing X-Api-Key header");
+            }
+
+            String cityId = apiKeyToCityId.get(apiKey);
+            if (cityId == null) {
+                logger.warning(() -> "Invalid API key — httpStatus=401 method=" + request.getMethod()
+                        + " path=" + request.getPath());
+                return unauthorizedResponse("Invalid API key");
+            }
+
+            request.setAttribute(ApiKeyAuthFilter.CITY_ATTRIBUTE, cityId);
+            request.setAttribute(ApiKeyAuthFilter.USER_ATTRIBUTE, "api-key-client");
+
+            return null;
+        }
+
+        private boolean isExcluded(HttpRequest<?> request) {
+            String path = request.getPath();
+            HttpMethod method = request.getMethod();
+            return HttpMethod.GET.equals(method)
+                    && (path.equals("/") || path.equals("/health") || path.equals("/health/startup"));
+        }
+
+        private MutableHttpResponse<?> unauthorizedResponse(String reason) {
+            Map<String, Object> body = Map.of(
+                    "success", false,
+                    "message", reason == null ? "Unauthorized" : reason,
+                    "errorCode", "UNAUTHORIZED");
+            return HttpResponse.unauthorized().body(body);
+        }
     }
 
     @MockBean(SqsComplaintPublisher.class)
