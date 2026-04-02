@@ -247,13 +247,13 @@ export class LambdaStack extends cdk.Stack {
 
     httpApi.addRoutes({
       path: '/',
-      methods: [HttpMethod.ANY],
+      methods: [HttpMethod.GET, HttpMethod.POST, HttpMethod.PUT, HttpMethod.DELETE, HttpMethod.PATCH, HttpMethod.HEAD],
       integration: lambdaIntegration,
     });
 
     httpApi.addRoutes({
       path: '/{proxy+}',
-      methods: [HttpMethod.ANY],
+      methods: [HttpMethod.GET, HttpMethod.POST, HttpMethod.PUT, HttpMethod.DELETE, HttpMethod.PATCH, HttpMethod.HEAD],
       integration: lambdaIntegration,
     });
 
