@@ -362,8 +362,8 @@ export class LambdaStack extends cdk.Stack {
         // Restrict CORS to the GitHub Pages frontend.
         // Override with COMPLAI_CORS_ALLOWED_ORIGIN env var if needed.
         allowedOrigins: [process.env.COMPLAI_CORS_ALLOWED_ORIGIN || 'https://raultorres2603.github.io'],
-        allowedMethods: [lambda.HttpMethod.POST, lambda.HttpMethod.GET],
-        allowedHeaders: ['Content-Type', 'X-Api-Key'],
+        allowedMethods: [lambda.HttpMethod.ALL],
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-Api-Key'],
       },
     });
 
