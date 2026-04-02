@@ -1,5 +1,6 @@
 package cat.complai.openrouter.controllers;
 
+import cat.complai.auth.ApiKeyAuthFilter;
 import cat.complai.http.HttpWrapper;
 import cat.complai.http.OpenRouterStreamingException;
 import cat.complai.http.dto.HttpDto;
@@ -21,8 +22,6 @@ import cat.complai.openrouter.helpers.EventRagHelperRegistry;
 import cat.complai.openrouter.services.validation.InputValidationService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.http.HttpRequest;
@@ -43,9 +42,6 @@ import cat.complai.sqs.SqsComplaintPublisher;
 import cat.complai.sqs.dto.RedactSqsMessage;
 
 import cat.complai.openrouter.helpers.ProcedureRagHelperRegistry;
-import javax.crypto.SecretKey;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.List;
 import java.util.Map;
@@ -61,12 +57,10 @@ import static org.junit.jupiter.api.Assertions.*;
 @MicronautTest
 public class OpenRouterControllerIntegrationTest {
 
-    // Same Base64-encoded key used in JwtAuthFilterTest and JwtValidatorTest,
-    // and declared as jwt.secret in src/test/resources/application.properties.
-    // Using the same key in all places ensures tokens minted here are accepted
-    // by the JwtValidator that the test Micronaut context instantiates.
-    private static final String TEST_SECRET_B64 = "hEmatrRKbxfC/9PxZ14VsYksRkTZHMpqRScBUhshYzQ=";
-    private static final String ISSUER = "complai";
+    // Fixed API keys for integration tests. The mock ApiKeyAuthFilter (defined below)
+    // is pre-configured with these two keys, making them valid for the test context.
+    private static final String TEST_API_KEY = "test-integration-key-elprat";
+    private static final String TEST_API_KEY_TESTCITY = "test-integration-key-testcity";
     private static final AtomicInteger OPENROUTER_POST_CALLS = new AtomicInteger();
 
     @Inject
@@ -85,13 +79,8 @@ public class OpenRouterControllerIntegrationTest {
 
     private final ObjectMapper mapper = new ObjectMapper();
 
-    // A fresh, valid JWT is minted before each test.
-    // Keeping it per-test (rather than static) avoids flakiness if tests run near
-    // expiry.
-    private String authHeader;
-
     @BeforeEach
-    void mintTestToken() {
+    void setUp() {
         OPENROUTER_POST_CALLS.set(0);
 
         // Clear the response cache before each test to prevent pollution from previous
@@ -99,22 +88,6 @@ public class OpenRouterControllerIntegrationTest {
         // ResponseCacheService is a @Singleton that persists across tests, so we must
         // invalidate it to ensure each test gets fresh mock responses.
         cacheService.invalidateAll();
-
-        authHeader = mintAuthHeader("elprat");
-    }
-
-    private String mintAuthHeader(String cityId) {
-        byte[] keyBytes = Base64.getDecoder().decode(TEST_SECRET_B64);
-        SecretKey key = Keys.hmacShaKeyFor(keyBytes);
-        String token = Jwts.builder()
-                .subject("integration-test-" + UUID.randomUUID())
-                .issuer(ISSUER)
-                .issuedAt(new Date())
-                .expiration(Date.from(Instant.now().plus(1, ChronoUnit.HOURS)))
-                .claim("city", cityId)
-                .signWith(key)
-                .compact();
-        return "Bearer " + token;
     }
 
     @Test
@@ -168,7 +141,7 @@ public class OpenRouterControllerIntegrationTest {
     void integration_redact_success() {
         RedactRequest req = new RedactRequest("There is noise from the airport");
         HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req)
-                .header("Authorization", authHeader);
+                .header("X-Api-Key", TEST_API_KEY);
         HttpResponse<OpenRouterPublicDto> resp = client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
         assertEquals(200, resp.getStatus().getCode());
         Optional<OpenRouterPublicDto> bodyOpt = resp.getBody();
@@ -192,7 +165,7 @@ public class OpenRouterControllerIntegrationTest {
     void integration_ask_upstream() throws Exception {
         AskRequest req = new AskRequest("Is there a recycling center? [UPSTREAM_402]");
         HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
-                .header("Authorization", authHeader);
+                .header("X-Api-Key", TEST_API_KEY);
         try {
             client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
             fail("Expected HttpClientResponseException for upstream startup error");
@@ -209,7 +182,7 @@ public class OpenRouterControllerIntegrationTest {
     void integration_ask_upstream429_mapsTo502() throws Exception {
         AskRequest req = new AskRequest("Is there a recycling center? [UPSTREAM_429]");
         HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
-                .header("Authorization", authHeader);
+                .header("X-Api-Key", TEST_API_KEY);
         try {
             client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
             fail("Expected HttpClientResponseException for upstream startup error");
@@ -243,7 +216,7 @@ public class OpenRouterControllerIntegrationTest {
         try {
             AskRequest req = new AskRequest("Is there a recycling center? [UPSTREAM_402]");
             HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
-                    .header("Authorization", authHeader);
+                    .header("X-Api-Key", TEST_API_KEY);
             assertThrows(HttpClientResponseException.class,
                     () -> client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class));
         } finally {
@@ -259,7 +232,7 @@ public class OpenRouterControllerIntegrationTest {
     void integration_redact_refusal() throws Exception {
         RedactRequest req = new RedactRequest("How to cook paella? [REFUSE]");
         HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req)
-                .header("Authorization", authHeader);
+                .header("X-Api-Key", TEST_API_KEY);
         try {
             client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
             fail("Expected HttpClientResponseException for 422");
@@ -276,7 +249,7 @@ public class OpenRouterControllerIntegrationTest {
     void integration_redact_upstream() throws Exception {
         RedactRequest req = new RedactRequest("Noise from airport [UPSTREAM]");
         HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req)
-                .header("Authorization", authHeader);
+                .header("X-Api-Key", TEST_API_KEY);
         try {
             client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
             fail("Expected HttpClientResponseException for 502");
@@ -312,7 +285,7 @@ public class OpenRouterControllerIntegrationTest {
         // gracefully and returns the raw AI message as a 200 JSON response.
         RedactRequest req = new RedactRequest("Complaint with no header [NOHEADER]");
         HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req)
-                .header("Authorization", authHeader);
+                .header("X-Api-Key", TEST_API_KEY);
         HttpResponse<OpenRouterPublicDto> resp = client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
         assertEquals(200, resp.getStatus().getCode());
         Optional<OpenRouterPublicDto> bodyOpt = resp.getBody();
@@ -346,7 +319,7 @@ public class OpenRouterControllerIntegrationTest {
         // 200 with the raw AI message instead of failing with a 400.
         RedactRequest req = new RedactRequest("Complaint with invalid header [HEADER_INVALID]");
         HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req)
-                .header("Authorization", authHeader);
+                .header("X-Api-Key", TEST_API_KEY);
         HttpResponse<OpenRouterPublicDto> resp = client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
         assertEquals(200, resp.getStatus().getCode());
         Optional<OpenRouterPublicDto> bodyOpt = resp.getBody();
@@ -409,13 +382,13 @@ public class OpenRouterControllerIntegrationTest {
                 "Event context should contain at most 3 sources");
     }
 
-    // --- JWT authentication ---
+    // --- API key authentication ---
 
     @Test
-    void integration_ask_missingJwt_returns401() throws Exception {
-        // The JwtAuthFilter must short-circuit and return 401 before the controller is
+    void integration_ask_missingApiKey_returns401() throws Exception {
+        // The ApiKeyAuthFilter must short-circuit and return 401 before the controller is
         // invoked.
-        // No Authorization header is sent — simulating an unauthenticated client.
+        // No X-Api-Key header is sent — simulating an unauthenticated client.
         AskRequest req = new AskRequest("Hola, quina és la capital de Catalunya?");
         HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req);
         try {
@@ -432,21 +405,11 @@ public class OpenRouterControllerIntegrationTest {
     }
 
     @Test
-    void integration_ask_expiredJwt_returns401() throws Exception {
-        // An expired token must be rejected even if it is otherwise well-formed.
-        byte[] keyBytes = Base64.getDecoder().decode(TEST_SECRET_B64);
-        SecretKey key = Keys.hmacShaKeyFor(keyBytes);
-        String expiredToken = Jwts.builder()
-                .subject("integration-test")
-                .issuer(ISSUER)
-                .issuedAt(Date.from(Instant.now().minus(2, ChronoUnit.DAYS)))
-                .expiration(Date.from(Instant.now().minus(1, ChronoUnit.DAYS)))
-                .signWith(key)
-                .compact();
-
+    void integration_ask_invalidApiKey_returns401() throws Exception {
+        // An unrecognised API key must be rejected with 401.
         AskRequest req = new AskRequest("Hola");
         HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
-                .header("Authorization", "Bearer " + expiredToken);
+                .header("X-Api-Key", "not-a-valid-key");
         try {
             client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
             fail("Expected HttpClientResponseException for 401");
@@ -465,7 +428,7 @@ public class OpenRouterControllerIntegrationTest {
         // The AI must never be called — the service rejects before building the prompt.
         RedactRequest req = new RedactRequest("Noise from the airport. I want to remain anonymous.");
         HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req)
-                .header("Authorization", authHeader);
+                .header("X-Api-Key", TEST_API_KEY);
         try {
             client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
             fail("Expected HttpClientResponseException for 400");
@@ -486,7 +449,7 @@ public class OpenRouterControllerIntegrationTest {
         // The response must be 200 so the client can display the question to the user.
         RedactRequest req = new RedactRequest("Noise from the airport [ASKS_IDENTITY]");
         HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req)
-                .header("Authorization", authHeader);
+                .header("X-Api-Key", TEST_API_KEY);
         HttpResponse<OpenRouterPublicDto> resp = client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
         assertEquals(200, resp.getStatus().getCode());
         assertTrue(resp.getBody().isPresent());
@@ -516,7 +479,7 @@ public class OpenRouterControllerIntegrationTest {
         RedactRequest req = RedactRequest.fromJson(
                 "Noise from the airport", "pdf", null, "Joan", "Garcia", "12345678A");
         HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req)
-                .header("Authorization", authHeader);
+                .header("X-Api-Key", TEST_API_KEY);
         HttpResponse<RedactAcceptedDto> resp = client.toBlocking().exchange(httpReq, RedactAcceptedDto.class);
         assertEquals(202, resp.getStatus().getCode());
         assertTrue(resp.getBody().isPresent());
@@ -531,7 +494,7 @@ public class OpenRouterControllerIntegrationTest {
         RedactRequest req = RedactRequest.fromJson(
                 "Noise from the airport", "json", null, "Joan", "Garcia", "12345678A");
         HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req)
-                .header("Authorization", authHeader);
+                .header("X-Api-Key", TEST_API_KEY);
         try {
             client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
             fail("Expected HttpClientResponseException for 400");
@@ -553,7 +516,7 @@ public class OpenRouterControllerIntegrationTest {
         // controller properly processes them and emits chunk/sources/done events.
         AskRequest req = new AskRequest("Is there a recycling center? [SSE_MULTIEXENT]");
         HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
-                .header("Authorization", authHeader);
+                .header("X-Api-Key", TEST_API_KEY);
 
         // Use toBlocking and read the response body which should contain SSE events.
         // Micronaut's SSE streaming returns raw string data in the body.
@@ -611,7 +574,7 @@ public class OpenRouterControllerIntegrationTest {
         // Test that validation errors are emitted as SSE error events.
         AskRequest req = new AskRequest(""); // Empty question triggers validation error
         HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
-                .header("Authorization", authHeader);
+                .header("X-Api-Key", TEST_API_KEY);
 
         HttpResponse<String> resp = client.toBlocking().exchange(httpReq, String.class);
         assertEquals(200, resp.getStatus().getCode()); // Stream initiated
@@ -639,7 +602,7 @@ public class OpenRouterControllerIntegrationTest {
         AskRequest req = new AskRequest("Is there a recycling center? [SSE_MULTIEXENT_CONVID]",
                 "test-conversation-xyz");
         HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
-                .header("Authorization", authHeader);
+                .header("X-Api-Key", TEST_API_KEY);
 
         HttpResponse<String> resp = client.toBlocking().exchange(httpReq, String.class);
         assertEquals(200, resp.getStatus().getCode());
@@ -666,7 +629,7 @@ public class OpenRouterControllerIntegrationTest {
     void integration_ask_streamIgnoresCommentAndEmptyFrames() throws Exception {
         AskRequest req = new AskRequest("Is there a recycling center? [SSE_COMMENT_EMPTY]");
         HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
-                .header("Authorization", authHeader);
+                .header("X-Api-Key", TEST_API_KEY);
 
         HttpResponse<String> resp = client.toBlocking().exchange(httpReq, String.class);
         assertEquals(200, resp.getStatus().getCode());
@@ -689,10 +652,9 @@ public class OpenRouterControllerIntegrationTest {
 
     @Test
     void integration_ask_newsIntent_withCityScopedNewsContext_usesNewsBranch() throws Exception {
-        String testCityAuthHeader = mintAuthHeader("testcity");
         AskRequest req = new AskRequest("latest news about recycling [SSE_NEWS_CONTEXT]");
         HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
-                .header("Authorization", testCityAuthHeader);
+                .header("X-Api-Key", TEST_API_KEY_TESTCITY);
 
         HttpResponse<String> resp = client.toBlocking().exchange(httpReq, String.class);
         assertEquals(200, resp.getStatus().getCode());
@@ -717,10 +679,9 @@ public class OpenRouterControllerIntegrationTest {
 
     @Test
     void integration_ask_newsIntent_withoutRelatedNews_returnsExplicitFallbackMessage() throws Exception {
-        String testCityAuthHeader = mintAuthHeader("testcity");
         AskRequest req = new AskRequest("Any recent news about martian taxation in the city?");
         HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
-                .header("Authorization", testCityAuthHeader);
+                .header("X-Api-Key", TEST_API_KEY_TESTCITY);
 
         HttpResponse<String> resp = client.toBlocking().exchange(httpReq, String.class);
         assertEquals(200, resp.getStatus().getCode());
@@ -746,10 +707,9 @@ public class OpenRouterControllerIntegrationTest {
 
     @Test
     void integration_ask_eventIntent_withoutDateWindow_returnsClarificationBeforeRetrieval() throws Exception {
-        String testCityAuthHeader = mintAuthHeader("testcity");
         AskRequest req = new AskRequest("Que eventos hay en la ciudad?");
         HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
-                .header("Authorization", testCityAuthHeader);
+                .header("X-Api-Key", TEST_API_KEY_TESTCITY);
 
         HttpResponse<String> resp = client.toBlocking().exchange(httpReq, String.class);
         assertEquals(200, resp.getStatus().getCode());
@@ -783,18 +743,16 @@ public class OpenRouterControllerIntegrationTest {
 
     @Test
     void integration_ask_procedureEventNewsIncludeSourceUrlsInSourcesEvent() throws Exception {
-        String testCityAuthHeader = mintAuthHeader("testcity");
-
-        assertSourcesEventContainsUrl(testCityAuthHeader, "Recycling procedure in testcity");
-        assertSourcesEventContainsUrl(testCityAuthHeader, "Film Festival events this week in testcity");
-        assertSourcesEventContainsUrl(testCityAuthHeader, "latest news about recycling campaign [SSE_NEWS_CONTEXT]");
+        assertSourcesEventContainsUrl(TEST_API_KEY_TESTCITY, "Recycling procedure in testcity");
+        assertSourcesEventContainsUrl(TEST_API_KEY_TESTCITY, "Film Festival events this week in testcity");
+        assertSourcesEventContainsUrl(TEST_API_KEY_TESTCITY, "latest news about recycling campaign [SSE_NEWS_CONTEXT]");
     }
 
     @Test
     void integration_ask_streamMalformedAfterFirstChunk_emitsSseErrorEvent() throws Exception {
         AskRequest req = new AskRequest("Is there a recycling center? [SSE_MALFORMED]");
         HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
-                .header("Authorization", authHeader);
+                .header("X-Api-Key", TEST_API_KEY);
 
         HttpResponse<String> resp = client.toBlocking().exchange(httpReq, String.class);
         assertEquals(200, resp.getStatus().getCode());
@@ -821,7 +779,7 @@ public class OpenRouterControllerIntegrationTest {
     void integration_ask_streamUpstreamAfterFirstChunk_emitsSseErrorEvent() throws Exception {
         AskRequest req = new AskRequest("Is there a recycling center? [SSE_UPSTREAM_AFTER_CHUNK]");
         HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
-                .header("Authorization", authHeader);
+                .header("X-Api-Key", TEST_API_KEY);
 
         HttpResponse<String> resp = client.toBlocking().exchange(httpReq, String.class);
         assertEquals(200, resp.getStatus().getCode());
@@ -844,10 +802,10 @@ public class OpenRouterControllerIntegrationTest {
         assertEquals(OpenRouterErrorCode.UPSTREAM.getCode(), errorEvent.path("errorCode").asInt());
     }
 
-    private void assertSourcesEventContainsUrl(String bearerToken, String question) throws Exception {
+    private void assertSourcesEventContainsUrl(String apiKey, String question) throws Exception {
         AskRequest req = new AskRequest(question);
         HttpRequest<AskRequest> httpReq = HttpRequest.POST("/complai/ask", req)
-                .header("Authorization", bearerToken);
+                .header("X-Api-Key", apiKey);
 
         HttpResponse<String> resp = client.toBlocking().exchange(httpReq, String.class);
         assertEquals(200, resp.getStatus().getCode());
@@ -1049,6 +1007,14 @@ public class OpenRouterControllerIntegrationTest {
     @Replaces(ResponseCacheService.class)
     ResponseCacheService enabledResponseCacheService() {
         return new ResponseCacheService(true, 10, 500);
+    }
+
+    @MockBean(ApiKeyAuthFilter.class)
+    @Replaces(ApiKeyAuthFilter.class)
+    ApiKeyAuthFilter testApiKeyAuthFilter() {
+        return new ApiKeyAuthFilter(Map.of(
+                TEST_API_KEY, "elprat",
+                TEST_API_KEY_TESTCITY, "testcity"));
     }
 
     @MockBean(SqsComplaintPublisher.class)

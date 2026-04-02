@@ -26,7 +26,7 @@ class RateLimitFilterTest {
     void filter_underLimit_returnsNull() {
         RateLimitFilter filter = new RateLimitFilter(3);
         MutableHttpRequest<?> req = postRequest("/complai/ask");
-        req.setAttribute(JwtAuthFilter.USER_ATTRIBUTE, "user-a");
+        req.setAttribute(ApiKeyAuthFilter.USER_ATTRIBUTE, "user-a");
 
         assertNull(filter.filter(req), "Request 1 must pass");
         assertNull(filter.filter(req), "Request 2 must pass");
@@ -38,7 +38,7 @@ class RateLimitFilterTest {
     void filter_exceedingLimit_returns429() {
         RateLimitFilter filter = new RateLimitFilter(3);
         MutableHttpRequest<?> req = postRequest("/complai/ask");
-        req.setAttribute(JwtAuthFilter.USER_ATTRIBUTE, "user-b");
+        req.setAttribute(ApiKeyAuthFilter.USER_ATTRIBUTE, "user-b");
 
         filter.filter(req); // 1
         filter.filter(req); // 2
@@ -70,10 +70,10 @@ class RateLimitFilterTest {
         RateLimitFilter filter = new RateLimitFilter(3);
 
         MutableHttpRequest<?> reqX = postRequest("/complai/ask");
-        reqX.setAttribute(JwtAuthFilter.USER_ATTRIBUTE, "user-x");
+        reqX.setAttribute(ApiKeyAuthFilter.USER_ATTRIBUTE, "user-x");
 
         MutableHttpRequest<?> reqY = postRequest("/complai/ask");
-        reqY.setAttribute(JwtAuthFilter.USER_ATTRIBUTE, "user-y");
+        reqY.setAttribute(ApiKeyAuthFilter.USER_ATTRIBUTE, "user-y");
 
         // Each user makes 3 requests — none should be blocked
         assertNull(filter.filter(reqX), "user-x request 1 must pass");

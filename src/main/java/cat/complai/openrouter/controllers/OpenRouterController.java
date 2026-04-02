@@ -17,7 +17,7 @@ import cat.complai.s3.S3PdfUploader;
 import cat.complai.sqs.SqsComplaintPublisher;
 import cat.complai.sqs.dto.RedactSqsMessage;
 import cat.complai.auth.IdentityTokenValidationException;
-import cat.complai.auth.JwtAuthFilter;
+import cat.complai.auth.ApiKeyAuthFilter;
 import cat.complai.auth.OidcIdentityTokenValidator;
 import cat.complai.auth.VerifiedCitizenIdentity;
 import io.micronaut.core.annotation.Nullable;
@@ -69,9 +69,9 @@ public class OpenRouterController {
     @Post("/ask")
         @Produces({ MediaType.TEXT_EVENT_STREAM, MediaType.APPLICATION_JSON })
         public HttpResponse<?> ask(@Body AskRequest request, HttpRequest<?> httpRequest) {
-        String cityId = httpRequest.getAttribute(JwtAuthFilter.CITY_ATTRIBUTE, String.class)
+        String cityId = httpRequest.getAttribute(ApiKeyAuthFilter.CITY_ATTRIBUTE, String.class)
                 .orElseThrow(() -> new IllegalStateException(
-                        "city attribute missing from request — JWT filter should have set it"));
+                        "city attribute missing from request — API key filter should have set it"));
         String conversationId = request != null ? request.getConversationId() : null;
         int inputLength = request != null && request.getText() != null ? request.getText().length() : 0;
         logger.info(() -> "POST /complai/ask (stream) received — conversationId=" + conversationId
@@ -127,9 +127,9 @@ public class OpenRouterController {
     @Post("/redact")
     @Produces({ MediaType.APPLICATION_JSON })
     public HttpResponse<?> redact(@Body RedactRequest request, HttpRequest<?> httpRequest) {
-        String cityId = httpRequest.getAttribute(JwtAuthFilter.CITY_ATTRIBUTE, String.class)
+        String cityId = httpRequest.getAttribute(ApiKeyAuthFilter.CITY_ATTRIBUTE, String.class)
                 .orElseThrow(() -> new IllegalStateException(
-                        "city attribute missing from request — JWT filter should have set it"));
+                        "city attribute missing from request — API key filter should have set it"));
         String conversationId = request != null ? request.getConversationId() : null;
         int inputLength = request != null && request.getText() != null ? request.getText().length() : 0;
         OutputFormat requestedFormat = request != null ? request.getFormat() : null;

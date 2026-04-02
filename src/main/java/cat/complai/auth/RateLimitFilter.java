@@ -29,16 +29,16 @@ import java.util.logging.Logger;
  * Returns HTTP 429 when the limit is exceeded.
  *
  * <p>
- * Must run AFTER {@link JwtAuthFilter} so the {@code user} attribute is
+ * Must run AFTER {@link ApiKeyAuthFilter} so the {@code user} attribute is
  * already set on the request. This is achieved by implementing
  * {@link Ordered} and returning a numerically higher order value than the
- * JwtAuthFilter default (0), so this filter executes second.
+ * ApiKeyAuthFilter default (0), so this filter executes second.
  *
  * <p>
  * Excluded paths (same as JwtAuthFilter): GET /, GET /health,
  * GET /health/startup — pass through immediately without incrementing.
  */
-@Requires(property = "jwt.secret")
+@Requires(property = "api.key.enabled")
 @ServerFilter("/**")
 public class RateLimitFilter implements Ordered {
 
@@ -69,7 +69,7 @@ public class RateLimitFilter implements Ordered {
             return null;
         }
 
-        String userId = request.getAttribute(JwtAuthFilter.USER_ATTRIBUTE, String.class).orElse("anonymous");
+        String userId = request.getAttribute(ApiKeyAuthFilter.USER_ATTRIBUTE, String.class).orElse("anonymous");
         AtomicInteger counter = rateLimitCache.get(userId, k -> new AtomicInteger(0));
         int count = counter.incrementAndGet();
 

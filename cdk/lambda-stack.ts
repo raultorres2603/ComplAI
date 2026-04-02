@@ -169,7 +169,11 @@ export class LambdaStack extends cdk.Stack {
         CITYINFO_BUCKET: cityInfoBucket.bucketName,
         CITYINFO_REGION: this.region,
         OPENROUTER_MODEL: process.env.OPENROUTER_MODEL || 'openrouter/free',
-        JWT_SECRET: process.env.JWT_SECRET || '',
+        // API key authentication — one env var per city.
+        // To add a new city: add API_KEY_<CITYID_UPPER> here and set the corresponding
+        // GitHub Environment secret (API_KEY_<CITYID_UPPER>) for both development and production.
+        API_KEY_ENABLED: 'true',
+        API_KEY_ELPRAT: process.env.API_KEY_ELPRAT || '',
         // Async redact flow: queue URL for publishing + bucket details for pre-signed URLs.
         REDACT_QUEUE_URL: redactQueue.queueUrl,
         FEEDBACK_QUEUE_URL: feedbackQueue.queueUrl,
@@ -191,7 +195,7 @@ export class LambdaStack extends cdk.Stack {
         COMPLAI_LOCAL_CORS_ENABLED: 'false',
         // OIDC identity verification. Per-city config (issuer, JWKS URI, audience, NIF claim)
         // is bundled in oidc-mapping.json — enabled per city, no env var needed.
-        // The worker Lambda does not receive JWT_SECRET and therefore never loads the
+        // The worker Lambda does not receive API_KEY_ENABLED and therefore never loads the
         // OidcIdentityTokenValidator bean.
         RATE_LIMIT_REQUESTS_PER_MINUTE: process.env.RATE_LIMIT_REQUESTS_PER_MINUTE || '20',
         COMPLAI_DEFAULT_CITY_ID: process.env.COMPLAI_DEFAULT_CITY_ID || 'elprat',
@@ -359,7 +363,7 @@ export class LambdaStack extends cdk.Stack {
         // Override with COMPLAI_CORS_ALLOWED_ORIGIN env var if needed.
         allowedOrigins: [process.env.COMPLAI_CORS_ALLOWED_ORIGIN || 'https://raultorres2603.github.io'],
         allowedMethods: [lambda.HttpMethod.POST, lambda.HttpMethod.GET],
-        allowedHeaders: ['Content-Type', 'Authorization'],
+        allowedHeaders: ['Content-Type', 'X-Api-Key'],
       },
     });
 

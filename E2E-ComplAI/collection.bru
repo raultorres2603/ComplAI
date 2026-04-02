@@ -1,8 +1,8 @@
 auth {
-  mode: bearer
+  mode: none
 }
 
-auth:bearer {
-  token: {{jwtToken}}
+headers {
+  X-Api-Key: {{apiKey}}
 }
 
