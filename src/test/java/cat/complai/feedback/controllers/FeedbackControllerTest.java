@@ -1,32 +1,23 @@
 package cat.complai.feedback.controllers;
 
-import cat.complai.auth.ApiKeyAuthFilter;
 import cat.complai.feedback.controllers.dto.FeedbackAcceptedDto;
 import cat.complai.feedback.controllers.dto.FeedbackRequest;
 import cat.complai.feedback.dto.FeedbackErrorCode;
 import cat.complai.feedback.dto.FeedbackResult;
 import cat.complai.feedback.services.FeedbackPublisherService;
 import io.micronaut.context.annotation.Replaces;
-import io.micronaut.core.annotation.Nullable;
-import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MutableHttpRequest;
-import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.annotation.RequestFilter;
-import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import io.micronaut.test.annotation.MockBean;
 import jakarta.inject.Inject;
-import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
-import java.util.logging.Logger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -38,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * FeedbackPublisherService.
  * Validates request/response handling, error codes, and API key enforcement.
  */
-@MicronautTest(environments = {"test"})
+@MicronautTest(environments = { "test", "feedback-test" })
 public class FeedbackControllerTest {
 
     private static final String TEST_API_KEY = "test-api-key-feedback";
@@ -203,72 +194,6 @@ public class FeedbackControllerTest {
     }
 
     // -----------------------------------------------------------------------
-    // Test Filter Bean — replaces ApiKeyAuthFilter in the HTTP pipeline
-    // -----------------------------------------------------------------------
-
-    @Singleton
-    @ServerFilter("/**")
-    @Replaces(ApiKeyAuthFilter.class)
-    static class TestApiKeyFilterFeedback {
-        private static final Logger logger = Logger.getLogger(TestApiKeyFilterFeedback.class.getName());
-        private final Map<String, String> apiKeyToCityId = Map.of(
-            "test-api-key-feedback", "elprat"
-        );
-
-        @RequestFilter
-        @Nullable
-        public MutableHttpResponse<?> filter(MutableHttpRequest<?> request) {
-            if (isExcluded(request)) {
-                return null;
-            }
-
-            String apiKey = request.getHeaders().get("X-Api-Key");
-            if (apiKey == null || apiKey.isBlank()) {
-                logger.warning(() -> "Missing X-Api-Key header — httpStatus=401 method=" + request.getMethod()
-                        + " path=" + request.getPath());
-                return unauthorizedResponse("Missing X-Api-Key header");
-            }
-
-            String cityId = apiKeyToCityId.get(apiKey);
-            if (cityId == null) {
-                logger.warning(() -> "Invalid API key — httpStatus=401 method=" + request.getMethod()
-                        + " path=" + request.getPath());
-                return unauthorizedResponse("Invalid API key");
-            }
-
-            request.setAttribute(ApiKeyAuthFilter.CITY_ATTRIBUTE, cityId);
-            request.setAttribute(ApiKeyAuthFilter.USER_ATTRIBUTE, "api-key-client");
-
-            return null;
-        }
-
-        private boolean isExcluded(HttpRequest<?> request) {
-            String path = request.getPath();
-            HttpMethod method = request.getMethod();
-            return HttpMethod.GET.equals(method)
-                    && (path.equals("/") || path.equals("/health") || path.equals("/health/startup"));
-        }
-
-        private MutableHttpResponse<?> unauthorizedResponse(String reason) {
-            Map<String, Object> body = Map.of(
-                    "success", false,
-                    "message", reason == null ? "Unauthorized" : reason,
-                    "errorCode", "UNAUTHORIZED");
-            return HttpResponse.unauthorized().body(body);
-        }
-    }
-
-    // -----------------------------------------------------------------------
-    // Mock ApiKeyAuthFilter bean (for dependency injection purposes only)
-    // -----------------------------------------------------------------------
-
-    @MockBean(ApiKeyAuthFilter.class)
-    @Replaces(ApiKeyAuthFilter.class)
-    ApiKeyAuthFilter testApiKeyAuthFilter() {
-        return new ApiKeyAuthFilter(Map.of("test-api-key-feedback", "elprat"));
-    }
-
-    // -----------------------------------------------------------------------
     // Mock FeedbackPublisherService
     // -----------------------------------------------------------------------
 
@@ -300,4 +225,6 @@ public class FeedbackControllerTest {
             }
         };
     }
+
+    // -----------------------------------------------------------------------
 }

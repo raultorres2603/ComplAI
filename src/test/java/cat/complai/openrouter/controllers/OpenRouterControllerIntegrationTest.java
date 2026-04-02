@@ -60,11 +60,13 @@ import java.util.logging.Logger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@MicronautTest(environments = {"test", "openrouter-test"})
+@MicronautTest(environments = { "test", "openrouter-test" })
 public class OpenRouterControllerIntegrationTest {
 
-    // Fixed API keys for integration tests. The mock ApiKeyAuthFilter (defined below)
-    // is pre-configured with these two keys, making them valid for the test context.
+    // Fixed API keys for integration tests. The mock ApiKeyAuthFilter (defined
+    // below)
+    // is pre-configured with these two keys, making them valid for the test
+    // context.
     private static final String TEST_API_KEY = "test-integration-key-elprat";
     private static final String TEST_API_KEY_TESTCITY = "test-integration-key-testcity";
     private static final AtomicInteger OPENROUTER_POST_CALLS = new AtomicInteger();
@@ -392,7 +394,8 @@ public class OpenRouterControllerIntegrationTest {
 
     @Test
     void integration_ask_missingApiKey_returns401() throws Exception {
-        // The ApiKeyAuthFilter must short-circuit and return 401 before the controller is
+        // The ApiKeyAuthFilter must short-circuit and return 401 before the controller
+        // is
         // invoked.
         // No X-Api-Key header is sent — simulating an unauthenticated client.
         AskRequest req = new AskRequest("Hola, quina és la capital de Catalunya?");
@@ -1032,9 +1035,9 @@ public class OpenRouterControllerIntegrationTest {
     static class TestApiKeyFilterOpenRouter {
         private static final Logger logger = Logger.getLogger(TestApiKeyFilterOpenRouter.class.getName());
         private final Map<String, String> apiKeyToCityId = Map.of(
-            "test-api-key", "elprat",
-            "test-api-key-testcity", "testcity"
-        );
+                "test-integration-key-elprat", "elprat",
+                "test-integration-key-testcity", "testcity",
+                "test-api-key-feedback", "elprat");
 
         @RequestFilter
         @Nullable
@@ -1074,7 +1077,7 @@ public class OpenRouterControllerIntegrationTest {
             Map<String, Object> body = Map.of(
                     "success", false,
                     "message", reason == null ? "Unauthorized" : reason,
-                    "errorCode", "UNAUTHORIZED");
+                    "errorCode", OpenRouterErrorCode.UNAUTHORIZED.getCode());
             return HttpResponse.unauthorized().body(body);
         }
     }
