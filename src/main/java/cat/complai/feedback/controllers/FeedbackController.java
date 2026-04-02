@@ -5,7 +5,7 @@ import cat.complai.feedback.controllers.dto.FeedbackRequest;
 import cat.complai.feedback.dto.FeedbackErrorCode;
 import cat.complai.feedback.dto.FeedbackResult;
 import cat.complai.feedback.services.FeedbackPublisherService;
-import cat.complai.auth.JwtAuthFilter;
+import cat.complai.auth.ApiKeyAuthFilter;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -69,8 +69,8 @@ public class FeedbackController {
      */
     @Post("/feedback")
     public HttpResponse<?> feedback(@Body FeedbackRequest request, HttpRequest<?> httpRequest) {
-        // Extract city from the JWT claim (set by JwtAuthFilter)
-        String city = httpRequest.getAttribute(JwtAuthFilter.CITY_ATTRIBUTE, String.class)
+        // Extract city from the API key claim (set by ApiKeyAuthFilter)
+        String city = httpRequest.getAttribute(ApiKeyAuthFilter.CITY_ATTRIBUTE, String.class)
                 .orElseThrow(() -> new IllegalStateException(
                         "city attribute missing from request — JWT filter should have set it"));
 

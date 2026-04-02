@@ -6,7 +6,6 @@ import cat.complai.openrouter.helpers.RedactPromptBuilder;
 import cat.complai.s3.S3PdfUploader;
 import cat.complai.sqs.dto.RedactSqsMessage;
 import com.amazonaws.services.lambda.runtime.events.SQSBatchResponse;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;

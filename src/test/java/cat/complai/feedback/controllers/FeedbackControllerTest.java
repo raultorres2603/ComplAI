@@ -5,8 +5,6 @@ import cat.complai.feedback.controllers.dto.FeedbackRequest;
 import cat.complai.feedback.dto.FeedbackErrorCode;
 import cat.complai.feedback.dto.FeedbackResult;
 import cat.complai.feedback.services.FeedbackPublisherService;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -17,14 +15,8 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import io.micronaut.test.annotation.MockBean;
 import jakarta.inject.Inject;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import javax.crypto.SecretKey;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.Base64;
-import java.util.Date;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -32,42 +24,25 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Integration tests for {@link FeedbackController}.
  *
- * <p>Tests the HTTP endpoint using @MicronautTest with a mocked FeedbackPublisherService.
- * Validates request/response handling, error codes, and JWT enforcement.
+ * <p>
+ * Tests the HTTP endpoint using @MicronautTest with a mocked
+ * FeedbackPublisherService.
+ * Validates request/response handling, error codes, and API key enforcement.
  */
-@MicronautTest
+@MicronautTest(environments = { "test", "feedback-test" })
 public class FeedbackControllerTest {
 
-    // Same secret as test configuration (src/test/resources/application.properties)
-    private static final String TEST_SECRET_B64 = "hEmatrRKbxfC/9PxZ14VsYksRkTZHMpqRScBUhshYzQ=";
-    private static final String ISSUER = "complai";
+    private static final String TEST_API_KEY = "test-api-key-feedback";
 
     @Inject
     @Client("/")
     HttpClient client;
 
-    private String authHeader;
-
-    @BeforeEach
-    void mintTestToken() {
-        byte[] keyBytes = Base64.getDecoder().decode(TEST_SECRET_B64);
-        SecretKey key = Keys.hmacShaKeyFor(keyBytes);
-        String token = Jwts.builder()
-                .subject("integration-test")
-                .issuer(ISSUER)
-                .issuedAt(new Date())
-                .expiration(Date.from(Instant.now().plus(1, ChronoUnit.HOURS)))
-                .claim("city", "elprat")
-                .signWith(key)
-                .compact();
-        authHeader = "Bearer " + token;
-    }
-
     @Test
     void feedback_validRequest_returns202Accepted() {
         FeedbackRequest req = new FeedbackRequest("Joan Garcia", "12345678A", "Noise from airport");
         HttpRequest<FeedbackRequest> httpReq = HttpRequest.POST("/complai/feedback", req)
-                .header("Authorization", authHeader);
+                .header("X-Api-Key", TEST_API_KEY);
 
         HttpResponse<FeedbackAcceptedDto> resp = client.toBlocking().exchange(httpReq, FeedbackAcceptedDto.class);
 
@@ -79,10 +54,10 @@ public class FeedbackControllerTest {
     }
 
     @Test
-    void feedback_missingJwt_returns401Unauthorized() {
+    void feedback_missingApiKey_returns401Unauthorized() {
         FeedbackRequest req = new FeedbackRequest("Joan Garcia", "12345678A", "Message");
         HttpRequest<FeedbackRequest> httpReq = HttpRequest.POST("/complai/feedback", req);
-        // No Authorization header
+        // No X-Api-Key header
 
         try {
             client.toBlocking().exchange(httpReq, FeedbackAcceptedDto.class);
@@ -93,10 +68,10 @@ public class FeedbackControllerTest {
     }
 
     @Test
-    void feedback_invalidJwt_returns401Unauthorized() {
+    void feedback_invalidApiKey_returns401Unauthorized() {
         FeedbackRequest req = new FeedbackRequest("Joan Garcia", "12345678A", "Message");
         HttpRequest<FeedbackRequest> httpReq = HttpRequest.POST("/complai/feedback", req)
-                .header("Authorization", "Bearer invalid.token.here");
+                .header("X-Api-Key", "invalid-api-key");
 
         try {
             client.toBlocking().exchange(httpReq, FeedbackAcceptedDto.class);
@@ -110,7 +85,7 @@ public class FeedbackControllerTest {
     void feedback_missingUserName_returns400ValidationError() {
         FeedbackRequest req = new FeedbackRequest(null, "12345678A", "Message");
         HttpRequest<FeedbackRequest> httpReq = HttpRequest.POST("/complai/feedback", req)
-                .header("Authorization", authHeader);
+                .header("X-Api-Key", TEST_API_KEY);
 
         try {
             client.toBlocking().exchange(httpReq, FeedbackAcceptedDto.class);
@@ -128,7 +103,7 @@ public class FeedbackControllerTest {
     void feedback_missingIdUser_returns400ValidationError() {
         FeedbackRequest req = new FeedbackRequest("Joan Garcia", null, "Message");
         HttpRequest<FeedbackRequest> httpReq = HttpRequest.POST("/complai/feedback", req)
-                .header("Authorization", authHeader);
+                .header("X-Api-Key", TEST_API_KEY);
 
         try {
             client.toBlocking().exchange(httpReq, FeedbackAcceptedDto.class);
@@ -142,7 +117,7 @@ public class FeedbackControllerTest {
     void feedback_missingMessage_returns400ValidationError() {
         FeedbackRequest req = new FeedbackRequest("Joan Garcia", "12345678A", null);
         HttpRequest<FeedbackRequest> httpReq = HttpRequest.POST("/complai/feedback", req)
-                .header("Authorization", authHeader);
+                .header("X-Api-Key", TEST_API_KEY);
 
         try {
             client.toBlocking().exchange(httpReq, FeedbackAcceptedDto.class);
@@ -157,11 +132,14 @@ public class FeedbackControllerTest {
         // This test requires the mock to return an error result
         FeedbackRequest req = new FeedbackRequest("Joan Garcia", "12345678A", "Message");
         HttpRequest<FeedbackRequest> httpReq = HttpRequest.POST("/complai/feedback", req)
-                .header("Authorization", authHeader);
+                .header("X-Api-Key", TEST_API_KEY);
 
-        // The mock FeedbackPublisherService is configured below to simulate this scenario
-        // For this test we'd need to set up a mock that returns Error(QUEUE_PUBLISH_FAILED)
-        // The current mock always returns success, so this test validates the controller
+        // The mock FeedbackPublisherService is configured below to simulate this
+        // scenario
+        // For this test we'd need to set up a mock that returns
+        // Error(QUEUE_PUBLISH_FAILED)
+        // The current mock always returns success, so this test validates the
+        // controller
         // can handle both success and error paths.
         try {
             HttpResponse<?> resp = client.toBlocking().exchange(httpReq, Map.class);
@@ -174,11 +152,11 @@ public class FeedbackControllerTest {
     }
 
     @Test
-    void feedback_cityIsProvidedByJwt() {
-        // Verify that the city from the JWT claim is passed to the service
+    void feedback_cityIsProvidedByApiKey() {
+        // Verify that the city resolved from the API key is passed to the service
         FeedbackRequest req = new FeedbackRequest("Joan", "123", "Message");
         HttpRequest<FeedbackRequest> httpReq = HttpRequest.POST("/complai/feedback", req)
-                .header("Authorization", authHeader);
+                .header("X-Api-Key", TEST_API_KEY);
 
         HttpResponse<FeedbackAcceptedDto> resp = client.toBlocking().exchange(httpReq, FeedbackAcceptedDto.class);
 
@@ -190,7 +168,7 @@ public class FeedbackControllerTest {
     void feedback_responseDtoStructure() {
         FeedbackRequest req = new FeedbackRequest("Test User", "87654321B", "Test feedback");
         HttpRequest<FeedbackRequest> httpReq = HttpRequest.POST("/complai/feedback", req)
-                .header("Authorization", authHeader);
+                .header("X-Api-Key", TEST_API_KEY);
 
         HttpResponse<FeedbackAcceptedDto> resp = client.toBlocking().exchange(httpReq, FeedbackAcceptedDto.class);
 
@@ -205,7 +183,7 @@ public class FeedbackControllerTest {
     void feedback_blankFields_returns400ValidationError() {
         FeedbackRequest req = new FeedbackRequest("  ", "12345678A", "Message");
         HttpRequest<FeedbackRequest> httpReq = HttpRequest.POST("/complai/feedback", req)
-                .header("Authorization", authHeader);
+                .header("X-Api-Key", TEST_API_KEY);
 
         try {
             client.toBlocking().exchange(httpReq, FeedbackAcceptedDto.class);
@@ -242,10 +220,11 @@ public class FeedbackControllerTest {
                 FeedbackAcceptedDto acceptedDto = new FeedbackAcceptedDto(
                         feedbackId,
                         "accepted",
-                        "Feedback received and queued for processing"
-                );
+                        "Feedback received and queued for processing");
                 return new FeedbackResult.Success(acceptedDto);
             }
         };
     }
+
+    // -----------------------------------------------------------------------
 }

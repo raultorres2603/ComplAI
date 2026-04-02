@@ -57,9 +57,9 @@ import java.util.logging.Logger;
  *
  * <p>All failures are wrapped in {@link IdentityTokenValidationException}.
  */
-// Guard mirrors JwtAuthFilter / JwtValidator: only load on the API Lambda (jwt.secret present).
-// The worker Lambda has no JWT_SECRET and must never attempt a JWKS fetch at startup.
-@Requires(property = "jwt.secret")
+// Guard mirrors ApiKeyAuthFilter: only load on the API Lambda (API_KEY_ENABLED present).
+// The worker Lambda has no API_KEY_ENABLED and must never attempt a JWKS fetch at startup.
+@Requires(property = "api.key.enabled")
 @Singleton
 public class OidcIdentityTokenValidator {
 

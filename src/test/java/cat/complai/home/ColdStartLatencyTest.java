@@ -1,11 +1,21 @@
 package cat.complai.home;
 
+import cat.complai.auth.ApiKeyAuthFilter;
+import io.micronaut.context.annotation.Replaces;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.http.HttpMethod;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.annotation.RequestFilter;
+import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -148,5 +158,21 @@ class ColdStartLatencyTest {
 
         // Just verify it completes; no strict timing guarantee in tests
         assertTrue(totalLatency >= 0, "Latency should be measurable");
+    }
+
+    // -----------------------------------------------------------------------
+    // Test Filter Bean — replaces ApiKeyAuthFilter in the HTTP pipeline
+    // -----------------------------------------------------------------------
+
+    @Singleton
+    @ServerFilter("/**")
+    static class TestApiKeyFilterColdStart {
+        @RequestFilter
+        @Nullable
+        public MutableHttpResponse<?> filter(MutableHttpRequest<?> request) {
+            // For health endpoints, no authentication needed (they are excluded)
+            // For other endpoints, allow all traffic through in this latency test
+            return null;
+        }
     }
 }

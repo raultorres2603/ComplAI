@@ -37,7 +37,7 @@ dependencies {
     implementation("software.amazon.awssdk:s3:2.25.18")
     implementation("software.amazon.awssdk:sqs:2.25.18")
 
-    // JWT validation — HS256 Bearer token support (JwtValidator, TokenGenerator)
+    // JJWT — used by OidcIdentityTokenValidator for OIDC/JWK validation (HS256 JWT auth was removed).
     // jjwt-api is the compile-time dependency; impl and jackson are runtime-only.
     // jjwt-jackson bridges jjwt's claim serialisation to the Jackson 2.x already on the classpath.
     implementation("io.jsonwebtoken:jjwt-api:0.12.6")

@@ -1,7 +1,7 @@
 ---
 description: "Use when: planning a feature, analyzing requirements, breaking down tasks, writing implementation steps, creating a task plan, understanding what needs to be built before coding. Produces a structured task.md with actionable steps derived from requirements analysis. Ideal as a first stage before implementation agents run."
 name: "planner"
-tools: [read, search, web, todo]
+tools: [read, search, web, todo, edit]
 argument-hint: "Describe the feature or requirement to plan (e.g. 'Add JWT refresh token support' or 'Build PDF export endpoint')"
 user-invocable: false
 ---

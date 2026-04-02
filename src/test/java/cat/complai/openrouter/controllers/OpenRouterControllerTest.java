@@ -1,6 +1,6 @@
 package cat.complai.openrouter.controllers;
 
-import cat.complai.auth.JwtAuthFilter;
+import cat.complai.auth.ApiKeyAuthFilter;
 import cat.complai.auth.IdentityTokenValidationException;
 import cat.complai.auth.OidcIdentityTokenValidator;
 import cat.complai.auth.VerifiedCitizenIdentity;
@@ -533,11 +533,11 @@ public class OpenRouterControllerTest {
 
     /**
      * Creates a POST request with the city attribute pre-set on it, simulating what
-     * JwtAuthFilter does after successful JWT validation.
+     * ApiKeyAuthFilter does after successful API key validation.
      */
     private static HttpRequest<?> requestWithCity(String cityId) {
         MutableHttpRequest<?> req = HttpRequest.POST("/complai/redact", "{}");
-        req.setAttribute(JwtAuthFilter.CITY_ATTRIBUTE, cityId);
+        req.setAttribute(ApiKeyAuthFilter.CITY_ATTRIBUTE, cityId);
         return req;
     }
 
@@ -549,7 +549,7 @@ public class OpenRouterControllerTest {
      */
     private static HttpRequest<?> requestWithCityAndIdentityToken(String cityId, String identityToken) {
         MutableHttpRequest<?> req = HttpRequest.POST("/complai/redact", "{}");
-        req.setAttribute(JwtAuthFilter.CITY_ATTRIBUTE, cityId);
+        req.setAttribute(ApiKeyAuthFilter.CITY_ATTRIBUTE, cityId);
         req.header("X-Identity-Token", identityToken);
         return req;
     }

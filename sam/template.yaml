@@ -18,9 +18,10 @@ Parameters:
   OpenRouterApiKey:
     Type: String
     Description: OpenRouter API key (passed from CI or manually)
-  JwtSecret:
+  ApiKeyElprat:
     Type: String
-    Description: Base64-encoded HS256 JWT secret (min 32 bytes). Generate with openssl rand -base64 32.
+    Default: ''
+    Description: API key for city 'elprat'. Generate with ApiKeyGenerator CLI.
 Conditions:
   IsProduction: !Equals [!Ref Environment, production]
 
@@ -234,7 +235,8 @@ Resources:
           OPENROUTER_OVERALL_TIMEOUT_SECONDS: "60"
           OPENROUTER_MAX_RETRIES: "3"
           OPENROUTER_MODEL: google/gemma-3-12b-it:free
-          JWT_SECRET: !Ref JwtSecret
+          API_KEY_ENABLED: 'true'
+          API_KEY_ELPRAT: !Ref ApiKeyElprat
           REDACT_QUEUE_URL: !Ref RedactQueue
           FEEDBACK_QUEUE_URL: !Ref FeedbackQueue
           FEEDBACK_QUEUE_REGION: !Ref LambdaRegion

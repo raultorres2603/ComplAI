@@ -279,7 +279,7 @@ jobs:
           # Required secrets/vars ------------------------------------------------
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          API_KEY_ELPRAT: ${{ secrets.API_KEY_ELPRAT }}
           TARGET_ENV: ${{ steps.target.outputs.environment }}
           # DEPLOYMENT_JAR_KEY is written to $GITHUB_ENV in the Upload JAR step.
           # Re-expose it explicitly here so the step contract is obvious.
@@ -336,20 +336,6 @@ jobs:
         with:
           node-version: '20'
 
-      # FIX 2: Set up Java to run the TokenGenerator
-      - name: Set up JDK 25
-        uses: actions/setup-java@v4
-        with:
-          java-version: '25'
-          distribution: 'corretto'
-
-      # FIX 3: Download the already built JAR instead of running Gradle again
-      - name: Download JAR artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: lambda-jar
-          path: build/libs
-
       - name: Install Bruno CLI
         # npm spawns postinstall scripts via a bare 'sh' name, which fails on this
         # runner when PATH lookup doesn't resolve it. Setting script-shell to the
@@ -361,49 +347,18 @@ jobs:
           npm config set script-shell /bin/sh
           npm install -g @usebruno/cli@3.1.3
 
-      - name: Generate JWT token for Bruno E2E
+      - name: Export API key for Bruno E2E
         run: |
-          # Use $JAVA_HOME/bin/java and bash built-ins exclusively.
-          # If a GitHub Environment Variable named PATH is accidentally present it
-          # will shadow the system $PATH for every step in the job, making 'java',
-          # 'head', 'tail', and 'ls' all unfindable. Bypassing PATH lookup entirely
-          # avoids that whole class of failure.
-
-          # Bash glob expansion — no 'ls' or 'head' needed.
-          CANDIDATE=""
-          for f in build/libs/*-all.jar; do [[ -f "$f" ]] && CANDIDATE="$f" && break; done
-          if [[ -z "$CANDIDATE" ]]; then
-            for f in build/libs/*.jar; do [[ -f "$f" ]] && CANDIDATE="$f" && break; done
-          fi
-          if [[ -z "$CANDIDATE" ]]; then
-            echo "ERROR: No JAR found in build/libs." >&2
-            exit 1
-          fi
-
-          # Read the last non-empty output line without relying on 'tail'.
-          TOKEN=""
-          while IFS= read -r line; do
-            [[ -n "$line" ]] && TOKEN="$line"
-          done < <(JWT_SECRET="${{ secrets.JWT_SECRET }}" \
-                   "$JAVA_HOME/bin/java" -cp "$CANDIDATE" \
-                   cat.complai.auth.TokenGenerator e2e-development 1 elprat 2>/dev/null)
-          echo "jwtToken=$TOKEN" >> "$GITHUB_ENV"
+          echo "apiKey=${{ secrets.API_KEY_ELPRAT }}" >> "$GITHUB_ENV"
 
       - name: Run Bruno E2E tests (development)
         working-directory: ./E2E-ComplAI
         env:
-          jwtToken: ${{ env.jwtToken }}
-          # path is a vars:secret in Development.bru so Bruno CLI requires it to
-          # be injected at runtime — it is never stored in the .bru file.
-          # We use COMPLAI_BASE_URL as the env var name to avoid shadowing the
-          # system $PATH variable, then map it to the Bruno variable name 'path'
-          # via --env-var. The GitHub secret must be named COMPLAI_BASE_URL
-          # (not PATH — a secret named PATH would not auto-inject, but a GitHub
-          # Environment *variable* named PATH would shadow $PATH for the whole job).
+          apiKey: ${{ env.apiKey }}
           COMPLAI_BASE_URL: ${{ secrets.COMPLAI_BASE_URL }}
         run: >
           bru run . -r --env Development
-          --env-var jwtToken="$jwtToken"
+          --env-var apiKey="$apiKey"
           --env-var path="$COMPLAI_BASE_URL"
           --reporter-json report/results.json
         continue-on-error: true
