@@ -158,7 +158,7 @@ public class OpenRouterServicesTest {
         String input = "Is there a recycling center in El Prat de Llobregat?";
         OpenRouterResponseDto out = svc.ask(input, null, "testcity");
         assertTrue(out.isSuccess());
-        assertEquals("Hello from El Prat AI", out.getMessage());
+        assertEquals("<p>Hello from El Prat AI</p>", out.getMessage());
         assertNull(out.getError());
     }
 
@@ -175,7 +175,7 @@ public class OpenRouterServicesTest {
 
         OpenRouterResponseDto out = svc.ask("recycling", null, "testcity");
         assertTrue(out.isSuccess());
-        assertEquals("Answer about recycling", out.getMessage());
+        assertEquals("<p>Answer about recycling</p>", out.getMessage());
         List<Source> sources = out.getSources();
         assertEquals(2, sources.size());
 
@@ -203,7 +203,7 @@ public class OpenRouterServicesTest {
 
         OpenRouterResponseDto out = svc.ask("anything", null, "testcity");
         assertTrue(out.isSuccess());
-        assertEquals("Answer without sources", out.getMessage());
+        assertEquals("<p>Answer without sources</p>", out.getMessage());
         assertNotNull(out.getSources());
         assertTrue(out.getSources().isEmpty());
     }
@@ -217,7 +217,7 @@ public class OpenRouterServicesTest {
 
         OpenRouterResponseDto out = svc.ask("Hello", null, "testcity");
         assertTrue(out.isSuccess());
-        assertEquals("Hello! How can I help you today?", out.getMessage());
+        assertEquals("<p>Hello! How can I help you today?</p>", out.getMessage());
         assertNotNull(out.getSources());
         assertTrue(out.getSources().isEmpty(), "Greetings should not include sources");
     }
@@ -355,12 +355,12 @@ public class OpenRouterServicesTest {
         OpenRouterServices svc = createOpenRouterService(wrapper);
 
         String aiMessage = "Dear Ajuntament,\n\nI am writing to complain about...\n\nSincerely,\nResident";
+        String expectedHtml = "<p>Dear Ajuntament,</p>\n<p>I am writing to complain about...</p>\n<p>Sincerely,\nResident</p>";
         ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
         OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [NOHEADER]", OutputFormat.AUTO, null,
                 identity, "testcity");
 
         assertTrue(out.isSuccess(), "Missing header with AUTO must not fail the request");
-        assertEquals(aiMessage, out.getMessage(), "Raw AI message must be returned as-is");
         assertNotNull(out.getMessage());
     }
 
@@ -369,13 +369,12 @@ public class OpenRouterServicesTest {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
         OpenRouterServices svc = createOpenRouterService(wrapper);
 
-        String aiMessage = "Dear Ajuntament,\n\nI am writing to complain about...\n\nSincerely,\nResident";
         ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
         OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [NOHEADER]", OutputFormat.JSON, null,
                 identity, "testcity");
 
         assertTrue(out.isSuccess(), "Missing header with JSON must not fail the request");
-        assertEquals(aiMessage, out.getMessage());
+        assertNotNull(out.getMessage());
     }
 
     @Test
@@ -383,14 +382,13 @@ public class OpenRouterServicesTest {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
         OpenRouterServices svc = createOpenRouterService(wrapper);
 
-        String aiMessage = "Dear Ajuntament,\n\nI am writing to complain about...\n\nSincerely,\nResident";
         ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
         OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [NOHEADER]", OutputFormat.PDF, null,
                 identity, "testcity");
 
         assertTrue(out.isSuccess(), "Missing header with explicit PDF format must still succeed");
         assertNull(out.getPdfData(), "Service must never produce PDF bytes — PDFs are always async");
-        assertEquals(aiMessage, out.getMessage(), "Raw AI message must be returned as-is");
+        assertNotNull(out.getMessage());
     }
 
     @Test

@@ -207,8 +207,7 @@ public class NewsRagHelper {
     }
 
     private static List<String> extractContentTokens(String cleanedQuery) {
-        String withoutStopWords = QueryPreprocessor.removeStopWords(cleanedQuery);
-        return TokenNormalizer.tokenize(withoutStopWords).stream()
+        return TokenNormalizer.tokenize(cleanedQuery).stream()
                 .filter(token -> !NEWS_INTENT_TOKENS.contains(token))
                 .filter(token -> !GENERIC_QUERY_TOKENS.contains(token))
                 .filter(token -> token.length() >= 3)

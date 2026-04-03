@@ -10,6 +10,7 @@ import cat.complai.openrouter.dto.OpenRouterErrorCode;
 import cat.complai.openrouter.dto.OutputFormat;
 import cat.complai.openrouter.helpers.AiParsed;
 import cat.complai.openrouter.helpers.HtmlFormatter;
+import cat.complai.openrouter.helpers.MarkdownToHtmlConverter;
 import cat.complai.openrouter.helpers.RedactPromptBuilder;
 import cat.complai.openrouter.services.cache.ResponseCacheService;
 import jakarta.inject.Inject;
@@ -175,7 +176,9 @@ public class AiResponseProcessingService {
                 }
                 logger.fine(() -> "callOpenRouterAndExtract — AI responded successfully httpStatus=" + dto.statusCode()
                         + " responseLength=" + dto.message().length());
-                return new OpenRouterResponseDto(true, dto.message(), null, dto.statusCode(), OpenRouterErrorCode.NONE);
+                // Apply HTML formatting: convert Markdown to HTML, then clean excessive formatting
+                String cleanedMessage = ensureHtmlFormat(dto.message());
+                return new OpenRouterResponseDto(true, cleanedMessage, null, dto.statusCode(), OpenRouterErrorCode.NONE);
             }
             logger.warning(() -> "callOpenRouterAndExtract — AI returned empty message httpStatus=" + dto.statusCode());
             return new OpenRouterResponseDto(false, null, "AI returned no message.", dto.statusCode(),
@@ -201,7 +204,7 @@ public class AiResponseProcessingService {
         // Identity incomplete: the AI is asking the user for missing fields.
         // Return its question as text so the client can display it.
         if (!identityComplete) {
-            String cleanedMessage = HtmlFormatter.cleanHtml(parsed.message());
+            String cleanedMessage = ensureHtmlFormat(parsed.message());
             return new OpenRouterResponseDto(true, cleanedMessage, null, aiDto.getStatusCode(),
                     OpenRouterErrorCode.NONE);
         }
@@ -216,14 +219,36 @@ public class AiResponseProcessingService {
                     : (aiDto.getMessage().length() > 200 ? aiDto.getMessage().substring(0, 200) + "..."
                             : aiDto.getMessage());
             logger.warning("AI response missing required JSON header; raw response prefix: " + rawPreview);
-            String cleanedMessage = HtmlFormatter.cleanHtml(aiDto.getMessage());
+            String cleanedMessage = ensureHtmlFormat(aiDto.getMessage());
             return new OpenRouterResponseDto(true, cleanedMessage, null, aiDto.getStatusCode(),
                     OpenRouterErrorCode.NONE);
         }
 
         // Header present: return the extracted letter body as text.
-        String cleanedMessage = HtmlFormatter.cleanHtml(parsed.message());
+        String cleanedMessage = ensureHtmlFormat(parsed.message());
         return new OpenRouterResponseDto(true, cleanedMessage, null, aiDto.getStatusCode(), OpenRouterErrorCode.NONE);
+    }
+
+    /**
+     * Ensures a message is HTML-formatted by converting Markdown syntax to HTML
+     * and applying HTML cleaning.
+     * 
+     * <p>Process:</p>
+     * <ul>
+     *   <li>If message is null or empty, returns as-is</li>
+     *   <li>Converts Markdown formatting to HTML using {@link MarkdownToHtmlConverter#convertMarkdownToHtml(String)}</li>
+     *   <li>Applies HTML cleaning using {@link HtmlFormatter#cleanHtml(String)} to remove excessive formatting</li>
+     * </ul>
+     * 
+     * @param message The message text to format (may be null or empty)
+     * @return The HTML-formatted message, or null/empty if input was null/empty
+     */
+    private String ensureHtmlFormat(String message) {
+        if (message == null || message.isEmpty()) {
+            return message;
+        }
+        String htmlFormatted = MarkdownToHtmlConverter.convertMarkdownToHtml(message);
+        return HtmlFormatter.cleanHtml(htmlFormatted);
     }
 
     /**

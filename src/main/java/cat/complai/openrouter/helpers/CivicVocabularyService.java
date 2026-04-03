@@ -16,7 +16,8 @@ import java.util.logging.Logger;
  * <p>
  * Loads civic vocabulary mappings from {@code civic-vocabulary-mapping.json}
  * (classpath resource) that provides English → Catalan, Spanish → Catalan, and
- * French → Catalan synonym mappings. When a user queries in English, Spanish, or
+ * French → Catalan synonym mappings. When a user queries in English, Spanish,
+ * or
  * French using civic terminology (complaint, permit, application, etc.), this
  * service appends the Catalan equivalents to the query, enabling cross-language
  * retrieval from a Catalan-indexed knowledge base.
@@ -57,7 +58,8 @@ public class CivicVocabularyService {
      * </ul>
      *
      * @param query    the input query (may contain multiple words)
-     * @param language ISO language code: "en", "es", "ca", "fr"; others default to no
+     * @param language ISO language code: "en", "es", "ca", "fr"; others default to
+     *                 no
      *                 expansion
      * @return expanded query with Catalan synonyms appended, or original if no
      *         mappings found
@@ -128,13 +130,13 @@ public class CivicVocabularyService {
             Map<String, Map<String, List<String>>> result = new HashMap<>();
 
             // Iterate over language keys (e.g., "en", "es", "ca")
-            root.fields().forEachRemaining(languageEntry -> {
+            root.properties().forEach(languageEntry -> {
                 String languageCode = languageEntry.getKey();
                 JsonNode languageNode = languageEntry.getValue();
                 Map<String, List<String>> termToSynonyms = new HashMap<>();
 
                 // Iterate over term keys (e.g., "complaint", "permit")
-                languageNode.fields().forEachRemaining(termEntry -> {
+                languageNode.properties().forEach(termEntry -> {
                     String term = termEntry.getKey();
                     // Normalize the term key (remove accents, lowercase) for consistent lookup
                     String normalizedTerm = TokenNormalizer.normalizeForSearch(term);

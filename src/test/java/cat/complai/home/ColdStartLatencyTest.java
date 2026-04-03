@@ -1,21 +1,11 @@
 package cat.complai.home;
 
-import cat.complai.auth.ApiKeyAuthFilter;
-import io.micronaut.context.annotation.Replaces;
-import io.micronaut.core.annotation.Nullable;
-import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.MutableHttpRequest;
-import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.annotation.RequestFilter;
-import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
-import jakarta.inject.Singleton;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -41,10 +31,11 @@ class ColdStartLatencyTest {
     /**
      * Executes an HTTP request with exponential backoff retry mechanism.
      *
-     * @param <T>       the response body type
-     * @param endpoint  the endpoint path
-     * @param type      the response type class
-     * @param maxRetries the maximum number of retries (exponential backoff: 100ms * retryCount)
+     * @param <T>        the response body type
+     * @param endpoint   the endpoint path
+     * @param type       the response type class
+     * @param maxRetries the maximum number of retries (exponential backoff: 100ms *
+     *                   retryCount)
      * @return the HTTP response
      * @throws AssertionError if all retries are exhausted
      */
@@ -70,18 +61,16 @@ class ColdStartLatencyTest {
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
                     throw new AssertionError(
-                        "Retry interrupted for endpoint: " + endpoint + ", retryCount: " + retryCount,
-                        ie
-                    );
+                            "Retry interrupted for endpoint: " + endpoint + ", retryCount: " + retryCount,
+                            ie);
                 }
             }
         }
 
         throw new AssertionError(
-            "Failed to execute request to " + endpoint + " after " + maxRetries + " retries. " +
-            "Last exception: " + (lastException != null ? lastException.getMessage() : "unknown"),
-            lastException
-        );
+                "Failed to execute request to " + endpoint + " after " + maxRetries + " retries. " +
+                        "Last exception: " + (lastException != null ? lastException.getMessage() : "unknown"),
+                lastException);
     }
 
     @Test
@@ -160,19 +149,4 @@ class ColdStartLatencyTest {
         assertTrue(totalLatency >= 0, "Latency should be measurable");
     }
 
-    // -----------------------------------------------------------------------
-    // Test Filter Bean — replaces ApiKeyAuthFilter in the HTTP pipeline
-    // -----------------------------------------------------------------------
-
-    @Singleton
-    @ServerFilter("/**")
-    static class TestApiKeyFilterColdStart {
-        @RequestFilter
-        @Nullable
-        public MutableHttpResponse<?> filter(MutableHttpRequest<?> request) {
-            // For health endpoints, no authentication needed (they are excluded)
-            // For other endpoints, allow all traffic through in this latency test
-            return null;
-        }
-    }
 }

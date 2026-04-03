@@ -4,12 +4,18 @@ import java.security.SecureRandom;
 import java.util.Base64;
 
 /**
- * CLI utility that generates a cryptographically strong, URL-safe API key for a given city.
+ * CLI utility that generates a cryptographically strong, URL-safe API key for a
+ * given city.
  *
- * <p>Usage: {@code java -cp complai-all.jar cat.complai.auth.ApiKeyGenerator <cityId>}
+ * <p>
+ * Usage:
+ * {@code java -cp complai-all.jar cat.complai.auth.ApiKeyGenerator <cityId>}
  *
- * <p>The generated key is printed to stdout so it can be captured by {@code $(...)} in shell
- * scripts. A human-readable note with the corresponding environment variable name is printed
+ * <p>
+ * The generated key is printed to stdout so it can be captured by
+ * {@code $(...)} in shell
+ * scripts. A human-readable note with the corresponding environment variable
+ * name is printed
  * to stderr.
  */
 public class ApiKeyGenerator {
@@ -33,7 +39,9 @@ public class ApiKeyGenerator {
 
         System.out.println(key);
 
-        assert cityId != null : "cityId should not be null at this point";
+        if (cityId == null || cityId.isBlank()) {
+            throw new IllegalArgumentException("cityId cannot be null or blank");
+        }
         String cityIdUpper = cityId.toUpperCase();
         System.err.println("Generated API key for city '" + cityId + "'.");
         System.err.println("Set environment variable: API_KEY_" + cityIdUpper + "=" + key);

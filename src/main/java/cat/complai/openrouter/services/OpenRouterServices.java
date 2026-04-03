@@ -32,6 +32,8 @@ import jakarta.inject.Singleton;
 import jakarta.inject.Inject;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -39,14 +41,12 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 @Singleton
 public class OpenRouterServices implements IOpenRouterService {
 
-    private final Logger logger = Logger.getLogger(OpenRouterServices.class.getName());
+    private static final Logger log = LoggerFactory.getLogger(OpenRouterServices.class);
     private final InputValidationService validationService;
     private final ConversationManagementService conversationService;
     private final AiResponseProcessingService aiResponseService;
@@ -100,6 +100,33 @@ public class OpenRouterServices implements IOpenRouterService {
         return sb.toString().hashCode();
     }
 
+    /**
+     * Validates and adds sources to the merged list, logging warnings for missing
+     * URLs.
+     * Missing URLs do not prevent the source from being added — logging only.
+     * 
+     * @param mergedSources  The list to add sources to
+     * @param contextSources The sources from a context (procedure, event, news,
+     *                       etc.)
+     * @param contextType    The type of context (for logging): "procedure",
+     *                       "event", "news", "city_info"
+     */
+    private void validateAndAddSources(List<Source> mergedSources, List<Source> contextSources, String contextType) {
+        if (contextSources == null || contextSources.isEmpty()) {
+            return;
+        }
+
+        for (Source source : contextSources) {
+            // Check for missing URL and log warning
+            if (source.getUrl() == null || source.getUrl().isBlank()) {
+                String title = source.getTitle() != null ? source.getTitle() : "<no title>";
+                log.warn("Missing URL for {} item: {}", contextType, title);
+            }
+            // Always add the source, even if URL is missing
+            mergedSources.add(source);
+        }
+    }
+
     @Inject
     public OpenRouterServices(InputValidationService validationService,
             ConversationManagementService conversationService,
@@ -135,13 +162,11 @@ public class OpenRouterServices implements IOpenRouterService {
     @Override
     public OpenRouterResponseDto ask(String question, String conversationId, String cityId) {
         int inputLength = question != null ? question.length() : 0;
-        logger.info(() -> "ask() called — conversationId=" + conversationId + " inputLength=" + inputLength + " city="
-                + cityId);
+        log.info("ask() called — conversationId={} inputLength={} city={}", conversationId, inputLength, cityId);
 
         var validationError = validationService.validateQuestion(question);
         if (validationError.isPresent()) {
-            logger.fine(() -> "ask() rejected — reason=" + validationError.get().getError() + " conversationId="
-                    + conversationId);
+            log.debug("ask() rejected — reason={} conversationId={}", validationError.get().getError(), conversationId);
             return validationError.get();
         }
 
@@ -153,8 +178,8 @@ public class OpenRouterServices implements IOpenRouterService {
             if (conversationId != null && !conversationId.isBlank()) {
                 conversationService.updateConversationHistory(conversationId, question, clarificationMessage);
             }
-            logger.info(() -> "ask() event date-window clarification triggered - conversationId=" + conversationId
-                    + " city=" + cityId);
+            log.info("ask() event date-window clarification triggered - conversationId={} city={}", conversationId,
+                    cityId);
             return new OpenRouterResponseDto(true, clarificationMessage, null, 200, OpenRouterErrorCode.NONE, null,
                     List.of());
         }
@@ -172,7 +197,7 @@ public class OpenRouterServices implements IOpenRouterService {
             if (conversationId != null && !conversationId.isBlank()) {
                 conversationService.updateConversationHistory(conversationId, question, fallbackMessage);
             }
-            logger.info(() -> "ask() news fallback used - conversationId=" + conversationId + " city=" + cityId);
+            log.info("ask() news fallback used - conversationId={} city={}", conversationId, cityId);
             return new OpenRouterResponseDto(true, fallbackMessage, null, 200, OpenRouterErrorCode.NONE, null,
                     List.of());
         }
@@ -232,15 +257,11 @@ public class OpenRouterServices implements IOpenRouterService {
         final int totalTokens = systemTokens + historyTokens + userTokens;
         final int historyTurns = history != null ? (history.size() / 2) : 0;
 
-        logger.fine(() -> "ask() CONTEXT METRICS — systemTokens=" + systemTokens
-                + " historyTokens=" + historyTokens
-                + " userTokens=" + userTokens
-                + " totalTokens=" + totalTokens
-                + " historyTurns=" + historyTurns
-                + " conversationId=" + conversationId);
+        log.debug(
+                "ask() CONTEXT METRICS — systemTokens={} historyTokens={} userTokens={} totalTokens={} historyTurns={} conversationId={}",
+                systemTokens, historyTokens, userTokens, totalTokens, historyTurns, conversationId);
 
-        logger.fine(() -> "ask() messages prepared — messageCount=" + messages.size()
-                + " conversationId=" + conversationId);
+        log.debug("ask() messages prepared — messageCount={} conversationId={}", messages.size(), conversationId);
 
         // Calculate context hashes for caching (deterministic, reproducible)
         long procContextHash = computeSourcesHash(procCtx != null ? procCtx.getSources() : List.of());
@@ -262,18 +283,10 @@ public class OpenRouterServices implements IOpenRouterService {
         // Collect all sources WITHOUT deduplication - symmetric handling
         // Procedure and event sources are treated equally at collection time
         List<Source> mergedSources = new ArrayList<>();
-        if (procCtx != null && !procCtx.getSources().isEmpty()) {
-            mergedSources.addAll(procCtx.getSources());
-        }
-        if (eventCtx != null && !eventCtx.getSources().isEmpty()) {
-            mergedSources.addAll(eventCtx.getSources());
-        }
-        if (newsCtx != null && !newsCtx.getSources().isEmpty()) {
-            mergedSources.addAll(newsCtx.getSources());
-        }
-        if (cityInfoCtx != null && !cityInfoCtx.getSources().isEmpty()) {
-            mergedSources.addAll(cityInfoCtx.getSources());
-        }
+        validateAndAddSources(mergedSources, procCtx != null ? procCtx.getSources() : null, "procedure");
+        validateAndAddSources(mergedSources, eventCtx != null ? eventCtx.getSources() : null, "event");
+        validateAndAddSources(mergedSources, newsCtx != null ? newsCtx.getSources() : null, "news");
+        validateAndAddSources(mergedSources, cityInfoCtx != null ? cityInfoCtx.getSources() : null, "city_info");
 
         // Deduplicate ONCE after all sources are collected
         // This ensures symmetric handling and prevents double deduplication
@@ -300,14 +313,13 @@ public class OpenRouterServices implements IOpenRouterService {
             ComplainantIdentity identity, String cityId) {
         int inputLength = complaint != null ? complaint.length() : 0;
         boolean identityProvided = identity != null && identity.isPartiallyProvided();
-        logger.info(() -> "redactComplaint() called — conversationId=" + conversationId
-                + " inputLength=" + inputLength + " format=" + format + " identityProvided=" + identityProvided
-                + " city=" + cityId);
+        log.info("redactComplaint() called — conversationId={} inputLength={} format={} identityProvided={} city={}",
+                conversationId, inputLength, format, identityProvided, cityId);
 
         var validationError = validationService.validateRedactInput(complaint);
         if (validationError.isPresent()) {
-            logger.fine(() -> "redactComplaint() rejected — reason=" + validationError.get().getError()
-                    + " conversationId=" + conversationId);
+            log.debug("redactComplaint() rejected — reason={} conversationId={}", validationError.get().getError(),
+                    conversationId);
             return validationError.get();
         }
 
@@ -349,8 +361,8 @@ public class OpenRouterServices implements IOpenRouterService {
             String originalComplaint = conversationService.getPendingComplaint(conversationId);
             if (originalComplaint != null) {
                 conversationService.clearPendingComplaint(conversationId);
-                logger.fine(() -> "redactComplaint() resumed stored complaint — conversationId=" + conversationId
-                        + " originalLength=" + originalComplaint.length());
+                log.debug("redactComplaint() resumed stored complaint — conversationId={} originalLength={}",
+                        conversationId, originalComplaint.length());
             }
             String complaintForPrompt = (originalComplaint != null)
                     ? originalComplaint + "\n\n" + complaint
@@ -361,16 +373,16 @@ public class OpenRouterServices implements IOpenRouterService {
         } else {
             if (conversationId != null && !conversationId.isBlank()) {
                 conversationService.storePendingComplaint(conversationId, complaint);
-                logger.fine(() -> "redactComplaint() saved complaint for identity follow-up — conversationId="
-                        + conversationId);
+                log.debug("redactComplaint() saved complaint for identity follow-up — conversationId={}",
+                        conversationId);
             }
             userPrompt = promptBuilder.buildRedactPromptRequestingIdentity(complaint, identity, cityId);
         }
 
         messages.add(Map.of("role", "user", "content", userPrompt));
 
-        logger.fine(() -> "redactComplaint() messages prepared — messageCount=" + messages.size()
-                + " identityComplete=" + identityComplete + " conversationId=" + conversationId);
+        log.debug("redactComplaint() messages prepared — messageCount={} identityComplete={} conversationId={}",
+                messages.size(), identityComplete, conversationId);
 
         // No procedure/event context for complaints, use default cache key
         OpenRouterResponseDto aiDto = aiResponseService.callOpenRouterAndExtract(messages, cityId, 0, 0);
@@ -398,7 +410,7 @@ public class OpenRouterServices implements IOpenRouterService {
                 String json = objectMapper.writeValueAsString(errorEvent);
                 return new AskStreamResult.Success(Flux.just(json));
             } catch (Exception e) {
-                logger.log(Level.SEVERE, "streamAsk() failed to serialize validation error", e);
+                log.error("streamAsk() failed to serialize validation error", e);
                 return new AskStreamResult.Error(AskStreamErrorMapper.toResponseDto(e));
             }
         }
@@ -408,8 +420,8 @@ public class OpenRouterServices implements IOpenRouterService {
 
         if (procedureContextService.requiresEventDateWindowClarification(question, cityId)) {
             String clarificationMessage = buildEventDateWindowClarificationMessage(detectedLanguage);
-            logger.info(() -> "streamAsk() event date-window clarification triggered - conversationId="
-                    + conversationId + " city=" + cityId);
+            log.info("streamAsk() event date-window clarification triggered - conversationId={} city={}",
+                    conversationId, cityId);
             return buildFallbackStreamResult(clarificationMessage, conversationId, question);
         }
 
@@ -424,7 +436,7 @@ public class OpenRouterServices implements IOpenRouterService {
 
         if (ragContexts.newsIntent() && (newsCtx == null || newsCtx.getSources().isEmpty())) {
             String fallbackMessage = buildNoNewsFoundMessage(detectedLanguage, cityId);
-            logger.info(() -> "streamAsk() news fallback used - conversationId=" + conversationId + " city=" + cityId);
+            log.info("streamAsk() news fallback used - conversationId={} city={}", conversationId, cityId);
             return buildFallbackStreamResult(fallbackMessage, conversationId, question);
         }
 
@@ -441,28 +453,16 @@ public class OpenRouterServices implements IOpenRouterService {
         conversationService.addToMessages(messages, history);
         messages.add(Map.of("role", "user", "content", question != null ? question.trim() : ""));
 
-        // 4. Collect sources from RAG context
-        List<SseSources> allSources = new ArrayList<>();
-        if (procCtx != null && procCtx.getSources() != null) {
-            allSources.addAll(procCtx.getSources().stream()
-                    .map(s -> new SseSources(s.getTitle(), s.getUrl()))
-                    .collect(Collectors.toList()));
-        }
-        if (eventCtx != null && eventCtx.getSources() != null) {
-            allSources.addAll(eventCtx.getSources().stream()
-                    .map(s -> new SseSources(s.getTitle(), s.getUrl()))
-                    .collect(Collectors.toList()));
-        }
-        if (newsCtx != null && newsCtx.getSources() != null) {
-            allSources.addAll(newsCtx.getSources().stream()
-                    .map(s -> new SseSources(s.getTitle(), s.getUrl()))
-                    .collect(Collectors.toList()));
-        }
-        if (cityInfoCtx != null && cityInfoCtx.getSources() != null) {
-            allSources.addAll(cityInfoCtx.getSources().stream()
-                    .map(s -> new SseSources(s.getTitle(), s.getUrl()))
-                    .collect(Collectors.toList()));
-        }
+        // 4. Collect sources from RAG context with URL validation
+        List<Source> validatedSources = new ArrayList<>();
+        validateAndAddSources(validatedSources, procCtx != null ? procCtx.getSources() : null, "procedure");
+        validateAndAddSources(validatedSources, eventCtx != null ? eventCtx.getSources() : null, "event");
+        validateAndAddSources(validatedSources, newsCtx != null ? newsCtx.getSources() : null, "news");
+        validateAndAddSources(validatedSources, cityInfoCtx != null ? cityInfoCtx.getSources() : null, "city_info");
+
+        List<SseSources> allSources = validatedSources.stream()
+                .map(s -> new SseSources(s.getTitle(), s.getUrl()))
+                .collect(Collectors.toList());
 
         // 5. Stream chunks, then emit sources, then done
         final String capturedQuestion = question;
@@ -472,12 +472,11 @@ public class OpenRouterServices implements IOpenRouterService {
         final java.util.concurrent.atomic.AtomicBoolean hasEmitted = new java.util.concurrent.atomic.AtomicBoolean(
                 false);
 
-        logger.fine(() -> "streamAsk() preparing to stream — conversationId=" + capturedConvId + " sources="
-                + allSources.size());
+        log.debug("streamAsk() preparing to stream — conversationId={} sources={}", capturedConvId, allSources.size());
 
         // Verify objectMapper is not null before proceeding
         if (objectMapper == null) {
-            logger.severe("streamAsk() ERROR: objectMapper is null! This should never happen.");
+            log.error("streamAsk() ERROR: objectMapper is null! This should never happen.");
             return new AskStreamResult.Error(AskStreamErrorMapper.toResponseDto(
                     new IllegalStateException("ObjectMapper is not properly injected")));
         }
@@ -507,36 +506,35 @@ public class OpenRouterServices implements IOpenRouterService {
                 .doOnNext(delta -> {
                     assembled.append(delta);
                     hasEmitted.set(true);
-                    logger.fine(() -> "streamAsk() chunk delta processed");
+                    log.debug("streamAsk() chunk delta processed");
                 })
                 .map(delta -> {
                     // Serialize each chunk delta to JSON
                     try {
                         SseChunkEvent chunk = new SseChunkEvent(delta);
                         String serialized = objectMapper.writeValueAsString(chunk);
-                        logger.fine(() -> "streamAsk() emitting chunk event serialized");
+                        log.debug("streamAsk() emitting chunk event serialized");
                         return serialized;
                     } catch (Exception e) {
-                        logger.log(Level.SEVERE, "Failed to serialize chunk", e);
+                        log.error("Failed to serialize chunk", e);
                         throw new RuntimeException("Chunk serialization failed", e);
                     }
                 })
                 .doOnComplete(() -> {
-                    logger.info("First Flux completed");
+                    log.info("First Flux completed");
                 })
                 .concatWith(produceSourcesAndDone(allSources, capturedConvId))
-                .doOnNext(event -> logger.fine(() -> "streamAsk() emitting event"))
+                .doOnNext(event -> log.debug("streamAsk() emitting event"))
                 .doOnComplete(() -> {
                     String fullText = assembled.toString();
                     if (capturedConvId != null && !capturedConvId.isBlank() && !fullText.isBlank()) {
                         conversationService.updateConversationHistory(capturedConvId, capturedQuestion, fullText);
                     }
-                    logger.info(() -> "streamAsk() completed — conversationId=" + capturedConvId
-                            + " assembledLength=" + fullText.length() + " city=" + capturedCityId);
+                    log.info("streamAsk() completed — conversationId={} assembledLength={} city={}",
+                            capturedConvId, fullText.length(), capturedCityId);
                 })
                 .doOnError(e -> {
-                    logger.log(Level.SEVERE, "streamAsk() error during streaming — conversationId=" + capturedConvId,
-                            e);
+                    log.error("streamAsk() error during streaming — conversationId={}", capturedConvId, e);
                 })
                 .onErrorResume(e -> {
                     // Only convert to SSE error event if data has already been emitted.
@@ -550,7 +548,7 @@ public class OpenRouterServices implements IOpenRouterService {
                         String json = objectMapper.writeValueAsString(errorEvent);
                         return Flux.just(json);
                     } catch (Exception serEx) {
-                        logger.log(Level.SEVERE, "streamAsk() failed to serialize streaming error event", serEx);
+                        log.error("streamAsk() failed to serialize streaming error event", serEx);
                         return Flux.empty();
                     }
                 }));
@@ -561,11 +559,11 @@ public class OpenRouterServices implements IOpenRouterService {
      */
     private Publisher<String> produceSourcesAndDone(List<SseSources> sources, String conversationId) {
         try {
-            logger.info(() -> "produceSourcesAndDone() CALLED — sources=" + (sources != null ? sources.size() : "null")
-                    + " conversationId=" + conversationId);
+            log.info("produceSourcesAndDone() CALLED — sources={} conversationId={}",
+                    sources != null ? sources.size() : "null", conversationId);
 
             if (objectMapper == null) {
-                logger.severe("produceSourcesAndDone() ERROR: objectMapper is null!");
+                log.error("produceSourcesAndDone() ERROR: objectMapper is null!");
                 return Flux.error(new IllegalStateException("ObjectMapper is null in produceSourcesAndDone"));
             }
 
@@ -576,10 +574,10 @@ public class OpenRouterServices implements IOpenRouterService {
             final String doneJson = objectMapper.writeValueAsString(doneEvent);
 
             Publisher<String> result = Flux.just(sourcesJson, doneJson);
-            logger.info("produceSourcesAndDone() RETURNING Flux with 2 events");
+            log.info("produceSourcesAndDone() RETURNING Flux with 2 events");
             return result;
         } catch (Exception e) {
-            logger.log(Level.SEVERE, "produceSourcesAndDone() EXCEPTION: Failed to serialize sources or done event", e);
+            log.error("produceSourcesAndDone() EXCEPTION: Failed to serialize sources or done event", e);
             return Flux.error(e);
         }
     }
@@ -589,12 +587,13 @@ public class OpenRouterServices implements IOpenRouterService {
         ContextRequirements requirements = procedureContextService.detectContextRequirements(question, cityId);
         long detectionDurationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - detectionStart);
 
-        logger.fine(() -> operationName + " context detection — conversationId=" + conversationId
-                + " procedure=" + requirements.needsProcedureContext()
-                + " event=" + requirements.needsEventContext()
-                + " news=" + requirements.needsNewsContext()
-                + " cityInfo=" + requirements.needsCityInfoContext()
-                + " durationMs=" + detectionDurationMs);
+        log.debug("{} context detection — conversationId={} procedure={} event={} news={} cityInfo={} durationMs={}",
+                operationName, conversationId,
+                requirements.needsProcedureContext(),
+                requirements.needsEventContext(),
+                requirements.needsNewsContext(),
+                requirements.needsCityInfoContext(),
+                detectionDurationMs);
 
         if (!requirements.needsProcedureContext() && !requirements.needsEventContext()
                 && !requirements.needsNewsContext() && !requirements.needsCityInfoContext()) {
@@ -603,11 +602,11 @@ public class OpenRouterServices implements IOpenRouterService {
 
         if (requirements.needsNewsContext()) {
             NewsContextResult newsContext = safelyBuildNewsContext(question, cityId, conversationId, operationName);
-            logger.fine(() -> operationName + " news retrieval completed — conversationId=" + conversationId
-                    + " city=" + cityId
-                    + " hitCount=" + (newsContext != null && newsContext.getSources() != null
+            log.debug("{} news retrieval completed — conversationId={} city={} hitCount={}",
+                    operationName, conversationId, cityId,
+                    newsContext != null && newsContext.getSources() != null
                             ? newsContext.getSources().size()
-                            : 0));
+                            : 0);
             return new RagContexts(null, null, newsContext, null, true);
         }
 
@@ -630,8 +629,8 @@ public class OpenRouterServices implements IOpenRouterService {
             ProcedureContextService.EventContextResult eventContext = eventFuture.join();
 
             long ragDurationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - ragStart);
-            logger.fine(() -> operationName + " RAG build completed — conversationId=" + conversationId
-                    + " mode=bounded-parallel durationMs=" + ragDurationMs);
+            log.debug("{} RAG build completed — conversationId={} mode=bounded-parallel durationMs={}",
+                    operationName, conversationId, ragDurationMs);
             return new RagContexts(procedureContext, eventContext, null, null, false);
         }
 
@@ -662,8 +661,8 @@ public class OpenRouterServices implements IOpenRouterService {
         try {
             NewsContextResult result = procedureContextService.buildNewsContextResult(question, cityId);
             long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
-            logger.fine(() -> operationName + " RAG build completed — conversationId=" + conversationId
-                    + " mode=news-only durationMs=" + durationMs);
+            log.debug("{} RAG build completed — conversationId={} mode=news-only durationMs={}",
+                    operationName, conversationId, durationMs);
             return result;
         } catch (Exception e) {
             logRagFailure(operationName, conversationId, cityId, "news", e);
@@ -677,8 +676,8 @@ public class OpenRouterServices implements IOpenRouterService {
         try {
             ProcedureContextResult result = procedureContextService.buildProcedureContextResult(question, cityId);
             long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
-            logger.fine(() -> operationName + " RAG build completed — conversationId=" + conversationId
-                    + " mode=procedure-only durationMs=" + durationMs);
+            log.debug("{} RAG build completed — conversationId={} mode=procedure-only durationMs={}",
+                    operationName, conversationId, durationMs);
             return result;
         } catch (Exception e) {
             logRagFailure(operationName, conversationId, cityId, "procedure", e);
@@ -694,8 +693,8 @@ public class OpenRouterServices implements IOpenRouterService {
                     question,
                     cityId);
             long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
-            logger.fine(() -> operationName + " RAG build completed — conversationId=" + conversationId
-                    + " mode=event-only durationMs=" + durationMs);
+            log.debug("{} RAG build completed — conversationId={} mode=event-only durationMs={}",
+                    operationName, conversationId, durationMs);
             return result;
         } catch (Exception e) {
             logRagFailure(operationName, conversationId, cityId, "event", e);
@@ -709,8 +708,8 @@ public class OpenRouterServices implements IOpenRouterService {
         try {
             CityInfoContextResult result = procedureContextService.buildCityInfoContextResult(question, cityId);
             long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
-            logger.fine(() -> operationName + " RAG build completed — conversationId=" + conversationId
-                    + " mode=cityinfo-only durationMs=" + durationMs);
+            log.debug("{} RAG build completed — conversationId={} mode=cityinfo-only durationMs={}",
+                    operationName, conversationId, durationMs);
             return result;
         } catch (Exception e) {
             logRagFailure(operationName, conversationId, cityId, "cityinfo", e);
@@ -723,11 +722,8 @@ public class OpenRouterServices implements IOpenRouterService {
         Throwable rootCause = failure instanceof CompletionException && failure.getCause() != null
                 ? failure.getCause()
                 : failure;
-        logger.log(Level.WARNING,
-                operationName + " RAG build failed — conversationId=" + conversationId
-                        + " city=" + cityId + " contextType=" + contextType
-                        + " error=" + rootCause.getMessage(),
-                rootCause);
+        log.warn("{} RAG build failed — conversationId={} city={} contextType={} error={}",
+                operationName, conversationId, cityId, contextType, rootCause.getMessage(), rootCause);
     }
 
     private ExecutorService createRagExecutor() {
@@ -754,7 +750,7 @@ public class OpenRouterServices implements IOpenRouterService {
 
             return new AskStreamResult.Success(Flux.just(chunkJson, sourcesJson, doneJson));
         } catch (Exception e) {
-            logger.log(Level.SEVERE, "streamAsk() failed to serialize fallback news response", e);
+            log.error("streamAsk() failed to serialize fallback news response", e);
             return new AskStreamResult.Error(AskStreamErrorMapper.toResponseDto(e));
         }
     }
