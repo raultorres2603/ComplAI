@@ -143,4 +143,45 @@ class QueryPreprocessorTest {
         String tokenString = String.join(" ", result.tokens());
         assertTrue(tokenString.contains("123") || tokenString.contains("apartment"));
     }
+
+    @Test
+    @DisplayName("preprocess detects and normalizes French queries")
+    void test_preprocess_french() {
+        QueryContext result = QueryPreprocessor.preprocess("Je veux présenter une plainte");
+        assertEquals("FR", result.detectedLanguage());
+        assertTrue(result.tokens().stream().anyMatch(t -> t.contains("plainte")),
+                "Should contain 'plainte' (complaint in French)");
+    }
+
+    @Test
+    @DisplayName("preprocess applies French stop word filtering")
+    void test_preprocess_frenchStopWords() {
+        QueryContext result = QueryPreprocessor.preprocess("le permis de construction", "FR");
+        assertEquals("FR", result.detectedLanguage());
+        // "le", "de" are French stop words; "permis", "construction" should be
+        // preserved
+        String tokenString = String.join(" ", result.tokens());
+        assertTrue(tokenString.contains("permis") || tokenString.contains("construction"),
+                "Should preserve non-stop-word French terms");
+    }
+
+    @Test
+    @DisplayName("preprocess detects French with accented characters")
+    void test_preprocess_french_accents() {
+        QueryContext result = QueryPreprocessor.preprocess("J'ai une réclamation à faire");
+        assertEquals("FR", result.detectedLanguage(), "Should detect French by accent marks");
+        String tokenString = String.join(" ", result.tokens());
+        assertTrue(tokenString.contains("reclamation") || tokenString.contains("clamation"),
+                "Should normalize accented French terms");
+    }
+
+    @Test
+    @DisplayName("preprocess with French civic terms")
+    void test_preprocess_frenchCivicTerms() {
+        QueryContext result = QueryPreprocessor.preprocess("permis d'événement autorisation", "FR");
+        assertEquals("FR", result.detectedLanguage());
+        String tokenString = String.join(" ", result.tokens());
+        assertTrue(tokenString.contains("permis") || tokenString.contains("autorisation"),
+                "Should preserve French civic vocabulary");
+    }
 }

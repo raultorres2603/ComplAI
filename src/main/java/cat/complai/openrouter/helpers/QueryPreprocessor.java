@@ -10,7 +10,7 @@ import java.util.logging.Logger;
  * indexing.
  *
  * Provides methods to:
- * - Detect the user's language (CA/ES/EN) at the START of preprocessing
+ * - Detect the user's language (CA/ES/EN/FR) at the START of preprocessing
  * - Normalize whitespace (collapse multiple spaces to single space)
  * - Remove accents (é → e, à → a, etc.) for cross-dialect matching
  * - Filter stop words (language-aware) to reduce noise in search queries
@@ -82,6 +82,33 @@ public class QueryPreprocessor {
             "while", "who", "whom", "why", "you", "your", "yours", "yourself",
             "yourselves"));
 
+    private static final Set<String> FRENCH_STOP_WORDS = new HashSet<>(Arrays.asList(
+            "le", "la", "les", "un", "une", "des", "de", "d", "du", "et", "ou", "mais",
+            "donc", "car", "que", "qui", "quoi", "comment", "où", "quand", "pourquoi",
+            "combien", "quel", "quelle", "quels", "quelles", "celui", "celà", "ce",
+            "cette", "cet", "ceux", "ces", "son", "sa", "ses", "notre", "nos", "votre",
+            "vos", "leur", "leurs", "je", "tu", "il", "elle", "nous", "vous", "ils",
+            "elles", "moi", "toi", "lui", "nous", "vous", "eux", "elles", "être",
+            "avoir", "aller", "faire", "pouvoir", "vouloir", "devoir", "falloir",
+            "sembler", "devenir", "penser", "savoir", "prendre", "trouver", "donner",
+            "mettre", "venir", "montrer", "voir", "laisser", "garder", "demander",
+            "croire", "rester", "durer", "craindre", "attendre", "changer", "tomber",
+            "quitter", "reconnaître", "connaître", "répondre", "tenir", "chercher",
+            "noter", "entendre", "partir", "achever", "cacher", "cela", "ceci", "près",
+            "loin", "avant", "après", "contre", "avec", "sans", "chez", "par", "pour",
+            "vers", "depuis", "jusque", "pendant", "sous", "sur", "entre", "dans",
+            "hors", "malgré", "selon", "aucun", "aucune", "quelque", "quelques",
+            "certain", "certaine", "certains", "certaines", "divers", "diverse",
+            "différent", "différente", "autre", "autres", "même", "mêmes", "bon",
+            "bonne", "mauvais", "mauvaise", "grand", "grande", "petit", "petite",
+            "nouveau", "nouvelle", "vieux", "vieille", "jeune", "ancien", "ancienne",
+            "premier", "première", "dernier", "dernière", "seul", "seule", "seuls",
+            "seules", "tout", "toute", "tous", "toutes", "à", "a", "afin", "ainsi",
+            "alors", "assez", "attendu", "aucun", "aucune", "aura", "aurai", "auraient",
+            "aurais", "aurait", "auras", "aurez", "auries", "aurions", "aurois",
+            "avoue", "ayant", "b", "bah", "bas", "basee", "bat", "beau", "beaucoup",
+            "because"));
+
     // Backward-compatible combined set (now deprecated, use language-specific sets)
     @Deprecated
     private static final Set<String> STOP_WORDS = new HashSet<>(Arrays.asList(
@@ -97,7 +124,7 @@ public class QueryPreprocessor {
      * Preprocesses the query with early language detection.
      * Returns a {@code QueryContext} containing:
      * - Original query
-     * - Detected language (CA, ES, EN)
+     * - Detected language (CA, ES, EN, FR)
      * - Normalized and language-specific stop-word-filtered tokens
      *
      * @param query the raw search query (may be null or blank)
@@ -160,7 +187,7 @@ public class QueryPreprocessor {
             case "CA" -> CATALAN_STOP_WORDS;
             case "ES" -> SPANISH_STOP_WORDS;
             case "EN" -> ENGLISH_STOP_WORDS;
-            case "FR" -> ENGLISH_STOP_WORDS; // Fallback to English for French
+            case "FR" -> FRENCH_STOP_WORDS;
             default -> ENGLISH_STOP_WORDS;
         };
     }

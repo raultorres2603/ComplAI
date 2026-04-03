@@ -14,15 +14,15 @@ import java.util.logging.Logger;
  *
  * <p>
  * Loads civic vocabulary mappings from {@code civic-vocabulary-mapping.json}
- * (classpath resource) that provides English → Catalan and Spanish → Catalan
- * synonym mappings. When a user queries in English or Spanish using civic
- * terminology (complaint, permit, application, etc.), this service appends
- * the Catalan equivalents to the query, enabling cross-language retrieval from
- * a Catalan-indexed knowledge base.
+ * (classpath resource) that provides English → Catalan, Spanish → Catalan, and
+ * French → Catalan synonym mappings. When a user queries in English, Spanish, or
+ * French using civic terminology (complaint, permit, application, etc.), this
+ * service appends the Catalan equivalents to the query, enabling cross-language
+ * retrieval from a Catalan-indexed knowledge base.
  *
  * <p>
- * Example: expandQuery("complaint application", "en") returns
- * "complaint application reclamació sol·licitud"
+ * Example: expandQuery("plainte autorisation", "fr") returns
+ * "plainte autorisation reclamació autorització"
  */
 @Singleton
 public class CivicVocabularyService {
@@ -51,11 +51,12 @@ public class CivicVocabularyService {
      * <ul>
      * <li>{@code expandQuery("complaint", "en")} → "complaint reclamació denúncia"
      * <li>{@code expandQuery("queja", "es")} → "queja reclamació denúncia"
+     * <li>{@code expandQuery("plainte", "fr")} → "plainte reclamació denúncia"
      * <li>{@code expandQuery("unknown", "en")} → "unknown" (unchanged)
      * </ul>
      *
      * @param query    the input query (may contain multiple words)
-     * @param language ISO language code: "en", "es", "ca"; others default to no
+     * @param language ISO language code: "en", "es", "ca", "fr"; others default to no
      *                 expansion
      * @return expanded query with Catalan synonyms appended, or original if no
      *         mappings found
@@ -67,7 +68,8 @@ public class CivicVocabularyService {
 
         if (language == null || (!language.equalsIgnoreCase("en") &&
                 !language.equalsIgnoreCase("es") &&
-                !language.equalsIgnoreCase("ca"))) {
+                !language.equalsIgnoreCase("ca") &&
+                !language.equalsIgnoreCase("fr"))) {
             logger.fine(() -> "CivicVocabularyService.expandQuery: unsupported language='" + language
                     + "'; returning original query");
             return query;

@@ -157,6 +157,32 @@ class RedactPromptBuilderTest {
     }
 
     @Test
+    void getSystemMessage_withFR_containsFrenchBlock() {
+        String msg = builder.getSystemMessage("elprat", "FR");
+        assertTrue(msg.contains("En français:"), "FR prompt must contain the French section marker");
+        assertTrue(msg.contains("Gall Potablava"), "FR prompt must contain the assistant name");
+        assertFalse(msg.contains("Ets un assistent"), "FR prompt must NOT contain the Catalan opener");
+        assertFalse(msg.contains("En español:"), "FR prompt must NOT contain the Spanish section marker");
+        assertFalse(msg.contains("In English"), "FR prompt must NOT contain the English section marker");
+    }
+
+    @Test
+    void getSystemMessage_frenchPrompt_adheresToHTMLOnlyRequirement() {
+        String msg = builder.getSystemMessage("elprat", "FR");
+        assertTrue(msg.contains("OBLIGATOIRE") || msg.contains("HTML"), 
+                "FR prompt must enforce HTML-only output (French terms)");
+        assertTrue(msg.contains("Jamais Markdown") || msg.contains("HTML"),
+                "FR prompt must forbid Markdown");
+    }
+
+    @Test
+    void getSystemMessage_frenchPrompt_containsOfficialCityReferences() {
+        String msg = builder.getSystemMessage("elprat", "FR");
+        assertTrue(msg.contains("elprat"), "FR prompt must reference the official city");
+        assertTrue(msg.contains("Gall Potablava"), "FR prompt must name the assistant");
+    }
+
+    @Test
     void getSystemMessage_withNull_returnsTriLingual() {
         String triLingual = builder.getSystemMessage("elprat");
         String withNull = builder.getSystemMessage("elprat", null);

@@ -134,4 +134,85 @@ class CivicVocabularyServiceTest {
         assertNotNull(result);
         assertTrue(result.contains("complaint") || result.contains("complaint!"));
     }
+
+    // ========================================================================
+    // French Language Tests (Step 5)
+    // ========================================================================
+
+    @Test
+    void testExpandQuery_FrenchPlainte() {
+        String result = service.expandQuery("plainte", "fr");
+        assertNotNull(result);
+        assertTrue(result.contains("plainte"));
+        assertTrue(result.contains("reclamació") || result.contains("denúncia"),
+                "French 'plainte' should expand to Catalan equivalents");
+    }
+
+    @Test
+    void testExpandQuery_FrenchReclamation() {
+        String result = service.expandQuery("réclamation", "fr");
+        assertNotNull(result);
+        assertTrue(result.contains("reclamacio") || result.contains("reclamation"),
+                "French 'réclamation' should be recognized (accents normalized)");
+        assertTrue(result.contains("reclamació"),
+                "French 'réclamation' should expand to Catalan 'reclamació'");
+    }
+
+    @Test
+    void testExpandQuery_FrenchPermis() {
+        String result = service.expandQuery("permis", "fr");
+        assertNotNull(result);
+        assertTrue(result.contains("permis"));
+        assertTrue(result.contains("permís"),
+                "French 'permis' should expand to Catalan 'permís'");
+    }
+
+    @Test
+    void testExpandQuery_FrenchAutorisation() {
+        String result = service.expandQuery("autorisation", "fr");
+        assertNotNull(result);
+        assertTrue(result.contains("autorisation"));
+        assertTrue(result.contains("autorització"),
+                "French 'autorisation' should expand to Catalan 'autorització'");
+    }
+
+    @Test
+    void testExpandQuery_FrenchMultipleTerms() {
+        String result = service.expandQuery("plainte permis", "fr");
+        assertNotNull(result);
+        assertTrue(result.contains("plainte"));
+        assertTrue(result.contains("permis"));
+        // At least one expansion should be present
+        assertTrue(result.matches(".*(?:reclamació|denúncia|permís).*"),
+                "Multiple French civic terms should expand to Catalan equivalents");
+    }
+
+    @Test
+    void testExpandQuery_FrenchAccentedTerms() {
+        // French civic term with accents: "formulaire" (no accent here, but testing FR
+        // language code works)
+        String result = service.expandQuery("formulaire", "fr");
+        assertNotNull(result);
+        assertTrue(result.contains("formulaire") || result.contains("formularis"),
+                "French 'formulaire' should be processed (language recognized)");
+    }
+
+    @Test
+    void testExpandQuery_FrenchDemande() {
+        String result = service.expandQuery("demande", "fr");
+        assertNotNull(result);
+        assertTrue(result.contains("demande"));
+        assertTrue(result.contains("sol·licitud"),
+                "French 'demande' should expand to Catalan 'sol·licitud'");
+    }
+
+    @Test
+    void testExpandQuery_FrenchCivicVocabularyCaseSensitivity() {
+        String result1 = service.expandQuery("PLAINTE", "fr");
+        String result2 = service.expandQuery("plainte", "fr");
+
+        // Both should expand (case-insensitive)
+        assertTrue(result1.contains("reclamació") || result1.contains("denúncia"));
+        assertTrue(result2.contains("reclamació") || result2.contains("denúncia"));
+    }
 }

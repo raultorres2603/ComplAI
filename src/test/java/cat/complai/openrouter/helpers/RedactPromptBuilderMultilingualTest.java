@@ -64,6 +64,28 @@ class RedactPromptBuilderMultilingualTest {
     }
 
     @Test
+    void testGetSystemMessage_FrenchLanguage() {
+        String cityId = "testcity";
+        String frenchPrompt = promptBuilder.getSystemMessage(cityId, "FR");
+
+        // Verify it's NOT empty and NOT the default
+        assertNotNull(frenchPrompt, "French prompt should not be null");
+        assertTrue(frenchPrompt.length() > 100, "French prompt should contain substantial content");
+
+        // Verify it contains French text markers
+        assertTrue(frenchPrompt.contains("Vous êtes"), "French prompt should contain 'Vous êtes' (French grammar)");
+        assertTrue(frenchPrompt.contains("François") || frenchPrompt.contains("assistant"), "French prompt should identify the assistant");
+
+        // Verify it does NOT contain only Spanish/Catalan/English
+        assertFalse(frenchPrompt.contains("Eres un asistente") && !frenchPrompt.contains("Vous êtes"),
+                "Should contain French, not just Spanish");
+
+        // Verify city name is embedded
+        assertTrue(frenchPrompt.toLowerCase().contains(cityId.toLowerCase()),
+                "French prompt should include city name: " + cityId);
+    }
+
+    @Test
     void testGetSystemMessage_CatalanVsEnglish() {
         String catResult = promptBuilder.getSystemMessage("testcity", "CA");
         String enResult = promptBuilder.getSystemMessage("testcity", "EN");

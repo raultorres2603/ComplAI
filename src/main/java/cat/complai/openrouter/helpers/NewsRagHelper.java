@@ -191,7 +191,7 @@ public class NewsRagHelper {
             return Collections.emptyList();
         }
 
-        List<News> rankedResults = runJavaSearch(context, query.length());
+        List<News> rankedResults = runJavaSearch(String.join(" ", context.tokens()), query.length());
         if (rankedResults.isEmpty()) {
             return rankedResults;
         }

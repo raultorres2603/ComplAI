@@ -92,11 +92,11 @@ class QueryPreprocessorLanguageAwareTest {
     }
 
     @Test
-    void testPreprocess_FrenchFallbackToEnglish() {
+    void testPreprocess_FrenchDetected() {
         QueryContext result = QueryPreprocessor.preprocess("à bientôt");
-        // French should fall back to English stop words list
-        assertEquals("EN", result.detectedLanguage(),
-                "French query should default to English language code");
+        // French should be detected from accent markers
+        assertEquals("FR", result.detectedLanguage(),
+                "French query with accents should be detected as FR language");
         assertNotNull(result.tokens());
     }
 
