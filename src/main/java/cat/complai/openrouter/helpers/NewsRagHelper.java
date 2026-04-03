@@ -186,17 +186,17 @@ public class NewsRagHelper {
             return Collections.emptyList();
         }
 
-        String cleanedQuery = QueryPreprocessor.preprocess(query);
-        if (cleanedQuery.isBlank()) {
+        QueryContext context = QueryPreprocessor.preprocess(query);
+        if (context.tokens().isEmpty()) {
             return Collections.emptyList();
         }
 
-        List<News> rankedResults = runJavaSearch(cleanedQuery, query.length());
+        List<News> rankedResults = runJavaSearch(context, query.length());
         if (rankedResults.isEmpty()) {
             return rankedResults;
         }
 
-        List<String> contentTokens = extractContentTokens(cleanedQuery);
+        List<String> contentTokens = extractContentTokens(String.join(" ", context.tokens()));
         if (contentTokens.isEmpty()) {
             return rankedResults;
         }

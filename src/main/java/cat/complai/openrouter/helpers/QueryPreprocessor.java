@@ -3,108 +3,182 @@ package cat.complai.openrouter.helpers;
 import cat.complai.openrouter.helpers.rag.TokenNormalizer;
 
 import java.util.*;
+import java.util.logging.Logger;
 
 /**
  * Utility class for preprocessing and normalizing search queries before
  * indexing.
- * 
+ *
  * Provides methods to:
+ * - Detect the user's language (CA/ES/EN) at the START of preprocessing
  * - Normalize whitespace (collapse multiple spaces to single space)
  * - Remove accents (é → e, à → a, etc.) for cross-dialect matching
- * - Filter stop words (optional) to reduce noise in search queries
- * 
- * This preprocessing improves Lucene search quality by removing noise tokens
- * and normalizing query variations (e.g., "Quan tanca?" vs "quan tanca").
+ * - Filter stop words (language-aware) to reduce noise in search queries
+ *
+ * This preprocessing improves search quality by applying language-specific
+ * filtering and normalizing query variations (e.g., "Quan tanca?" vs "quan
+ * tanca").
  */
 public class QueryPreprocessor {
 
-    // Multilingual stop words: English, Catalan, Spanish
-    // These are very common words that don't typically improve search signal
-    private static final Set<String> STOP_WORDS = new HashSet<>(Arrays.asList(
-            // English
-            "a", "an", "and", "are", "as", "at", "be", "by", "for", "from",
-            "has", "he", "in", "is", "it", "its", "of", "on", "or", "that",
-            "the", "to", "was", "will", "with",
-            // Catalan
-            "a", "al", "amb", "als", "amb", "aquest", "aquesta", "aquest",
+    private static final Logger logger = Logger.getLogger(QueryPreprocessor.class.getName());
+
+    // Language-specific stop words
+    private static final Set<String> CATALAN_STOP_WORDS = new HashSet<>(Arrays.asList(
+            "a", "al", "amb", "als", "aquest", "aquesta",
             "aquells", "aquelles", "aquell", "aquella", "aquelles", "d'un",
             "de", "del", "dels", "dins", "do", "dos", "dues", "durant",
             "el", "els", "ella", "elles", "ells", "em", "en", "enfront",
             "entra", "entre", "era", "eren", "es", "ès", "esa", "eses",
             "eso", "esos", "esta", "estaba", "estas", "este", "estes",
             "esto", "estos", "estoy", "estuvo", "fa", "fai", "fem", "fins",
-            "foi", "fomos", "fon", "fora", "foren", "foren", "fou", "fuera",
+            "foi", "fomos", "fon", "fora", "foren", "fou", "fuera",
             "fueron", "fue", "fui", "fum", "ha", "habeis", "han", "has",
-            "hat", "hay", "he", "heu", "hi", "hom", "hom", "hui", "igual",
-            "inclus", "intenta", "intentas", "hi", "ho", "hom", "hong",
+            "hat", "hay", "he", "heu", "hi", "hom", "hui", "igual",
+            "inclus", "intenta", "intentas", "ho",
             "ja", "jo", "l", "la", "las", "le", "lejos", "les", "li",
             "llavors", "lo", "los", "luego", "llur", "me", "mediante",
-            "mediante", "mes", "més", "mi", "mentre", "me", "meu", "meves",
-            "meu", "mever", "mi", "mentre", "mes", "mentre", "meu", "mia",
-            "mias", "mientras", "min", "mio", "mios", "mis", "misma",
+            "mes", "més", "mi", "mentre", "meu", "meves",
+            "mia", "mias", "mientras", "min", "mio", "mios", "mis", "misma",
             "mismas", "mismo", "mismos", "modo", "molt", "molts", "mon",
-            "mons", "months", "more", "most", "my", "ne", "negació",
+            "mons", "more", "most", "my", "ne", "negació",
             "ni", "ning", "ningú", "ninguna", "ninguno", "no", "noi",
             "noies", "nos", "nosaltres", "nosotros", "nostra", "nostren",
-            "nostres", "not", "nota", "nouns", "nous", "nova", "noves",
-            "novio", "noviós", "novios", "noy", "noys", "nuana", "nuit",
-            "nur", "o", "ocasionalment", "on", "ones", "ons", "onsevulla",
-            "onze", "onzena", "onzenals", "onzenes", "onzens", "onzé",
-            "ora", "oras", "ordinariament", "os", "osa", "oses", "ossos",
+            "nostres", "not", "nota", "nous", "nova", "noves",
+            "noy", "noys", "nuit", "o", "ocasionalment", "on", "ones", "ons",
+            "onzena", "onze", "ora", "oras", "ordinariament", "os", "osa", "oses",
             "ost", "osta", "ostes", "ostinats", "ostinada", "ostinatament",
-            "ostinats", "our", "ous", "out", "ovella", "ovellas", "ovelló",
-            "ovellos", "over", "oy", "oyó", "oyos", "oyste", "oystes",
-            "oyáis", "oyan", "oye", "oyendo", "oyer", "oyera", "oyeran",
-            "oyerei", "oyereis", "oyeren", "oyeria", "oyeriades", "oyeriais",
-            "oyerian", "oyeriao", "oyeriamos", "oyerias", "oyeriau", "oyeriau",
-            "oyería", "oyeriádes", "oyeríais", "oyerían", "oyeriámos", "oyería",
-            "oyen", "oyendo", "oyer", "oyera", "oyeran", "oyere", "oyeren",
-            "oyeré", "oyereis", "oyería", "oyeriades", "oyeriais", "oyerian",
-            "oyeriamos", "oyeria", "oyerias", "oyeriau", "oyeriáu", "oyes",
-            "oyese", "oyesen", "oyesemos", "oyeses", "oyeseu", "oyeséu",
-            "oyeseu", "oyesia", "oyesiesn", "oyesía", "oyesías", "oyesín",
-            "oyesíns", "oyesta", "oye", "oyendo", "oyer", "oyera", "oyeran",
-            "oyeria", "oyeriades", "oyeriais", "oyerian", "oyeriamos", "oyeras",
-            "oyerais", "oyeren", "oyereis", "oyeria", "oyeriades", "oyeriais",
-            "oyerian", "oyeriamos", "oyeriás", "oyeras", "oyerais", "oyese",
-            "oyesen", "oyesemos", "oyeses", "oyesia", "oyesias", "oyet",
-            "oyeta", "oyetas", "oyetáu", "oyeteu", "oyetía", "oyetías",
-            "oyetín", "oyetíns", "p", "pa", "paber", "pablear", "paç",
-            "pàç", "pacs", "padre", "padres", "padri", "padrina", "padrina",
-            "padrinas", "padrino", "padrino", "padrinos", "padrons", "padró",
-            "padrona", "padronas", "padrone", "padrones", "padronía",
-            "padronis", "padrono", "padronos", "pafs", "paga", "pagable",
-            "pagada", "pagadas", "pagadís", "pagador", "pagadora", "pagadores",
-            // Spanish
+            "our", "ous", "out", "ovella", "ovellas", "ovelló",
+            "ovellos", "over"));
+
+    private static final Set<String> SPANISH_STOP_WORDS = new HashSet<>(Arrays.asList(
+            "un", "una", "unas", "unos", "uno", "y", "z",
+            "a", "an", "and", "are", "as", "at", "be", "by", "for", "from",
+            "has", "he", "in", "is", "it", "its", "of", "on", "or", "that",
+            "the", "to", "was", "will", "with",
+            "el", "la", "de", "que", "y", "a", "en", "un", "ser", "se", "no",
+            "haber", "por", "con", "su", "para", "es", "al", "lo", "como", "más",
+            "o", "pero", "sus", "le", "ya", "o", "ésta", "sí", "porque", "esta",
+            "como", "en", "para", "atras", "fue",
+            "eres", "estaba", "estamos", "están", "estaras", "estaremos",
+            "estará", "estarán", "estaría", "estarían", "estaríamos",
+            "estuviese", "estuviesen", "estuvieras", "estuviéramos",
+            "estuviesis", "estuviésemos"));
+
+    private static final Set<String> ENGLISH_STOP_WORDS = new HashSet<>(Arrays.asList(
+            "a", "an", "and", "are", "as", "at", "be", "by", "for", "from",
+            "has", "he", "in", "is", "it", "its", "of", "on", "or", "that",
+            "the", "to", "was", "will", "with",
+            "about", "above", "after", "again", "against", "all", "am", "any",
+            "being", "below", "between", "both", "but", "can", "could",
+            "did", "do", "does", "doing", "down", "during", "each",
+            "few", "further", "had", "have", "having", "here", "hers",
+            "herself", "him", "himself", "his", "how", "i", "if", "just",
+            "me", "might", "more", "most", "my", "myself", "no", "nor", "not",
+            "only", "out", "over", "own", "same", "should", "so", "some",
+            "such", "than", "then", "them", "themselves", "there", "these",
+            "they", "this", "those", "through", "too", "under", "until",
+            "up", "very", "we", "were", "what", "when", "where", "which",
+            "while", "who", "whom", "why", "you", "your", "yours", "yourself",
+            "yourselves"));
+
+    // Backward-compatible combined set (now deprecated, use language-specific sets)
+    @Deprecated
+    private static final Set<String> STOP_WORDS = new HashSet<>(Arrays.asList(
+            "a", "an", "and", "are", "as", "at", "be", "by", "for", "from",
+            "has", "he", "in", "is", "it", "its", "of", "on", "or", "that",
+            "the", "to", "was", "will", "with",
             "un", "una", "unas", "unos", "uno", "y", "z"));
 
+    private QueryPreprocessor() {
+    }
+
     /**
-     * Preprocesses the query by:
-     * - Converting to lowercase
-     * - Trimming whitespace
-     * - Collapsing multiple consecutive spaces to single space
-     * - Removing accents (é→e, à→a, etc.)
-     * 
-     * This improves cross-dialect matching and reduces noise without filtering
-     * potentially significant words.
-     * 
-     * @param query the raw search query
-     * @return normalized query string, or empty string if input is null/blank
+     * Preprocesses the query with early language detection.
+     * Returns a {@code QueryContext} containing:
+     * - Original query
+     * - Detected language (CA, ES, EN)
+     * - Normalized and language-specific stop-word-filtered tokens
+     *
+     * @param query the raw search query (may be null or blank)
+     * @return {@code QueryContext} with language detected and tokens processed
      */
-    public static String preprocess(String query) {
-        return TokenNormalizer.normalizeForSearch(query);
+    public static QueryContext preprocess(String query) {
+        return preprocess(query, null);
+    }
+
+    /**
+     * Preprocesses the query with explicit language override.
+     * If {@code language} is null, detects language automatically.
+     *
+     * @param query    the raw search query (may be null or blank)
+     * @param language explicit language code ("CA", "ES", "EN"), or null to
+     *                 auto-detect
+     * @return {@code QueryContext} with language and tokens processed
+     */
+    public static QueryContext preprocess(String query, String language) {
+        if (query == null || query.isBlank()) {
+            return new QueryContext("", "CA", Collections.emptyList());
+        }
+
+        String detectedLanguage = language != null ? language : LanguageDetector.detect(query);
+
+        // Normalize: remove accents, lowercase, collapse whitespace
+        String normalized = TokenNormalizer.normalizeForSearch(query);
+
+        // Tokenize
+        List<String> tokens = TokenNormalizer.tokenize(normalized);
+
+        // Filter language-specific stop words
+        Set<String> stopWordsForLanguage = getStopWordsForLanguage(detectedLanguage);
+        List<String> filtered = new ArrayList<>();
+        for (String token : tokens) {
+            if (!stopWordsForLanguage.contains(token.toLowerCase())) {
+                filtered.add(token);
+            }
+        }
+
+        // Fallback to all tokens if all were filtered
+        List<String> finalTokens = filtered.isEmpty() ? tokens : filtered;
+
+        String logMsg = "QueryPreprocessor: query='" + query +
+                "' language='" + detectedLanguage + "' tokens=" + finalTokens.size();
+        logger.fine(logMsg);
+
+        return new QueryContext(query, detectedLanguage, List.copyOf(finalTokens));
+    }
+
+    /**
+     * Returns the language-specific stop words set for the given language.
+     * Falls back to English stop words for unknown/unsupported languages.
+     */
+    private static Set<String> getStopWordsForLanguage(String language) {
+        if (language == null) {
+            language = "CA";
+        }
+        return switch (language.toUpperCase()) {
+            case "CA" -> CATALAN_STOP_WORDS;
+            case "ES" -> SPANISH_STOP_WORDS;
+            case "EN" -> ENGLISH_STOP_WORDS;
+            case "FR" -> ENGLISH_STOP_WORDS; // Fallback to English for French
+            default -> ENGLISH_STOP_WORDS;
+        };
     }
 
     /**
      * Removes common stop words from the query while preserving query intent.
      * Falls back to the original query if all words are stop words to ensure
      * the query isn't completely empty.
-     * 
+     *
+     * @deprecated Use {@link #preprocess(String)} instead, which returns
+     *             {@code QueryContext} with language-specific filtering.
+     *
      * @param query the preprocessed query (preferably already processed by
      *              preprocess())
      * @return query with stop words removed, or original query if all words are
      *         stops
      */
+    @Deprecated
     public static String removeStopWords(String query) {
         if (query == null || query.isBlank()) {
             return query;
@@ -123,5 +197,4 @@ public class QueryPreprocessor {
         // Fallback to original if all words were stop words
         return result.isEmpty() ? query : result;
     }
-
 }

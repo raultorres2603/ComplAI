@@ -1,0 +1,141 @@
+{
+    "en": {
+        "complaint": [
+            "reclamació",
+            "denúncia"
+        ],
+        "permit": [
+            "permís"
+        ],
+        "application": [
+            "sol·licitud"
+        ],
+        "license": [
+            "llicència"
+        ],
+        "procedure": [
+            "procediment"
+        ],
+        "document": [
+            "document"
+        ],
+        "fee": [
+            "taxa",
+            "tarifa"
+        ],
+        "requirement": [
+            "requisit"
+        ],
+        "bureaucracy": [
+            "paperassa"
+        ],
+        "approval": [
+            "aprovació"
+        ],
+        "deadline": [
+            "termini"
+        ],
+        "form": [
+            "formulari"
+        ],
+        "office": [
+            "oficina"
+        ],
+        "petition": [
+            "petició"
+        ],
+        "request": [
+            "sol·licitud"
+        ],
+        "certificate": [
+            "certificat"
+        ],
+        "authorization": [
+            "autorització"
+        ],
+        "registration": [
+            "registre"
+        ],
+        "complaint form": [
+            "formulari de reclamació"
+        ],
+        "administrative": [
+            "administrativa"
+        ]
+    },
+    "es": {
+        "queja": [
+            "reclamació",
+            "denúncia"
+        ],
+        "permiso": [
+            "permís"
+        ],
+        "solicitud": [
+            "sol·licitud"
+        ],
+        "licencia": [
+            "llicència"
+        ],
+        "procedimiento": [
+            "procediment"
+        ],
+        "documento": [
+            "document"
+        ],
+        "tarifa": [
+            "taxa"
+        ],
+        "requisito": [
+            "requisit"
+        ],
+        "burocracia": [
+            "paperassa"
+        ],
+        "aprobación": [
+            "aprovació"
+        ],
+        "plazo": [
+            "termini"
+        ],
+        "formulario": [
+            "formulari"
+        ],
+        "oficina": [
+            "oficina"
+        ],
+        "petición": [
+            "petició"
+        ],
+        "solicitación": [
+            "sol·licitud"
+        ],
+        "certificado": [
+            "certificat"
+        ],
+        "autorización": [
+            "autorització"
+        ],
+        "registro": [
+            "registre"
+        ],
+        "reclamación": [
+            "reclamació"
+        ],
+        "denuncia": [
+            "denúncia"
+        ],
+        "trámite": [
+            "tràmit"
+        ],
+        "gestión": [
+            "gestió"
+        ],
+        "expediente": [
+            "expedient"
+        ],
+        "resolución": [
+            "resolució"
+        ]
+    }
+}

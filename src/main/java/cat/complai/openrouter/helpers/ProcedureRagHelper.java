@@ -143,28 +143,33 @@ public class ProcedureRagHelper {
         fieldWeights.put("title", javaCalibration.titleBoost());
         fieldWeights.put("description", javaCalibration.descriptionBoost());
 
-        return InMemoryLexicalIndex.build(procedures, fieldWeights, procedure -> {
-            Map<String, String> fields = new LinkedHashMap<>();
-            fields.put("title", procedure.title);
-            fields.put("description", procedure.description);
-            return fields;
-        });
+        return InMemoryLexicalIndex.build(
+                procedures,
+                fieldWeights,
+                procedure -> {
+                    Map<String, String> fields = new LinkedHashMap<>();
+                    fields.put("title", procedure.title);
+                    fields.put("description", procedure.description);
+                    return fields;
+                },
+                procedure -> "CA",
+                "CA");
     }
 
     public List<Procedure> search(String query) {
         if (query == null || query.isBlank())
             return Collections.emptyList();
 
-        String cleanedQuery = QueryPreprocessor.preprocess(query);
-        if (cleanedQuery.isBlank()) {
+        QueryContext context = QueryPreprocessor.preprocess(query);
+        if (context.tokens().isEmpty()) {
             return Collections.emptyList();
         }
 
-        return runJavaSearch(cleanedQuery, query.length());
+        return runJavaSearch(context, query.length());
     }
 
-    private List<Procedure> runJavaSearch(String cleanedQuery, int rawQueryLength) {
-        List<String> queryTokens = TokenNormalizer.tokenize(cleanedQuery);
+    private List<Procedure> runJavaSearch(QueryContext context, int rawQueryLength) {
+        List<String> queryTokens = context.tokens();
         List<String> expandedTokens = DeterministicQueryExpansion.expandProcedureQueryTokens(
             queryTokens,
             javaCalibration.expansionEnabled());
@@ -174,7 +179,8 @@ public class ProcedureRagHelper {
             expandedTokens,
                 MAX_RESULTS,
             javaCalibration.absoluteFloor(),
-            javaCalibration.relativeFloor());
+            javaCalibration.relativeFloor(),
+            context.detectedLanguage());
         long latencyMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
 
         List<Procedure> results = response.results().stream()
@@ -183,6 +189,7 @@ public class ProcedureRagHelper {
 
         logger.fine(() -> "RAG SEARCH — type=PROCEDURE cityId=" + cityId
                 + " engine=java queryLength=" + rawQueryLength
+                + " queryLanguage=" + context.detectedLanguage()
                 + " resultCount=" + results.size()
                 + " candidateCount=" + response.candidateCount()
                 + " filteredCount=" + response.filteredCount()
