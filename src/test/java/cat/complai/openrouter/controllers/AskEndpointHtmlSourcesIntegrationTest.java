@@ -1,6 +1,5 @@
 package cat.complai.openrouter.controllers;
 
-import cat.complai.auth.ApiKeyAuthFilter;
 import cat.complai.http.HttpWrapper;
 import cat.complai.http.OpenRouterStreamingException;
 import cat.complai.http.dto.HttpDto;
@@ -17,21 +16,11 @@ import cat.complai.sqs.dto.RedactSqsMessage;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.context.annotation.Replaces;
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.annotation.Nullable;
-import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.MutableHttpRequest;
-import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.annotation.RequestFilter;
-import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import io.micronaut.test.annotation.MockBean;
 import jakarta.inject.Inject;
-import jakarta.inject.Singleton;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

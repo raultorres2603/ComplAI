@@ -1,6 +1,5 @@
 package cat.complai.openrouter.controllers;
 
-import cat.complai.auth.ApiKeyAuthFilter;
 import cat.complai.http.HttpWrapper;
 import cat.complai.http.OpenRouterStreamingException;
 import cat.complai.http.dto.HttpDto;
@@ -24,15 +23,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Replaces;
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.annotation.Nullable;
-import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.MutableHttpRequest;
-import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.annotation.RequestFilter;
-import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;

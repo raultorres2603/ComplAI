@@ -216,9 +216,6 @@ class InMemoryLexicalIndexLanguageBoostTest {
                 queryTokens, 10, 0.0, 0.1, "ca");
         InMemoryLexicalIndex.SearchResponse<TestDocument> responseUpper = index.search(
                 queryTokens, 10, 0.0, 0.1, "CA");
-        InMemoryLexicalIndex.SearchResponse<TestDocument> responseMixed = index.search(
-                queryTokens, 10, 0.0, 0.1, "Ca");
-
         // All should produce same results (language comparison is case-insensitive)
         assertTrue(responseLower.results().size() > 0 || responseUpper.results().size() > 0,
                 "Should find results with various language code cases");

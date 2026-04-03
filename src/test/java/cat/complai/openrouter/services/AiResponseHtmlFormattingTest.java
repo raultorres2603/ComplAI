@@ -3,7 +3,6 @@ package cat.complai.openrouter.services;
 import cat.complai.http.HttpWrapper;
 import cat.complai.http.dto.HttpDto;
 import cat.complai.openrouter.dto.OpenRouterResponseDto;
-import cat.complai.openrouter.dto.Source;
 import cat.complai.openrouter.helpers.EventRagHelperRegistry;
 import cat.complai.openrouter.helpers.ProcedureRagHelper;
 import cat.complai.openrouter.helpers.ProcedureRagHelperRegistry;

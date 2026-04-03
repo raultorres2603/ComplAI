@@ -1,32 +1,21 @@
 package cat.complai.feedback.controllers;
 
-import cat.complai.auth.ApiKeyAuthFilter;
 import cat.complai.feedback.controllers.dto.FeedbackAcceptedDto;
 import cat.complai.feedback.controllers.dto.FeedbackRequest;
 import cat.complai.feedback.dto.FeedbackErrorCode;
 import cat.complai.feedback.dto.FeedbackResult;
 import cat.complai.feedback.services.FeedbackPublisherService;
 import io.micronaut.context.annotation.Replaces;
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.annotation.Nullable;
-import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MutableHttpRequest;
-import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.annotation.RequestFilter;
-import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import io.micronaut.test.annotation.MockBean;
 import jakarta.inject.Inject;
-import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
-
-import java.util.logging.Logger;
 
 import java.util.Map;
 

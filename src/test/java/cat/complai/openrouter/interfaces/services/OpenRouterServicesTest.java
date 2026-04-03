@@ -354,8 +354,6 @@ public class OpenRouterServicesTest {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
         OpenRouterServices svc = createOpenRouterService(wrapper);
 
-        String aiMessage = "Dear Ajuntament,\n\nI am writing to complain about...\n\nSincerely,\nResident";
-        String expectedHtml = "<p>Dear Ajuntament,</p>\n<p>I am writing to complain about...</p>\n<p>Sincerely,\nResident</p>";
         ComplainantIdentity identity = new ComplainantIdentity("Joan", "Garcia", "12345678A");
         OpenRouterResponseDto out = svc.redactComplaint("Some complaint text [NOHEADER]", OutputFormat.AUTO, null,
                 identity, "testcity");
