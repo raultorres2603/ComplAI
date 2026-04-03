@@ -1,5 +1,6 @@
 package cat.complai.openrouter.helpers;
 
+import cat.complai.openrouter.helpers.rag.TokenNormalizer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.inject.Singleton;
@@ -86,8 +87,9 @@ public class CivicVocabularyService {
         Set<String> synonyms = new LinkedHashSet<>();
 
         for (String token : tokens) {
-            String cleanToken = token.replaceAll("[^a-z0-9]", "");
-            if (langMapping.containsKey(cleanToken)) {
+            // Use TokenNormalizer for consistent accent removal (NFD + mark stripping)
+            String cleanToken = TokenNormalizer.normalizeForSearch(token);
+            if (!cleanToken.isBlank() && langMapping.containsKey(cleanToken)) {
                 synonyms.addAll(langMapping.get(cleanToken));
                 logger.fine(() -> "CivicVocabularyService: expanded token='" + cleanToken
                         + "' with synonyms=" + langMapping.get(cleanToken));
@@ -134,6 +136,8 @@ public class CivicVocabularyService {
                 // Iterate over term keys (e.g., "complaint", "permit")
                 languageNode.fields().forEachRemaining(termEntry -> {
                     String term = termEntry.getKey();
+                    // Normalize the term key (remove accents, lowercase) for consistent lookup
+                    String normalizedTerm = TokenNormalizer.normalizeForSearch(term);
                     JsonNode synonymsNode = termEntry.getValue();
                     List<String> synonymsList = new ArrayList<>();
 
@@ -146,7 +150,7 @@ public class CivicVocabularyService {
                         });
                     }
 
-                    termToSynonyms.put(term, List.copyOf(synonymsList));
+                    termToSynonyms.put(normalizedTerm, List.copyOf(synonymsList));
                 });
 
                 result.put(languageCode, Map.copyOf(termToSynonyms));

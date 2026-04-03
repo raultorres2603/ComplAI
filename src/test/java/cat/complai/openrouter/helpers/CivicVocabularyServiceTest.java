@@ -152,8 +152,8 @@ class CivicVocabularyServiceTest {
     void testExpandQuery_FrenchReclamation() {
         String result = service.expandQuery("réclamation", "fr");
         assertNotNull(result);
-        assertTrue(result.contains("reclamacio") || result.contains("reclamation"),
-                "French 'réclamation' should be recognized (accents normalized)");
+        assertTrue(result.contains("réclamation"),
+                "French 'réclamation' should be in result");
         assertTrue(result.contains("reclamació"),
                 "French 'réclamation' should expand to Catalan 'reclamació'");
     }
