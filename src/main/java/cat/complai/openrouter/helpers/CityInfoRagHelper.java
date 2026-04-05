@@ -160,16 +160,16 @@ public class CityInfoRagHelper {
             return Collections.emptyList();
         }
 
-        String cleanedQuery = QueryPreprocessor.preprocess(query);
-        if (cleanedQuery.isBlank()) {
+        QueryContext context = QueryPreprocessor.preprocess(query);
+        if (context.tokens().isEmpty()) {
             return Collections.emptyList();
         }
 
-        return runJavaSearch(cleanedQuery, query.length());
+        return runJavaSearch(context, query.length());
     }
 
-    private List<CityInfo> runJavaSearch(String cleanedQuery, int rawQueryLength) {
-        List<String> queryTokens = TokenNormalizer.tokenize(cleanedQuery);
+    private List<CityInfo> runJavaSearch(QueryContext context, int rawQueryLength) {
+        List<String> queryTokens = context.tokens();
         List<String> expandedTokens = DeterministicQueryExpansion.expandProcedureQueryTokens(
                 queryTokens,
                 javaCalibration.expansionEnabled());

@@ -8,5 +8,15 @@ public record IndexedDocument<T>(
         T source,
         Map<String, List<String>> fieldTokens,
         Map<String, Integer> fieldLengths,
-        Map<String, Map<String, Integer>> fieldTermFrequency) {
+        Map<String, Map<String, Integer>> fieldTermFrequency,
+        String language) {
+    
+    public IndexedDocument(
+            int sourceOrder,
+            T source,
+            Map<String, List<String>> fieldTokens,
+            Map<String, Integer> fieldLengths,
+            Map<String, Map<String, Integer>> fieldTermFrequency) {
+        this(sourceOrder, source, fieldTokens, fieldLengths, fieldTermFrequency, "CA");
+    }
 }

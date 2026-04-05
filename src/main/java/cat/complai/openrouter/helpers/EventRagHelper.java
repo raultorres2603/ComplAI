@@ -153,28 +153,33 @@ public class EventRagHelper {
         fieldWeights.put("title", javaCalibration.titleBoost());
         fieldWeights.put("description", javaCalibration.descriptionBoost());
 
-        return InMemoryLexicalIndex.build(events, fieldWeights, event -> {
-            Map<String, String> fields = new LinkedHashMap<>();
-            fields.put("title", event.title);
-            fields.put("description", event.description);
-            return fields;
-        });
+        return InMemoryLexicalIndex.build(
+                events,
+                fieldWeights,
+                event -> {
+                    Map<String, String> fields = new LinkedHashMap<>();
+                    fields.put("title", event.title);
+                    fields.put("description", event.description);
+                    return fields;
+                },
+                event -> "CA",
+                "CA");
     }
 
     public List<Event> search(String query) {
         if (query == null || query.isBlank())
             return Collections.emptyList();
 
-        String cleanedQuery = QueryPreprocessor.preprocess(query);
-        if (cleanedQuery.isBlank()) {
+        QueryContext context = QueryPreprocessor.preprocess(query);
+        if (context.tokens().isEmpty()) {
             return Collections.emptyList();
         }
 
-        return runJavaSearch(cleanedQuery, query.length());
+        return runJavaSearch(context, query.length());
     }
 
-    private List<Event> runJavaSearch(String cleanedQuery, int rawQueryLength) {
-        List<String> queryTokens = TokenNormalizer.tokenize(cleanedQuery);
+    private List<Event> runJavaSearch(QueryContext context, int rawQueryLength) {
+        List<String> queryTokens = context.tokens();
         List<String> expandedTokens = DeterministicQueryExpansion.expandEventQueryTokens(
             queryTokens,
             javaCalibration.expansionEnabled());
@@ -184,7 +189,8 @@ public class EventRagHelper {
             expandedTokens,
                 MAX_RESULTS,
             javaCalibration.absoluteFloor(),
-            javaCalibration.relativeFloor());
+            javaCalibration.relativeFloor(),
+            context.detectedLanguage());
         long latencyMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
 
         List<Event> results = response.results().stream()
@@ -193,6 +199,7 @@ public class EventRagHelper {
 
         logger.fine(() -> "RAG SEARCH — type=EVENT cityId=" + cityId
                 + " engine=java queryLength=" + rawQueryLength
+                + " queryLanguage=" + context.detectedLanguage()
                 + " resultCount=" + results.size()
                 + " candidateCount=" + response.candidateCount()
                 + " filteredCount=" + response.filteredCount()

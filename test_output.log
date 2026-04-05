@@ -1,0 +1,251 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::load has been called by net.rubygrapefruit.platform.internal.NativeLibraryLoader in an unnamed module (file:/Users/torres/.gradle/wrapper/dists/gradle-9.1.0-bin/9agqghryom9wkf8r80qlhnts3/gradle-9.1.0/lib/native-platform-0.22-milestone-28.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+
+> Task :compileJava
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+
+> Task :processResources UP-TO-DATE
+> Task :classes
+> Task :compileTestJava UP-TO-DATE
+> Task :inspectRuntimeClasspath UP-TO-DATE
+> Task :processTestResources
+> Task :testClasses
+20:55:45.702 [Thread-5] DEBUG io.micronaut.context.DefaultBeanContext -- Stopping BeanContext
+20:55:45.702 [Thread-5] DEBUG io.micronaut.context.DefaultBeanContext -- Finding candidate beans for type: ApplicationEventPublisher<ShutdownEvent T>
+20:55:45.702 [Thread-5] DEBUG io.micronaut.context.DefaultBeanContext --   interface io.micronaut.context.event.ApplicationEventPublisher null io.micronaut.context.event.ApplicationEventPublisherFactory@3df0cbe5
+20:55:45.702 [Thread-5] DEBUG io.micronaut.context.DefaultBeanContext -- Found concrete candidate [io.micronaut.context.event.ApplicationEventPublisherFactory@3df0cbe5] for type: applicationEventPublisher 
+20:55:45.702 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Created bean [io.micronaut.context.event.ApplicationEventPublisherFactory$2@68a4321e] from definition [io.micronaut.context.event.ApplicationEventPublisherFactory@3df0cbe5] with qualifier [null]
+20:55:45.702 [Thread-5] DEBUG io.micronaut.context.event.ApplicationEventPublisher -- Publishing event: io.micronaut.context.event.ShutdownEvent[source=io.micronaut.context.DefaultApplicationContext@6601cc93]
+20:55:45.702 [Thread-5] DEBUG io.micronaut.context.DefaultBeanContext -- Resolving beans for type: <ShutdownEvent> io.micronaut.context.event.ApplicationEventListener 
+20:55:45.702 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.server.RouteExecutor@18ac53e8] with identifier [routeExecutor]
+20:55:45.702 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.server.RouteExecutor@18ac53e8] with identifier [routeExecutor]
+20:55:45.702 [Thread-5] DEBUG io.micronaut.context.DefaultBeanContext -- Finding candidate beans for type: BeanPreDestroyEventListener
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.DefaultBeanContext -- No bean candidates found for type: BeanPreDestroyEventListener
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.DefaultBeanContext -- Finding candidate beans for type: BeanDestroyedEventListener
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.DefaultBeanContext -- No bean candidates found for type: BeanDestroyedEventListener
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.server.binding.RequestArgumentSatisfier@2babf189] with identifier [requestArgumentSatisfier]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.server.binding.RequestArgumentSatisfier@2babf189] with identifier [requestArgumentSatisfier]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.server.codec.TextStreamCodec@10c2064a] with identifier [textStreamCodec]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.server.codec.TextStreamCodec@10c2064a] with identifier [textStreamCodec]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [Provider(MediaTypeCodecRegistry T)] with identifier [codecRegistryProvider]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.function.aws.proxy.ApiGatewayBinderRegistry@69e05f61] with identifier [requestBinderRegistry]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.function.aws.proxy.ApiGatewayBinderRegistry@69e05f61] with identifier [requestBinderRegistry]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.codec.DefaultMediaTypeCodecRegistry@70e13fa] with identifier [mediaTypeCodecRegistry]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.codec.DefaultMediaTypeCodecRegistry@70e13fa] with identifier [mediaTypeCodecRegistry]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.json.codec.JsonMediaTypeCodec@6a282fdd] with identifier [@Named('json') jsonMediaTypeCodec]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.json.codec.JsonMediaTypeCodec@6a282fdd] with identifier [@Named('json') jsonMediaTypeCodec]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [Provider(JsonMapper T)] with identifier [jsonCodec]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.json.codec.JsonStreamMediaTypeCodec@70331432] with identifier [jsonStreamMediaTypeCodec]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.json.codec.JsonStreamMediaTypeCodec@70331432] with identifier [jsonStreamMediaTypeCodec]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [Provider(JsonMapper T)] with identifier [jsonCodec]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.netty.body.NettyJsonHandler@42210be1] with identifier [nettyJsonHandler]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.netty.body.NettyJsonHandler@42210be1] with identifier [nettyJsonHandler]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.jackson.databind.JacksonDatabindMapper@4315e9af] with identifier [jsonMapper]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.jackson.databind.JacksonDatabindMapper@4315e9af] with identifier [jsonMapper]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.server.exceptions.response.DefaultErrorResponseProcessor@4f966719] with identifier [errorResponseProcessor]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.server.exceptions.response.DefaultErrorResponseProcessor@4f966719] with identifier [errorResponseProcessor]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [cat.complai.openrouter.services.cache.CommonResponseCacheInitializer@5e5073ab] with identifier [commonResponseCacheInitializer]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [cat.complai.openrouter.services.cache.CommonResponseCacheInitializer@5e5073ab] with identifier [commonResponseCacheInitializer]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [cat.complai.openrouter.controllers.$OpenRouterControllerIntegrationTest$EnabledResponseCacheService1$Definition$Intercepted@23f72d88] with identifier [cacheService]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.DefaultBeanContext -- Finding candidate beans for type: CustomScope
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.DefaultBeanContext --   class io.micronaut.runtime.context.scope.refresh.RefreshScope null Definition: io.micronaut.runtime.context.scope.refresh.RefreshScope
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.DefaultBeanContext --   class io.micronaut.runtime.context.scope.ThreadLocalCustomScope null Definition: io.micronaut.runtime.context.scope.ThreadLocalCustomScope
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.DefaultBeanContext --   class io.micronaut.runtime.http.scope.RequestCustomScope null Definition: io.micronaut.runtime.http.scope.RequestCustomScope
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.DefaultBeanContext -- Qualifying bean [customScope] for qualifier: <io.micronaut.runtime.context.scope.Refreshable> 
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.DefaultBeanContext -- Found concrete candidate [Definition: io.micronaut.runtime.context.scope.refresh.RefreshScope] for type: <io.micronaut.runtime.context.scope.Refreshable> customScope 
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Created bean [io.micronaut.runtime.context.scope.refresh.RefreshScope@6663c17a] from definition [Definition: io.micronaut.runtime.context.scope.refresh.RefreshScope] with qualifier [<io.micronaut.runtime.context.scope.Refreshable>]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.server.binding.LocaleArgumentBinder@f446158] with identifier [localeArgumentBinder]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.server.binding.LocaleArgumentBinder@f446158] with identifier [localeArgumentBinder]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.web.router.DefaultRouter@1eb2d371] with identifier [router]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.web.router.DefaultRouter@1eb2d371] with identifier [router]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.web.router.ServerFilterRouteBuilder@49a26d19] with identifier [serverFilterRouteBuilder]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.web.router.ServerFilterRouteBuilder@49a26d19] with identifier [serverFilterRouteBuilder]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.scheduling.processor.ScheduledMethodProcessor$ApplicationEventListener$scheduleTasks1$Intercepted@63716833] with identifier [scheduledMethodProcessor$ApplicationEventListener$scheduleTasks1$Intercepted]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.scheduling.processor.ScheduledMethodProcessor$ApplicationEventListener$scheduleTasks1$Intercepted@63716833] with identifier [scheduledMethodProcessor$ApplicationEventListener$scheduleTasks1$Intercepted]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [cat.complai.openrouter.services.cache.CommonResponseCacheInitializer$ApplicationEventListener$onStartup1$Intercepted@54d901aa] with identifier [commonResponseCacheInitializer$ApplicationEventListener$onStartup1$Intercepted]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [cat.complai.openrouter.services.cache.CommonResponseCacheInitializer$ApplicationEventListener$onStartup1$Intercepted@54d901aa] with identifier [commonResponseCacheInitializer$ApplicationEventListener$onStartup1$Intercepted]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.web.router.AnnotatedFilterRouteBuilder@19058533] with identifier [annotatedFilterRouteBuilder]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.web.router.AnnotatedFilterRouteBuilder@19058533] with identifier [annotatedFilterRouteBuilder]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.scheduling.processor.ScheduledMethodProcessor@422b8438] with identifier [scheduledMethodProcessor]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.scheduling.processor.ScheduledMethodProcessor@422b8438] with identifier [scheduledMethodProcessor]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.web.router.AnnotatedMethodRouteBuilder@7275c74b] with identifier [annotatedMethodRouteBuilder]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.web.router.AnnotatedMethodRouteBuilder@7275c74b] with identifier [annotatedMethodRouteBuilder]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.runtime.http.codec.TextPlainCodec@743c6ce4] with identifier [textPlainCodec]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.runtime.http.codec.TextPlainCodec@743c6ce4] with identifier [textPlainCodec]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.server.websocket.ServerWebSocketProcessor@730e5763] with identifier [serverWebSocketProcessor]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.server.websocket.ServerWebSocketProcessor@730e5763] with identifier [serverWebSocketProcessor]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.server.exceptions.response.DefaultHtmlErrorResponseBodyProvider@7159a5cd] with identifier [htmlBodyErrorResponseProvider]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.server.exceptions.response.DefaultHtmlErrorResponseBodyProvider@7159a5cd] with identifier [htmlBodyErrorResponseProvider]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.runtime.context.CompositeMessageSource@58a2b4c] with identifier [messageSource]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.server.util.locale.CompositeHttpLocaleResolver@31f20c9f] with identifier [localeResolver]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.server.util.locale.CompositeHttpLocaleResolver@31f20c9f] with identifier [localeResolver]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [com.fasterxml.jackson.databind.ObjectMapper@2b917fb0] with identifier [objectMapper]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [com.fasterxml.jackson.databind.ObjectMapper@2b917fb0] with identifier [objectMapper]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.scheduling.executor.DefaultExecutorSelector@108d55c4] with identifier [executorSelector]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.scheduling.executor.DefaultExecutorSelector@108d55c4] with identifier [executorSelector]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [Provider(ExecutorService T)] with identifier [@Named('blocking') blockingExecutor]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [Provider(ExecutorService T)] with identifier [@Named('io') ioExecutor]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.body.DefaultMessageBodyHandlerRegistry@6ff415ad] with identifier [messageBodyHandlerRegistry]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.body.DefaultMessageBodyHandlerRegistry@6ff415ad] with identifier [messageBodyHandlerRegistry]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.jackson.serialize.OptionalValuesSerializer@365a6a43] with identifier [optionalValuesSerializer]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.jackson.serialize.OptionalValuesSerializer@365a6a43] with identifier [optionalValuesSerializer]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [com.fasterxml.jackson.core.JsonFactory@6c796cc1] with identifier [jsonFactory]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [com.fasterxml.jackson.core.JsonFactory@6c796cc1] with identifier [jsonFactory]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.web.router.naming.HyphenatedUriNamingStrategy@28fd3dc1] with identifier [uriNamingStrategy]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.web.router.naming.HyphenatedUriNamingStrategy@28fd3dc1] with identifier [uriNamingStrategy]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.web.router.resource.StaticResourceResolver$1@70807224] with identifier [staticResourceResolver]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.web.router.resource.StaticResourceResolver$1@70807224] with identifier [staticResourceResolver]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.server.exceptions.response.DefaultJsonErrorResponseBodyProvider@479f2dc2] with identifier [jsonBodyErrorResponseProvider]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.server.exceptions.response.DefaultJsonErrorResponseBodyProvider@479f2dc2] with identifier [jsonBodyErrorResponseProvider]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.reactor.instrument.ReactorInstrumentation@537c8c7e] with identifier [reactorInstrumentation]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.reactor.instrument.ReactorInstrumentation@537c8c7e] with identifier [reactorInstrumentation]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.jackson.modules.BeanIntrospectionModule@4bafe935] with identifier [beanIntrospectionModule]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.jackson.modules.BeanIntrospectionModule@4bafe935] with identifier [beanIntrospectionModule]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.server.HttpServerConfiguration@5f9b6ae7] with identifier [contextPathProvider]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.server.HttpServerConfiguration@5f9b6ae7] with identifier [contextPathProvider]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder@1128620c] with identifier [defaultBodyAnnotationBinder]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder@1128620c] with identifier [defaultBodyAnnotationBinder]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [ReactorConfiguration[enableAutomaticContextPropagation=null, enableScheduleHookContextPropagation=null]] with identifier [configuration]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [ReactorConfiguration[enableAutomaticContextPropagation=null, enableScheduleHookContextPropagation=null]] with identifier [configuration]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.server.util.locale.RequestLocaleResolver@bdd2027] with identifier [requestLocaleResolver]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.server.util.locale.RequestLocaleResolver@bdd2027] with identifier [requestLocaleResolver]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.scheduling.DefaultTaskExceptionHandler@6d5037a9] with identifier [taskExceptionHandler]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.scheduling.DefaultTaskExceptionHandler@6d5037a9] with identifier [taskExceptionHandler]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.server.HttpServerConfiguration$HttpLocaleResolutionConfigurationProperties@69fa8e76] with identifier [httpLocaleResolutionConfiguration]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.server.HttpServerConfiguration$HttpLocaleResolutionConfigurationProperties@69fa8e76] with identifier [httpLocaleResolutionConfiguration]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.function.aws.proxy.test.MockContextProvider@76f856a8] with identifier [contextProvider]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.function.aws.proxy.test.MockContextProvider@76f856a8] with identifier [contextProvider]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.jackson.serialize.ResourceModule@87b5b49] with identifier [resourceModule]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.jackson.serialize.ResourceModule@87b5b49] with identifier [resourceModule]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.server.binding.RouteInfoArgumentBinder@32f0c7f8] with identifier [routeInfoArgumentBinder]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.server.binding.RouteInfoArgumentBinder@32f0c7f8] with identifier [routeInfoArgumentBinder]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.aop.chain.DefaultInterceptorRegistry@3730ab42] with identifier [interceptorRegistry]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.aop.chain.DefaultInterceptorRegistry@3730ab42] with identifier [interceptorRegistry]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.buffer.netty.NettyByteBufferFactory@3bbf9027] with identifier [byteBufferFactory]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.buffer.netty.NettyByteBufferFactory@3bbf9027] with identifier [byteBufferFactory]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.server.binding.BasicAuthArgumentBinder@5432c277] with identifier [basicAuthArgumentBinder]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.server.binding.BasicAuthArgumentBinder@5432c277] with identifier [basicAuthArgumentBinder]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.function.aws.proxy.alb.ApplicationLoadBalancerResponseEventBinder@6bf13698] with identifier [applicationLoadBalancerResponseEventBinder]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.function.aws.proxy.alb.ApplicationLoadBalancerResponseEventBinder@6bf13698] with identifier [applicationLoadBalancerResponseEventBinder]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.server.binding.RouteMatchArgumentBinder@3b90a30a] with identifier [routeMatchArgumentBinder]
+20:55:45.703 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.server.binding.RouteMatchArgumentBinder@3b90a30a] with identifier [routeMatchArgumentBinder]
+20:55:45.704 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.function.aws.proxy.payload2.APIGatewayV2HTTPResponseBinder@5d1b9c3d] with identifier [APIGatewayV2HTTPResponseBinder]
+20:55:45.704 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.function.aws.proxy.payload2.APIGatewayV2HTTPResponseBinder@5d1b9c3d] with identifier [APIGatewayV2HTTPResponseBinder]
+20:55:45.704 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.jackson.JacksonConfiguration@64a9d48c] with identifier [jacksonConfiguration]
+20:55:45.704 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.jackson.JacksonConfiguration@64a9d48c] with identifier [jacksonConfiguration]
+20:55:45.704 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.function.aws.proxy.alb.ApplicationLoadBalancerRequestEventBinder@299270eb] with identifier [applicationLoadBalancerRequestEventBinder]
+20:55:45.704 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.function.aws.proxy.alb.ApplicationLoadBalancerRequestEventBinder@299270eb] with identifier [applicationLoadBalancerRequestEventBinder]
+20:55:45.704 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.jackson.serialize.JsonNodeSerializer@288cdaab] with identifier [jsonNodeSerializer]
+20:55:45.704 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.jackson.serialize.JsonNodeSerializer@288cdaab] with identifier [jsonNodeSerializer]
+20:55:45.704 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.function.aws.proxy.payload1.APIGatewayProxyResponseEventBinder@15e0fe05] with identifier [APIGatewayProxyResponseEventBinder]
+20:55:45.704 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.function.aws.proxy.payload1.APIGatewayProxyResponseEventBinder@15e0fe05] with identifier [APIGatewayProxyResponseEventBinder]
+20:55:45.704 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.jackson.serialize.ConvertibleMultiValuesSerializer@507b79f7] with identifier [convertibleMultiValuesSerializer]
+20:55:45.704 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.jackson.serialize.ConvertibleMultiValuesSerializer@507b79f7] with identifier [convertibleMultiValuesSerializer]
+20:55:45.704 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.function.aws.proxy.payload2.APIGatewayV2HTTPEventBinder@71f96dfb] with identifier [APIGatewayV2HTTPEventBinder]
+20:55:45.704 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.function.aws.proxy.payload2.APIGatewayV2HTTPEventBinder@71f96dfb] with identifier [APIGatewayV2HTTPEventBinder]
+20:55:45.704 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.util.HtmlEntityEncodingHtmlSanitizer@dab48d3] with identifier [htmlSanitizer]
+20:55:45.704 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.http.util.HtmlEntityEncodingHtmlSanitizer@dab48d3] with identifier [htmlSanitizer]
+20:55:45.704 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.context.DefaultApplicationContext$RuntimeConfiguredEnvironment@70f31322] with identifier [T]
+20:55:45.704 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.context.DefaultApplicationContext$RuntimeConfiguredEnvironment@70f31322] with identifier [T]
+20:55:45.704 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.jackson.serialize.ConvertibleValuesSerializer@4a7a965d] with identifier [convertibleValuesSerializer]
+20:55:45.704 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.jackson.serialize.ConvertibleValuesSerializer@4a7a965d] with identifier [convertibleValuesSerializer]
+20:55:45.704 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.jackson.ObjectMapperFactory@99407c2] with identifier [objectMapperFactory]
+20:55:45.704 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.jackson.ObjectMapperFactory@99407c2] with identifier [objectMapperFactory]
+20:55:45.704 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.function.aws.proxy.payload1.APIGatewayProxyRequestEventBinder@504e1599] with identifier [APIGatewayProxyRequestEventBinder]
+20:55:45.704 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.function.aws.proxy.payload1.APIGatewayProxyRequestEventBinder@504e1599] with identifier [APIGatewayProxyRequestEventBinder]
+20:55:45.704 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.jackson.serialize.JsonNodeDeserializer@23b3aa8c] with identifier [jsonNodeDeserializer]
+20:55:45.704 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.jackson.serialize.JsonNodeDeserializer@23b3aa8c] with identifier [jsonNodeDeserializer]
+20:55:45.704 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.web.router.resource.StaticResourceResolverFactory@280d9edc] with identifier [staticResourceResolverFactory]
+20:55:45.704 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.web.router.resource.StaticResourceResolverFactory@280d9edc] with identifier [staticResourceResolverFactory]
+20:55:45.704 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.runtime.http.codec.MediaTypeCodecRegistryFactory@30669dac] with identifier [mediaTypeCodecRegistryFactory]
+20:55:45.704 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.runtime.http.codec.MediaTypeCodecRegistryFactory@30669dac] with identifier [mediaTypeCodecRegistryFactory]
+20:55:45.704 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.runtime.ApplicationConfiguration@629adce] with identifier [applicationConfiguration]
+20:55:45.704 [Thread-5] DEBUG io.micronaut.context.lifecycle -- Destroying bean [io.micronaut.runtime.ApplicationConfiguration@629adce] with identifier [applicationConfiguration]
+
+> Task :test FAILED
+
+OpenRouterControllerIntegrationTest > integration_ask_newsIntent_withoutRelatedNews_returnsExplicitFallbackMessage() FAILED
+    io.micronaut.http.client.exceptions.HttpClientResponseException at DefaultHttpClient.java:2136
+
+OpenRouterControllerIntegrationTest > integration_redact_completeIdentityAndPdfFormat_returns202WithPdfUrl() FAILED
+    io.micronaut.http.client.exceptions.HttpClientResponseException at DefaultHttpClient.java:2136
+
+OpenRouterControllerIntegrationTest > integration_ask_newsIntent_withCityScopedNewsContext_usesNewsBranch() FAILED
+    io.micronaut.http.client.exceptions.HttpClientResponseException at DefaultHttpClient.java:2136
+
+OpenRouterControllerIntegrationTest > integration_ask_streamEmitsErrorOnValidationFailure() FAILED
+    io.micronaut.http.client.exceptions.HttpClientResponseException at DefaultHttpClient.java:2136
+
+OpenRouterControllerIntegrationTest > integration_ask_procedureEventNewsIncludeSourceUrlsInSourcesEvent() FAILED
+    io.micronaut.http.client.exceptions.HttpClientResponseException at DefaultHttpClient.java:2136
+
+OpenRouterControllerIntegrationTest > integration_redact_anonymousRequest_returns400() FAILED
+    org.opentest4j.AssertionFailedError at OpenRouterControllerIntegrationTest.java:445
+
+OpenRouterControllerIntegrationTest > integration_ask_streamUpstreamAfterFirstChunk_emitsSseErrorEvent() FAILED
+    io.micronaut.http.client.exceptions.HttpClientResponseException at DefaultHttpClient.java:2136
+
+OpenRouterControllerIntegrationTest > integration_ask_streamReceivesAllEventTypes() FAILED
+    io.micronaut.http.client.exceptions.HttpClientResponseException at DefaultHttpClient.java:2136
+
+OpenRouterControllerIntegrationTest > integration_redact_upstream() FAILED
+    org.opentest4j.AssertionFailedError at OpenRouterControllerIntegrationTest.java:265
+
+OpenRouterControllerIntegrationTest > integration_ask_upstream429_mapsTo502() FAILED
+    org.opentest4j.AssertionFailedError at OpenRouterControllerIntegrationTest.java:198
+
+OpenRouterControllerIntegrationTest > integration_ask_streamIncludesConversationIdInDoneEvent() FAILED
+    io.micronaut.http.client.exceptions.HttpClientResponseException at DefaultHttpClient.java:2136
+
+OpenRouterControllerIntegrationTest > integration_ask_streamIgnoresCommentAndEmptyFrames() FAILED
+    io.micronaut.http.client.exceptions.HttpClientResponseException at DefaultHttpClient.java:2136
+
+OpenRouterControllerIntegrationTest > integration_ask_upstream402_auditLogRecordsUpstreamCode() FAILED
+    org.opentest4j.AssertionFailedError at OpenRouterControllerIntegrationTest.java:234
+
+OpenRouterControllerIntegrationTest > integration_redact_missingHeader_fallsBackToJsonSuccess() FAILED
+    io.micronaut.http.client.exceptions.HttpClientResponseException at DefaultHttpClient.java:2136
+
+OpenRouterControllerIntegrationTest > integration_redact_refusal() FAILED
+    org.opentest4j.AssertionFailedError at OpenRouterControllerIntegrationTest.java:248
+
+OpenRouterControllerIntegrationTest > integration_redact_invalidHeaderFormat_fallsBackToJsonSuccess() FAILED
+    io.micronaut.http.client.exceptions.HttpClientResponseException at DefaultHttpClient.java:2136
+
+OpenRouterControllerIntegrationTest > integration_redact_jsonFormat_returns400() FAILED
+    org.opentest4j.AssertionFailedError at OpenRouterControllerIntegrationTest.java:511
+
+OpenRouterControllerIntegrationTest > integration_ask_upstream() FAILED
+    org.opentest4j.AssertionFailedError at OpenRouterControllerIntegrationTest.java:181
+
+OpenRouterControllerIntegrationTest > integration_ask_streamMalformedAfterFirstChunk_emitsSseErrorEvent() FAILED
+    io.micronaut.http.client.exceptions.HttpClientResponseException at DefaultHttpClient.java:2136
+
+OpenRouterControllerIntegrationTest > integration_ask_eventIntent_withoutDateWindow_returnsClarificationBeforeRetrieval() FAILED
+    io.micronaut.http.client.exceptions.HttpClientResponseException at DefaultHttpClient.java:2136
+
+OpenRouterControllerIntegrationTest > integration_redact_success() FAILED
+    io.micronaut.http.client.exceptions.HttpClientResponseException at DefaultHttpClient.java:2136
+
+OpenRouterControllerIntegrationTest > integration_redact_missingIdentity_returns200WithQuestion() FAILED
+    io.micronaut.http.client.exceptions.HttpClientResponseException at DefaultHttpClient.java:2136
+
+36 tests completed, 22 failed
+
+[Incubating] Problems report is available at: file:///Users/torres/Documents/Emprendimiento/ComplAI/backend/ComplAI/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':test'.
+> There were failing tests. See the report at: file:///Users/torres/Documents/Emprendimiento/ComplAI/backend/ComplAI/build/reports/tests/test/index.html
+
+* Try:
+> Run with --scan to generate a Build Scan (Powered by Develocity).
+
+BUILD FAILED in 3s
+6 actionable tasks: 3 executed, 3 up-to-date

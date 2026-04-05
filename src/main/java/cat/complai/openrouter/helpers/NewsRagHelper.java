@@ -186,17 +186,17 @@ public class NewsRagHelper {
             return Collections.emptyList();
         }
 
-        String cleanedQuery = QueryPreprocessor.preprocess(query);
-        if (cleanedQuery.isBlank()) {
+        QueryContext context = QueryPreprocessor.preprocess(query);
+        if (context.tokens().isEmpty()) {
             return Collections.emptyList();
         }
 
-        List<News> rankedResults = runJavaSearch(cleanedQuery, query.length());
+        List<News> rankedResults = runJavaSearch(String.join(" ", context.tokens()), query.length());
         if (rankedResults.isEmpty()) {
             return rankedResults;
         }
 
-        List<String> contentTokens = extractContentTokens(cleanedQuery);
+        List<String> contentTokens = extractContentTokens(String.join(" ", context.tokens()));
         if (contentTokens.isEmpty()) {
             return rankedResults;
         }
@@ -207,8 +207,7 @@ public class NewsRagHelper {
     }
 
     private static List<String> extractContentTokens(String cleanedQuery) {
-        String withoutStopWords = QueryPreprocessor.removeStopWords(cleanedQuery);
-        return TokenNormalizer.tokenize(withoutStopWords).stream()
+        return TokenNormalizer.tokenize(cleanedQuery).stream()
                 .filter(token -> !NEWS_INTENT_TOKENS.contains(token))
                 .filter(token -> !GENERIC_QUERY_TOKENS.contains(token))
                 .filter(token -> token.length() >= 3)

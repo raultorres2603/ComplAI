@@ -507,24 +507,83 @@ public class OpenRouterControllerTest {
     }
 
     @Test
-    void redact_noIdentityTokenHeaderAndFeatureEnabled_usesBodyFields() {
-        // Feature is on but no X-Identity-Token header → falls back to body fields
-        // normally.
+    void redact_noIdentityTokenHeaderAndFeatureEnabled_returns401() {
+        // OIDC enabled but no X-Identity-Token header → 401, self-reported body fields
+        // must never be used for OIDC-enabled cities.
         VerifiedCitizenIdentity idpIdentity = new VerifiedCitizenIdentity("Joan", "Torres", "12345678A");
         OidcIdentityTokenValidator validator = validatorThatReturns(idpIdentity);
 
         OpenRouterController c = new OpenRouterController(
-                new FakeServiceSuccess(), NOOP_PUBLISHER, FIXED_URL_UPLOADER, validator);
+                new FakeServiceSuccess(), ASSERT_NOT_CALLED_PUBLISHER, ASSERT_NOT_CALLED_UPLOADER, validator);
 
-        // Body has complete identity, no X-Identity-Token header, PDF format → async
-        // path
+        // Body has complete identity, no X-Identity-Token header
         RedactRequest bodyReq = RedactRequest.fromJson("Noise", "pdf", null, "Maria", "Garcia", "87654321B");
         HttpResponse<?> raw = c.redact(bodyReq, requestWithCity("testcity"));
 
-        assertEquals(202, raw.getStatus().getCode());
-        RedactAcceptedDto body = (RedactAcceptedDto) raw.getBody().get();
+        assertEquals(401, raw.getStatus().getCode());
+        OpenRouterPublicDto body = (OpenRouterPublicDto) raw.getBody().get();
         assertNotNull(body);
-        assertTrue(body.success());
+        assertFalse(body.isSuccess());
+        assertEquals(OpenRouterErrorCode.UNAUTHORIZED.getCode(), body.getErrorCode());
+        assertTrue(body.getError().contains("authenticate"));
+    }
+
+    @Test
+    void redact_blankIdentityTokenHeaderAndFeatureEnabled_returns401() {
+        // OIDC enabled, X-Identity-Token header effectively absent (empty) → 401.
+        // Note: Netty rejects whitespace-only header values at the HTTP level, so the
+        // realistic blank-header scenario is an empty string. The controller's
+        // isBlank() check provides defense-in-depth for non-Netty transports.
+        VerifiedCitizenIdentity idpIdentity = new VerifiedCitizenIdentity("Joan", "Torres", "12345678A");
+        OidcIdentityTokenValidator validator = validatorThatReturns(idpIdentity);
+
+        OpenRouterController c = new OpenRouterController(
+                new FakeServiceSuccess(), ASSERT_NOT_CALLED_PUBLISHER, ASSERT_NOT_CALLED_UPLOADER, validator);
+
+        // Use requestWithCity (no header) to simulate absent/blank token — Netty
+        // does not allow setting an empty header value, but the controller sees null
+        // from getHeaders().get(), which triggers the same missing-token 401 path.
+        HttpResponse<?> raw = c.redact(
+                RedactRequest.fromJson("Noise", "pdf", null, "Maria", "Garcia", "87654321B"),
+                requestWithCity("testcity"));
+
+        assertEquals(401, raw.getStatus().getCode());
+        OpenRouterPublicDto body = (OpenRouterPublicDto) raw.getBody().get();
+        assertNotNull(body);
+        assertFalse(body.isSuccess());
+        assertEquals(OpenRouterErrorCode.UNAUTHORIZED.getCode(), body.getErrorCode());
+        assertTrue(body.getError().contains("authenticate"));
+    }
+
+    @Test
+    void redact_oidcEnabledValidToken_bodyIdentityFieldsIgnored() {
+        // OIDC enabled, valid token provides verified identity. Body sends conflicting
+        // identity fields — the SQS message must use the IdP identity, not the body.
+        VerifiedCitizenIdentity idpIdentity = new VerifiedCitizenIdentity("Joan", "Torres", "12345678A");
+        OidcIdentityTokenValidator validator = validatorThatReturns(idpIdentity);
+
+        // Capturing publisher to inspect the published SQS message.
+        final RedactSqsMessage[] captured = new RedactSqsMessage[1];
+        SqsComplaintPublisher capturingPublisher = new SqsComplaintPublisher() {
+            @Override
+            public void publish(RedactSqsMessage message) {
+                captured[0] = message;
+            }
+        };
+
+        OpenRouterController c = new OpenRouterController(
+                new FakeServiceSuccess(), capturingPublisher, FIXED_URL_UPLOADER, validator);
+
+        // Body has conflicting identity fields
+        RedactRequest bodyReq = RedactRequest.fromJson("Noise", "pdf", null, "FAKE", "IMPOSTOR", "00000000X");
+        HttpRequest<?> req = requestWithCityAndIdentityToken("testcity", "valid.token.here");
+        HttpResponse<?> raw = c.redact(bodyReq, req);
+
+        assertEquals(202, raw.getStatus().getCode());
+        assertNotNull(captured[0], "SQS message should have been published");
+        assertEquals("Joan", captured[0].requesterName());
+        assertEquals("Torres", captured[0].requesterSurname());
+        assertEquals("12345678A", captured[0].requesterIdNumber());
     }
 
     // -------------------------------------------------------------------------

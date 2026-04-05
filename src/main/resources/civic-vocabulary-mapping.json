@@ -1,0 +1,611 @@
+{
+    "en": {
+        "complaint": [
+            "reclamació",
+            "denúncia"
+        ],
+        "permit": [
+            "permís"
+        ],
+        "application": [
+            "sol·licitud"
+        ],
+        "license": [
+            "llicència"
+        ],
+        "procedure": [
+            "procediment"
+        ],
+        "document": [
+            "document"
+        ],
+        "fee": [
+            "taxa",
+            "tarifa"
+        ],
+        "requirement": [
+            "requisit"
+        ],
+        "bureaucracy": [
+            "paperassa"
+        ],
+        "approval": [
+            "aprovació"
+        ],
+        "deadline": [
+            "termini"
+        ],
+        "form": [
+            "formulari"
+        ],
+        "office": [
+            "oficina"
+        ],
+        "petition": [
+            "petició"
+        ],
+        "request": [
+            "sol·licitud"
+        ],
+        "certificate": [
+            "certificat"
+        ],
+        "authorization": [
+            "autorització"
+        ],
+        "registration": [
+            "registre"
+        ],
+        "complaint form": [
+            "formulari de reclamació"
+        ],
+        "administrative": [
+            "administrativa"
+        ],
+        "declaration": [
+            "declaració"
+        ],
+        "eligibility": [
+            "elegibilitat"
+        ],
+        "submission": [
+            "presentació"
+        ],
+        "rejection": [
+            "rebuig"
+        ],
+        "appeal": [
+            "recurs"
+        ],
+        "extension": [
+            "pròrroga"
+        ],
+        "street cleaning": [
+            "neteja de carrer"
+        ],
+        "pothole": [
+            "sot",
+            "forat"
+        ],
+        "lighting": [
+            "il·luminació"
+        ],
+        "park maintenance": [
+            "manteniment de parc"
+        ],
+        "water supply": [
+            "subministrament d'aigua"
+        ],
+        "sewage": [
+            "clavegueram"
+        ],
+        "garbage collection": [
+            "recollida de residus"
+        ],
+        "recycling": [
+            "reciclatge"
+        ],
+        "street signs": [
+            "senyals de carrer"
+        ],
+        "repairs": [
+            "reparacions"
+        ],
+        "maintenance": [
+            "manteniment"
+        ],
+        "noise": [
+            "soroll"
+        ],
+        "construction": [
+            "construcció"
+        ],
+        "parking violation": [
+            "infraccio de aparcament"
+        ],
+        "illegal dumping": [
+            "abocament il·legal"
+        ],
+        "safety hazard": [
+            "perill per a la seguretat"
+        ],
+        "bad service": [
+            "mala atenció"
+        ],
+        "delayed response": [
+            "resposta retardada"
+        ],
+        "discrimination": [
+            "discriminació"
+        ],
+        "unfair treatment": [
+            "tracte injust"
+        ],
+        "harassment": [
+            "assetjament"
+        ],
+        "construction permit": [
+            "permís de construcció"
+        ],
+        "renovation permit": [
+            "permís de reforma"
+        ],
+        "business permit": [
+            "permís comercial"
+        ],
+        "parking permit": [
+            "permís de aparcament"
+        ],
+        "event permit": [
+            "permís d'acte"
+        ],
+        "gathering permit": [
+            "permís de concentració"
+        ],
+        "demonstration permit": [
+            "permís de manifestació"
+        ],
+        "commercial activity": [
+            "activitat comercial"
+        ],
+        "outdoor seating": [
+            "terrassa"
+        ],
+        "inspection": [
+            "inspecció"
+        ],
+        "audit": [
+            "auditoria"
+        ],
+        "violation": [
+            "infracció"
+        ],
+        "fine": [
+            "multa"
+        ],
+        "penalty": [
+            "sanció"
+        ],
+        "amnesty": [
+            "amnistia"
+        ],
+        "delay": [
+            "retard"
+        ],
+        "documentation": [
+            "documentació"
+        ]
+    },
+    "es": {
+        "queja": [
+            "reclamació",
+            "denúncia"
+        ],
+        "permiso": [
+            "permís"
+        ],
+        "solicitud": [
+            "sol·licitud"
+        ],
+        "licencia": [
+            "llicència"
+        ],
+        "procedimiento": [
+            "procediment"
+        ],
+        "documento": [
+            "document"
+        ],
+        "tarifa": [
+            "taxa"
+        ],
+        "requisito": [
+            "requisit"
+        ],
+        "burocracia": [
+            "paperassa"
+        ],
+        "aprobación": [
+            "aprovació"
+        ],
+        "plazo": [
+            "termini"
+        ],
+        "formulario": [
+            "formulari"
+        ],
+        "oficina": [
+            "oficina"
+        ],
+        "petición": [
+            "petició"
+        ],
+        "solicitación": [
+            "sol·licitud"
+        ],
+        "certificado": [
+            "certificat"
+        ],
+        "autorización": [
+            "autorització"
+        ],
+        "registro": [
+            "registre"
+        ],
+        "reclamación": [
+            "reclamació"
+        ],
+        "denuncia": [
+            "denúncia"
+        ],
+        "trámite": [
+            "tràmit"
+        ],
+        "gestión": [
+            "gestió"
+        ],
+        "expediente": [
+            "expedient"
+        ],
+        "resolución": [
+            "resolució"
+        ],
+        "declaración": [
+            "declaració"
+        ],
+        "elegibilidad": [
+            "elegibilitat"
+        ],
+        "presentación": [
+            "presentació"
+        ],
+        "rechazo": [
+            "rebuig"
+        ],
+        "recurso": [
+            "recurs"
+        ],
+        "prórroga": [
+            "pròrroga"
+        ],
+        "limpieza de calle": [
+            "neteja de carrer"
+        ],
+        "bache": [
+            "sot"
+        ],
+        "iluminación": [
+            "il·luminació"
+        ],
+        "mantenimiento de parque": [
+            "manteniment de parc"
+        ],
+        "suministro de agua": [
+            "subministrament d'aigua"
+        ],
+        "alcantarillado": [
+            "clavegueram"
+        ],
+        "recogida de basura": [
+            "recollida de residus"
+        ],
+        "reciclaje": [
+            "reciclatge"
+        ],
+        "señales de tráfico": [
+            "senyals de carrer"
+        ],
+        "reparaciones": [
+            "reparacions"
+        ],
+        "mantenimiento": [
+            "manteniment"
+        ],
+        "ruido": [
+            "soroll"
+        ],
+        "construcción": [
+            "construcció"
+        ],
+        "infracción de aparcamiento": [
+            "infraccio de aparcament"
+        ],
+        "vertido ilegal": [
+            "abocament il·legal"
+        ],
+        "peligro para la seguridad": [
+            "perill per a la seguretat"
+        ],
+        "mal servicio": [
+            "mala atenció"
+        ],
+        "respuesta retrasada": [
+            "resposta retardada"
+        ],
+        "discriminación": [
+            "discriminació"
+        ],
+        "trato injusto": [
+            "tracte injust"
+        ],
+        "acoso": [
+            "assetjament"
+        ],
+        "permiso de construcción": [
+            "permís de construcció"
+        ],
+        "permiso de reforma": [
+            "permís de reforma"
+        ],
+        "permiso comercial": [
+            "permís comercial"
+        ],
+        "permiso de aparcamiento": [
+            "permís de aparcament"
+        ],
+        "permiso de evento": [
+            "permís d'acte"
+        ],
+        "permiso de concentración": [
+            "permís de concentració"
+        ],
+        "permiso de manifestación": [
+            "permís de manifestació"
+        ],
+        "actividad comercial": [
+            "activitat comercial"
+        ],
+        "terraza": [
+            "terrassa"
+        ],
+        "inspección": [
+            "inspecció"
+        ],
+        "auditoría": [
+            "auditoria"
+        ],
+        "infracción": [
+            "infracció"
+        ],
+        "multa": [
+            "multa"
+        ],
+        "sanción": [
+            "sanció"
+        ],
+        "amnistía": [
+            "amnistia"
+        ],
+        "retraso": [
+            "retard"
+        ],
+        "documentación": [
+            "documentació"
+        ]
+    },
+    "fr": {
+        "plainte": [
+            "reclamació",
+            "denúncia"
+        ],
+        "reclamation": [
+            "reclamació"
+        ],
+        "permis": [
+            "permís"
+        ],
+        "licence": [
+            "llicència"
+        ],
+        "demande": [
+            "sol·licitud"
+        ],
+        "candidature": [
+            "sol·licitud"
+        ],
+        "procedure": [
+            "procediment"
+        ],
+        "document": [
+            "document"
+        ],
+        "frais": [
+            "taxa",
+            "tarifa"
+        ],
+        "tarif": [
+            "taxa"
+        ],
+        "exigence": [
+            "requisit"
+        ],
+        "bureaucratie": [
+            "paperassa"
+        ],
+        "approbation": [
+            "aprovació"
+        ],
+        "delai": [
+            "termini"
+        ],
+        "formulaire": [
+            "formulari"
+        ],
+        "bureau": [
+            "oficina"
+        ],
+        "petition": [
+            "petició"
+        ],
+        "certificat": [
+            "certificat"
+        ],
+        "certification": [
+            "certificat"
+        ],
+        "autorisation": [
+            "autorització"
+        ],
+        "enregistrement": [
+            "registre"
+        ],
+        "formulaire de reclamation": [
+            "formulari de reclamació"
+        ],
+        "administratif": [
+            "administrativa"
+        ],
+        "declaration": [
+            "declaració"
+        ],
+        "eligibilite": [
+            "elegibilitat"
+        ],
+        "soumission": [
+            "presentació"
+        ],
+        "rejet": [
+            "rebuig"
+        ],
+        "appel": [
+            "recurs"
+        ],
+        "prolongation": [
+            "pròrroga"
+        ],
+        "nettoyage des rues": [
+            "neteja de carrer"
+        ],
+        "nid de poule": [
+            "sot"
+        ],
+        "eclairage": [
+            "il·luminació"
+        ],
+        "entretien du parc": [
+            "manteniment de parc"
+        ],
+        "approvisionnement en eau": [
+            "subministrament d'aigua"
+        ],
+        "egout": [
+            "clavegueram"
+        ],
+        "collecte des ordures": [
+            "recollida de residus"
+        ],
+        "recyclage": [
+            "reciclatge"
+        ],
+        "panneaux routiers": [
+            "senyals de carrer"
+        ],
+        "reparations": [
+            "reparacions"
+        ],
+        "maintenance": [
+            "manteniment"
+        ],
+        "bruit": [
+            "soroll"
+        ],
+        "chantier": [
+            "construcció"
+        ],
+        "infraction de stationnement": [
+            "infraccio de aparcament"
+        ],
+        "depot sauvage": [
+            "abocament il·legal"
+        ],
+        "danger pour la sécurité": [
+            "perill per a la seguretat"
+        ],
+        "mauvais service": [
+            "mala atenció"
+        ],
+        "reponse retardee": [
+            "resposta retardada"
+        ],
+        "discrimination": [
+            "discriminació"
+        ],
+        "traitement injuste": [
+            "tracte injust"
+        ],
+        "harcelement": [
+            "assetjament"
+        ],
+        "permis de construction": [
+            "permís de construcció"
+        ],
+        "permis de renovation": [
+            "permís de reforma"
+        ],
+        "permis commercial": [
+            "permís comercial"
+        ],
+        "permis de stationnement": [
+            "permís de aparcament"
+        ],
+        "permis d'evenement": [
+            "permís d'acte"
+        ],
+        "permis de rassemblement": [
+            "permís de concentració"
+        ],
+        "permis de manifestation": [
+            "permís de manifestació"
+        ],
+        "activite commerciale": [
+            "activitat comercial"
+        ],
+        "terrasse": [
+            "terrassa"
+        ],
+        "inspection": [
+            "inspecció"
+        ],
+        "audit": [
+            "auditoria"
+        ],
+        "violation": [
+            "infracció"
+        ],
+        "amende": [
+            "multa"
+        ],
+        "penalite": [
+            "sanció"
+        ],
+        "amnistie": [
+            "amnistia"
+        ],
+        "retard": [
+            "retard"
+        ],
+        "documentation": [
+            "documentació"
+        ]
+    }
+}

@@ -153,34 +153,46 @@ public class OpenRouterController {
                 return HttpResponse.badRequest(err).contentType(MediaType.APPLICATION_JSON);
             }
 
-            // When OIDC is enabled for this city (via oidc-mapping.json), validate the
-            // X-Identity-Token header if provided. The verified IdP identity overrides
+            // When OIDC is enabled for this city (via oidc-mapping.json), the
+            // X-Identity-Token header is mandatory. The verified IdP identity overrides
             // any self-reported body fields, ensuring the PDF carries a cryptographically
             // verified NIF/NIE rather than user-supplied data.
             //
-            // If the header is absent the request proceeds with self-reported identity
-            // (or the AI asks for it). If the header is present but invalid, we return 401.
+            // If the header is absent or blank, we return 401 Unauthorized.
+            // If the header is present but invalid, we also return 401.
             if (identityTokenValidator != null && identityTokenValidator.isEnabledForCity(cityId)) {
                 String rawIdentityToken = httpRequest.getHeaders().get("X-Identity-Token");
-                if (rawIdentityToken != null && !rawIdentityToken.isBlank()) {
-                    try {
-                        VerifiedCitizenIdentity verified = identityTokenValidator.validate(rawIdentityToken, cityId);
-                        identity = new ComplainantIdentity(
-                                verified.name(), verified.surname(), verified.nif());
-                    } catch (IdentityTokenValidationException e) {
-                        long latency = System.currentTimeMillis() - start;
-                        AuditLogger.log("/complai/redact", AuditLogger.hashText(text),
-                                OpenRouterErrorCode.UNAUTHORIZED.getCode(), latency,
-                                format != null ? format.name() : null, null);
-                        logger.warning(() -> "POST /complai/redact rejected — httpStatus=401"
-                                + " reason=invalidIdentityToken: " + e.getMessage()
-                                + " conversationId=" + conversationId);
-                        OpenRouterPublicDto err = new OpenRouterPublicDto(false, null,
-                                "Identity token is invalid. Please re-authenticate.",
-                                OpenRouterErrorCode.UNAUTHORIZED.getCode(), List.of());
-                        return HttpResponse.unauthorized().body(err)
-                                .contentType(MediaType.APPLICATION_JSON);
-                    }
+                if (rawIdentityToken == null || rawIdentityToken.isBlank()) {
+                    long latency = System.currentTimeMillis() - start;
+                    AuditLogger.log("/complai/redact", AuditLogger.hashText(text),
+                            OpenRouterErrorCode.UNAUTHORIZED.getCode(), latency,
+                            format != null ? format.name() : null, null);
+                    logger.warning(() -> "POST /complai/redact rejected — httpStatus=401"
+                            + " reason=missingIdentityToken"
+                            + " conversationId=" + conversationId);
+                    OpenRouterPublicDto err = new OpenRouterPublicDto(false, null,
+                            "Identity verification is required. Please authenticate via your city's identity provider.",
+                            OpenRouterErrorCode.UNAUTHORIZED.getCode(), List.of());
+                    return HttpResponse.unauthorized().body(err)
+                            .contentType(MediaType.APPLICATION_JSON);
+                }
+                try {
+                    VerifiedCitizenIdentity verified = identityTokenValidator.validate(rawIdentityToken, cityId);
+                    identity = new ComplainantIdentity(
+                            verified.name(), verified.surname(), verified.nif());
+                } catch (IdentityTokenValidationException e) {
+                    long latency = System.currentTimeMillis() - start;
+                    AuditLogger.log("/complai/redact", AuditLogger.hashText(text),
+                            OpenRouterErrorCode.UNAUTHORIZED.getCode(), latency,
+                            format != null ? format.name() : null, null);
+                    logger.warning(() -> "POST /complai/redact rejected — httpStatus=401"
+                            + " reason=invalidIdentityToken: " + e.getMessage()
+                            + " conversationId=" + conversationId);
+                    OpenRouterPublicDto err = new OpenRouterPublicDto(false, null,
+                            "Identity token is invalid. Please re-authenticate.",
+                            OpenRouterErrorCode.UNAUTHORIZED.getCode(), List.of());
+                    return HttpResponse.unauthorized().body(err)
+                            .contentType(MediaType.APPLICATION_JSON);
                 }
             }
 

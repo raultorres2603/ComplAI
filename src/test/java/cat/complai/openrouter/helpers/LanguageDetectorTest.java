@@ -50,5 +50,40 @@ class LanguageDetectorTest {
         // Catalan-specific signals should dominate.
         assertEquals("CA", LanguageDetector.detect("Vull saber quan es farà la reparació, però ningú em respon."));
     }
+
+    @Test
+    void detect_frenchText_returnsFR() {
+        assertEquals("FR", LanguageDetector.detect("Je veux présenter une plainte sur le bruit."));
+    }
+
+    @Test
+    void detect_frenchWithAccents_returnsFR() {
+        // French uses accented characters extensively: é, è, ê, à, ô, û, ç
+        assertEquals("FR", LanguageDetector.detect("J'ai une réclamation à faire concernant l'éclairage."));
+    }
+
+    @Test
+    void detect_frenchWithCedilla_returnsFR() {
+        // ç is uniquely French (absent in Spanish, Catalan, English)
+        assertEquals("FR", LanguageDetector.detect("La mairie doit améliorer les façades des bâtiments."));
+    }
+
+    @Test
+    void detect_frenchKeywords_returnsFR() {
+        // French-specific keywords and phrases
+        assertEquals("FR", LanguageDetector.detect("Bonjour, vous devez autoriser ma demande de construction."));
+    }
+
+    @Test
+    void detect_frenchCivicVocabulary_returnsFR() {
+        // French civic terms used in complaints
+        assertEquals("FR", LanguageDetector.detect("Je veux demander un permis pour une manifestation."));
+    }
+
+    @Test
+    void detect_frenchVousMarker_returnsFR() {
+        // "vous" is strongly French (Spanish uses "usted", Catalan uses other forms)
+        assertEquals("FR", LanguageDetector.detect("Pouvez-vous m'aider avec mon autorisation?"));
+    }
 }
 

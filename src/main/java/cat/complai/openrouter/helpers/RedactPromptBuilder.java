@@ -184,11 +184,11 @@ public class RedactPromptBuilder {
     /**
      * Returns a mono-lingual system message for the given city and language code.
      * If {@code language} is null or not one of {@code "CA"}, {@code "ES"},
-     * {@code "EN"},
+     * {@code "EN"}, or {@code "FR"},
      * falls back to the full tri-lingual message.
      *
      * @param cityId   city identifier
-     * @param language ISO language code: "CA", "ES", or "EN"
+     * @param language ISO language code: "CA", "ES", "EN", or "FR"
      */
     public String getSystemMessage(String cityId, String language) {
         if (language == null) {
@@ -199,6 +199,7 @@ public class RedactPromptBuilder {
             case "CA" -> buildCatalanBlock(cfg);
             case "ES" -> buildSpanishBlock(cfg);
             case "EN" -> buildEnglishBlock(cfg);
+            case "FR" -> buildFrenchBlock(cfg);
             default -> getSystemMessage(cityId);
         };
     }
@@ -281,6 +282,32 @@ public class RedactPromptBuilder {
                         Official information: %s. Independent news: %s.
                         """,
                 cityName, boldHtml, linkHtml, listHtml, cityName, officialEn, indepEn);
+    }
+
+    private String buildFrenchBlock(CityConfig cfg) {
+        String cityName = cfg.cityName();
+        String officialFr = formatSources(cfg.officialSources(), " et ", " et ");
+        String indepFr = formatSources(cfg.newsSources(), ", ", "");
+        String boldHtml = FORMAT_RULES.getOrDefault("format.bold.html", "<strong>{text}</strong>");
+        String linkHtml = FORMAT_RULES.getOrDefault("format.link.html",
+                "<a href=\"{url}\" target=\"_blank\" rel=\"noopener noreferrer\">{text}</a>");
+        String listHtml = FORMAT_RULES.getOrDefault("format.list.html", "<ul><li>{item}</li></ul>");
+        return String.format(
+                """
+                        En français: Vous êtes un assistant local amical nommé Gall Potablava pour les résidents de %s.
+
+                        Les réponses s'affichent dans une application web. OBLIGATOIRE: utilisez UNIQUEMENT le format HTML. Jamais Markdown.
+                        FORMAT OBLIGATOIRE: %s pour le gras, %s pour les liens, %s pour les listes.
+                        URLS: JAMAIS inventer une URL. Utilisez uniquement les URLs qui apparaissent explicitement dans le contexte fourni pour les procédures, événements ou informations. Si un élément n'a pas d'URL dans le contexte, mentionnez simplement son nom sans lien. Les sources officielles sont pour l'information générale uniquement.
+                        • Fournissez des réponses détaillées et complètes. Quand il y a des procédures, événements ou informations connexes, nommez-les et INCLUEZ TOUJOURS le lien HTML dans la réponse si le contexte le fournit. Inclure l'URL est OBLIGATOIRE quand le contexte la contient.
+                        • Si on vous demande des événements mais aucune période n'est fournie (date, semaine, mois ou plage), demandez d'abord cette plage de dates avant de donner les résultats.
+                        • Structurez votre réponse clairement: explication d'abord, puis étapes si applicable, puis liens utiles.
+                        • Soyez respectueux et approchable.
+                        • Si la demande ne concerne pas %s, dites-le poliment et suggérez qu'ils posent des questions sur des sujets locaux.
+
+                        Informations officielles: %s. Actualités indépendantes: %s.
+                        """,
+                cityName, boldHtml, linkHtml, listHtml, cityName, officialFr, indepFr);
     }
 
     /**

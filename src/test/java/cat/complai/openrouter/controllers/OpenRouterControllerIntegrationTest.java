@@ -1,6 +1,5 @@
 package cat.complai.openrouter.controllers;
 
-import cat.complai.auth.ApiKeyAuthFilter;
 import cat.complai.http.HttpWrapper;
 import cat.complai.http.OpenRouterStreamingException;
 import cat.complai.http.dto.HttpDto;
@@ -24,14 +23,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Replaces;
-import io.micronaut.core.annotation.Nullable;
-import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.MutableHttpRequest;
-import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.annotation.RequestFilter;
-import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
@@ -106,7 +99,7 @@ public class OpenRouterControllerIntegrationTest {
         // HttpWrapper.
         OpenRouterResponseDto result = openRouterService.ask("Is there a recycling center?", null, "elprat");
         assertTrue(result.isSuccess());
-        assertEquals("OK from AI (integration)", result.getMessage());
+        assertEquals("<p>OK from AI (integration)</p>", result.getMessage());
     }
 
     @Test
@@ -140,23 +133,40 @@ public class OpenRouterControllerIntegrationTest {
         // Tested at service level — the SSE stream does not carry sources metadata.
         OpenRouterResponseDto result = openRouterService.ask("recycling center", null, "elprat");
         assertTrue(result.isSuccess());
-        assertEquals("OK from AI (integration)", result.getMessage());
+        assertEquals("<p>OK from AI (integration)</p>", result.getMessage());
         assertNotNull(result.getSources());
         assertTrue(result.getSources().isEmpty());
     }
 
     @Test
     void integration_redact_success() {
-        RedactRequest req = new RedactRequest("There is noise from the airport");
-        HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req)
-                .header("X-Api-Key", TEST_API_KEY);
-        HttpResponse<OpenRouterPublicDto> resp = client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
-        assertEquals(200, resp.getStatus().getCode());
-        Optional<OpenRouterPublicDto> bodyOpt = resp.getBody();
-        assertTrue(bodyOpt.isPresent());
-        OpenRouterPublicDto body = bodyOpt.get();
-        assertTrue(body.isSuccess());
-        assertEquals("Redacted (integration)", body.getMessage());
+        try {
+            RedactRequest req = new RedactRequest("There is noise from the airport");
+            System.out.println("DEBUG: Creating request with text: " + req.getText());
+            HttpRequest<RedactRequest> httpReq = HttpRequest.POST("/complai/redact", req)
+                    .header("X-Api-Key", TEST_API_KEY);
+            System.out.println("DEBUG: About to call /complai/redact");
+            HttpResponse<OpenRouterPublicDto> resp = client.toBlocking().exchange(httpReq, OpenRouterPublicDto.class);
+            System.out.println("DEBUG: Got response with status: " + resp.getStatus().getCode());
+            assertEquals(200, resp.getStatus().getCode());
+            Optional<OpenRouterPublicDto> bodyOpt = resp.getBody();
+            assertTrue(bodyOpt.isPresent());
+            OpenRouterPublicDto body = bodyOpt.get();
+            assertTrue(body.isSuccess());
+            System.out.println("DEBUG: Actual message = [" + body.getMessage() + "]");
+            System.out.println("DEBUG: Expected message = [<p>Redacted (integration)</p>]");
+            System.out.println(
+                    "DEBUG: Message length = " + (body.getMessage() != null ? body.getMessage().length() : "null"));
+            assertEquals("<p>Redacted (integration)</p>", body.getMessage());
+        } catch (Exception e) {
+            System.out.println("DEBUG: Exception occurred: " + e.getClass().getName());
+            System.out.println("DEBUG: Exception message: " + e.getMessage());
+            if (e instanceof HttpClientResponseException hcre) {
+                System.out.println("DEBUG: HTTP Status: " + hcre.getStatus());
+                System.out.println("DEBUG: Response body: " + hcre.getResponse().body());
+            }
+            throw e;
+        }
     }
 
     @Test
@@ -927,7 +937,8 @@ public class OpenRouterControllerIntegrationTest {
                             .completedFuture(new HttpDto("OK from AI (integration)", 200, "POST", null));
                 }
                 // Fallback: simulate a generic successful redact response
-                return CompletableFuture.completedFuture(new HttpDto("Redacted (integration)", 200, "POST", null));
+                return CompletableFuture
+                        .completedFuture(new HttpDto("Redacted (integration)", 200, "POST", null));
             }
 
             @Override
@@ -968,7 +979,7 @@ public class OpenRouterControllerIntegrationTest {
                             "data: [DONE]"));
                 }
                 if (userPrompt != null && userPrompt.contains("[SSE_MULTIEXENT]")) {
-                    // Mock SSE stream with multiple events for testing
+                    // Mock SSE stream with multiple chunk events in OpenRouter format
                     String chunk1 = "data: {\"choices\":[{\"delta\":{\"content\":\"Response \"}}]}";
                     String chunk2 = "data: {\"choices\":[{\"delta\":{\"content\":\"with sources\"}}]}";
                     String done = "data: [DONE]";
@@ -976,7 +987,7 @@ public class OpenRouterControllerIntegrationTest {
                             reactor.core.publisher.Flux.just(chunk1, chunk2, done));
                 }
                 if (userPrompt != null && userPrompt.contains("[SSE_MULTIEXENT_CONVID]")) {
-                    // Same as above
+                    // Same as above but with conversationId passed in the request
                     String chunk1 = "data: {\"choices\":[{\"delta\":{\"content\":\"Test \"}}]}";
                     String chunk2 = "data: {\"choices\":[{\"delta\":{\"content\":\"response\"}}]}";
                     String done = "data: [DONE]";
@@ -1004,7 +1015,7 @@ public class OpenRouterControllerIntegrationTest {
                                     "OpenRouter streaming failed.",
                                     null))));
                 }
-                // Default: successful streaming response
+                // Default: successful streaming response in OpenRouter format
                 return new OpenRouterStreamStartResult.Success(reactor.core.publisher.Flux.just(
                         "data: {\"choices\":[{\"delta\":{\"content\":\"OK from AI (integration)\"}}]}",
                         "data: [DONE]"));
@@ -1016,70 +1027,6 @@ public class OpenRouterControllerIntegrationTest {
     @Replaces(ResponseCacheService.class)
     ResponseCacheService enabledResponseCacheService() {
         return new ResponseCacheService(true, 10, 500);
-    }
-
-    @MockBean(ApiKeyAuthFilter.class)
-    ApiKeyAuthFilter testApiKeyAuthFilterBean() {
-        return new ApiKeyAuthFilter(Map.of(
-                TEST_API_KEY, "elprat",
-                TEST_API_KEY_TESTCITY, "testcity"));
-    }
-
-    // -----------------------------------------------------------------------
-    // Test Filter Bean — replaces ApiKeyAuthFilter in the HTTP pipeline
-    // -----------------------------------------------------------------------
-
-    @Singleton
-    @ServerFilter("/**")
-    @Replaces(ApiKeyAuthFilter.class)
-    static class TestApiKeyFilterOpenRouter {
-        private static final Logger logger = Logger.getLogger(TestApiKeyFilterOpenRouter.class.getName());
-        private final Map<String, String> apiKeyToCityId = Map.of(
-                "test-integration-key-elprat", "elprat",
-                "test-integration-key-testcity", "testcity",
-                "test-api-key-feedback", "elprat");
-
-        @RequestFilter
-        @Nullable
-        public MutableHttpResponse<?> filter(MutableHttpRequest<?> request) {
-            if (isExcluded(request)) {
-                return null;
-            }
-
-            String apiKey = request.getHeaders().get("X-Api-Key");
-            if (apiKey == null || apiKey.isBlank()) {
-                logger.warning(() -> "Missing X-Api-Key header — httpStatus=401 method=" + request.getMethod()
-                        + " path=" + request.getPath());
-                return unauthorizedResponse("Missing X-Api-Key header");
-            }
-
-            String cityId = apiKeyToCityId.get(apiKey);
-            if (cityId == null) {
-                logger.warning(() -> "Invalid API key — httpStatus=401 method=" + request.getMethod()
-                        + " path=" + request.getPath());
-                return unauthorizedResponse("Invalid API key");
-            }
-
-            request.setAttribute(ApiKeyAuthFilter.CITY_ATTRIBUTE, cityId);
-            request.setAttribute(ApiKeyAuthFilter.USER_ATTRIBUTE, "api-key-client");
-
-            return null;
-        }
-
-        private boolean isExcluded(HttpRequest<?> request) {
-            String path = request.getPath();
-            HttpMethod method = request.getMethod();
-            return HttpMethod.GET.equals(method)
-                    && (path.equals("/") || path.equals("/health") || path.equals("/health/startup"));
-        }
-
-        private MutableHttpResponse<?> unauthorizedResponse(String reason) {
-            Map<String, Object> body = Map.of(
-                    "success", false,
-                    "message", reason == null ? "Unauthorized" : reason,
-                    "errorCode", OpenRouterErrorCode.UNAUTHORIZED.getCode());
-            return HttpResponse.unauthorized().body(body);
-        }
     }
 
     @MockBean(SqsComplaintPublisher.class)

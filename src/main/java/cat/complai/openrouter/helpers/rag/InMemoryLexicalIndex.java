@@ -18,10 +18,10 @@ public final class InMemoryLexicalIndex<T> {
     private final LexicalScorer lexicalScorer;
 
     public InMemoryLexicalIndex(List<IndexedDocument<T>> documents,
-                                Map<String, Double> averageFieldLength,
-                                Map<String, Map<String, Integer>> docFrequencyByField,
-                                Map<String, Double> fieldWeights,
-                                LexicalScorer lexicalScorer) {
+            Map<String, Double> averageFieldLength,
+            Map<String, Map<String, Integer>> docFrequencyByField,
+            Map<String, Double> fieldWeights,
+            LexicalScorer lexicalScorer) {
         this.documents = List.copyOf(documents);
         this.averageFieldLength = Map.copyOf(averageFieldLength);
         this.docFrequencyByField = Map.copyOf(docFrequencyByField);
@@ -30,8 +30,8 @@ public final class InMemoryLexicalIndex<T> {
     }
 
     public static <T> InMemoryLexicalIndex<T> build(List<T> entities,
-                                                    Map<String, Double> fieldWeights,
-                                                    Function<T, Map<String, String>> fieldExtractor) {
+            Map<String, Double> fieldWeights,
+            Function<T, Map<String, String>> fieldExtractor) {
         List<IndexedDocument<T>> docs = new ArrayList<>();
         Map<String, Integer> totalFieldLengths = new HashMap<>();
         Map<String, Map<String, Integer>> docFrequencies = new HashMap<>();
@@ -60,7 +60,8 @@ public final class InMemoryLexicalIndex<T> {
                 termFrequenciesByField.put(fieldName, Map.copyOf(termFrequency));
 
                 for (String token : termFrequency.keySet()) {
-                    Map<String, Integer> byField = docFrequencies.computeIfAbsent(fieldName, ignored -> new HashMap<>());
+                    Map<String, Integer> byField = docFrequencies.computeIfAbsent(fieldName,
+                            ignored -> new HashMap<>());
                     int currentDocFrequency = byField.getOrDefault(token, 0);
                     byField.put(token, currentDocFrequency + 1);
                 }
@@ -93,6 +94,75 @@ public final class InMemoryLexicalIndex<T> {
                 new LexicalScorer());
     }
 
+    public static <T> InMemoryLexicalIndex<T> build(List<T> entities,
+            Map<String, Double> fieldWeights,
+            Function<T, Map<String, String>> fieldExtractor,
+            Function<T, String> languageExtractor,
+            String... languageTags) {
+        List<IndexedDocument<T>> docs = new ArrayList<>();
+        Map<String, Integer> totalFieldLengths = new HashMap<>();
+        Map<String, Map<String, Integer>> docFrequencies = new HashMap<>();
+
+        int sourceOrder = 0;
+        for (T entity : entities) {
+            Map<String, String> fields = fieldExtractor.apply(entity);
+            Map<String, List<String>> fieldTokens = new LinkedHashMap<>();
+            Map<String, Integer> fieldLengths = new LinkedHashMap<>();
+            Map<String, Map<String, Integer>> termFrequenciesByField = new LinkedHashMap<>();
+
+            for (Map.Entry<String, Double> weightedField : fieldWeights.entrySet()) {
+                String fieldName = weightedField.getKey();
+                String rawValue = fields.getOrDefault(fieldName, "");
+                List<String> tokens = TokenNormalizer.tokenize(rawValue);
+                fieldTokens.put(fieldName, tokens);
+                fieldLengths.put(fieldName, tokens.size());
+                int currentFieldLength = totalFieldLengths.getOrDefault(fieldName, 0);
+                totalFieldLengths.put(fieldName, currentFieldLength + tokens.size());
+
+                Map<String, Integer> termFrequency = new HashMap<>();
+                for (String token : tokens) {
+                    int currentFrequency = termFrequency.getOrDefault(token, 0);
+                    termFrequency.put(token, currentFrequency + 1);
+                }
+                termFrequenciesByField.put(fieldName, Map.copyOf(termFrequency));
+
+                for (String token : termFrequency.keySet()) {
+                    Map<String, Integer> byField = docFrequencies.computeIfAbsent(fieldName,
+                            ignored -> new HashMap<>());
+                    int currentDocFrequency = byField.getOrDefault(token, 0);
+                    byField.put(token, currentDocFrequency + 1);
+                }
+            }
+
+            String docLanguage = languageExtractor.apply(entity);
+            docs.add(new IndexedDocument<>(
+                    sourceOrder++,
+                    entity,
+                    Map.copyOf(fieldTokens),
+                    Map.copyOf(fieldLengths),
+                    Map.copyOf(termFrequenciesByField),
+                    docLanguage != null ? docLanguage : "CA"));
+        }
+
+        int totalDocuments = Math.max(1, docs.size());
+        Map<String, Double> averageFieldLength = new HashMap<>();
+        for (String fieldName : fieldWeights.keySet()) {
+            averageFieldLength.put(fieldName, totalFieldLengths.getOrDefault(fieldName, 0) / (double) totalDocuments);
+        }
+
+        Map<String, Map<String, Integer>> immutableDocFrequencies = new HashMap<>();
+        for (Map.Entry<String, Map<String, Integer>> entry : docFrequencies.entrySet()) {
+            immutableDocFrequencies.put(entry.getKey(), Map.copyOf(entry.getValue()));
+        }
+
+        return new InMemoryLexicalIndex<>(
+                docs,
+                averageFieldLength,
+                immutableDocFrequencies,
+                fieldWeights,
+                new LexicalScorer());
+    }
+
     public SearchResponse<T> search(String query, int topK, double absoluteFloor, double relativeFloor) {
         List<String> queryTokens = TokenNormalizer.tokenize(query);
         if (queryTokens.isEmpty() || topK <= 0 || documents.isEmpty()) {
@@ -103,6 +173,11 @@ public final class InMemoryLexicalIndex<T> {
     }
 
     public SearchResponse<T> search(List<String> queryTokens, int topK, double absoluteFloor, double relativeFloor) {
+        return search(queryTokens, topK, absoluteFloor, relativeFloor, null);
+    }
+
+    public SearchResponse<T> search(List<String> queryTokens, int topK, double absoluteFloor, double relativeFloor,
+            String queryLanguage) {
         if (queryTokens.isEmpty() || topK <= 0 || documents.isEmpty()) {
             return SearchResponse.empty(absoluteFloor, relativeFloor);
         }
@@ -118,7 +193,8 @@ public final class InMemoryLexicalIndex<T> {
             for (Map.Entry<String, Double> fieldWeight : fieldWeights.entrySet()) {
                 String fieldName = fieldWeight.getKey();
                 double weight = fieldWeight.getValue();
-                Map<String, Integer> fieldTermFrequency = document.fieldTermFrequency().getOrDefault(fieldName, Map.of());
+                Map<String, Integer> fieldTermFrequency = document.fieldTermFrequency().getOrDefault(fieldName,
+                        Map.of());
                 int fieldLength = document.fieldLengths().getOrDefault(fieldName, 0);
                 double avgFieldLength = averageFieldLength.getOrDefault(fieldName, 1.0d);
                 Map<String, Integer> fieldDocFrequency = docFrequencyByField.getOrDefault(fieldName, Map.of());
@@ -136,6 +212,14 @@ public final class InMemoryLexicalIndex<T> {
                             fieldLength,
                             avgFieldLength,
                             weight);
+                }
+            }
+
+            // Apply language boost if query language matches document language
+            if (score > 0.0d && queryLanguage != null && !queryLanguage.isEmpty()) {
+                String docLanguage = document.language();
+                if (docLanguage != null && queryLanguage.equalsIgnoreCase(docLanguage)) {
+                    score *= 1.5d;
                 }
             }
 
