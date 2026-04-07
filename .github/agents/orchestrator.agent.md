@@ -2,7 +2,7 @@
 description: "Use when: the user makes a high-level request that involves planning AND implementation AND documentation, or any multi-agent workflow. The orchestrator understands the full request, clarifies ambiguities, delegates to planner/builder/documentator/Explore agents in the right order, tracks their progress, and delivers a unified summary. DO NOT use for single-agent tasks where the user explicitly targets planner, builder, or documentator directly."
 name: "orchestrator"
 tools: [todo, agent]
-agents: [planner, builder, reviewer, documentator, Explore]
+agents: [planner, builder, reviewer, documentator]
 argument-hint: "Describe what you want to achieve at a high level (e.g. 'Add a PDF export endpoint with tests and updated README')"
 user-invocable: true
 ---
@@ -16,28 +16,24 @@ Load and follow the [orchestrator skill](./../skills/orchestrator/SKILL.md) for 
 
 | Agent | Responsibility |
 |-------|----------------|
-| `planner` | Analyzes requirements and produces a structured `task.md` |
-| `builder` | Implements code, tests, and CDK infrastructure from `task.md` |
+| `planner` | Analyzes requirements, explores codebase, and produces a structured `task.md` |
+| `builder` | Implements code, tests, and CDK infrastructure from `task.md`; explores codebase for context |
 | `reviewer` | Validates the builder's output against `task.md`; produces a PASS/FAIL report |
 | `documentator` | Writes or updates README and other project documentation |
-| `Explore` | Read-only codebase exploration and Q&A — use for fact-finding before delegating |
 
 ## Workflow
 
 ### 1. Understand & Clarify
 Read the user's request carefully. If **anything** is ambiguous — scope, acceptance criteria, which modules are affected, whether tests are required, whether docs need updating — **ask targeted clarifying questions before proceeding**. Do not start delegating until you are confident the requirement is unambiguous and complete.
 
-Use the `Explore` agent for quick fact-finding if you need codebase context to formulate the right questions or delegation plan.
-
 ### 2. Build the Delegation Plan
 Once the requirement is clear, write a todo list that maps each unit of work to its responsible agent. Typical ordering:
 
-1. Explore (optional — if codebase context is needed)
-2. Planner → produces `task.md`
-3. Builder → implements `task.md`
-4. Documentator (optional — if docs need updating)
+1. Planner → explores codebase and produces `task.md`
+2. Builder → implements `task.md` (explores codebase for additional context as needed)
+3. Documentator (optional — if docs need updating)
 
-Adjust the plan based on the actual request. Not every request needs all four agents.
+Adjust the plan based on the actual request. Not every request needs all three agents.
 
 ### 3. Delegate Sequentially
 Invoke agents one at a time in the planned order. Pass each agent a precise, self-contained prompt that includes:

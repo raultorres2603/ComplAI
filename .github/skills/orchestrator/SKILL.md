@@ -40,11 +40,11 @@ Before touching any agent, fully understand the request.
 
    | Condition | Agents to include |
    |-----------|------------------|
-   | New feature or non-trivial change | `Explore` → `planner` → `builder` → `reviewer` |
+   | New feature or non-trivial change | `planner` → `builder` → `reviewer` (planner uses `Explore` as needed) |
    | Trivial bug fix / small addition where scope is obvious | `builder` → `reviewer` (skip `planner`) |
    | Documentation-only change | `documentator` only |
-   | Code change + doc update | `planner` → `builder` → `reviewer` → `documentator` |
-   | Need codebase facts before planning | Prepend `Explore` |
+   | Code change + doc update | `planner` → `builder` → `reviewer` → `documentator` (planner/builder use `Explore` as needed) |
+   | Need codebase facts | `planner` handles via `Explore` internally; do not prepend outside the orchestrator |
 
 2. Write a `todo` list. Each item must be **one agent invocation**, named as:
    ```
@@ -52,8 +52,7 @@ Before touching any agent, fully understand the request.
    ```
    Example:
    ```
-   [Explore]      — Confirm existing complaint service location and method signatures
-   [planner]      — Write task.md for the new PDF export endpoint
+   [planner]      — Explore codebase and write task.md for the new PDF export endpoint
    [builder]      — Implement task.md (PDF export endpoint + tests)
    [reviewer]     — Validate builder output against task.md; emit PASS/FAIL report
    [documentator] — Update README with the new PDF export endpoint

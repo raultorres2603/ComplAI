@@ -1,6 +1,6 @@
 ---
 name: builder
-description: "Step-by-step implementation workflow for the ComplAI project. Use when: implementing task.md, writing Java/Micronaut code, adding controllers/services/AWS wrappers, writing JUnit 5 tests, adding CDK infrastructure, fixing bugs. Covers exact package layout, code patterns, test patterns, Gradle commands, and final summary format."
+description: "Step-by-step implementation workflow for the ComplAI project. Use when: implementing task.md, writing Java/Micronaut code, adding controllers/services/AWS wrappers, writing JUnit 5 tests, adding CDK infrastructure, fixing bugs. Covers exact package layout, code patterns, test patterns, Gradle commands, and final summary format. Includes Explore agent for codebase context-gathering."
 argument-hint: "Point to task.md or describe what to implement (e.g. 'Implement task.md' or 'Add the notification endpoint')"
 ---
 
@@ -44,9 +44,10 @@ Before writing a single line of code:
 
 For every task step, **read before you write**:
 
-1. Locate the relevant class using search. Use the package map in [./references/package-map.md](./references/package-map.md) as a guide.
-2. Read the constructors, field declarations, and existing error handling of the nearest neighbour class.
-3. Only create a new file if no existing class fits. Follow the naming and packaging rules in [./references/conventions.md](./references/conventions.md).
+1. **Decide whether to delegate to Explore**: If you need fast, comprehensive codebase context (e.g., finding all handlers for a domain, understanding a complex service hierarchy), use the `Explore` agent. Otherwise, proceed with targeted searches in steps 2–3.
+2. Locate the relevant class using search. Use the package map in [./references/package-map.md](./references/package-map.md) as a guide.
+3. Read the constructors, field declarations, and existing error handling of the nearest neighbour class.
+4. Only create a new file if no existing class fits. Follow the naming and packaging rules in [./references/conventions.md](./references/conventions.md).
 
 ---
 

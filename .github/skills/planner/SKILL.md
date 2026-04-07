@@ -1,6 +1,6 @@
 ---
 name: planner
-description: "Detailed planning workflow for the Planner agent. Use when: analyzing requirements, exploring codebase, researching best practices, producing task.md, creating implementation plan, breaking down tasks, planning features, writing steps, requirement analysis."
+description: "Detailed planning workflow for the Planner agent. Use when: analyzing requirements, exploring codebase (via Explore agent), researching best practices, producing task.md, creating implementation plan, breaking down tasks, planning features, writing steps, requirement analysis."
 argument-hint: "Describe the feature or requirement to plan"
 ---
 
@@ -41,16 +41,17 @@ Produce a structured, fully populated `task.md` at the workspace root from a giv
 
 ### Steps
 
-1. **Locate entry point**: Search for the controller, handler, or SQS listener closest to the requirement domain.
-2. **Trace the call chain** down to repository / infrastructure layer:
+1. **Decide whether to delegate to Explore**: If the requirement scope is complex or you need a thorough codebase survey to plan effectively, use the `Explore` agent to gather context. Otherwise, proceed with targeted searches in steps 2–5.
+2. **Locate entry point**: Search for the controller, handler, or SQS listener closest to the requirement domain.
+3. **Trace the call chain** down to repository / infrastructure layer:
    - Controller → Service → Repository / AWS client
-3. **Identify existing patterns** to follow:
+4. **Identify existing patterns** to follow:
    - Constructor injection style (never field injection)
    - Error handling conventions (`@Error` handlers, exception types used)
    - Configuration binding (`@Value`, `@ConfigurationProperties`)
    - DTO / record patterns in use
-4. **List affected files**: Every file that will be created or modified.
-5. **Flag risks**: Shared utilities, cross-cutting concerns, or files touched by multiple features simultaneously.
+5. **List affected files**: Every file that will be created or modified.
+6. **Flag risks**: Shared utilities, cross-cutting concerns, or files touched by multiple features simultaneously.
 
 ### Search Strategy
 
