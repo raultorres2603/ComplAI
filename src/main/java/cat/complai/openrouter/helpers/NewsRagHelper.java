@@ -22,8 +22,24 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * RAG helper for city news articles.
+ *
+ * <p>Builds and queries an {@link InMemoryLexicalIndex} (BM25) over the news corpus for
+ * a specific city. The corpus JSON is loaded from S3 (when {@code NEWS_BUCKET} and
+ * {@code NEWS_REGION} environment variables are set) or from the classpath resource
+ * {@code /news-<cityId>.json} (for local tests).
+ *
+ * <p>Returns the top-{@code MAX_RESULTS} news articles most relevant to the user's query,
+ * including title, summary, body, publication date, categories, author, and URL.
+ */
 public class NewsRagHelper {
 
+    /**
+     * Represents a single news article with all retrievable fields.
+     *
+     * <p>Fields may be null when the source JSON does not include them for a given article.
+     */
     public static class News {
         public final String newsId;
         public final String title;

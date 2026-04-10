@@ -6,6 +6,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * Public-facing response DTO serialised to JSON for all API responses.
+ *
+ * <p>A subset of {@link OpenRouterResponseDto}: PDF bytes are stripped (never sent over the
+ * wire in this form) and the error code is surfaced as a plain integer for easy parsing by
+ * front-end clients. Use {@link #from(OpenRouterResponseDto)} to convert from the internal DTO.
+ */
 @Introspected
 public class OpenRouterPublicDto {
     private final boolean success;

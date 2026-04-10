@@ -6,6 +6,21 @@ import jakarta.inject.Singleton;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * Startup service that pre-warms the in-memory RAG indexes for the default city.
+ *
+ * <p>Runs automatically after bean initialisation ({@code @PostConstruct}). Loading the
+ * indexes during startup — rather than lazily on the first request — eliminates the
+ * latency spike that would otherwise be paid by the first citizen to send a message after
+ * a Lambda cold start.
+ *
+ * <p>A warmup failure is logged as a warning but does not prevent the application from
+ * starting. The first request for the affected city will pay the loading cost instead.
+ *
+ * <p>The default city is controlled by the {@code complai.default-city-id} property
+ * (mapped from the {@code COMPLAI_DEFAULT_CITY_ID} environment variable, default
+ * {@code elprat}).
+ */
 @Singleton
 public class RagWarmupService {
 

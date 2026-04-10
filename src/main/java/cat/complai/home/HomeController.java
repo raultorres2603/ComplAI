@@ -7,11 +7,23 @@ import io.micronaut.http.annotation.Get;
 
 import java.util.logging.Logger;
 
+/**
+ * Root HTTP controller for the ComplAI API.
+ *
+ * <p>Serves a single {@code GET /} welcome response. This endpoint is excluded from
+ * API key authentication and is typically used to verify that the Lambda function has
+ * started and is reachable. No business logic is executed here.
+ */
 @Controller()
 public class HomeController {
 
     private final Logger logger = Logger.getLogger(HomeController.class.getName());
 
+    /**
+     * Returns a welcome message for the ComplAI home page.
+     *
+     * @return {@code 200 OK} with a JSON body containing the welcome message
+     */
     @Get()
     public HttpResponse<HomeDto> index() {
         logger.fine("GET / — serving home page");

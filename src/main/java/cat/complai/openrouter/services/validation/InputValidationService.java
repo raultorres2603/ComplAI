@@ -9,6 +9,21 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.logging.Logger;
 
+/**
+ * Validates user-supplied text inputs at the service boundary.
+ *
+ * <p>All validation is performed before any AI call is made, ensuring that invalid or
+ * policy-violating inputs are rejected cheaply. Two separate validation paths exist:
+ * <ul>
+ *   <li>{@link #validateQuestion(String)} — used by the {@code /ask} flow</li>
+ *   <li>{@link #validateRedactInput(String)} — used by the {@code /redact} flow; additionally
+ *       rejects requests that explicitly ask for an anonymous complaint, which the Ajuntament
+ *       cannot process</li>
+ * </ul>
+ *
+ * <p>The maximum allowed input length is controlled by the
+ * {@code complai.input.max-length-chars} property (default 5,000 characters).
+ */
 @Singleton
 public class InputValidationService {
     
@@ -20,6 +35,13 @@ public class InputValidationService {
         this.maxInputLength = maxInputLength;
     }
     
+    /**
+     * Validates a citizen question for the {@code /ask} flow.
+     *
+     * @param question the raw question text
+     * @return an empty {@link Optional} when valid; a {@link OpenRouterResponseDto} with
+     *         {@link cat.complai.openrouter.dto.OpenRouterErrorCode#VALIDATION} when invalid
+     */
     public Optional<OpenRouterResponseDto> validateQuestion(String question) {
         if (question == null || question.isBlank()) {
             return Optional.of(new OpenRouterResponseDto(false, null, "Question must not be empty.", null, OpenRouterErrorCode.VALIDATION));
@@ -31,6 +53,17 @@ public class InputValidationService {
         return Optional.empty();
     }
     
+    /**
+     * Validates a complaint text for the {@code /redact} flow.
+     *
+     * <p>In addition to the null/blank/length checks performed by
+     * {@link #validateQuestion(String)}, this method rejects any text that explicitly
+     * requests anonymity, since the Ajuntament does not process anonymous complaints.
+     *
+     * @param complaint the raw complaint text
+     * @return an empty {@link Optional} when valid; a {@link OpenRouterResponseDto} with
+     *         {@link cat.complai.openrouter.dto.OpenRouterErrorCode#VALIDATION} when invalid
+     */
     public Optional<OpenRouterResponseDto> validateRedactInput(String complaint) {
         if (complaint == null || complaint.isBlank()) {
             return Optional.of(new OpenRouterResponseDto(false, null, "Complaint must not be empty.", null, OpenRouterErrorCode.VALIDATION));

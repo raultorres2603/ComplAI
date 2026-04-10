@@ -9,6 +9,20 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 
+/**
+ * Generic in-memory BM25 lexical index for retrieval-augmented generation (RAG).
+ *
+ * <p>Indexes a list of typed entities by extracting named text fields (e.g. "title",
+ * "description"). Each field can be given a different importance weight. At query time,
+ * the BM25 scoring function ({@link LexicalScorer}) ranks documents by relevance to the
+ * tokenised query and returns the top-N results that exceed a configurable score floor.
+ *
+ * <p>Build once per corpus with {@link #build(List, Map, Function)} and then call
+ * {@link #search(List, int, double, double)} repeatedly for different queries.
+ * All state is immutable after construction — the index is thread-safe.
+ *
+ * @param <T> the entity type being indexed (e.g. {@code Procedure}, {@code Event})
+ */
 public final class InMemoryLexicalIndex<T> {
 
     private final List<IndexedDocument<T>> documents;

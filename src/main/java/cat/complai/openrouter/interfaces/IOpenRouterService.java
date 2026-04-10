@@ -7,6 +7,14 @@ import cat.complai.openrouter.dto.OutputFormat;
 
 import java.util.Optional;
 
+/**
+ * Service contract for the ComplAI question-answering and complaint-drafting flows.
+ *
+ * <p>The controller depends on this interface rather than the concrete implementation,
+ * making the service trivially replaceable in tests. All methods are non-throwing: the
+ * implementation catches internal exceptions and maps them to typed {@link OpenRouterResponseDto}
+ * error values.
+ */
 public interface IOpenRouterService {
     OpenRouterResponseDto ask(String question, String conversationId, String cityId);
 

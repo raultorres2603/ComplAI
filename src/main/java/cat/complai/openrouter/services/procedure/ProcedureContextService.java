@@ -28,6 +28,25 @@ import java.util.regex.Pattern;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * Assembles RAG (Retrieval-Augmented Generation) context for a citizen query.
+ *
+ * <p>Queries four independent in-memory lexical indexes:
+ * <ul>
+ *   <li>Procedures — municipal tramits and how-to guides from the Ajuntament website</li>
+ *   <li>Events — cultural and civic events from the city agenda</li>
+ *   <li>News — recent news articles published by the municipality</li>
+ *   <li>City info — general city information (services, infrastructure, contacts)</li>
+ * </ul>
+ *
+ * <p>A lightweight intent-detection pass ({@link #questionNeedsProcedureContext(String, String)},
+ * {@link #requiresEventDateWindowClarification(String, String)}, etc.) decides which indexes to
+ * query, reducing unnecessary S3 reads and BM25 scoring for conversational exchanges that do not
+ * involve procedures or events.
+ *
+ * <p>All index lookups are per-city: the city identifier from the caller's API key determines
+ * which JSON corpus is loaded from S3 (key pattern: {@code procedures-<cityId>.json}, etc.).
+ */
 @Singleton
 public class ProcedureContextService {
 

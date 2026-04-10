@@ -43,6 +43,23 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+/**
+ * Primary implementation of {@link IOpenRouterService}.
+ *
+ * <p>Orchestrates the full request lifecycle for both the {@code /ask} and {@code /redact} flows:
+ * <ol>
+ *   <li>Input validation via {@link InputValidationService}</li>
+ *   <li>Conversation history lookup via {@link ConversationManagementService} (Caffeine cache)</li>
+ *   <li>RAG context assembly via {@link ProcedureContextService} (procedures, events, news,
+ *       city-info) executed in parallel using a virtual-thread executor</li>
+ *   <li>Prompt construction and OpenRouter invocation via {@link HttpWrapper}</li>
+ *   <li>Response processing, refusal detection, and cache update via
+ *       {@link AiResponseProcessingService}</li>
+ * </ol>
+ *
+ * <p>All exceptions are caught and converted to typed {@link OpenRouterResponseDto} error values
+ * so the controller never needs to handle unchecked exceptions from the service layer.
+ */
 @Singleton
 public class OpenRouterServices implements IOpenRouterService {
 

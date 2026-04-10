@@ -6,6 +6,17 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ * Internal service-layer response DTO.
+ *
+ * <p>Carries the AI response (or error information) from the service layer to the controller.
+ * The controller converts this into an {@link OpenRouterPublicDto} for the HTTP response body.
+ * PDF bytes ({@code pdfData}) are populated only in the synchronous JSON path — the async PDF
+ * path sends bytes directly to S3 via the worker Lambda.
+ *
+ * <p>The service layer always returns an instance of this class rather than throwing exceptions.
+ * Failures are indicated by {@code success=false} and the appropriate {@link OpenRouterErrorCode}.
+ */
 @Introspected
 public class OpenRouterResponseDto {
     private final boolean success;

@@ -13,6 +13,17 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * In-memory PDF generator for complaint letters using Apache PDFBox.
+ *
+ * <p>Renders a plain-text letter body as an A4 PDF entirely in memory — no temporary files
+ * are created. The embedded font is {@code NotoSans-Regular.ttf}, which provides full Unicode
+ * coverage for Catalan ({@code ç, à, ü, ·l}), Spanish, and English characters. Falls back to
+ * Helvetica if the font resource is missing from the classpath.
+ *
+ * <p>Long lines are word-wrapped to fit within the A4 page margins and new pages are added
+ * automatically when the content overflows the current page.
+ */
 public class PdfGenerator {
 
     private static final float MARGIN = 50;
@@ -23,6 +34,16 @@ public class PdfGenerator {
     private static final float USABLE_WIDTH = PAGE_WIDTH - 2 * MARGIN;
     private static final float BOTTOM_MARGIN = 50;
 
+    /**
+     * Generates a PDF document from the given plain-text content.
+     *
+     * <p>The text is word-wrapped to fit within the usable A4 page width. Paragraph breaks
+     * (blank lines in the input) are preserved. Multi-page documents are handled automatically.
+     *
+     * @param content the letter body text; if null or blank, a placeholder message is rendered
+     * @return the PDF as a byte array
+     * @throws Exception if PDFBox fails to generate the document
+     */
     public static byte[] generatePdf(String content) {
         if (content == null || content.trim().isEmpty()) {
             content = "No content was generated or extracted.";

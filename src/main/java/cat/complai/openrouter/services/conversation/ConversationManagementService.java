@@ -10,6 +10,21 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
+/**
+ * Manages in-process conversation history using a Caffeine cache.
+ *
+ * <p>History is stored as an ordered list of {@link MessageEntry} records (role + content pairs)
+ * keyed by conversation ID. Entries expire after 30 minutes of inactivity and the cache is
+ * bounded to 10,000 concurrent conversations.
+ *
+ * <p>History depth is capped at {@code maxHistoryTurns} (default 5) full turns (i.e. 10
+ * message entries) to control AI token costs. Older messages are pruned when the cap is
+ * exceeded.
+ *
+ * <p>A secondary "pending complaint" cache holds the raw complaint text between the turn
+ * where the user describes their problem and the turn where they provide identity details,
+ * allowing the full context to be reconstructed for the final PDF prompt.
+ */
 @Singleton
 public class ConversationManagementService {
 
@@ -31,6 +46,16 @@ public class ConversationManagementService {
         logger.info(() -> "ConversationManagementService initialized with maxHistoryTurns=" + maxHistoryTurns);
     }
 
+    /**
+     * Appends a user–assistant turn to the cached conversation history.
+     *
+     * <p>If the history would exceed {@code maxHistoryTurns} full turns the oldest messages
+     * are pruned from the front. A {@code null} or blank {@code conversationId} is a no-op.
+     *
+     * @param conversationId  identifies the conversation; no-op if null or blank
+     * @param userMessage     the citizen's message; skipped if null or blank
+     * @param assistantMessage the AI's response; no-op if null
+     */
     public void updateConversationHistory(String conversationId, String userMessage, String assistantMessage) {
         if (conversationId == null || conversationId.isBlank() || assistantMessage == null)
             return;
@@ -56,6 +81,12 @@ public class ConversationManagementService {
                 + " currentHistorySize=" + currentHistorySize + " maxHistoryTurns=" + maxTurns);
     }
 
+    /**
+     * Retrieves the current conversation history for the given ID.
+     *
+     * @param conversationId the session identifier; returns an empty list if null, blank, or unknown
+     * @return an unmodifiable list of message entries in chronological order
+     */
     public List<MessageEntry> getConversationHistory(String conversationId) {
         if (conversationId == null || conversationId.isBlank()) {
             return List.of();
@@ -74,12 +105,24 @@ public class ConversationManagementService {
         conversationCache.put(conversationId, historyList);
     }
 
+    /**
+     * Persists the pending complaint text for a multi-turn redact session.
+     *
+     * @param conversationId the session identifier; no-op if null or blank
+     * @param complaint      the raw complaint text entered by the citizen
+     */
     public void storePendingComplaint(String conversationId, String complaint) {
         if (conversationId != null && !conversationId.isBlank() && complaint != null) {
             pendingComplaintCache.put(conversationId, complaint);
         }
     }
 
+    /**
+     * Retrieves the pending complaint text for the given conversation, if any.
+     *
+     * @param conversationId the session identifier
+     * @return the pending complaint text, or {@code null} if not present or expired
+     */
     public String getPendingComplaint(String conversationId) {
         if (conversationId == null || conversationId.isBlank()) {
             return null;
@@ -87,12 +130,24 @@ public class ConversationManagementService {
         return pendingComplaintCache.getIfPresent(conversationId);
     }
 
+    /**
+     * Removes the pending complaint entry for the given conversation.
+     *
+     * @param conversationId the session identifier; no-op if null or blank
+     */
     public void clearPendingComplaint(String conversationId) {
         if (conversationId != null && !conversationId.isBlank()) {
             pendingComplaintCache.invalidate(conversationId);
         }
     }
 
+    /**
+     * Appends all entries from {@code history} to {@code messages} as OpenAI-compatible
+     * {@code role}/{@code content} map entries.
+     *
+     * @param messages the target list to append to
+     * @param history  the conversation history to append; no-op if null or empty
+     */
     public void addToMessages(List<Map<String, Object>> messages, List<MessageEntry> history) {
         if (history != null) {
             for (MessageEntry entry : history) {

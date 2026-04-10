@@ -3,6 +3,13 @@ package cat.complai.openrouter.dto;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
 
+/**
+ * Supported output formats for the {@code POST /complai/redact} endpoint.
+ *
+ * <p>Only {@link #PDF} is accepted from external clients (enforced by
+ * {@link #isSupportedClientFormat(OutputFormat)}). {@link #JSON} and {@link #AUTO} are
+ * retained for internal testing and backward compatibility.
+ */
 public enum OutputFormat {
     JSON,
     PDF,

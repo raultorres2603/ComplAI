@@ -26,6 +26,20 @@ import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * Service responsible for calling OpenRouter and post-processing the AI response.
+ *
+ * <p>Implements a two-level cache strategy:
+ * <ul>
+ *   <li>Checks the {@link ResponseCacheService} (Caffeine in-memory) before issuing an
+ *       OpenRouter call. Cache hits avoid token consumption entirely.</li>
+ *   <li>Caches successful responses so subsequent identical queries within the same
+ *       conversation session are served from cache.</li>
+ * </ul>
+ *
+ * <p>Timeout is governed by the {@code OPENROUTER_OVERALL_TIMEOUT_SECONDS} environment
+ * variable (default 60 s). On timeout, returns {@link OpenRouterErrorCode#TIMEOUT}.
+ */
 @Singleton
 public class AiResponseProcessingService {
 

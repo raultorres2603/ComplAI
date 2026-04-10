@@ -17,7 +17,24 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * RAG helper for city procedures (municipal tramits).
+ *
+ * <p>Builds and queries an {@link InMemoryLexicalIndex} (BM25) over the procedure corpus
+ * for a specific city. The corpus JSON is loaded from S3 (when {@code PROCEDURES_BUCKET}
+ * and {@code PROCEDURES_REGION} environment variables are set) or from the classpath
+ * resource {@code /procedures-<cityId>.json} (for local tests).
+ *
+ * <p>Returns the top-{@code MAX_RESULTS} procedures most relevant to the user's query,
+ * including their title, description, requirements, steps, and URL.
+ */
 public class ProcedureRagHelper {
+
+    /**
+     * Represents a single municipal procedure with all retrievable fields.
+     *
+     * <p>Fields may be null when the source JSON does not include them for a given procedure.
+     */
     public static class Procedure {
         public final String procedureId;
         public final String title;

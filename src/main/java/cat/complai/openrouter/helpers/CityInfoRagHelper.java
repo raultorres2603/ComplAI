@@ -21,8 +21,24 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * RAG helper for general city information (services, contacts, infrastructure, etc.).
+ *
+ * <p>Builds and queries an {@link InMemoryLexicalIndex} (BM25) over the city-info corpus
+ * for a specific city. The corpus JSON is loaded from S3 (when {@code CITYINFO_BUCKET} and
+ * {@code CITYINFO_REGION} environment variables are set) or from the classpath resource
+ * {@code /cityinfo-<cityId>.json} (for local tests).
+ *
+ * <p>Serves as a fallback information source when the query does not match any specific
+ * procedure, event, or news article, providing broader municipal context to the AI.
+ */
 public class CityInfoRagHelper {
 
+    /**
+     * Represents a single city-info document with all retrievable fields.
+     *
+     * <p>Fields may be null when the source JSON does not include them for a given document.
+     */
     public static class CityInfo {
         public final String cityInfoId;
         public final String theme;

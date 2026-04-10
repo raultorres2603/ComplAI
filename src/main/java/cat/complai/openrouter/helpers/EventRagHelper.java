@@ -17,7 +17,24 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * RAG helper for city events (cultural, civic, sports agenda).
+ *
+ * <p>Builds and queries an {@link InMemoryLexicalIndex} (BM25) over the events corpus for
+ * a specific city. The corpus JSON is loaded from S3 (when {@code EVENTS_BUCKET} and
+ * {@code EVENTS_REGION} environment variables are set) or from the classpath resource
+ * {@code /events-<cityId>.json} (for local tests).
+ *
+ * <p>Returns the top-{@code MAX_RESULTS} events most relevant to the user's query,
+ * including event type, date, time, location, and URL.
+ */
 public class EventRagHelper {
+
+    /**
+     * Represents a single city event with all retrievable fields.
+     *
+     * <p>Fields may be null when the source JSON does not include them for a given event.
+     */
     public static class Event {
         public final String eventId;
         public final String title;

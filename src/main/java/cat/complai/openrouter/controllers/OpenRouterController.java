@@ -42,6 +42,31 @@ import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * Primary HTTP controller for the ComplAI conversational API.
+ *
+ * <p>Exposes two endpoints under {@code /complai}:
+ * <ul>
+ *   <li>{@code POST /complai/ask} — answers a citizen's question about El Prat de Llobregat
+ *       using Server-Sent Events (SSE) streaming. Falls back to plain JSON when the client
+ *       does not accept {@code text/event-stream}.</li>
+ *   <li>{@code POST /complai/redact} — drafts a formal complaint letter. When the caller
+ *       supplies a complete complainant identity and requests PDF format the controller
+ *       enqueues a {@link RedactSqsMessage} and returns {@code 202 Accepted} immediately;
+ *       otherwise a synchronous JSON letter is returned.</li>
+ * </ul>
+ *
+ * <p>All POST requests require a valid {@code X-Api-Key} header, enforced upstream by
+ * {@link ApiKeyAuthFilter}. The validated city identifier is read from the request attribute
+ * {@link ApiKeyAuthFilter#CITY_ATTRIBUTE} and passed into every service call.
+ *
+ * <p>OIDC identity verification (via the optional {@link OidcIdentityTokenValidator}) is
+ * applied to the redact flow when enabled for the caller's city. When enabled the
+ * {@code X-Identity-Token} header is mandatory and overrides any self-reported body fields.
+ *
+ * <p>Every request is audit-logged via {@link AuditLogger} with only metadata
+ * (endpoint, request hash, error code, latency) — no user text or AI response is ever logged.
+ */
 @Controller("/complai")
 public class OpenRouterController {
 
@@ -66,6 +91,26 @@ public class OpenRouterController {
         this.identityTokenValidator = identityTokenValidator;
     }
 
+    /**
+     * Answers a citizen's question about El Prat de Llobregat using SSE streaming.
+     *
+     * <p>The response is a {@code text/event-stream} of JSON-encoded SSE events:
+     * <ol>
+     *   <li>{@code sources} — procedure/document references retrieved from the RAG index</li>
+     *   <li>{@code response} — zero or more streamed text chunks for real-time display</li>
+     *   <li>{@code complete} — final event with success/error status and full assembled text</li>
+     * </ol>
+     *
+     * <p>On a pre-stream validation or service error, a plain JSON error response is returned
+     * instead of starting the SSE stream.
+     *
+     * @param request     the ask request body containing the citizen's question and optional
+     *                    conversation ID
+     * @param httpRequest the HTTP request, used to extract the city attribute set by
+     *                    {@link ApiKeyAuthFilter}
+     * @return {@code 200 OK} with a streaming SSE body on success, or an appropriate
+     *         error response ({@code 400}, {@code 422}, {@code 502}, {@code 504}) on failure
+     */
     @Post("/ask")
         @Produces({ MediaType.TEXT_EVENT_STREAM, MediaType.APPLICATION_JSON })
         public HttpResponse<?> ask(@Body AskRequest request, HttpRequest<?> httpRequest) {
@@ -124,6 +169,28 @@ public class OpenRouterController {
         return HttpResponse.ok(responseBody).contentType(MediaType.TEXT_EVENT_STREAM_TYPE);
     }
 
+    /**
+     * Drafts a formal complaint letter addressed to the Ajuntament.
+     *
+     * <p>Two processing paths exist:
+     * <ul>
+     *   <li><b>Async PDF path</b>: when the identity is complete (name + surname + ID) and the
+     *       requested format is {@code pdf}, the controller validates the input, generates a
+     *       pre-signed S3 URL, publishes a {@link RedactSqsMessage} to SQS, and returns
+     *       {@code 202 Accepted} with the URL. The worker Lambda produces the PDF asynchronously.</li>
+     *   <li><b>Synchronous path</b>: when the identity is incomplete or format is {@code json},
+     *       the letter (or an AI question requesting missing identity fields) is returned
+     *       synchronously as {@code 200 OK} JSON.</li>
+     * </ul>
+     *
+     * <p>When OIDC is enabled for the caller's city, the {@code X-Identity-Token} header is
+     * required and its validated claims override any self-reported body fields.
+     *
+     * @param request     the redact request body
+     * @param httpRequest the HTTP request, used to extract the city attribute and OIDC token header
+     * @return {@code 202 Accepted} for async PDF, {@code 200 OK} for synchronous letter, or an
+     *         appropriate error response
+     */
     @Post("/redact")
     @Produces({ MediaType.APPLICATION_JSON })
     public HttpResponse<?> redact(@Body RedactRequest request, HttpRequest<?> httpRequest) {

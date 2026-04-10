@@ -1,14 +1,15 @@
-# ComplAI — Gall Potablava · Project Overview
+# ComplAI — Gall Potablava
 
 © 2026 Raúl Torres Alarcón. All rights reserved.
 
 LinkedIn: [My profile](https://www.linkedin.com/in/raultorresalarcon/)
 
-Last version: [![GitHub Release](https://img.shields.io/github/v/release/raultorres2603/ComplAI)](https://github.com/raultorres2603/ComplAI/releases/latest)
+[![GitHub Release](https://img.shields.io/github/v/release/raultorres2603/ComplAI)](https://github.com/raultorres2603/ComplAI/releases/latest)
 
-> **Gall Potablava** is an AI assistant for the residents of El Prat de Llobregat (Catalonia, Spain).
-> It helps citizens ask questions about local services, understand municipal procedures, and draft
-> formal complaints addressed to the City Hall (Ajuntament d'El Prat de Llobregat).
+> **Gall Potablava** is a serverless AI assistant for the residents of El Prat de Llobregat
+> (Catalonia, Spain). It answers questions about local services, explains municipal procedures,
+> and drafts formal complaint letters addressed to the Ajuntament — in Catalan, Spanish, French,
+> or English.
 
 ---
 
@@ -16,43 +17,41 @@ Last version: [![GitHub Release](https://img.shields.io/github/v/release/raultor
 
 1. [What Is This Project?](#1-what-is-this-project)
 2. [Vision and Goals](#2-vision-and-goals)
-3. [Integration with Prat Espais](#3-integration-with-prat-espais)
-4. [Architecture Overview](#4-architecture-overview)
-5. [Performance Optimizations](#5-performance-optimizations)
-6. [How It Works — Request Lifecycle](#6-how-it-works--request-lifecycle)
-7. [API Reference](#7-api-reference)
-8. [Conversation History (Multi-turn)](#8-conversation-history-multi-turn)
-9. [AI Identity and Behaviour](#9-ai-identity-and-behaviour)
-10. [PDF Complaint Letter Generation](#10-pdf-complaint-letter-generation)
-11. [Infrastructure](#11-infrastructure)
-12. [Operational Details](#12-operational-details)
-13. [Security](#13-security)
-14. [JWT Bearer Authentication](#14-jwt-bearer-authentication)
-15. [OIDC Identity Verification (Cl@ve, VALId, idCat, etc.)](#15-oidc-identity-verification-clave-valid-idcat-etc)
+3. [Architecture Overview](#3-architecture-overview)
+4. [Tech Stack](#4-tech-stack)
+5. [Getting Started](#5-getting-started)
+6. [API Reference](#6-api-reference)
+7. [Infrastructure](#7-infrastructure)
+8. [Security](#8-security)
+9. [Testing](#9-testing)
+10. [Performance Optimizations](#10-performance-optimizations)
+11. [Conversation History (Multi-turn)](#11-conversation-history-multi-turn)
+12. [PDF Complaint Generation](#12-pdf-complaint-generation)
+13. [OIDC Identity Verification](#13-oidc-identity-verification)
+14. [AI Identity and Behaviour](#14-ai-identity-and-behaviour)
+15. [Contributing](#15-contributing)
+16. [License](#16-license)
+
 ---
 
 ## 1. What Is This Project?
 
-**ComplAI** is a serverless REST API that acts as the backend "brain" of a citizen-facing chatbot.
-Its front-end integration point is **Prat Espais**, the digital services platform for residents of
-El Prat de Llobregat. Citizens interact through a chat widget embedded in the Prat Espais web
-application; those messages are forwarded to this API, which processes them with an AI language
-model and returns a response.
+**ComplAI** is a serverless REST API that acts as the backend brain of a citizen-facing chatbot
+called **Gall Potablava**. Its front-end integration point is **Prat Espais**, the digital services
+platform for residents of El Prat de Llobregat. Citizens interact through a chat widget; messages
+are forwarded to this API, which processes them with an AI language model and returns a response.
 
 The assistant can:
 
 - **Answer local questions** — opening hours, public services, transport, events, municipal
-  offices, bins, parks, etc.
-- **Explain municipal procedures** — how to register as a resident, apply for a grant, report a
-  pothole, request a permit, etc.
-- **Help carry out procedures** — guided step-by-step assistance so citizens can start or complete
-  their request with the Ajuntament.
-- **Draft formal complaint letters** — given a description of a problem, the assistant produces a
-  complete, formal letter addressed to the Ajuntament ready to print, submit digitally, or download
-  as a PDF.
+  offices, parks, and more.
+- **Explain municipal procedures** — how to register as a resident, apply for a grant, report an
+  issue, request a permit, etc.
+- **Draft formal complaint letters** — the citizen describes a problem; the assistant produces a
+  complete, addressed letter ready to submit or download as a PDF.
 
-All three languages spoken in the area are supported: **Catalan (default)**, **Spanish**, and
-**English**.
+All four languages spoken in the area are supported: **Catalan (default)**, **Spanish**,
+**English**, and **French**.
 
 ---
 
@@ -60,61 +59,657 @@ All three languages spoken in the area are supported: **Catalan (default)**, **S
 
 | Goal | How ComplAI addresses it |
 |------|--------------------------|
-| Reduce the cognitive burden for citizens navigating bureaucracy | Plain-language answers and step-by-step guidance in the user's language |
+| Reduce the cognitive burden of navigating bureaucracy | Plain-language answers and step-by-step guidance in the user's language |
 | Lower the barrier to filing formal complaints | Automatic letter drafting — the citizen describes the problem, the AI writes the letter |
-| Serve the entire El Prat community | Catalan, Spanish, and English support out of the box |
+| Serve the entire El Prat community | Catalan, Spanish, English, and French support out of the box |
 | Integrate naturally into existing digital infrastructure | REST API designed to be consumed by any front-end, starting with Prat Espais |
 | Keep operating costs predictable and low | Serverless Lambda; no servers idle overnight; pay per request |
-| Be production-safe and maintainable long-term | Boring, layered architecture; typed error codes; full test coverage |
+| Be production-safe and maintainable long-term | Layered architecture; typed error codes; full test coverage |
 
 ---
 
-## 3. Integration with Prat Espais
+## 3. Architecture Overview
 
-**Prat Espais** is the citizen-facing digital platform for El Prat de Llobregat. ComplAI is designed
-to be embedded in it as a **chat widget** — a floating conversation panel that citizens open from
-any page of the portal.
+ComplAI follows a strict **layered architecture** with clear boundaries at every level.
+
+```xml
+<!-- draw.io architecture diagram — open in draw.io or VS Code draw.io extension -->
+<mxfile>
+  <diagram name="ComplAI Architecture">
+    <mxGraphModel>
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <!-- Client -->
+        <mxCell id="2" value="Prat Espais (Browser)" style="rounded=1;fillColor=#dae8fc;" vertex="1" parent="1">
+          <mxGeometry x="20" y="60" width="160" height="40" as="geometry"/>
+        </mxCell>
+        <!-- WAF -->
+        <mxCell id="3" value="AWS WAF" style="rounded=1;fillColor=#ffe6cc;" vertex="1" parent="1">
+          <mxGeometry x="240" y="60" width="120" height="40" as="geometry"/>
+        </mxCell>
+        <!-- HTTP API -->
+        <mxCell id="4" value="API Gateway HTTP API" style="rounded=1;fillColor=#ffe6cc;" vertex="1" parent="1">
+          <mxGeometry x="420" y="60" width="160" height="40" as="geometry"/>
+        </mxCell>
+        <!-- API Lambda -->
+        <mxCell id="5" value="ComplAILambda&#xa;(Java 25 / ARM64)" style="rounded=1;fillColor=#d5e8d4;" vertex="1" parent="1">
+          <mxGeometry x="420" y="160" width="160" height="50" as="geometry"/>
+        </mxCell>
+        <!-- OpenRouter -->
+        <mxCell id="6" value="OpenRouter API" style="rounded=1;fillColor=#e1d5e7;" vertex="1" parent="1">
+          <mxGeometry x="650" y="160" width="140" height="50" as="geometry"/>
+        </mxCell>
+        <!-- SQS Redact -->
+        <mxCell id="7" value="SQS complai-redact-*" style="rounded=1;fillColor=#ffe6cc;" vertex="1" parent="1">
+          <mxGeometry x="420" y="280" width="160" height="40" as="geometry"/>
+        </mxCell>
+        <!-- Redact Worker -->
+        <mxCell id="8" value="ComplAIRedactorLambda&#xa;(Java 25 / ARM64)" style="rounded=1;fillColor=#d5e8d4;" vertex="1" parent="1">
+          <mxGeometry x="420" y="380" width="160" height="50" as="geometry"/>
+        </mxCell>
+        <!-- S3 Complaints -->
+        <mxCell id="9" value="S3 complai-complaints-*&#xa;(PDF output)" style="rounded=1;fillColor=#ffe6cc;" vertex="1" parent="1">
+          <mxGeometry x="650" y="380" width="160" height="50" as="geometry"/>
+        </mxCell>
+        <!-- SQS Feedback -->
+        <mxCell id="10" value="SQS complai-feedback-*" style="rounded=1;fillColor=#ffe6cc;" vertex="1" parent="1">
+          <mxGeometry x="240" y="280" width="160" height="40" as="geometry"/>
+        </mxCell>
+        <!-- Feedback Worker -->
+        <mxCell id="11" value="ComplAIFeedbackWorkerLambda&#xa;(Java 25 / ARM64)" style="rounded=1;fillColor=#d5e8d4;" vertex="1" parent="1">
+          <mxGeometry x="240" y="380" width="160" height="50" as="geometry"/>
+        </mxCell>
+        <!-- S3 Feedback -->
+        <mxCell id="12" value="S3 complai-feedback-*&#xa;(JSON output)" style="rounded=1;fillColor=#ffe6cc;" vertex="1" parent="1">
+          <mxGeometry x="50" y="380" width="160" height="50" as="geometry"/>
+        </mxCell>
+        <!-- S3 RAG buckets -->
+        <mxCell id="13" value="S3 RAG buckets&#xa;(procedures/events/news/cityinfo)" style="rounded=1;fillColor=#ffe6cc;" vertex="1" parent="1">
+          <mxGeometry x="650" y="280" width="160" height="50" as="geometry"/>
+        </mxCell>
+        <!-- Edges -->
+        <mxCell id="e1" edge="1" source="2" target="3" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" edge="1" source="3" target="4" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" edge="1" source="4" target="5" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" edge="1" source="5" target="6" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" edge="1" source="5" target="7" label="async PDF" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e6" edge="1" source="7" target="8" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e7" edge="1" source="8" target="9" label="upload PDF" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e8" edge="1" source="5" target="10" label="feedback" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e9" edge="1" source="10" target="11" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e10" edge="1" source="11" target="12" label="upload JSON" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e11" edge="1" source="5" target="13" label="RAG read" parent="1"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
+```
+
+### Layers
+
+| Layer | Classes | Responsibility |
+|-------|---------|----------------|
+| HTTP boundary | `OpenRouterController`, `FeedbackController`, `HomeController`, `HealthController` | Deserialise requests, validate format, map error codes → HTTP status |
+| Filter chain | `ApiKeyAuthFilter`, `RateLimitFilter`, `CorsFilter` | Auth, rate limiting, CORS |
+| Service | `OpenRouterServices`, `InputValidationService`, `ConversationManagementService` | Business logic, AI prompt assembly, conversation history |
+| RAG | `ProcedureContextService`, `ProcedureRagHelper`, `EventRagHelper`, `NewsRagHelper`, `CityInfoRagHelper` | BM25 lexical retrieval from in-memory indexes |
+| Infrastructure | `HttpWrapper`, `S3PdfUploader`, `SqsComplaintPublisher` | OpenRouter HTTP calls, S3 uploads, SQS publishing |
+| Workers | `RedactWorkerHandler`, `FeedbackWorkerHandler` | SQS-triggered async processing |
+
+---
+
+## 4. Tech Stack
+
+| Concern | Technology |
+|---------|-----------|
+| Language / Runtime | Java 25 (ARM64 Lambda) |
+| Framework | Micronaut 4.10 (`lambda_provided` runtime) |
+| Build tool | Gradle 8 + Shadow JAR (`complai-all.jar`) |
+| Cloud provider | AWS (eu-west-1) |
+| AI gateway | OpenRouter (OpenAI-compatible API) |
+| Response streaming | Server-Sent Events (Reactor `Flux`) |
+| In-memory cache | Caffeine (conversation history + response cache) |
+| Lexical RAG | Custom BM25 `InMemoryLexicalIndex` |
+| PDF generation | Apache PDFBox 2.0 + NotoSans-Regular.ttf |
+| SQS client | AWS SDK v2 |
+| S3 client | AWS SDK v2 |
+| OIDC validation | JJWT 0.12 + JWKS |
+| Infrastructure-as-code | AWS CDK (TypeScript) |
+| WAF | AWS WAFv2 |
+
+---
+
+## 5. Getting Started
+
+### Prerequisites
+
+- Java 25 JDK
+- Gradle 8
+- Docker Desktop (for LocalStack)
+- AWS SAM CLI
+- An [OpenRouter](https://openrouter.ai/) API key
+
+### Clone and build
+
+```bash
+git clone https://github.com/raultorres2603/ComplAI.git
+cd ComplAI
+./gradlew clean shadowJar   # produces build/libs/complai-all.jar
+```
+
+### Configure environment variables
+
+Copy `sam/env.json.example` to `sam/env.json` and fill in your values:
+
+```bash
+cp sam/env.json.example sam/env.json
+```
+
+Key variables:
+
+```json
+{
+  "ComplAIFunction": {
+    "OPENROUTER_API_KEY": "<your-openrouter-api-key>",
+    "AWS_ENDPOINT_URL": "http://host.docker.internal:4566",
+    "PROCEDURES_BUCKET": "complai-local",
+    "PROCEDURES_REGION": "eu-west-1",
+    "EVENTS_BUCKET": "complai-local",
+    "EVENTS_REGION": "eu-west-1",
+    "NEWS_BUCKET": "complai-news-local",
+    "NEWS_REGION": "eu-west-1",
+    "REDACT_QUEUE_URL": "http://sqs.eu-west-1.localhost.localstack.cloud:4566/000000000000/complai-redact-local",
+    "COMPLAINTS_BUCKET": "complai-complaints-local",
+    "COMPLAINTS_REGION": "eu-west-1"
+  }
+}
+```
+
+> All keys in `env.json` are **secrets** — never commit this file. It is in `.gitignore`.
+
+### Run locally with SAM + LocalStack
+
+```bash
+cd sam
+docker compose up -d          # starts LocalStack (S3, SQS) on port 4566
+./start-local.sh              # builds JAR, starts SAM local API on http://localhost:3000
+```
+
+The SQS worker poller (`sqs_worker_poller.py`) runs in the background and invokes the
+`ComplAIRedactorFunction` via `sam local invoke` whenever a message lands on the local queue.
+
+### Generate an API key for local testing
+
+```bash
+# Mint a URL-safe random key for a city (prints key to stdout, env var name to stderr):
+java -cp build/libs/complai-all.jar cat.complai.auth.ApiKeyGenerator elprat
+```
+
+Set the returned value as `API_KEY_ELPRAT` in `sam/env.json` and send it in the
+`X-Api-Key` header on every request.
+
+---
+
+## 6. API Reference
+
+All `POST` endpoints require:
 
 ```
-┌─────────────────────────────────────────────┐
-│             Prat Espais (Web App)            │
-│                                              │
-│  ┌──────────────────────────────────────┐   │
-│  │  📋 Tràmits   🗺️ Mapa   📅 Agenda  │   │
-│  └──────────────────────────────────────┘   │
-│                                              │
-│                         ┌─────────────────┐ │
-│                         │  💬 Gall        │ │
-│                         │   Potablava     │ │
-│                         │                 │ │
-│                         │ Citizen: "Com   │ │
-│                         │  puc registrar  │ │
-│                         │  el meu gos?"   │ │
-│                         │                 │ │
-│                         │ AI: "Per        │ │
-│                         │  registrar el   │ │
-│                         │  teu gos..."    │ │
-│                         └─────────────────┘ │
-└─────────────────────────────────────────────┘
+X-Api-Key: <city-api-key>
+Content-Type: application/json
 ```
 
-### How the front-end calls the API
+`GET /` and `GET /health` and `GET /health/startup` are public (no key required).
 
-The chat widget makes standard `POST` requests to the ComplAI Lambda Function URL endpoint. Two flows exist:
+---
 
-1. **Conversational questions** (`POST /complai/ask`) — the citizen types a question; the widget
-   sends it and displays the AI response as a new chat bubble.
-2. **Complaint drafting** (`POST /complai/redact`) — the citizen describes their problem; the
-   widget sends it with `"format": "pdf"` or `"format": "json"` and either renders the letter
-   in-chat or triggers a PDF download.
+### `GET /`
 
-Both calls can include an optional `conversationId` (a UUID the front-end generates per session)
-so the AI remembers the context of the conversation. This is what allows natural multi-turn
-exchanges: *"Can you add my neighbour's name to the letter?"* works because the previous turn is
-remembered.
+Welcome endpoint.
 
-**Endpoint:**
-- The public endpoint is the Lambda Function URL, e.g.:
+**Response `200 OK`:**
+```json
+{ "message": "Welcome to the Complai Home Page!" }
+```
+
+---
+
+### `GET /health`
+
+Liveness check.
+
+**Response `200 OK`:**
+```json
+{ "status": "UP", "version": "1.0", "checks": { "openRouterApiKeyConfigured": true } }
+```
+
+---
+
+### `GET /health/startup`
+
+Lightweight Lambda startup probe — no I/O, no RAG initialisation.
+
+**Response `200 OK`:**
+```json
+{ "status": "UP", "version": "1.0", "checks": { "jvm_alive": true, "openRouterApiKeyConfigured": true } }
+```
+
+---
+
+### `POST /complai/ask`
+
+Ask a question about El Prat de Llobregat. Returns a **Server-Sent Events** stream.
+
+**Request body:**
+```json
+{
+  "text": "On puc renovar el padró municipal?",
+  "conversationId": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `text` | string | ✅ | The citizen's question (max 5,000 chars) |
+| `conversationId` | string (UUID) | ❌ | Session identifier for multi-turn context |
+
+**SSE stream events:**
+```
+data: {"type":"sources","sources":[{"url":"https://...","title":"..."}]}
+data: {"type":"response","chunk":"Pots renovar..."}
+data: {"type":"response","chunk":" el padró..."}
+data: {"type":"complete","success":true,"message":"Pots renovar el padró...","errorCode":0}
+```
+
+---
+
+### `POST /complai/redact`
+
+Draft a formal complaint letter addressed to the Ajuntament.
+
+**Request body:**
+```json
+{
+  "text": "El carrer de la Pau porta tres setmanes sense il·luminació.",
+  "format": "pdf",
+  "conversationId": "550e8400-e29b-41d4-a716-446655440000",
+  "requesterName": "Maria",
+  "requesterSurname": "Garcia",
+  "requesterIdNumber": "12345678A"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `text` | string | ✅ | Complaint description (max 5,000 chars) |
+| `format` | `"pdf"` | ✅ | Output format — only `"pdf"` is accepted by clients |
+| `conversationId` | string (UUID) | ❌ | Session identifier for multi-turn context |
+| `requesterName` | string | ❌ | Complainant first name |
+| `requesterSurname` | string | ❌ | Complainant surname |
+| `requesterIdNumber` | string | ❌ | Complainant DNI / NIF / NIE |
+
+**`202 Accepted`** — identity complete + format `pdf`:
+```json
+{
+  "success": true,
+  "message": "La vostra carta de reclamació s'està generant...",
+  "pdfUrl": "https://complai-complaints-<env>.s3.eu-west-1.amazonaws.com/complaints/...",
+  "errorCode": 0
+}
+```
+
+**`200 OK`** — identity incomplete (AI asks for missing fields):
+```json
+{ "success": true, "message": "Per redactar la carta necessito el vostre nom...", "errorCode": 0 }
+```
+
+---
+
+### `POST /complai/feedback`
+
+Submit citizen feedback asynchronously.
+
+**Request body:**
+```json
+{
+  "userName": "Joan Garcia",
+  "idUser": "12345678A",
+  "message": "El servei és molt útil, gràcies!"
+}
+```
+
+**`202 Accepted`:**
+```json
+{ "success": true, "feedbackId": "uuid", "message": "Feedback queued." }
+```
+
+---
+
+### Error Codes
+
+| `errorCode` | Name | HTTP Status | Meaning |
+|-------------|------|-------------|---------|
+| `0` | `NONE` | `200 / 202` | Success |
+| `1` | `VALIDATION` | `400` | Bad request (empty text, unsupported format) |
+| `2` | `REFUSAL` | `422` | AI refused: question not about El Prat |
+| `3` | `UPSTREAM` | `502` | OpenRouter returned an error |
+| `4` | `TIMEOUT` | `504` | OpenRouter call timed out |
+| `5` | `INTERNAL` | `500` | Unexpected server-side error |
+| `6` | `UNAUTHORIZED` | `401` | Missing or invalid API key / OIDC token |
+| `7` | `RATE_LIMITED` | `429` | Per-user rate limit exceeded |
+
+---
+
+## 7. Infrastructure
+
+### AWS Services
+
+```
+Internet → AWS WAF → API Gateway HTTP API → ComplAILambda (Java 25 ARM64)
+                                                  │
+                             ┌────────────────────┼──────────────────────┐
+                             │ SQS redact queue   │ SQS feedback queue   │ S3 RAG buckets
+                             ▼                    ▼
+                    ComplAIRedactorLambda   ComplAIFeedbackWorkerLambda
+                             │                    │
+                             ▼                    ▼
+                   S3 complaints bucket    S3 feedback bucket
+```
+
+### CDK Stacks (per environment: `development` / `production`)
+
+| Stack | Resources |
+|-------|-----------|
+| `ComplAIStorageStack-<env>` | `complai-procedures-<env>`, `complai-events-<env>`, `complai-news-<env>`, `complai-cityinfo-<env>`, `complai-complaints-<env>`, `complai-feedback-<env>`, `complai-deployments-<env>` |
+| `ComplAIQueueStack-<env>` | `complai-redact-<env>` + DLQ, `complai-feedback-<env>` + DLQ |
+| `ComplAILambdaStack-<env>` | `ComplAILambda-<env>`, `ComplAIRedactorLambda-<env>`, `ComplAIFeedbackWorkerLambda-<env>`, IAM roles, CloudWatch log groups |
+| `ComplAIWafStack-<env>` | WAFv2 WebACL with geo-match (Spain) and rate-based rules |
+
+### Lambda functions
+
+| Function | Handler | Memory | Trigger |
+|----------|---------|--------|---------|
+| `ComplAILambda-<env>` | `io.micronaut.function.aws.proxy.payload2.APIGatewayV2HTTPEventFunction` | 1024 MB | API Gateway HTTP API |
+| `ComplAIRedactorLambda-<env>` | `cat.complai.worker.RedactWorkerHandler` | 1024 MB | SQS (batch 1) |
+| `ComplAIFeedbackWorkerLambda-<env>` | `cat.complai.feedback.worker.FeedbackWorkerHandler` | 512 MB | SQS (batch 1) |
+
+All functions use **Java 25** on **ARM64** and run from the same shadow JAR
+(`complai-all.jar`) stored in `complai-deployments-<env>`.
+
+### Deployment
+
+```bash
+# Install CDK dependencies
+cd cdk && npm install
+
+# Deploy all stacks to development (requires AWS credentials):
+cdk deploy 'ComplAI*Stack-development' \
+  --context jarS3Key=complai-all-<sha>.jar
+
+# Stack deployment order (enforced by CDK addDependency):
+# StorageStack → QueueStack → LambdaStack → WafStack
+```
+
+### Key environment variables (Lambda)
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `OPENROUTER_API_KEY` | ✅ | Bearer token for the OpenRouter API |
+| `API_KEY_ELPRAT` | ✅ | Per-city API key; add one `API_KEY_<CITYID>` per city |
+| `OPENROUTER_MODEL` | ❌ | Model identifier (default: `openrouter/free`) |
+| `OPENROUTER_REQUEST_TIMEOUT_SECONDS` | ❌ | Per-request timeout (default: `60`) |
+| `OPENROUTER_OVERALL_TIMEOUT_SECONDS` | ❌ | Overall AI call timeout (default: `60`) |
+| `OPENROUTER_MAX_RETRIES` | ❌ | Retries on 429/5xx (default: `3`) |
+| `COMPLAINTS_BUCKET` / `COMPLAINTS_REGION` | ✅ | S3 bucket for generated PDFs |
+| `PROCEDURES_BUCKET` / `PROCEDURES_REGION` | ✅ | S3 bucket for procedures RAG corpus |
+| `EVENTS_BUCKET` / `EVENTS_REGION` | ✅ | S3 bucket for events RAG corpus |
+| `NEWS_BUCKET` / `NEWS_REGION` | ✅ | S3 bucket for news RAG corpus |
+| `CITYINFO_BUCKET` / `CITYINFO_REGION` | ✅ | S3 bucket for city-info RAG corpus |
+| `REDACT_QUEUE_URL` | ✅ | SQS queue URL for async complaint generation |
+| `FEEDBACK_QUEUE_URL` | ✅ | SQS queue URL for async feedback processing |
+| `COMPLAI_DEFAULT_CITY_ID` | ❌ | City to pre-warm RAG indexes for (default: `elprat`) |
+| `RATE_LIMIT_REQUESTS_PER_MINUTE` | ❌ | Per-user rate limit (default: `20`) |
+
+---
+
+## 8. Security
+
+| Concern | How it is addressed |
+|---------|---------------------|
+| **API key authentication** | All `POST` endpoints require `X-Api-Key: <city-api-key>`. Enforced by `ApiKeyAuthFilter` before any controller logic runs. `GET /`, `GET /health`, `GET /health/startup` are public. |
+| **Per-city key isolation** | Each city has its own API key (`API_KEY_<CITYID>` env var). The validated city ID is attached to the request as the `city` attribute and used throughout the request lifecycle. |
+| **API key generation** | Keys are generated with `ApiKeyGenerator` CLI (32 random bytes, URL-safe base64). Never store keys in source code. |
+| **Rate limiting** | `RateLimitFilter` enforces per-user limits (default 20 requests/minute) using a Caffeine sliding-window counter. Returns `429 RATE_LIMITED`. |
+| **OIDC identity verification** | Optional per-city OIDC layer for `/complai/redact`. When enabled, `X-Identity-Token` is mandatory and overrides self-reported body fields. See [Section 13](#13-oidc-identity-verification). |
+| **Input injection** | User text is passed to the AI as a structured `content` field in a `messages` array — never string-interpolated into raw JSON. |
+| **Input length** | All user input is capped at 5,000 characters. Requests exceeding the limit are rejected with `400 VALIDATION` before any AI call. |
+| **Off-topic abuse** | System prompt + programmatic refusal detection (`REFUSAL` error code) scope all AI responses to El Prat de Llobregat. |
+| **Audit logging** | `AuditLogger` writes structured metadata only (endpoint, request hash, error code, latency). No user text or AI response is ever logged. |
+| **WAF** | AWS WAFv2 WebACL restricts traffic to Spain (geo-match) and enforces infrastructure-level rate limiting. |
+| **IAM least privilege** | API Lambda: `AWSLambdaBasicExecutionRole` + SQS send + S3 read. Worker Lambdas: `AWSLambdaBasicExecutionRole` + SQS consume + S3 write (specific bucket only). |
+| **Secrets in code** | API keys and credentials are never committed. Use `API_KEY_<CITYID>` environment variables or GitHub Environment Secrets. |
+
+### Minting API keys
+
+```bash
+# Generate a new URL-safe API key for a city:
+java -cp build/libs/complai-all.jar cat.complai.auth.ApiKeyGenerator elprat
+# → prints the key to stdout; prints "Set API_KEY_ELPRAT=<key>" to stderr
+
+# Use the key in every API call:
+curl -X POST https://<api-gw-url>/complai/ask \
+     -H 'X-Api-Key: <key>' \
+     -H 'Content-Type: application/json' \
+     -d '{"text": "On queda l'\''ajuntament?"}'
+```
+
+---
+
+## 9. Testing
+
+### Unit tests (Gradle)
+
+```bash
+./gradlew test          # runs all JUnit 5 unit tests
+./gradlew ciTest        # CI-focused task: fails fast on first test failure
+```
+
+Tests use Mockito (`mockito-core`, `mockito-inline`) and JUnit 5. Test classes are under
+`src/test/java/cat/complai/`.
+
+### E2E tests (Bruno)
+
+The `E2E-ComplAI/` directory contains a [Bruno](https://www.usebruno.com/) collection.
+
+```bash
+# Run all E2E tests against the development environment:
+bru run E2E-ComplAI/ --env development
+
+# Key collections:
+#   02-OK/   — happy-path flows (ask, redact, feedback)
+#   03-ERROR/ — error flows (invalid key, bad format, etc.)
+```
+
+The Bruno `environments/` directory stores environment-specific variables (base URL, API key).
+**Do not commit real API keys** to the environment files — use Bruno's secret variables or
+your shell environment.
+
+---
+
+## 10. Performance Optimizations
+
+### In-memory RAG (BM25)
+
+ComplAI uses a custom `InMemoryLexicalIndex<T>` — a pure-Java BM25 implementation with no
+external search dependency. Each city's procedures, events, news, and city-info corpora are
+indexed once at Lambda warm-up (or lazily on first access) and queried in memory for every
+request. Typical RAG latency: < 5 ms.
+
+### Smart intent detection
+
+`ProcedureContextService` analyses the query before hitting any index:
+- Conversational questions (greetings, thanks, general chat) skip all RAG entirely.
+- Procedural questions are matched against title keywords and procedure corpus titles for
+  highly accurate context selection.
+- Eliminates 70–90% of unnecessary index scans for conversational exchanges.
+
+### Caffeine caching
+
+- **Conversation history**: keyed by `conversationId`, 30-minute TTL, max 10,000 entries.
+- **Response cache**: keyed by city + question category + RAG context hash, 10-minute TTL,
+  max 500 entries. Identical queries within a session skip the OpenRouter call entirely.
+
+### Retry strategy
+
+`HttpWrapper` retries upstream `429` and `5xx` responses up to `OPENROUTER_MAX_RETRIES`
+(default 3) times with exponential back-off and jitter. Other 4xx responses and network
+exceptions are not retried.
+
+### RAG pre-warming
+
+`RagWarmupService` loads indexes for the default city (`COMPLAI_DEFAULT_CITY_ID`) at bean
+initialisation time, eliminating cold-start latency for the first request.
+
+---
+
+## 11. Conversation History (Multi-turn)
+
+ComplAI supports natural multi-turn conversations via an optional `conversationId` field.
+
+1. The front-end generates a UUID when the user opens the chat widget and reuses it for every
+   message in that session.
+2. For each request with a `conversationId`, the service retrieves the cached history
+   (previous `{role, content}` pairs) and prepends it to the AI's `messages` array.
+3. After a successful AI response, the new user and assistant messages are appended.
+4. History is capped at **5 turns** (10 messages) to control AI token costs.
+5. Cache entries expire after **30 minutes** of inactivity.
+6. An unknown or expired `conversationId` starts fresh — no error is returned.
+
+Omitting `conversationId` gives fully stateless behaviour.
+
+---
+
+## 12. PDF Complaint Generation
+
+PDF generation is handled exclusively by the **worker Lambda** via an asynchronous SQS flow.
+
+**Flow:**
+
+1. The API Lambda validates the request, generates an S3 key, and creates a 24-hour
+   pre-signed GET URL for that key.
+2. A `RedactSqsMessage` is published to `complai-redact-<env>` and `202 Accepted` is returned.
+3. `ComplAIRedactorLambda` processes the SQS message:
+   - Calls `RedactPromptBuilder.buildRedactPromptWithIdentity()` to build the AI prompt.
+   - Calls OpenRouter via `HttpWrapper`.
+   - Parses the AI response header with `AiParsed.parseAiFormatHeader()`.
+   - Renders the letter body as a PDF with `PdfGenerator` (Apache PDFBox, in-memory).
+   - Uploads the PDF to S3 at the pre-determined key via `S3PdfUploader.upload()`.
+4. The caller polls the `pdfUrl` — returns `403/404` while the worker runs, then
+   `200 application/pdf` once the upload completes (typically within seconds).
+
+**PDF characteristics:**
+- Font: `NotoSans-Regular.ttf` (full Unicode: Catalan `ç à ü ·l`, Spanish `ñ`, etc.)
+- Page size: A4; word-wrapped; multi-page support; no disk I/O
+
+---
+
+## 13. OIDC Identity Verification
+
+**Status: Implemented and configurable per city. Currently disabled for all test cities.**
+
+When enabled for a city (via `"enabled": true` in `src/main/resources/oidc/oidc-mapping.json`),
+OIDC identity verification requires the front-end to authenticate the citizen with a
+government-approved identity provider (Cl@ve, VALId, or idCat) and include the resulting
+ID token in the `X-Identity-Token` request header.
+
+**Flow:**
+
+1. Front-end authenticates with the OIDC IdP and obtains a signed JWT ID token.
+2. The token is sent in `X-Identity-Token` on `POST /complai/redact`.
+3. `OidcIdentityTokenValidator` verifies the token's signature (via JWKS), issuer, audience,
+   and expiry, then extracts `given_name`, `family_name`, and the configured NIF claim.
+4. Verified identity overrides any self-reported body fields (`requesterName`, etc.).
+5. If the header is absent → `401 UNAUTHORIZED`.
+6. If the header is present but invalid → `401 UNAUTHORIZED`.
+
+**Per-city configuration (`oidc-mapping.json`):**
+
+```json
+{
+  "elprat": {
+    "enabled": false,
+    "issuer": "https://identity-provider.example.com",
+    "jwks_uri": "https://identity-provider.example.com/.well-known/jwks.json",
+    "audience": "complai-elprat",
+    "nif_claim": "nif"
+  }
+}
+```
+
+Set `"enabled": true` and redeploy to activate for a city. No environment variables are needed.
+
+---
+
+## 14. AI Identity and Behaviour
+
+The assistant identifies itself as **Gall Potablava** — a friendly character whose name
+references the *Ànec Collverd* (Mallard duck), El Prat's emblematic bird.
+
+**Personality:** friendly, local, concise, and respectful.
+
+**Languages:** Catalan (default), Spanish, English, French — detected automatically from
+the input text using `LanguageDetector` (heuristic signal-counting; no NLP library required).
+
+**Scope:** The system prompt restricts the AI to questions about El Prat de Llobregat.
+Off-topic questions are declined politely. `OpenRouterServices` also performs programmatic
+refusal detection in all four languages and maps detected refusals to `REFUSAL (2)`.
+
+**Model:** Configurable via `OPENROUTER_MODEL` environment variable. The OpenRouter gateway
+provides access to many models; the default is `openrouter/free`.
+
+---
+
+## 15. Contributing
+
+### Branch strategy
+
+- `main` — production-ready code; protected; requires PR + review.
+- Feature branches: `feature/<short-description>`
+- Bug fixes: `fix/<issue-or-description>`
+
+### Build and test before pushing
+
+```bash
+./gradlew clean ciTest shadowJar
+```
+
+### Code style
+
+- Follow the existing layered architecture — controllers never call repositories directly.
+- The service layer must never throw to the controller; return typed `OpenRouterResponseDto`.
+- Add Javadoc to all new public classes and methods.
+- Keep Lambda cold-start latency in mind: avoid adding synchronous startup I/O without
+  a warm-up counterpart in `RagWarmupService`.
+
+### Adding a new city
+
+1. Add a `procedures-<cityId>.json` corpus to `complai-procedures-<env>` in S3.
+2. Add corresponding event / news / city-info JSON files to the other RAG buckets.
+3. Add `API_KEY_<CITYID_UPPER>` as a Lambda environment variable (and GitHub Secret).
+4. Optionally add an OIDC entry to `oidc-mapping.json` with `"enabled": false`.
+5. Redeploy.
+
+---
+
+## 16. License
+
+© 2026 Raúl Torres Alarcón. All rights reserved.
+
+This project and all its source code, documentation, and assets are the exclusive property of
+Raúl Torres Alarcón. No part of this project may be reproduced, distributed, transmitted,
+displayed, published, or broadcast in any form or by any means without prior written permission
+from the copyright holder.
+
   `https://<lambda-function-id>.lambda-url.<region>.on.aws/complai/ask`
 - CORS and public access are managed via Lambda Function URL configuration.
 
