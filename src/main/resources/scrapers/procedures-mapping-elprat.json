@@ -186,12 +186,12 @@
     "baseUrl": "https://www.elprat.cat/la-ciutat/guia-agenda",
     "seedSites": [
       {
-        "baseUrl": "https://www.teatrelartesa.cat/",
-        "eventLinkSelector": "h4 a[href*='/la-ciutat/guia-agenda/']"
+        "baseUrl": "https://www.teatrelartesa.cat/programacio",
+        "eventLinkSelector": "a[href*='/la-ciutat/guia-agenda/']"
       },
       {
-        "baseUrl": "https://lacapsa.org/",
-        "eventLinkSelector": "a[href*='lacapsa.org/'][href*='-']:not([href$='lacapsa.org/']):not([href*='#']):not([href*='?'])"
+        "baseUrl": "https://lacapsa.org/agenda",
+        "eventLinkSelector": "a[href^='/'][href*='-']:not([href^='/espais-i-serveis']):not([href^='/cursos-i-tallers']):not([href^='/noticies']):not([href^='/projectes']):not([href^='/cartells']):not([href^='/bucs']):not([href^='/grups']):not([href^='/el-bar']):not([href^='/nosaltres']):not([href^='/cercador'])"
       }
     ],
     "crawl": {
