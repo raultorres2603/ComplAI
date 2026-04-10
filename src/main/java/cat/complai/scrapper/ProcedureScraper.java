@@ -131,6 +131,9 @@ public class ProcedureScraper {
         Set<String> detailUrls = new LinkedHashSet<>();
 
         pendingCategoryUrls.add(mapping.baseUrl);
+        if (mapping.crawl.additionalSeeds != null) {
+            pendingCategoryUrls.addAll(mapping.crawl.additionalSeeds);
+        }
 
         while (!pendingCategoryUrls.isEmpty()) {
             String currentUrl = pendingCategoryUrls.iterator().next();
@@ -310,6 +313,8 @@ public class ProcedureScraper {
         public NewsConfig news;
         /** City-info configuration for scraping municipal information pages */
         public CityInfoConfig cityInfo;
+        /** Transparency portal configuration for scraping open-data pages */
+        public TransparencyConfig transparency;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -323,6 +328,8 @@ public class ProcedureScraper {
          * = no exclusion.
          */
         public String detailLinkExcludePattern;
+        /** Additional seed URLs to crawl alongside baseUrl (e.g. SIAC portal). */
+        public List<String> additionalSeeds = new ArrayList<>();
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -357,6 +364,16 @@ public class ProcedureScraper {
          * Insertion order is preserved.
          */
         public Map<String, FieldExtractionRule> fields = new LinkedHashMap<>();
+        /** External event venue/calendar sites to crawl as additional event sources. */
+        public List<EventSeedSite> seedSites = new ArrayList<>();
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static final class EventSeedSite {
+        /** Base URL of the external event venue/calendar page to crawl. */
+        public String baseUrl;
+        /** CSS selector that matches event detail page links on this site. */
+        public String eventLinkSelector;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -428,6 +445,8 @@ public class ProcedureScraper {
         public Map<String, FieldExtractionRule> fields = new LinkedHashMap<>();
         /** Optional skip rules specific to city-info pages */
         public CityInfoSkipConfig skip;
+        /** External municipal utility sites to include as additional crawl seed themes. */
+        public List<String> seedThemeUrls = new ArrayList<>();
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -464,5 +483,35 @@ public class ProcedureScraper {
         public List<String> whenTitleEmptyOrEquals = new ArrayList<>();
         /** Skip entries when extracted body is blank */
         public boolean whenBodyEmpty = true;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static final class TransparencyConfig {
+        /** Base URL of the transparency portal. */
+        public String baseUrl;
+        /** Crawl configuration for category and detail link discovery. */
+        public TransparencyCrawlConfig crawl;
+        /** Field extraction rules keyed by output field name. Must contain "title". */
+        public Map<String, FieldExtractionRule> fields = new LinkedHashMap<>();
+        /** Optional skip rules. */
+        public SkipConfig skip;
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static final class TransparencyCrawlConfig {
+        /** CSS selector for same-scope category/section navigation links. */
+        public String categoryLinkSelector;
+        /** CSS selector that matches transparency content detail pages. */
+        public String detailLinkSelector;
+        /**
+         * Regex pattern — only category links whose href matches this are followed.
+         * Null = follow all discovered links.
+         */
+        public String categoryIncludePattern;
+        /**
+         * Regex pattern — category links whose href matches this are excluded.
+         * Null = no exclusion.
+         */
+        public String categoryExcludePattern;
     }
 }

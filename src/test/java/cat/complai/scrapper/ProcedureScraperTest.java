@@ -220,8 +220,8 @@ class ProcedureScraperTest {
         assertTrue(mapping.news.fields.containsKey("categories"));
 
         assertNotNull(mapping.news.seedCategoryUrls);
-        assertEquals(9, mapping.news.seedCategoryUrls.size(),
-                "seed categories should cover all known elprataldia categories");
+        assertEquals(13, mapping.news.seedCategoryUrls.size(),
+                "seed categories: 9 original elprataldia + 3 elprat.digital + 1 sala-de-premsa");
     }
 
     @Test
@@ -242,6 +242,59 @@ class ProcedureScraperTest {
 
         assertNotNull(mapping.cityInfo.skip);
         assertTrue(mapping.cityInfo.skip.whenBodyEmpty);
+    }
+
+    @Test
+    void elpratMapping_additionalSeeds_hasOneEntry() throws IOException {
+        ScraperMapping mapping = ProcedureScraper.loadMapping("elprat");
+
+        assertNotNull(mapping.crawl.additionalSeeds);
+        assertEquals(1, mapping.crawl.additionalSeeds.size(),
+                "additionalSeeds must have exactly 1 entry (SIAC portal)");
+        assertEquals("https://seu.elprat.cat/siac/default.aspx", mapping.crawl.additionalSeeds.get(0));
+    }
+
+    @Test
+    void elpratMapping_eventSeedSites_hasThreeEntries() throws IOException {
+        ScraperMapping mapping = ProcedureScraper.loadMapping("elprat");
+
+        assertNotNull(mapping.events, "events config must be present");
+        assertNotNull(mapping.events.seedSites);
+        assertEquals(3, mapping.events.seedSites.size(),
+                "seedSites must have 3 external event venues");
+        for (ProcedureScraper.EventSeedSite site : mapping.events.seedSites) {
+            assertNotNull(site.baseUrl, "each seedSite must have a baseUrl");
+            assertFalse(site.baseUrl.isBlank());
+            assertNotNull(site.eventLinkSelector, "each seedSite must have an eventLinkSelector");
+            assertFalse(site.eventLinkSelector.isBlank());
+        }
+    }
+
+    @Test
+    void elpratMapping_cityInfoSeedThemeUrls_hasTwoEntries() throws IOException {
+        ScraperMapping mapping = ProcedureScraper.loadMapping("elprat");
+
+        assertNotNull(mapping.cityInfo.seedThemeUrls);
+        assertEquals(2, mapping.cityInfo.seedThemeUrls.size(),
+                "seedThemeUrls must have 2 external utility sites");
+    }
+
+    @Test
+    void elpratMapping_transparencySection_loadsSuccessfully() throws IOException {
+        ScraperMapping mapping = ProcedureScraper.loadMapping("elprat");
+
+        assertNotNull(mapping.transparency, "transparency config must be present");
+        assertEquals("https://seu-e.cat/ca/web/elpratdellobregat/govern-obert-i-transparencia",
+                mapping.transparency.baseUrl);
+        assertNotNull(mapping.transparency.crawl);
+        assertFalse(mapping.transparency.crawl.detailLinkSelector.isBlank());
+
+        assertTrue(mapping.transparency.fields.containsKey("title"),
+                "transparency fields must contain 'title'");
+        assertTrue(mapping.transparency.fields.containsKey("section"),
+                "transparency fields must contain 'section'");
+        assertTrue(mapping.transparency.fields.containsKey("body"),
+                "transparency fields must contain 'body'");
     }
 
     // -------------------------------------------------------------------------

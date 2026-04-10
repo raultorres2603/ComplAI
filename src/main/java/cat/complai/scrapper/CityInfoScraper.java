@@ -138,6 +138,18 @@ public class CityInfoScraper {
         } catch (Exception e) {
             logger.severe("Failed city-info theme discovery from " + cityInfoConfig.baseUrl + " - " + e.getMessage());
         }
+
+        // Merge explicit seed theme URLs (external sites not discoverable from #prat-temes)
+        if (cityInfoConfig.seedThemeUrls != null) {
+            for (String seed : cityInfoConfig.seedThemeUrls) {
+                if (seed == null || seed.isBlank()) continue;
+                String canonical = canonicalizeUrl(seed);
+                if (canonical != null) {
+                    themeUrls.putIfAbsent(canonical, "");
+                }
+            }
+        }
+
         return themeUrls;
     }
 
