@@ -14,7 +14,6 @@ import cat.complai.s3.S3PdfUploader;
 import cat.complai.sqs.SqsComplaintPublisher;
 import cat.complai.sqs.dto.RedactSqsMessage;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.annotation.Client;
