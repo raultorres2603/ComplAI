@@ -26,6 +26,17 @@ import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * Handles the AI call to OpenRouter, including response caching and error
+ * mapping.
+ *
+ * <p>
+ * Checks the Caffeine response cache before forwarding the request to
+ * OpenRouter
+ * and stores successful responses so that semantically equivalent queries can
+ * be served
+ * without a new AI call.
+ */
 @Singleton
 public class AiResponseProcessingService {
 
@@ -34,6 +45,14 @@ public class AiResponseProcessingService {
     private final Logger logger = Logger.getLogger(AiResponseProcessingService.class.getName());
     private final int overallTimeoutSeconds;
 
+    /**
+     * Constructs the service with configurable timeout and cache dependencies.
+     *
+     * @param httpWrapper           HTTP wrapper for OpenRouter calls
+     * @param responseCacheService  Caffeine response cache
+     * @param overallTimeoutSeconds maximum seconds to wait for the AI response;
+     *                              defaults to 60
+     */
     @Inject
     public AiResponseProcessingService(HttpWrapper httpWrapper,
             ResponseCacheService responseCacheService,
@@ -60,8 +79,10 @@ public class AiResponseProcessingService {
         QuestionCategory category = QuestionCategoryDetector.detectCategory(userQuestion);
         int questionHash = hashQuestion(userQuestion);
 
-        // Build cache key: cityId + context hashes + category + question hash (no raw user query text!)
-        ResponseCacheKey cacheKey = new ResponseCacheKey(cityId, procContextHash, eventContextHash, category, questionHash);
+        // Build cache key: cityId + context hashes + category + question hash (no raw
+        // user query text!)
+        ResponseCacheKey cacheKey = new ResponseCacheKey(cityId, procContextHash, eventContextHash, category,
+                questionHash);
 
         // Check cache first
         Optional<String> cachedResponse = responseCacheService.getCachedResponse(cacheKey);
@@ -74,8 +95,10 @@ public class AiResponseProcessingService {
         logCacheObservation("CACHE MISS", cacheKey);
         OpenRouterResponseDto response = callOpenRouterInternal(messages, cityId);
 
-        // Cache all successful responses — the questionHash field in the cache key ensures
-        // that different questions with identical city/hashes/category are not confused.
+        // Cache all successful responses — the questionHash field in the cache key
+        // ensures
+        // that different questions with identical city/hashes/category are not
+        // confused.
         if (response.isSuccess() && response.getMessage() != null) {
             responseCacheService.cacheResponse(cacheKey, response.getMessage());
             logCacheObservation("CACHE STORE", cacheKey);
@@ -89,7 +112,8 @@ public class AiResponseProcessingService {
      * One-way hash: the raw question text is never stored in the cache key.
      */
     private static int hashQuestion(String question) {
-        if (question == null || question.isBlank()) return 0;
+        if (question == null || question.isBlank())
+            return 0;
         return question.strip().toLowerCase(java.util.Locale.ROOT).hashCode();
     }
 
@@ -176,9 +200,11 @@ public class AiResponseProcessingService {
                 }
                 logger.fine(() -> "callOpenRouterAndExtract — AI responded successfully httpStatus=" + dto.statusCode()
                         + " responseLength=" + dto.message().length());
-                // Apply HTML formatting: convert Markdown to HTML, then clean excessive formatting
+                // Apply HTML formatting: convert Markdown to HTML, then clean excessive
+                // formatting
                 String cleanedMessage = ensureHtmlFormat(dto.message());
-                return new OpenRouterResponseDto(true, cleanedMessage, null, dto.statusCode(), OpenRouterErrorCode.NONE);
+                return new OpenRouterResponseDto(true, cleanedMessage, null, dto.statusCode(),
+                        OpenRouterErrorCode.NONE);
             }
             logger.warning(() -> "callOpenRouterAndExtract — AI returned empty message httpStatus=" + dto.statusCode());
             return new OpenRouterResponseDto(false, null, "AI returned no message.", dto.statusCode(),
@@ -233,11 +259,15 @@ public class AiResponseProcessingService {
      * Ensures a message is HTML-formatted by converting Markdown syntax to HTML
      * and applying HTML cleaning.
      * 
-     * <p>Process:</p>
+     * <p>
+     * Process:
+     * </p>
      * <ul>
-     *   <li>If message is null or empty, returns as-is</li>
-     *   <li>Converts Markdown formatting to HTML using {@link MarkdownToHtmlConverter#convertMarkdownToHtml(String)}</li>
-     *   <li>Applies HTML cleaning using {@link HtmlFormatter#cleanHtml(String)} to remove excessive formatting</li>
+     * <li>If message is null or empty, returns as-is</li>
+     * <li>Converts Markdown formatting to HTML using
+     * {@link MarkdownToHtmlConverter#convertMarkdownToHtml(String)}</li>
+     * <li>Applies HTML cleaning using {@link HtmlFormatter#cleanHtml(String)} to
+     * remove excessive formatting</li>
      * </ul>
      * 
      * @param message The message text to format (may be null or empty)

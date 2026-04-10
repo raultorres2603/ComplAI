@@ -9,6 +9,8 @@ Last version: [![GitHub Release](https://img.shields.io/github/v/release/raultor
 > **Gall Potablava** is an AI assistant for the residents of El Prat de Llobregat (Catalonia, Spain).
 > It helps citizens ask questions about local services, understand municipal procedures, and draft
 > formal complaints addressed to the City Hall (Ajuntament d'El Prat de Llobregat).
+>
+> Version `0.9.6` — Java 25 · Micronaut 4.10.7 · AWS Lambda (ARM64) · API Gateway HTTP API
 
 ---
 
@@ -16,19 +18,20 @@ Last version: [![GitHub Release](https://img.shields.io/github/v/release/raultor
 
 1. [What Is This Project?](#1-what-is-this-project)
 2. [Vision and Goals](#2-vision-and-goals)
-3. [Integration with Prat Espais](#3-integration-with-prat-espais)
-4. [Architecture Overview](#4-architecture-overview)
-5. [Performance Optimizations](#5-performance-optimizations)
-6. [How It Works — Request Lifecycle](#6-how-it-works--request-lifecycle)
+3. [Tech Stack](#3-tech-stack)
+4. [Integration with Prat Espais](#4-integration-with-prat-espais)
+5. [Architecture Overview](#5-architecture-overview)
+6. [Getting Started (Local Dev)](#6-getting-started-local-dev)
 7. [API Reference](#7-api-reference)
 8. [Conversation History (Multi-turn)](#8-conversation-history-multi-turn)
 9. [AI Identity and Behaviour](#9-ai-identity-and-behaviour)
-10. [PDF Complaint Letter Generation](#10-pdf-complaint-letter-generation)
-11. [Infrastructure](#11-infrastructure)
-12. [Operational Details](#12-operational-details)
-13. [Security](#13-security)
-14. [JWT Bearer Authentication](#14-jwt-bearer-authentication)
-15. [OIDC Identity Verification (Cl@ve, VALId, idCat, etc.)](#15-oidc-identity-verification-clave-valid-idcat-etc)
+10. [Performance Optimizations](#10-performance-optimizations)
+11. [PDF Complaint Letter Generation](#11-pdf-complaint-letter-generation)
+12. [Infrastructure](#12-infrastructure)
+13. [Security and Authentication](#13-security-and-authentication)
+14. [OIDC Identity Verification (Cl@ve, VALId, idCat, etc.)](#14-oidc-identity-verification-clave-valid-idcat-etc)
+15. [Testing](#15-testing)
+16. [Audit Logging](#16-audit-logging)
 ---
 
 ## 1. What Is This Project?
@@ -69,7 +72,32 @@ All three languages spoken in the area are supported: **Catalan (default)**, **S
 
 ---
 
-## 3. Integration with Prat Espais
+## 3. Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| **Language / Runtime** | Java 25 |
+| **Framework** | Micronaut 4.10.7 (`lambda_provided` runtime) |
+| **Build** | Gradle 8 + Shadow JAR (`complai-all.jar`) |
+| **Cloud Provider** | AWS (eu-west-1) |
+| **Compute** | AWS Lambda (ARM64, 1 024 MB, Java 25 runtime) |
+| **API Layer** | AWS API Gateway HTTP API (payload format v2) |
+| **WAF** | AWS WAF (production only — geo-restrict to Spain + rate limiting) |
+| **Messaging** | AWS SQS (redact queue, feedback queue — each with DLQ) |
+| **Storage** | AWS S3 (procedures, events, news, city-info, complaints, feedback, deployments) |
+| **AI** | OpenRouter API (model configurable via `OPENROUTER_MODEL`) |
+| **PDF generation** | Apache PDFBox 2.0 (NotoSans TrueType, in-memory) |
+| **Caching** | Caffeine (conversation history + response cache) |
+| **Auth** | API Key (`X-Api-Key` header) per city + optional OIDC identity token for complaints |
+| **JWT / OIDC** | JJWT 0.12 (OIDC `X-Identity-Token` verification — Cl@ve, VALId, idCat) |
+| **HTML parsing** | Jsoup 1.17 |
+| **IaC** | AWS CDK v2 (TypeScript) |
+| **Local dev** | AWS SAM CLI + LocalStack 3 (Docker) |
+| **Testing** | JUnit 5 + Mockito 5; Bruno (`.bru`) for E2E |
+
+---
+
+## 4. Integration with Prat Espais
 
 **Prat Espais** is the citizen-facing digital platform for El Prat de Llobregat. ComplAI is designed
 to be embedded in it as a **chat widget** — a floating conversation panel that citizens open from
@@ -100,88 +128,94 @@ any page of the portal.
 
 ### How the front-end calls the API
 
-The chat widget makes standard `POST` requests to the ComplAI Lambda Function URL endpoint. Two flows exist:
+The chat widget makes standard `POST` requests to the ComplAI API Gateway endpoint. Two flows exist:
 
 1. **Conversational questions** (`POST /complai/ask`) — the citizen types a question; the widget
-   sends it and displays the AI response as a new chat bubble.
-2. **Complaint drafting** (`POST /complai/redact`) — the citizen describes their problem; the
-   widget sends it with `"format": "pdf"` or `"format": "json"` and either renders the letter
-   in-chat or triggers a PDF download.
+   sends it and displays the AI response as a new chat bubble (streamed via Server-Sent Events).
+2. **Complaint drafting** (`POST /complai/redact`) — the citizen describes their problem;
+   the widget sends it with `"format": "pdf"` and polls the returned pre-signed URL.
 
-Both calls can include an optional `conversationId` (a UUID the front-end generates per session)
-so the AI remembers the context of the conversation. This is what allows natural multi-turn
-exchanges: *"Can you add my neighbour's name to the letter?"* works because the previous turn is
-remembered.
+All calls require an `X-Api-Key` header. Both can include an optional `conversationId`
+(a UUID the front-end generates per session) so the AI remembers conversation context. This
+explains why *"Can you add my neighbour's name to the letter?"* works on the second turn.
 
-**Endpoint:**
-- The public endpoint is the Lambda Function URL, e.g.:
-  `https://<lambda-function-id>.lambda-url.<region>.on.aws/complai/ask`
-- CORS and public access are managed via Lambda Function URL configuration.
+**API base URL:**
+`https://<api-gateway-id>.execute-api.<region>.amazonaws.com/$default`
+
+CORS is configured on the API Gateway; allowed origins are set via `COMPLAI_CORS_ALLOWED_ORIGIN`.
 
 ### What the front-end receives
 
 | Scenario | Response |
 |---|---|
-| Successful answer | `200 OK` with JSON body containing the AI text |
-| PDF queued (identity complete, format ≠ json) | `202 Accepted` with `pdfUrl` pre-signed S3 link |
-| Successful JSON letter or AI asking for identity | `200 OK` with JSON body containing the letter/question text |
+| Successful answer (SSE) | `200 OK` — `text/event-stream` with progressive response chunks |
+| PDF queued (identity complete) | `202 Accepted` with `pdfUrl` pre-signed S3 link |
 | Question not about El Prat | `422 Unprocessable Entity` with error code `REFUSAL` |
 | Invalid request | `400 Bad Request` with error code `VALIDATION` |
+| Missing or invalid API key | `401 Unauthorized` with error code `UNAUTHORIZED` |
 | AI service unavailable | `502 Bad Gateway` with error code `UPSTREAM` |
 
 ---
 
-## 4. Architecture Overview
+## 5. Architecture Overview
 
 ComplAI follows a strict **layered architecture** with clear boundaries at every level.
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│                  Lambda Function URL (public HTTPS)              │
-│             AWS-managed: TLS, routing, throttle, CORS            │
+│          API Gateway HTTP API  (public HTTPS, CORS, throttle)    │
+│       WAF WebACL attached in production (geo + rate limit)       │
 └───────────────────────────────┬──────────────────────────────────┘
-                                │ HTTP event (payload v2)
+                                │ HTTP event (payload format v2)
 ┌───────────────────────────────▼──────────────────────────────────┐
-│                        AWS Lambda (Java 25)                      │
+│               ComplAILambda  (Java 25, ARM64, 1 024 MB)          │
 │                    Micronaut 4.10.7 function runtime             │
 │                                                                  │
+│  ApiKeyAuthFilter → RateLimitFilter → Controller                 │
+│                                                                  │
 │  ┌────────────────────────────────────────────────────────────┐  │
-│  │ Controller layer  (OpenRouterController, HomeController)   │  │
+│  │ Controller layer  (OpenRouterController, HomeController,   │  │
+│  │                    HealthController, FeedbackController)   │  │
 │  │  • HTTP boundary: deserialise request, validate format     │  │
 │  │  • Maps typed error codes → HTTP status codes              │  │
-│  │  • Returns JSON (PDFs are async only)                              │  │
+│  │  • Returns JSON or SSE stream (PDFs are async only)        │  │
 │  └───────────────────────────┬────────────────────────────────┘  │
 │                              │ calls                              │
 │  ┌───────────────────────────▼────────────────────────────────┐  │
 │  │ Service layer  (OpenRouterServices via IOpenRouterService)  │  │
-│  │  • Validates inputs (null/blank checks)                    │  │
+│  │  • Validates inputs (null/blank checks, max 5 000 chars)   │  │
+│  │  • RAG context enrichment (procedures, events, news)       │  │
 │  │  • Builds AI prompt + message history                      │  │
-│  │  • Detects AI refusals                                     │  │
-│  │  • Parses AI format header                                 │  │
-│  │  • Publishes to SQS for async PDF generation               │  │
-│  │  • Returns typed OpenRouterResponseDto — never throws      │  │
-│  └───────────────────────────┬────────────────────────────────┘  │
-│                              │ calls                              │
-│  ┌───────────────────────────▼────────────────────────────────┐  │
-│  │ Infrastructure layer  (HttpWrapper)                        │  │
-│  │  • Async HTTP call to OpenRouter API                       │  │
-│  │  • Two overloads: single-prompt + multi-turn message list  │  │
-│  │  • Parses OpenAI-compatible JSON response                  │  │
+│  │  • Detects AI refusals + streams SSE chunks                │  │
+│  │  • Publishes to SQS for async PDF/feedback generation      │  │
 │  └───────────────────────────┬────────────────────────────────┘  │
 │                              │                                    │
 │  ┌───────────────────────────▼────────────────────────────────┐  │
-│  │ Cache (Caffeine in-memory)                                 │  │
-│  │  • Conversation history keyed by conversationId            │  │
-│  │  • 30-minute TTL, max 10,000 concurrent conversations      │  │
-│  │  • Bounded to 10 turns per conversation                    │  │
+│  │ HttpWrapper  (Micronaut HTTP client, OpenAI-compatible SSE) │  │
+│  └───────────────────────────┬────────────────────────────────┘  │
+│                              │                                    │
+│  ┌───────────────────────────▼────────────────────────────────┐  │
+│  │ Caffeine Cache                                             │  │
+│  │  • Conversation history: TTL 30 min, max 5 turns           │  │
+│  │  • Response cache: TTL 10 min, max 500 entries (privacy)   │  │
 │  └────────────────────────────────────────────────────────────┘  │
 └──────────────────────────────────────────────────────────────────┘
-                                │ HTTPS POST
-                                │ Bearer token auth
-┌───────────────────────────────▼──────────────────────────────────┐
-│                    OpenRouter API                                │
-│              model: configurable via OPENROUTER_MODEL env var    │
-└──────────────────────────────────────────────────────────────────┘
+          │ SQS (complai-redact-<env>)      │ SQS (complai-feedback-<env>)
+          ▼                                ▼
+ ComplAIRedactorLambda              ComplAIFeedbackWorkerLambda
+ (ARM64, 1024 MB)                   (ARM64, 1024 MB)
+          │                                │
+          ▼ s3:PutObject                   ▼ s3:PutObject
+ complai-complaints-<env>          complai-feedback-<env>
+          ▲
+          │ s3:GetObject (pre-signed URL signer)
+   ComplAILambda (API)
+
+                               │ HTTPS POST (streaming)
+                ┌──────────────▼─────────────┐
+                │        OpenRouter API       │
+                │  model: OPENROUTER_MODEL    │
+                └────────────────────────────┘
 ```
 
 ### Key design decisions
@@ -246,17 +280,20 @@ ComplAI implements intelligent RAG (Retrieval-Augmented Generation) filtering to
 
 ComplAI implements intelligent response caching to reduce latency and OpenRouter API costs:
 
-- **Tier 1: Caffeine In-Memory Cache (Active)**
-  - **Implementation**: `ResponseCacheService` with `CommonResponseCacheInitializer` 
-  - **Scope**: Conversation responses keyed by conversation ID
-  - **TTL**: 30 minutes (auto-expiration after last access)
-  - **Capacity**: Bounded to 10,000 concurrent conversations, max 10 turns per conversation
-  - **Use Cases**: Multi-turn conversations reuse cached responses for subsequent identical queries within the same session
+- **Conversation Cache (Caffeine)**
+  - **Scope**: Conversation history keyed by `conversationId`
+  - **TTL**: 30 minutes of inactivity, max **5 turns** (10 messages) per conversation
+  - On a cache hit the service skips the OpenRouter call and returns the cached response immediately
+
+- **Response Cache (Caffeine)**
+  - **Implementation**: `ResponseCacheService` — privacy-first cache, key is `cityId + contextHash + questionCategory` (no user text stored)
+  - **TTL**: 10 minutes, max 500 entries (LRU eviction)
+  - **Feature flag**: `RESPONSE_CACHE_ENABLED` (default `true`)
+  - **Use Cases**: Identical factual queries (e.g., "opening hours of the library") served from cache without calling OpenRouter
   
-- **Tier 2: S3 Integration (Optional)**
-  - Prepared for future long-term response caching using S3
-  - Would allow responses to persist across multiple user sessions
-  - Configuration available but not enabled by default
+- **Tier 2: S3 Integration**
+  - Prepared for future long-term response caching (cross-session persistence)
+  - Not enabled by default
 
 - **When Caching Is Used**
   - Triggered automatically in `ResponseCacheService` when a conversation ID is provided
@@ -322,6 +359,9 @@ Client polls the pdfUrl — returns 403/404 while the worker is running,
 
 ## 7. API Reference
 
+> **Authentication**: All `POST` endpoints require `X-Api-Key: <key>` in the request header.
+> `GET /`, `GET /health`, and `GET /health/startup` are public and do not require a key.
+
 ### `GET /`
 
 Welcome endpoint.
@@ -335,7 +375,7 @@ Welcome endpoint.
 
 ### `GET /health`
 
-Liveness check. No JWT required.
+Full liveness check — triggers RAG index initialisation if not yet done.
 
 **Response `200 OK`:**
 ```json
@@ -347,6 +387,14 @@ Liveness check. No JWT required.
   }
 }
 ```
+
+---
+
+### `GET /health/startup`
+
+Lightweight startup probe — does **not** trigger RAG initialisation. Intended for Lambda warmup checks.
+
+**Response `200 OK`:** same shape as `GET /health`.
 
 ---
 
@@ -385,7 +433,7 @@ data: {"type":"complete","message":"Pots renovar el padró a l'Oficina d'Atenci�
 
 **Fallback JSON Response (non-streaming):**
 
-If the client does not support SSE or sends an `Accept: application/json` header, the endpoint returns a complete JSON object with all information available at once:
+If the client sends `Accept: application/json`, the endpoint returns a complete JSON object:
 
 ```json
 {

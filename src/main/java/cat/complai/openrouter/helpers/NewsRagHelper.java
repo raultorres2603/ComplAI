@@ -22,18 +22,53 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * In-memory lexical RAG helper for city news articles.
+ *
+ * <p>
+ * Loads news documents from S3 (when {@code NEWS_BUCKET} and
+ * {@code NEWS_REGION} are set)
+ * or from the classpath resource {@code news-<cityId>.json} for local
+ * development.
+ * Builds an {@link InMemoryLexicalIndex} on construction and exposes
+ * BM25-scored search
+ * via {@link #searchNews(String, int)}.
+ */
 public class NewsRagHelper {
 
+    /**
+     * A single news article loaded from the JSON knowledge base.
+     */
     public static class News {
+        /** Unique identifier for this news article. */
         public final String newsId;
+        /** Article headline. */
         public final String title;
+        /** Short summary of the article. */
         public final String summary;
+        /** Full body text of the article. */
         public final String body;
+        /** ISO-8601 publication timestamp. */
         public final String publishedAt;
+        /** Comma-separated categories. */
         public final String categories;
+        /** Author name, if available. */
         public final String author;
+        /** Canonical URL of the article. */
         public final String url;
 
+        /**
+         * Constructs a {@code News} article entry.
+         *
+         * @param newsId      unique identifier
+         * @param title       article headline
+         * @param summary     short summary
+         * @param body        full body text
+         * @param publishedAt publication date/time
+         * @param categories  comma-separated categories
+         * @param author      author name
+         * @param url         canonical URL
+         */
         public News(String newsId, String title, String summary, String body, String publishedAt,
                 String categories, String author, String url) {
             this.newsId = newsId;

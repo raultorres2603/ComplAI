@@ -21,17 +21,49 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * In-memory lexical RAG helper for city-information pages.
+ *
+ * <p>
+ * Loads city-info documents from S3 (when {@code CITYINFO_BUCKET} and
+ * {@code CITYINFO_REGION} are set) or from the classpath resource
+ * {@code cityinfo-<cityId>.json} for local development. Builds an
+ * {@link InMemoryLexicalIndex}
+ * on construction and exposes BM25-scored search via
+ * {@link #searchCityInfo(String, int)}.
+ */
 public class CityInfoRagHelper {
 
+    /**
+     * A single city-information document loaded from the JSON knowledge base.
+     */
     public static class CityInfo {
+        /** Unique identifier for this city-info entry. */
         public final String cityInfoId;
+        /** Theme or category of the page (e.g. "tourism", "services"). */
         public final String theme;
+        /** Page title. */
         public final String title;
+        /** Short summary of the page content. */
         public final String summary;
+        /** Full body text of the page. */
         public final String body;
+        /** Breadcrumb navigation path. */
         public final String breadcrumbs;
+        /** Canonical URL of the source page. */
         public final String url;
 
+        /**
+         * Constructs a {@code CityInfo} entry.
+         *
+         * @param cityInfoId  unique identifier
+         * @param theme       page theme or category
+         * @param title       page title
+         * @param summary     short summary
+         * @param body        full body text
+         * @param breadcrumbs breadcrumb navigation path
+         * @param url         canonical URL
+         */
         public CityInfo(String cityInfoId, String theme, String title, String summary,
                 String body, String breadcrumbs, String url) {
             this.cityInfoId = cityInfoId;
@@ -90,7 +122,8 @@ public class CityInfoRagHelper {
                         .bucket(bucket)
                         .key(s3Key)
                         .build();
-                logger.info(() -> "Loading city info from S3 - bucket=" + bucket + " key=" + s3Key + " region=" + region);
+                logger.info(
+                        () -> "Loading city info from S3 - bucket=" + bucket + " key=" + s3Key + " region=" + region);
                 byte[] cityInfoBytes = s3.getObjectAsBytes(req).asByteArray();
                 return new ByteArrayInputStream(cityInfoBytes);
             } catch (Exception e) {

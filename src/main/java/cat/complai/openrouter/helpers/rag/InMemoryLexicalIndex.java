@@ -9,6 +9,18 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 
+/**
+ * Immutable BM25 retrieval index that lives entirely in the JVM heap.
+ *
+ * <p>
+ * Documents are tokenised once at build time; scoring happens at query time
+ * without any
+ * external library (no Lucene, no Elasticsearch). Supports optional
+ * per-document language
+ * tagging for language-aware score boosting.
+ *
+ * @param <T> the domain type stored in each indexed document
+ */
 public final class InMemoryLexicalIndex<T> {
 
     private final List<IndexedDocument<T>> documents;
@@ -17,6 +29,16 @@ public final class InMemoryLexicalIndex<T> {
     private final Map<String, Double> fieldWeights;
     private final LexicalScorer lexicalScorer;
 
+    /**
+     * Constructs an index from pre-computed document statistics.
+     *
+     * @param documents           list of indexed documents
+     * @param averageFieldLength  average token count per field, keyed by field name
+     * @param docFrequencyByField per-field document-frequency map, keyed by field
+     *                            then term
+     * @param fieldWeights        relative scoring weight for each field
+     * @param lexicalScorer       BM25 scorer used at query time
+     */
     public InMemoryLexicalIndex(List<IndexedDocument<T>> documents,
             Map<String, Double> averageFieldLength,
             Map<String, Map<String, Integer>> docFrequencyByField,
@@ -29,6 +51,18 @@ public final class InMemoryLexicalIndex<T> {
         this.lexicalScorer = Objects.requireNonNull(lexicalScorer, "lexicalScorer");
     }
 
+    /**
+     * Builds an index from a list of entities, extracting field text with the
+     * provided
+     * function.
+     *
+     * @param <T>            the domain type to index
+     * @param entities       entities to index
+     * @param fieldWeights   scoring weight for each field, keyed by field name
+     * @param fieldExtractor function that maps an entity to its fields (field name
+     *                       → text)
+     * @return a ready-to-search {@link InMemoryLexicalIndex}
+     */
     public static <T> InMemoryLexicalIndex<T> build(List<T> entities,
             Map<String, Double> fieldWeights,
             Function<T, Map<String, String>> fieldExtractor) {
@@ -94,6 +128,18 @@ public final class InMemoryLexicalIndex<T> {
                 new LexicalScorer());
     }
 
+    /**
+     * Builds an index from a list of entities with optional per-document language
+     * detection.
+     *
+     * @param <T>               the domain type to index
+     * @param entities          entities to index
+     * @param fieldWeights      scoring weight for each field
+     * @param fieldExtractor    maps an entity to its fields
+     * @param languageExtractor maps an entity to its ISO language tag
+     * @param languageTags      expected language tags for token normalisation
+     * @return a ready-to-search {@link InMemoryLexicalIndex}
+     */
     public static <T> InMemoryLexicalIndex<T> build(List<T> entities,
             Map<String, Double> fieldWeights,
             Function<T, Map<String, String>> fieldExtractor,
@@ -163,6 +209,16 @@ public final class InMemoryLexicalIndex<T> {
                 new LexicalScorer());
     }
 
+    /**
+     * Searches the index with a plain-text query string and returns the top-K
+     * results.
+     *
+     * @param query         natural-language query
+     * @param topK          maximum number of results to return
+     * @param absoluteFloor minimum absolute BM25 score a result must exceed
+     * @param relativeFloor minimum score as a fraction of the top-scoring result
+     * @return a {@link SearchResponse} containing the ranked results
+     */
     public SearchResponse<T> search(String query, int topK, double absoluteFloor, double relativeFloor) {
         List<String> queryTokens = TokenNormalizer.tokenize(query);
         if (queryTokens.isEmpty() || topK <= 0 || documents.isEmpty()) {
@@ -172,10 +228,31 @@ public final class InMemoryLexicalIndex<T> {
         return search(queryTokens, topK, absoluteFloor, relativeFloor);
     }
 
+    /**
+     * Searches the index with pre-tokenised query tokens.
+     *
+     * @param queryTokens   tokens derived from the user query
+     * @param topK          maximum number of results
+     * @param absoluteFloor minimum absolute BM25 score
+     * @param relativeFloor minimum score relative to the top result
+     * @return a {@link SearchResponse} containing the ranked results
+     */
     public SearchResponse<T> search(List<String> queryTokens, int topK, double absoluteFloor, double relativeFloor) {
         return search(queryTokens, topK, absoluteFloor, relativeFloor, null);
     }
 
+    /**
+     * Searches the index with pre-tokenised query tokens and optional language
+     * boosting.
+     *
+     * @param queryTokens   tokens derived from the user query
+     * @param topK          maximum number of results
+     * @param absoluteFloor minimum absolute BM25 score
+     * @param relativeFloor minimum score relative to the top result
+     * @param queryLanguage ISO language tag used for language-aware score boosting;
+     *                      may be {@code null} to disable boosting
+     * @return a {@link SearchResponse} containing the ranked results
+     */
     public SearchResponse<T> search(List<String> queryTokens, int topK, double absoluteFloor, double relativeFloor,
             String queryLanguage) {
         if (queryTokens.isEmpty() || topK <= 0 || documents.isEmpty()) {

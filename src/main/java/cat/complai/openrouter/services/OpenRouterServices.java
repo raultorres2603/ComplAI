@@ -43,6 +43,23 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+/**
+ * Primary implementation of {@link IOpenRouterService}.
+ *
+ * <p>Orchestrates RAG context retrieval, conversation history management, AI HTTP calls,
+ * response caching, and PDF generation. Delegates to focused helper services rather than
+ * containing all logic inline.
+ */
+/**
+ * Primary implementation of {@link IOpenRouterService}.
+ *
+ * <p>
+ * Orchestrates RAG context retrieval, conversation history management, AI HTTP
+ * calls,
+ * response caching, and PDF generation. Delegates to focused helper services
+ * rather than
+ * containing all logic inline.
+ */
 @Singleton
 public class OpenRouterServices implements IOpenRouterService {
 
