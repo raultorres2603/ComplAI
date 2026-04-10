@@ -192,6 +192,15 @@ Overwrite `task.md` at the workspace root entirely. Use the exact structure belo
 - [<Title>](<URL>)
 ```
 
+### Mermaid Diagram Requirement
+
+If the task involves creating or updating **Architecture Overview** documentation or any system architecture planning:
+- A Mermaid diagram (flowchart or architecture graph) **MUST** be included in the `task.md`.
+- The diagram must render correctly in GitHub Markdown.
+- It must represent **actual** codebase structure (layers: Controllers → Services → Repositories, AWS integrations, data flows, etc.).
+- No unverified or speculative components.
+- Diagrams ensure clarity for both implementation and documentation agents.
+
 ### Rules for writing tasks
 
 - Each task maps to **one concern** (one layer, one domain concept).

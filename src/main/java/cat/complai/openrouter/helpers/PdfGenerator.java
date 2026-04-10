@@ -13,6 +13,16 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Generates a PDF document from a plain-text complaint letter.
+ *
+ * <p>
+ * Uses Apache PDFBox to lay out the text on A4 pages with word-wrap and
+ * automatic
+ * page breaks. Prefers the {@code NotoSans-Regular.ttf} font bundled on the
+ * classpath;
+ * falls back to {@code Helvetica} when the font resource is absent.
+ */
 public class PdfGenerator {
 
     private static final float MARGIN = 50;
@@ -23,18 +33,30 @@ public class PdfGenerator {
     private static final float USABLE_WIDTH = PAGE_WIDTH - 2 * MARGIN;
     private static final float BOTTOM_MARGIN = 50;
 
+    /**
+     * Generates a PDF from the given plain-text content and returns it as a byte
+     * array.
+     *
+     * @param content the plain-text letter body to render; a default placeholder is
+     *                used when blank
+     * @return the PDF bytes
+     * @throws RuntimeException if PDFBox encounters an error during document
+     *                          generation
+     */
     public static byte[] generatePdf(String content) {
         if (content == null || content.trim().isEmpty()) {
             content = "No content was generated or extracted.";
         }
 
         try (PDDocument document = new PDDocument();
-             ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+                ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
 
             InputStream fontStream = PdfGenerator.class.getResourceAsStream("/NotoSans-Regular.ttf");
             // Bug fix: PDType1Font.HELVETICA is the correct static constant to reuse.
-            // Constructing new PDType1Font(PDType1Font.HELVETICA.getCOSObject()) shares the same
-            // mutable COS dictionary, which can corrupt font encoding and produce a blank PDF.
+            // Constructing new PDType1Font(PDType1Font.HELVETICA.getCOSObject()) shares the
+            // same
+            // mutable COS dictionary, which can corrupt font encoding and produce a blank
+            // PDF.
             PDFont font = fontStream != null ? PDType0Font.load(document, fontStream) : PDType1Font.HELVETICA;
 
             List<String> visualLines = buildVisualLines(content, font);
@@ -57,8 +79,10 @@ public class PdfGenerator {
                 }
                 // newLine() advances by LINE_HEIGHT (set via setLeading in openContentStream).
                 // This must be called for every line — including empty ones — so that the text
-                // matrix position stays in sync with currentY. Using newLineAtOffset(0, -n) only
-                // for non-empty lines caused the cursor to drift off-page, producing a blank PDF.
+                // matrix position stays in sync with currentY. Using newLineAtOffset(0, -n)
+                // only
+                // for non-empty lines caused the cursor to drift off-page, producing a blank
+                // PDF.
                 contentStream.newLine();
                 currentY -= LINE_HEIGHT;
             }
@@ -80,12 +104,14 @@ public class PdfGenerator {
         return page;
     }
 
-    private static PDPageContentStream openContentStream(PDDocument document, PDPage page, PDFont font) throws Exception {
+    private static PDPageContentStream openContentStream(PDDocument document, PDPage page, PDFont font)
+            throws Exception {
         PDPageContentStream stream = new PDPageContentStream(document, page);
         stream.beginText();
         stream.setFont(font, FONT_SIZE);
         // setLeading tells PDFBox how far to advance per newLine() call.
-        // Without this, newLine() moves by zero and all lines are stacked on top of each other.
+        // Without this, newLine() moves by zero and all lines are stacked on top of
+        // each other.
         stream.setLeading(LINE_HEIGHT);
         stream.newLineAtOffset(MARGIN, PAGE_HEIGHT - MARGIN);
         return stream;
@@ -113,8 +139,10 @@ public class PdfGenerator {
     }
 
     /**
-     * Word-wraps a single paragraph into lines that fit within USABLE_WIDTH at FONT_SIZE.
-     * PDFBox's getStringWidth() returns width in 1/1000 text space units; divide by 1000
+     * Word-wraps a single paragraph into lines that fit within USABLE_WIDTH at
+     * FONT_SIZE.
+     * PDFBox's getStringWidth() returns width in 1/1000 text space units; divide by
+     * 1000
      * and multiply by font size to get points.
      */
     private static List<String> wrapParagraph(String paragraph, PDFont font) throws Exception {

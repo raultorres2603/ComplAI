@@ -6,6 +6,24 @@ import jakarta.inject.Singleton;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * Pre-warms the RAG indexes for the default city at application startup.
+ *
+ * <p>
+ * Eagerly calls {@link ProcedureRagHelperRegistry#getForCity},
+ * {@link EventRagHelperRegistry#getForCity}, and
+ * {@link CityInfoRagHelperRegistry#getForCity}
+ * for the city configured by {@code complai.default-city-id} (default:
+ * {@code elprat}).
+ * This amortises the first-request S3 I/O and index-build cost, reducing
+ * perceived latency
+ * on the first real user request after a Lambda cold start.
+ *
+ * <p>
+ * Failures are swallowed so a warmup problem can never prevent the application
+ * from
+ * starting.
+ */
 @Singleton
 public class RagWarmupService {
 
@@ -16,6 +34,16 @@ public class RagWarmupService {
     private final CityInfoRagHelperRegistry cityInfoRegistry;
     private final String defaultCityId;
 
+    /**
+     * Constructs the service with its registry dependencies and the default city
+     * ID.
+     *
+     * @param procedureRegistry registry for procedure RAG helpers
+     * @param eventRegistry     registry for event RAG helpers
+     * @param cityInfoRegistry  registry for city-info RAG helpers
+     * @param defaultCityId     identifier of the city to pre-warm; blank disables
+     *                          warmup
+     */
     public RagWarmupService(ProcedureRagHelperRegistry procedureRegistry,
             EventRagHelperRegistry eventRegistry,
             CityInfoRagHelperRegistry cityInfoRegistry,
@@ -26,6 +54,10 @@ public class RagWarmupService {
         this.defaultCityId = defaultCityId;
     }
 
+    /**
+     * Pre-warms the RAG indexes for the default city immediately after the bean is
+     * constructed.
+     */
     @PostConstruct
     public void onStartup() {
         if (defaultCityId == null || defaultCityId.isBlank()) {

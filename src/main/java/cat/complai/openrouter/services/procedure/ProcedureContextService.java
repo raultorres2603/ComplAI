@@ -28,6 +28,21 @@ import java.util.regex.Pattern;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * Retrieves RAG context blocks for procedures, events, news, and city
+ * information
+ * to inject into AI prompts.
+ *
+ * <p>
+ * Each domain (procedures, events, news, city-info) is served by its own helper
+ * registry
+ * that lazily builds an in-memory lexical index per city on first access. This
+ * service
+ * orchestrates keyword-based intent detection and context extraction, then
+ * returns typed
+ * result objects that carry both the context text and the source URLs for
+ * attribution.
+ */
 @Singleton
 public class ProcedureContextService {
 
@@ -104,6 +119,16 @@ public class ProcedureContextService {
     private final Logger logger = Logger.getLogger(ProcedureContextService.class.getName());
     private final ConcurrentHashMap<String, CityDetectionIndex> detectionIndexByCity = new ConcurrentHashMap<>();
 
+    /**
+     * Constructs the service with all RAG helper registries and the prompt builder.
+     *
+     * @param ragRegistry         registry for procedure RAG helpers
+     * @param eventRagRegistry    registry for event RAG helpers
+     * @param newsRagRegistry     registry for news RAG helpers
+     * @param cityInfoRagRegistry registry for city-info RAG helpers
+     * @param promptBuilder       builder used to resolve procedure keywords per
+     *                            city
+     */
     @Inject
     public ProcedureContextService(ProcedureRagHelperRegistry ragRegistry, EventRagHelperRegistry eventRagRegistry,
             NewsRagHelperRegistry newsRagRegistry,
@@ -166,42 +191,83 @@ public class ProcedureContextService {
         }
     }
 
+    /**
+     * Result type for news context extraction.
+     */
     public static class NewsContextResult {
         private final String contextBlock;
         private final List<Source> sources;
 
+        /**
+         * Constructs a news context result.
+         *
+         * @param contextBlock the RAG context text to inject into the AI prompt
+         * @param sources      the source documents used to build the context
+         */
         public NewsContextResult(String contextBlock, List<Source> sources) {
             this.contextBlock = contextBlock;
             this.sources = sources == null ? List.of() : Collections.unmodifiableList(new ArrayList<>(sources));
         }
 
+        /**
+         * Returns the RAG context text snippet for the AI prompt.
+         *
+         * @return context block text
+         */
         public String getContextBlock() {
             return contextBlock;
         }
 
+        /**
+         * Returns the unmodifiable list of source documents.
+         *
+         * @return list of sources
+         */
         public List<Source> getSources() {
             return sources;
         }
     }
 
+    /**
+     * Result type for city-information context extraction.
+     */
     public static class CityInfoContextResult {
         private final String contextBlock;
         private final List<Source> sources;
 
+        /**
+         * Constructs a city-info context result.
+         *
+         * @param contextBlock the RAG context text to inject into the AI prompt
+         * @param sources      the source documents used to build the context
+         */
         public CityInfoContextResult(String contextBlock, List<Source> sources) {
             this.contextBlock = contextBlock;
             this.sources = sources == null ? List.of() : Collections.unmodifiableList(new ArrayList<>(sources));
         }
 
+        /**
+         * Returns the RAG context text snippet for the AI prompt.
+         *
+         * @return context block text
+         */
         public String getContextBlock() {
             return contextBlock;
         }
 
+        /**
+         * Returns the unmodifiable list of source documents.
+         *
+         * @return list of sources
+         */
         public List<Source> getSources() {
             return sources;
         }
     }
 
+    /**
+     * Captures which RAG context domains are required for a given query.
+     */
     public static final class ContextRequirements {
         private static final ContextRequirements NONE = new ContextRequirements(false, false, false, false);
 
@@ -210,6 +276,16 @@ public class ProcedureContextService {
         private final boolean needsNewsContext;
         private final boolean needsCityInfoContext;
 
+        /**
+         * Constructs a requirements descriptor.
+         *
+         * @param needsProcedureContext {@code true} if procedure context should be
+         *                              fetched
+         * @param needsEventContext     {@code true} if event context should be fetched
+         * @param needsNewsContext      {@code true} if news context should be fetched
+         * @param needsCityInfoContext  {@code true} if city-info context should be
+         *                              fetched
+         */
         public ContextRequirements(boolean needsProcedureContext, boolean needsEventContext, boolean needsNewsContext,
                 boolean needsCityInfoContext) {
             this.needsProcedureContext = needsProcedureContext;
@@ -218,22 +294,47 @@ public class ProcedureContextService {
             this.needsCityInfoContext = needsCityInfoContext;
         }
 
+        /**
+         * Returns an instance that requires no context at all.
+         *
+         * @return shared NONE instance
+         */
         public static ContextRequirements none() {
             return NONE;
         }
 
+        /**
+         * Returns {@code true} if procedure context should be fetched.
+         *
+         * @return needs-procedure flag
+         */
         public boolean needsProcedureContext() {
             return needsProcedureContext;
         }
 
+        /**
+         * Returns {@code true} if event context should be fetched.
+         *
+         * @return needs-event flag
+         */
         public boolean needsEventContext() {
             return needsEventContext;
         }
 
+        /**
+         * Returns {@code true} if news context should be fetched.
+         *
+         * @return needs-news flag
+         */
         public boolean needsNewsContext() {
             return needsNewsContext;
         }
 
+        /**
+         * Returns {@code true} if city-info context should be fetched.
+         *
+         * @return needs-city-info flag
+         */
         public boolean needsCityInfoContext() {
             return needsCityInfoContext;
         }
