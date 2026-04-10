@@ -14,7 +14,10 @@
   "crawl": {
     "categoryLinkSelector": "div.LlistaTemes.LlistatMenu ul.llistat a[href]",
     "detailLinkSelector": "a[href*='DetallTramit.aspx']",
-    "detailLinkExcludePattern": "Tramitar=True"
+    "detailLinkExcludePattern": "Tramitar=True",
+    "additionalSeeds": [
+      "https://seu.elprat.cat/siac/default.aspx"
+    ]
   },
   "fields": {
     "title": {
@@ -55,7 +58,9 @@
     "crawl": {
       "themeMenuSelector": ".menu_categoria .panel-heading a[href]:not([href*='#']), .menu_categoria .panel-collapse a[href]:not([href*='#'])",
       "navIncludePatterns": [
-        "^https?://www\\.elprat\\.cat/.*"
+        "^https?://www\\.elprat\\.cat/.*",
+        "^https?://www\\.aiguesdelprat\\.cat/.*",
+        "^https?://www\\.pratespais\\.com/.*"
       ],
       "navExcludePatterns": [
         "(/(search|rss|user|admin)|\\.(pdf|jpg|jpeg|png|gif|zip))(\\?.*)?$",
@@ -64,7 +69,9 @@
         "javascript:"
       ],
       "detailIncludePatterns": [
-        "^https?://www\\.elprat\\.cat/.*"
+        "^https?://www\\.elprat\\.cat/.*",
+        "^https?://www\\.aiguesdelprat\\.cat/.*",
+        "^https?://www\\.pratespais\\.com/.*"
       ],
       "detailExcludePatterns": [
         "(/(search|rss|user|admin)|\\.(pdf|jpg|jpeg|png|gif|zip))(\\?.*)?$"
@@ -96,7 +103,11 @@
         "Ajuntament del Prat"
       ],
       "whenBodyEmpty": true
-    }
+    },
+    "seedThemeUrls": [
+      "https://www.aiguesdelprat.cat/es/",
+      "https://www.pratespais.com/es"
+    ]
   },
   "news": {
     "baseUrl": "https://elprataldia.es/",
@@ -110,9 +121,11 @@
       ]
     },
     "crawl": {
-      "articleLinkSelector": ".dg-blog-grid article h2.dg_bm_title a[href], .dg-blog-grid article a.featured-image-link[href], article .entry-title a[href]",
+    "articleLinkSelector": ".dg-blog-grid article h2.dg_bm_title a[href], .dg-blog-grid article a.featured-image-link[href], article .entry-title a[href], h2.entry-title a[href], h3.entry-title a[href], .post-title a[href], .noticia-title a[href], .article-title a[href]",
       "articleIncludePatterns": [
-        "^https://elprataldia\\.es/(?!category/|tag/|author/|wp-json/|wp-content/|wp-admin/|feed/)[^?#]+/?$"
+        "^https://elprataldia\\.es/(?!category/|tag/|author/|wp-json/|wp-content/|wp-admin/|feed/)[^?#]+/?$",
+        "^https://www\\.elprat\\.digital/(?!category/|tag/|author/|wp-json/|wp-content/|wp-admin/|feed/)[^?#]+/?$",
+        "^https://www\\.elprat\\.cat/sala-de-premsa/[^?#]+$"
       ],
       "articleExcludePatterns": [
         "/feed/?$",
@@ -130,7 +143,11 @@
       "https://elprataldia.es/category/opinio/",
       "https://elprataldia.es/category/politica-local/",
       "https://elprataldia.es/category/pratencs/",
-      "https://elprataldia.es/category/praticipa/"
+      "https://elprataldia.es/category/praticipa/",
+      "https://www.elprat.digital/",
+      "https://www.elprat.digital/radio/",
+      "https://www.elprat.digital/tv/",
+      "https://www.elprat.cat/sala-de-premsa"
     ],
     "fields": {
       "title": {
@@ -167,6 +184,20 @@
   },
   "events": {
     "baseUrl": "https://www.elprat.cat/la-ciutat/guia-agenda",
+    "seedSites": [
+      {
+        "baseUrl": "https://www.teatrelartesa.cat/",
+        "eventLinkSelector": "a[href*='teatrelartesa.cat/espectacle'], a[href*='teatrelartesa.cat/event'], a[href*='teatrelartesa.cat/activitat'], h2.entry-title a[href], h3.entry-title a[href]"
+      },
+      {
+        "baseUrl": "https://lacapsa.org/",
+        "eventLinkSelector": "a[href*='lacapsa.org/espectacle'], a[href*='lacapsa.org/event'], a[href*='lacapsa.org/activitat'], .entry-title a[href], h2 a[href]"
+      },
+      {
+        "baseUrl": "https://online.elprat.cat/actividadesweb/web/index.html",
+        "eventLinkSelector": "a[href*='/actividadesweb/web/actividades/'], a[href*='/actividadesweb/web/actividad/'], a[href*='/detalle'], .actividad-title a[href], table.listado a[href]"
+      }
+    ],
     "crawl": {
       "eventLinkSelector": ".view-guia-agenda .llistat-serveis-view h4 a[href^='https://www.elprat.cat/la-ciutat/guia-agenda/']",
       "eventDetailExcludePattern": null
@@ -204,6 +235,36 @@
         "selector": "a[href*='/arees-tematiques/'], .field-name-field-tema, .event-theme, .field--name-field-tema",
         "multiple": false
       }
+    }
+  },
+  "transparency": {
+    "baseUrl": "https://seu-e.cat/ca/web/elpratdellobregat/govern-obert-i-transparencia",
+    "crawl": {
+      "categoryLinkSelector": ".menu-lateral a[href], .col-menu a[href], nav.menu-seccions a[href], .seccions-navegacio a[href]",
+      "detailLinkSelector": "a[href*='/govern-obert'], a[href*='/transparencia'], .contingut-llistat a[href], .llistat-seccions a[href]",
+      "categoryIncludePattern": "^https://seu-e\\.cat/ca/web/elpratdellobregat/.*",
+      "categoryExcludePattern": "\\.(pdf|doc|docx|xls|xlsx|zip|csv)(\\?.*)?$"
+    },
+    "fields": {
+      "title": {
+        "selector": "h1, h2.titol-pagina, .titol-contingut, .page-title",
+        "multiple": false
+      },
+      "section": {
+        "selector": ".breadcrumbs a, .fil-ariadna a, .path-navigation a, ol.breadcrumb a",
+        "multiple": true
+      },
+      "body": {
+        "selector": ".col-contingut p, .cos-contingut p, .contingut-principal p, .cos-text p, main p",
+        "multiple": true
+      }
+    },
+    "skip": {
+      "whenTitleEmptyOrEquals": [
+        "Govern obert i transparència",
+        "Transparència",
+        "El Prat de Llobregat"
+      ]
     }
   }
 }

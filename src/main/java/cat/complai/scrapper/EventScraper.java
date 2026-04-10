@@ -123,6 +123,33 @@ public class EventScraper {
             }
         }
         logger.info("Total event detail URLs found: " + detailUrls.size() + " across " + pageCount + " pages");
+
+        // Crawl external event venue seed sites (single-page, no pagination)
+        if (mapping.events.seedSites != null) {
+            for (ProcedureScraper.EventSeedSite seed : mapping.events.seedSites) {
+                if (seed.baseUrl == null || seed.baseUrl.isBlank()) continue;
+                if (seed.eventLinkSelector == null || seed.eventLinkSelector.isBlank()) continue;
+                try {
+                    @SuppressWarnings("null")
+                    Document doc = Jsoup.connect(seed.baseUrl)
+                            .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                            .get();
+                    @SuppressWarnings("null")
+                    var seedLinks = doc.select(seed.eventLinkSelector);
+                    int added = 0;
+                    for (Element link : seedLinks) {
+                        String href = link.absUrl("href");
+                        if (!href.isBlank() && detailUrls.add(href)) {
+                            added++;
+                        }
+                    }
+                    logger.info("Seed site " + seed.baseUrl + ": found " + added + " event links");
+                } catch (Exception e) {
+                    logger.severe("Failed to crawl event seed site: " + seed.baseUrl + " — " + e.getMessage());
+                }
+            }
+        }
+
         return detailUrls;
     }
 
