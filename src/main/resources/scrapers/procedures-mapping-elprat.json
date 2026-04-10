@@ -187,15 +187,11 @@
     "seedSites": [
       {
         "baseUrl": "https://www.teatrelartesa.cat/",
-        "eventLinkSelector": "a[href*='teatrelartesa.cat/espectacle'], a[href*='teatrelartesa.cat/event'], a[href*='teatrelartesa.cat/activitat'], h2.entry-title a[href], h3.entry-title a[href]"
+        "eventLinkSelector": "h4 a[href*='/la-ciutat/guia-agenda/']"
       },
       {
         "baseUrl": "https://lacapsa.org/",
-        "eventLinkSelector": "a[href*='lacapsa.org/espectacle'], a[href*='lacapsa.org/event'], a[href*='lacapsa.org/activitat'], .entry-title a[href], h2 a[href]"
-      },
-      {
-        "baseUrl": "https://online.elprat.cat/actividadesweb/web/index.html",
-        "eventLinkSelector": "a[href*='/actividadesweb/web/actividades/'], a[href*='/actividadesweb/web/actividad/'], a[href*='/detalle'], .actividad-title a[href], table.listado a[href]"
+        "eventLinkSelector": "a[href*='lacapsa.org/'][href*='-']:not([href$='lacapsa.org/']):not([href*='#']):not([href*='?'])"
       }
     ],
     "crawl": {
@@ -240,9 +236,9 @@
   "transparency": {
     "baseUrl": "https://seu-e.cat/ca/web/elpratdellobregat/govern-obert-i-transparencia",
     "crawl": {
-      "categoryLinkSelector": ".menu-lateral a[href], .col-menu a[href], nav.menu-seccions a[href], .seccions-navegacio a[href]",
-      "detailLinkSelector": "a[href*='/govern-obert'], a[href*='/transparencia'], .contingut-llistat a[href], .llistat-seccions a[href]",
-      "categoryIncludePattern": "^https://seu-e\\.cat/ca/web/elpratdellobregat/.*",
+      "categoryLinkSelector": "a[href*='/govern-obert-i-transparencia/']",
+      "detailLinkSelector": "a[href*='/govern-obert-i-transparencia/']",
+      "categoryIncludePattern": "^https://seu-e\\.cat/.*/govern-obert-i-transparencia/.*",
       "categoryExcludePattern": "\\.(pdf|doc|docx|xls|xlsx|zip|csv)(\\?.*)?$"
     },
     "fields": {
