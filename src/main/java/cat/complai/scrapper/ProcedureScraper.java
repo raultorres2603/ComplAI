@@ -374,6 +374,12 @@ public class ProcedureScraper {
         public String baseUrl;
         /** CSS selector that matches event detail page links on this site. */
         public String eventLinkSelector;
+        /**
+         * Optional per-site field extraction overrides. When non-empty, these rules
+         * are merged over the global {@code events.fields} map when scraping event
+         * pages whose host matches this seed site's host.
+         */
+        public Map<String, FieldExtractionRule> fields = new LinkedHashMap<>();
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

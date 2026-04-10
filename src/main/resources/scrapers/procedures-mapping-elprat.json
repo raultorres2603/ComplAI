@@ -187,11 +187,79 @@
     "seedSites": [
       {
         "baseUrl": "https://www.teatrelartesa.cat/programacio",
-        "eventLinkSelector": "a[href*='/la-ciutat/guia-agenda/']"
+        "eventLinkSelector": "a[href*='/la-ciutat/guia-agenda/']",
+        "fields": {
+          "title": {
+            "selector": "h1.page-header, h1.titol, h1",
+            "multiple": false
+          },
+          "description": {
+            "selector": ".field-name-body .field-item, .field--name-body .field--item, .field--type-text-with-summary .field--item",
+            "multiple": false
+          },
+          "date": {
+            "selector": ".field-name-field-data .field-item, .field--name-field-data .field--item, .date-display-single",
+            "multiple": false
+          },
+          "time": {
+            "selector": ".field-name-field-hora .field-item, .field--name-field-hora .field--item",
+            "multiple": false
+          },
+          "location": {
+            "selector": ".field-name-field-lloc .field-item, .field--name-field-lloc .field--item",
+            "multiple": false
+          },
+          "eventType": {
+            "selector": ".field-name-field-tipus-acte .field-item, .field--name-field-tipus-acte .field--item",
+            "multiple": false
+          },
+          "targetAudience": {
+            "selector": ".field-name-field-per-a-qui .field-item, .field--name-field-per-a-qui .field--item",
+            "multiple": true
+          },
+          "theme": {
+            "selector": ".field-name-field-tema .field-item, .field--name-field-tema .field--item",
+            "multiple": false
+          }
+        }
       },
       {
         "baseUrl": "https://lacapsa.org/agenda",
-        "eventLinkSelector": "a[href^='/'][href*='-']:not([href^='/espais-i-serveis']):not([href^='/cursos-i-tallers']):not([href^='/noticies']):not([href^='/projectes']):not([href^='/cartells']):not([href^='/bucs']):not([href^='/grups']):not([href^='/el-bar']):not([href^='/nosaltres']):not([href^='/cercador'])"
+        "eventLinkSelector": "a[href^='/'][href*='-']:not([href^='/espais-i-serveis']):not([href^='/cursos-i-tallers']):not([href^='/noticies']):not([href^='/projectes']):not([href^='/cartells']):not([href^='/bucs']):not([href^='/grups']):not([href^='/el-bar']):not([href^='/nosaltres']):not([href^='/cercador'])",
+        "fields": {
+          "title": {
+            "selector": "h1.entry-title, h1.page-title, h1",
+            "multiple": false
+          },
+          "description": {
+            "selector": ".entry-content p, .event-description p, .content p, article p",
+            "multiple": false
+          },
+          "date": {
+            "selector": "time[datetime], .event-date, .date, .data-event",
+            "multiple": false
+          },
+          "time": {
+            "selector": ".event-time, .time, .hora",
+            "multiple": false
+          },
+          "location": {
+            "selector": ".event-location, .venue, .location, .lloc",
+            "multiple": false
+          },
+          "eventType": {
+            "selector": ".event-type, .category, .genre, .tipus",
+            "multiple": false
+          },
+          "targetAudience": {
+            "selector": ".audience, .target-audience, .publico",
+            "multiple": true
+          },
+          "theme": {
+            "selector": ".tags a, .categories a, .tema",
+            "multiple": false
+          }
+        }
       }
     ],
     "crawl": {

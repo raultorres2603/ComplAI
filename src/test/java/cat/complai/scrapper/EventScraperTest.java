@@ -340,4 +340,124 @@ class EventScraperTest {
             throw new RuntimeException(e);
         }
     }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, ProcedureScraper.FieldExtractionRule> invokeResolveFields(
+            String url, ProcedureScraper.ScraperMapping mapping) {
+        try {
+            var m = EventScraper.class.getDeclaredMethod(
+                    "resolveFields", String.class, ProcedureScraper.ScraperMapping.class);
+            m.setAccessible(true);
+            return (Map<String, ProcedureScraper.FieldExtractionRule>) m.invoke(null, url, mapping);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Test
+    void testResolveFields_returnsGlobalWhenNoSeedSites() {
+        ProcedureScraper.ScraperMapping mapping = new ProcedureScraper.ScraperMapping();
+        mapping.events = new ProcedureScraper.EventsConfig();
+        mapping.events.seedSites = null;
+        ProcedureScraper.FieldExtractionRule rule = new ProcedureScraper.FieldExtractionRule();
+        rule.selector = "h1";
+        rule.multiple = false;
+        mapping.events.fields = new LinkedHashMap<>();
+        mapping.events.fields.put("title", rule);
+
+        Map<String, ProcedureScraper.FieldExtractionRule> result =
+                invokeResolveFields("https://www.elprat.cat/event", mapping);
+
+        assertEquals(1, result.size());
+        assertEquals("h1", result.get("title").selector);
+    }
+
+    @Test
+    void testResolveFields_returnsGlobalWhenSeedHasNoFields() {
+        ProcedureScraper.ScraperMapping mapping = new ProcedureScraper.ScraperMapping();
+        mapping.events = new ProcedureScraper.EventsConfig();
+        ProcedureScraper.FieldExtractionRule globalRule = new ProcedureScraper.FieldExtractionRule();
+        globalRule.selector = "h1";
+        globalRule.multiple = false;
+        mapping.events.fields = new LinkedHashMap<>();
+        mapping.events.fields.put("title", globalRule);
+
+        ProcedureScraper.EventSeedSite seed = new ProcedureScraper.EventSeedSite();
+        seed.baseUrl = "https://lacapsa.org";
+        seed.fields = null;
+        mapping.events.seedSites = new ArrayList<>();
+        mapping.events.seedSites.add(seed);
+
+        Map<String, ProcedureScraper.FieldExtractionRule> result =
+                invokeResolveFields("https://lacapsa.org/some-event", mapping);
+
+        assertSame(mapping.events.fields, result);
+    }
+
+    @Test
+    void testResolveFields_mergesSeedFieldsOverGlobal() {
+        ProcedureScraper.ScraperMapping mapping = new ProcedureScraper.ScraperMapping();
+        mapping.events = new ProcedureScraper.EventsConfig();
+        mapping.events.fields = new LinkedHashMap<>();
+
+        ProcedureScraper.FieldExtractionRule titleRule = new ProcedureScraper.FieldExtractionRule();
+        titleRule.selector = "h1";
+        titleRule.multiple = false;
+        mapping.events.fields.put("title", titleRule);
+
+        ProcedureScraper.FieldExtractionRule globalDateRule = new ProcedureScraper.FieldExtractionRule();
+        globalDateRule.selector = ".notranslate";
+        globalDateRule.multiple = false;
+        mapping.events.fields.put("date", globalDateRule);
+
+        ProcedureScraper.EventSeedSite seed = new ProcedureScraper.EventSeedSite();
+        seed.baseUrl = "https://lacapsa.org";
+        seed.fields = new LinkedHashMap<>();
+        ProcedureScraper.FieldExtractionRule seedDateRule = new ProcedureScraper.FieldExtractionRule();
+        seedDateRule.selector = ".event-date";
+        seedDateRule.multiple = false;
+        seed.fields.put("date", seedDateRule);
+        mapping.events.seedSites = new ArrayList<>();
+        mapping.events.seedSites.add(seed);
+
+        Map<String, ProcedureScraper.FieldExtractionRule> result =
+                invokeResolveFields("https://lacapsa.org/some-event", mapping);
+
+        assertEquals(2, result.size());
+        assertEquals("h1", result.get("title").selector);
+        assertEquals(".event-date", result.get("date").selector);
+    }
+
+    @Test
+    void testResolveFields_ignoresHostMismatch() {
+        ProcedureScraper.ScraperMapping mapping = new ProcedureScraper.ScraperMapping();
+        mapping.events = new ProcedureScraper.EventsConfig();
+        mapping.events.fields = new LinkedHashMap<>();
+
+        ProcedureScraper.FieldExtractionRule titleRule = new ProcedureScraper.FieldExtractionRule();
+        titleRule.selector = "h1";
+        titleRule.multiple = false;
+        mapping.events.fields.put("title", titleRule);
+
+        ProcedureScraper.FieldExtractionRule globalDateRule = new ProcedureScraper.FieldExtractionRule();
+        globalDateRule.selector = ".notranslate";
+        globalDateRule.multiple = false;
+        mapping.events.fields.put("date", globalDateRule);
+
+        ProcedureScraper.EventSeedSite seed = new ProcedureScraper.EventSeedSite();
+        seed.baseUrl = "https://lacapsa.org";
+        seed.fields = new LinkedHashMap<>();
+        ProcedureScraper.FieldExtractionRule seedDateRule = new ProcedureScraper.FieldExtractionRule();
+        seedDateRule.selector = ".event-date";
+        seedDateRule.multiple = false;
+        seed.fields.put("date", seedDateRule);
+        mapping.events.seedSites = new ArrayList<>();
+        mapping.events.seedSites.add(seed);
+
+        Map<String, ProcedureScraper.FieldExtractionRule> result =
+                invokeResolveFields("https://www.elprat.cat/event", mapping);
+
+        assertSame(mapping.events.fields, result);
+        assertEquals(".notranslate", result.get("date").selector);
+    }
 }
