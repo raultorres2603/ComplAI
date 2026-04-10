@@ -14,6 +14,14 @@ If the requirement is unclear or ambiguous in any way, **ask the user to clarify
 
 Load and follow the [planner skill](./../skills/planner/SKILL.md) for the full step-by-step procedure, `task.md` structure, output format, and constraints.
 
+## Architecture Documentation Standards
+
+When planning tasks that involve **Architecture Overview** or system design documentation:
+- **Mermaid diagrams are mandatory** for any task touching architecture, system interactions, or component relationships.
+- Diagrams must be embedded in `task.md` and render in GitHub Markdown.
+- Diagrams must accurately represent the codebase (no speculative components).
+- This ensures clarity during implementation and documentation phases.
+
 ## Tech Stack Context
 
 ComplAI runs on:
