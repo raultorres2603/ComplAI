@@ -4,7 +4,6 @@ import cat.complai.openrouter.helpers.rag.DeterministicQueryExpansion;
 import cat.complai.openrouter.helpers.rag.InMemoryLexicalIndex;
 import cat.complai.openrouter.helpers.rag.RagJavaCalibration;
 import cat.complai.openrouter.helpers.rag.SearchResult;
-import cat.complai.openrouter.helpers.rag.TokenNormalizer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 

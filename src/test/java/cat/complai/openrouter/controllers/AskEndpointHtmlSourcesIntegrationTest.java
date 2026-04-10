@@ -37,7 +37,6 @@ import static org.junit.jupiter.api.Assertions.*;
 @DisplayName("ask() Endpoint HTML Formatting and Sources Integration Tests")
 public class AskEndpointHtmlSourcesIntegrationTest {
 
-    private static final String TEST_API_KEY = "test-integration-key-elprat-htmlsources";
     private static final String TEST_CITY = "testcity";
 
     @Inject
@@ -49,8 +48,6 @@ public class AskEndpointHtmlSourcesIntegrationTest {
 
     @Inject
     ResponseCacheService cacheService;
-
-    private final ObjectMapper mapper = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
