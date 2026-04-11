@@ -220,8 +220,8 @@ class ProcedureScraperTest {
         assertTrue(mapping.news.fields.containsKey("categories"));
 
         assertNotNull(mapping.news.seedCategoryUrls);
-        assertEquals(13, mapping.news.seedCategoryUrls.size(),
-                "seed categories: 9 original elprataldia + 3 elprat.digital + 1 sala-de-premsa");
+        assertEquals(10, mapping.news.seedCategoryUrls.size(),
+                "seed categories: 9 original elprataldia + 1 sala-de-premsa");
     }
 
     @Test
