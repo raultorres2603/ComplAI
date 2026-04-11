@@ -94,12 +94,8 @@ public class EventScraper {
             pageCount++;
             visitedPageUrls.add(nextPageUrl);
             try {
-                @SuppressWarnings("null")
-                Document doc = Jsoup.connect(nextPageUrl)
-                        .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                        .get();
+                Document doc = fetchDocument(nextPageUrl);
                 int eventsOnPage = 0;
-                @SuppressWarnings("null")
                 var eventLinks = doc.select(mapping.events.crawl.eventLinkSelector);
                 for (Element link : eventLinks) {
                     String href = link.absUrl("href");
@@ -130,11 +126,7 @@ public class EventScraper {
                 if (seed.baseUrl == null || seed.baseUrl.isBlank()) continue;
                 if (seed.eventLinkSelector == null || seed.eventLinkSelector.isBlank()) continue;
                 try {
-                    @SuppressWarnings("null")
-                    Document doc = Jsoup.connect(seed.baseUrl)
-                            .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                            .get();
-                    @SuppressWarnings("null")
+                    Document doc = fetchDocument(seed.baseUrl);
                     var seedLinks = doc.select(seed.eventLinkSelector);
                     int added = 0;
                     for (Element link : seedLinks) {
@@ -233,10 +225,7 @@ public class EventScraper {
 
     private static Optional<Map<String, Object>> scrapeEvent(String url, ProcedureScraper.ScraperMapping mapping)
             throws IOException {
-        @SuppressWarnings("null")
-        Document doc = Jsoup.connect(url)
-                .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                .get();
+        Document doc = fetchDocument(url);
 
         Map<String, Object> event = new LinkedHashMap<>();
         // eventId is deterministic: same URL always produces the same ID.
@@ -257,9 +246,14 @@ public class EventScraper {
         return Optional.of(event);
     }
 
+    private static Document fetchDocument(String url) throws IOException {
+        return Jsoup.connect(url)
+                .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                .get();
+    }
+
     private static String extractFieldValue(Document doc, ProcedureScraper.FieldExtractionRule rule) {
         if (rule.multiple) {
-            @SuppressWarnings("null")
             Elements elements = doc.select(rule.selector);
             StringBuilder sb = new StringBuilder();
             for (Element el : elements) {
@@ -272,7 +266,6 @@ public class EventScraper {
             }
             return sb.toString();
         } else {
-            @SuppressWarnings("null")
             Element el = doc.selectFirst(rule.selector);
             return el != null ? el.text().trim() : "";
         }
