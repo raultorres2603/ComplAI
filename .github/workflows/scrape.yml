@@ -73,6 +73,31 @@ jobs:
         run: ./gradlew clean shadowJar
 
       # -----------------------------------------------------------------------
+      # DIAGNOSTIC STEPS - Test connectivity to elprat.digital
+      # -----------------------------------------------------------------------
+      - name: Test connectivity to elprat.digital (basic)
+        continue-on-error: true
+        run: |
+          echo "🔍 Testing basic connectivity to elprat.digital..."
+          curl -v --max-time 15 https://www.elprat.digital/ 2>&1 | head -20
+          echo ""
+          echo "DNS resolution check:"
+          nslookup elprat.digital
+
+      - name: Test connectivity with NewsScraper User-Agent headers
+        continue-on-error: true
+        run: |
+          echo "🔍 Testing with NewsScraper User-Agent headers..."
+          curl -v \
+            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" \
+            -H "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" \
+            -H "Accept-Language: en-US,en;q=0.5" \
+            -H "Accept-Encoding: gzip, deflate" \
+            -H "Connection: keep-alive" \
+            --max-time 15 \
+            https://www.elprat.digital/ 2>&1 | head -30
+
+      # -----------------------------------------------------------------------
       # PROCEDURES
       # -----------------------------------------------------------------------
       - name: Configure AWS credentials (procedures)
