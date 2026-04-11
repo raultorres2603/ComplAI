@@ -124,7 +124,6 @@
       "articleLinkSelector": ".dg-blog-grid article h2.dg_bm_title a[href], .dg-blog-grid article a.featured-image-link[href], article .entry-title a[href], h2.entry-title a[href], h3.entry-title a[href], .post-title a[href], .noticia-title a[href], .article-title a[href]",
       "articleIncludePatterns": [
         "^https://elprataldia\\.es/(?!category/|tag/|author/|wp-json/|wp-content/|wp-admin/|feed/)[^?#]+/?$",
-        "^https://www\\.elprat\\.digital/(?!category/|tag/|author/|wp-json/|wp-content/|wp-admin/|feed/)[^?#]+/?$",
         "^https://www\\.elprat\\.cat/sala-de-premsa/[^?#]+$"
       ],
       "articleExcludePatterns": [
@@ -144,9 +143,6 @@
       "https://elprataldia.es/category/politica-local/",
       "https://elprataldia.es/category/pratencs/",
       "https://elprataldia.es/category/praticipa/",
-      "https://www.elprat.digital/",
-      "https://www.elprat.digital/radio/",
-      "https://www.elprat.digital/tv/",
       "https://www.elprat.cat/sala-de-premsa"
     ],
     "fields": {
