@@ -144,6 +144,7 @@ public class TransparencyScraper {
                     var categoryLinks = doc.select(config.crawl.categoryLinkSelector);
                     for (Element link : categoryLinks) {
                         String href = link.absUrl("href");
+                        if (href.contains("p_p_lifecycle=2")) continue;
                         if (href.isBlank()) continue;
                         if (config.crawl.categoryIncludePattern != null
                                 && !Pattern.compile(config.crawl.categoryIncludePattern).matcher(href).find()) {
@@ -165,6 +166,7 @@ public class TransparencyScraper {
                     var detailLinks = doc.select(config.crawl.detailLinkSelector);
                     for (Element link : detailLinks) {
                         String href = link.absUrl("href");
+                        if (href.contains("p_p_lifecycle=2")) continue;
                         if (href.isBlank()) continue;
                         detailUrls.add(href);
                     }
