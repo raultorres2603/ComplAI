@@ -13,6 +13,8 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.time.Instant;
@@ -194,7 +196,8 @@ public class NewsScraper {
     }
 
     static String findNextPageUrl(Document doc, Set<String> visitedPages, String paginationSelector) {
-        Elements paginationLinks = doc.select(Objects.requireNonNull(paginationSelector, "news.crawl.paginationLinkSelector"));
+        Elements paginationLinks = doc
+                .select(Objects.requireNonNull(paginationSelector, "news.crawl.paginationLinkSelector"));
         for (Element link : paginationLinks) {
             String href = normalizeUrl(link.absUrl("href"));
             if (!href.isBlank() && !visitedPages.contains(href)) {
@@ -321,10 +324,42 @@ public class NewsScraper {
     }
 
     private static Document connect(String url) throws IOException {
-        return Jsoup.connect(Objects.requireNonNull(url, "url"))
-                .userAgent(USER_AGENT)
-                .timeout(15000)
-                .get();
+        Objects.requireNonNull(url, "url");
+        int maxAttempts = 3;
+        IOException lastException = null;
+
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                return Jsoup.connect(url)
+                        .userAgent(USER_AGENT)
+                        .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+                        .header("Accept-Language", "ca,es;q=0.8,en-US;q=0.5,en;q=0.3")
+                        .header("Accept-Encoding", "gzip, deflate, br")
+                        .header("Connection", "keep-alive")
+                        .header("Upgrade-Insecure-Requests", "1")
+                        .timeout(30000)
+                        .ignoreHttpErrors(true)
+                        .get();
+            } catch (SocketTimeoutException | ConnectException e) {
+                lastException = e;
+                if (attempt < maxAttempts) {
+                    logger.info("Retry " + attempt + "/3 for " + url + " after timeout - will wait 2s");
+                    logger.info("Connection attempt " + attempt + " failed for " + url + " - " + e.getMessage()
+                            + " - retrying in 2 seconds");
+                    try {
+                        Thread.sleep(2000);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new IOException("Interrupted during retry backoff", ie);
+                    }
+                } else {
+                    logger.severe("Connection failed after " + maxAttempts + " attempts for " + url
+                            + " - " + e.getMessage());
+                }
+            }
+        }
+
+        throw lastException != null ? lastException : new IOException("Failed to connect to " + url);
     }
 
     private static String normalizeUrl(String url) {
