@@ -1,0 +1,41 @@
+{
+  "generatedAt": "2026-01-01T00:00:00Z",
+  "sourceUrl": "https://example.com/govern-obert-i-transparencia",
+  "transparency": [
+    {
+      "transparencyId": "a1b2c3d4-0001-0001-0001-000000000001",
+      "title": "Contractes de subministrament 2024",
+      "section": "Contractes",
+      "body": "Relació de contractes de subministrament formalitzats durant l'exercici 2024.",
+      "url": "https://example.com/transparency/contractes-subministrament-2024"
+    },
+    {
+      "transparencyId": "a1b2c3d4-0002-0002-0002-000000000002",
+      "title": "Subvencions atorgades 2024",
+      "section": "Subvencions",
+      "body": "Llista de les subvencions atorgades per l'ajuntament durant 2024.",
+      "url": "https://example.com/transparency/subvencions-2024"
+    },
+    {
+      "transparencyId": "a1b2c3d4-0003-0003-0003-000000000003",
+      "title": "Pressupost municipal 2025",
+      "section": "Pressupost",
+      "body": "Pressupost general de l'ajuntament per a l'exercici 2025.",
+      "url": "https://example.com/transparency/pressupost-2025"
+    },
+    {
+      "transparencyId": "a1b2c3d4-0004-0004-0004-000000000004",
+      "title": "Convenis de col·laboració vigents",
+      "section": "Convenis",
+      "body": "Relació de convenis de col·laboració vigents signats per l'ajuntament.",
+      "url": "https://example.com/transparency/convenis-vigents"
+    },
+    {
+      "transparencyId": "a1b2c3d4-0005-0005-0005-000000000005",
+      "title": "Factures i pagaments a proveïdors",
+      "section": "Factures",
+      "body": "Informació sobre les factures i pagaments realitzats als proveïdors municipals.",
+      "url": "https://example.com/transparency/factures-proveidors"
+    }
+  ]
+}

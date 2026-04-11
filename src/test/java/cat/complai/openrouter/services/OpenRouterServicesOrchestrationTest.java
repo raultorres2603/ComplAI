@@ -101,7 +101,7 @@ class OpenRouterServicesOrchestrationTest {
                                 "procedure-context",
                                 List.of(new Source("https://example.com/procedure", "Procedure")));
                 when(procedureContextService.detectContextRequirements(anyString(), eq("elprat")))
-                                .thenReturn(new ProcedureContextService.ContextRequirements(true, false, false, false));
+                                .thenReturn(new ProcedureContextService.ContextRequirements(true, false, false, false, false));
                 when(procedureContextService.buildProcedureContextResult(anyString(), eq("elprat")))
                                 .thenReturn(procedureContext);
 
@@ -125,7 +125,7 @@ class OpenRouterServicesOrchestrationTest {
                 when(procedureContextService.requiresEventDateWindowClarification(anyString(), eq("elprat")))
                                 .thenReturn(false);
                 when(procedureContextService.detectContextRequirements(anyString(), eq("elprat")))
-                                .thenReturn(new ProcedureContextService.ContextRequirements(false, true, false, false));
+                                .thenReturn(new ProcedureContextService.ContextRequirements(false, true, false, false, false));
                 when(procedureContextService.buildEventContextResult(anyString(), eq("elprat")))
                                 .thenReturn(eventContext);
 
@@ -167,7 +167,7 @@ class OpenRouterServicesOrchestrationTest {
                                 "event-context",
                                 List.of(new Source("https://example.com/event", "Event")));
                 when(procedureContextService.detectContextRequirements(anyString(), eq("elprat")))
-                                .thenReturn(new ProcedureContextService.ContextRequirements(true, true, false, false));
+                                .thenReturn(new ProcedureContextService.ContextRequirements(true, true, false, false, false));
                 when(procedureContextService.buildProcedureContextResultAsync(anyString(), eq("elprat"),
                                 any(Executor.class)))
                                 .thenReturn(CompletableFuture.completedFuture(procedureContext));
@@ -192,7 +192,7 @@ class OpenRouterServicesOrchestrationTest {
                                 "event-context",
                                 List.of(new Source("https://example.com/event", "Event")));
                 when(procedureContextService.detectContextRequirements(anyString(), eq("elprat")))
-                                .thenReturn(new ProcedureContextService.ContextRequirements(true, true, false, false));
+                                .thenReturn(new ProcedureContextService.ContextRequirements(true, true, false, false, false));
                 when(procedureContextService.buildProcedureContextResultAsync(anyString(), eq("elprat"),
                                 any(Executor.class)))
                                 .thenReturn(CompletableFuture
@@ -210,7 +210,7 @@ class OpenRouterServicesOrchestrationTest {
         @Test
         void ask_newsIntentWithoutMatches_returnsDeterministicFallbackWithoutCallingAi() {
                 when(procedureContextService.detectContextRequirements(anyString(), eq("elprat")))
-                                .thenReturn(new ProcedureContextService.ContextRequirements(false, false, true, false));
+                                .thenReturn(new ProcedureContextService.ContextRequirements(false, false, true, false, false));
                 when(procedureContextService.buildNewsContextResult(anyString(), eq("elprat")))
                                 .thenReturn(new ProcedureContextService.NewsContextResult(null, List.of()));
 
@@ -228,7 +228,7 @@ class OpenRouterServicesOrchestrationTest {
                                 "news-context",
                                 List.of(new Source("https://example.com/news", "News")));
                 when(procedureContextService.detectContextRequirements(anyString(), eq("elprat")))
-                                .thenReturn(new ProcedureContextService.ContextRequirements(false, false, true, false));
+                                .thenReturn(new ProcedureContextService.ContextRequirements(false, false, true, false, false));
                 when(procedureContextService.buildNewsContextResult(anyString(), eq("elprat")))
                                 .thenReturn(newsContext);
 
@@ -246,7 +246,7 @@ class OpenRouterServicesOrchestrationTest {
                                 "cityinfo-context",
                                 List.of(new Source("https://example.com/cityinfo", "City Info")));
                 when(procedureContextService.detectContextRequirements(anyString(), eq("elprat")))
-                                .thenReturn(new ProcedureContextService.ContextRequirements(false, false, false, true));
+                                .thenReturn(new ProcedureContextService.ContextRequirements(false, false, false, true, false));
                 when(procedureContextService.buildCityInfoContextResult(anyString(), eq("elprat")))
                                 .thenReturn(cityInfoContext);
 

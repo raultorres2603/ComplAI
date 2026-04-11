@@ -32,6 +32,7 @@ public class RagWarmupService {
     private final ProcedureRagHelperRegistry procedureRegistry;
     private final EventRagHelperRegistry eventRegistry;
     private final CityInfoRagHelperRegistry cityInfoRegistry;
+    private final TransparencyRagHelperRegistry transparencyRegistry;
     private final String defaultCityId;
 
     /**
@@ -47,10 +48,12 @@ public class RagWarmupService {
     public RagWarmupService(ProcedureRagHelperRegistry procedureRegistry,
             EventRagHelperRegistry eventRegistry,
             CityInfoRagHelperRegistry cityInfoRegistry,
+            TransparencyRagHelperRegistry transparencyRegistry,
             @Value("${complai.default-city-id:elprat}") String defaultCityId) {
         this.procedureRegistry = procedureRegistry;
         this.eventRegistry = eventRegistry;
         this.cityInfoRegistry = cityInfoRegistry;
+        this.transparencyRegistry = transparencyRegistry;
         this.defaultCityId = defaultCityId;
     }
 
@@ -70,6 +73,7 @@ public class RagWarmupService {
             procedureRegistry.getForCity(defaultCityId);
             eventRegistry.getForCity(defaultCityId);
             cityInfoRegistry.getForCity(defaultCityId);
+            transparencyRegistry.getForCity(defaultCityId);
             logger.info("RagWarmupService — pre-warm complete for city=" + defaultCityId
                     + " latencyMs=" + (System.currentTimeMillis() - start));
         } catch (Exception e) {

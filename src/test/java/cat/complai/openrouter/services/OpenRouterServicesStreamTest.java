@@ -89,7 +89,7 @@ class OpenRouterServicesStreamTest {
                 ProcedureContextResult procCtx = new ProcedureContextResult("Procedure context", sources);
 
                 when(procedureContextService.detectContextRequirements(anyString(), anyString()))
-                                .thenReturn(new ProcedureContextService.ContextRequirements(true, false, false, false));
+                                .thenReturn(new ProcedureContextService.ContextRequirements(true, false, false, false, false));
                 when(procedureContextService.buildProcedureContextResult(anyString(), anyString()))
                                 .thenReturn(procCtx);
 
@@ -160,7 +160,7 @@ class OpenRouterServicesStreamTest {
                 when(validationService.validateQuestion(anyString())).thenReturn(Optional.empty());
                 when(promptBuilder.getSystemMessage(eq("elprat"), anyString())).thenReturn("System");
                 when(procedureContextService.detectContextRequirements(anyString(), anyString()))
-                                .thenReturn(new ProcedureContextService.ContextRequirements(false, false, true, false));
+                                .thenReturn(new ProcedureContextService.ContextRequirements(false, false, true, false, false));
                 when(procedureContextService.buildNewsContextResult(anyString(), anyString()))
                                 .thenReturn(new ProcedureContextService.NewsContextResult(null, List.of()));
 
