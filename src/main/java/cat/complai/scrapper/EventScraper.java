@@ -209,6 +209,28 @@ public class EventScraper {
         return events;
     }
 
+    private static Map<String, ProcedureScraper.FieldExtractionRule> resolveFields(
+            String url, ProcedureScraper.ScraperMapping mapping) {
+        if (mapping.events.seedSites != null) {
+            for (ProcedureScraper.EventSeedSite seed : mapping.events.seedSites) {
+                if (seed.fields == null || seed.fields.isEmpty()) continue;
+                try {
+                    String seedHost = new java.net.URI(seed.baseUrl).getHost();
+                    String urlHost  = new java.net.URI(url).getHost();
+                    if (seedHost != null && seedHost.equalsIgnoreCase(urlHost)) {
+                        Map<String, ProcedureScraper.FieldExtractionRule> merged =
+                                new LinkedHashMap<>(mapping.events.fields);
+                        merged.putAll(seed.fields);
+                        return merged;
+                    }
+                } catch (Exception ignored) {
+                    // Malformed URI — skip this seed entry and fall through to global.
+                }
+            }
+        }
+        return mapping.events.fields;
+    }
+
     private static Optional<Map<String, Object>> scrapeEvent(String url, ProcedureScraper.ScraperMapping mapping)
             throws IOException {
         @SuppressWarnings("null")
@@ -220,7 +242,8 @@ public class EventScraper {
         // eventId is deterministic: same URL always produces the same ID.
         event.put("eventId", UUID.nameUUIDFromBytes(url.getBytes(StandardCharsets.UTF_8)).toString());
 
-        for (Map.Entry<String, ProcedureScraper.FieldExtractionRule> entry : mapping.events.fields.entrySet()) {
+        Map<String, ProcedureScraper.FieldExtractionRule> fields = resolveFields(url, mapping);
+        for (Map.Entry<String, ProcedureScraper.FieldExtractionRule> entry : fields.entrySet()) {
             event.put(entry.getKey(), extractFieldValue(doc, entry.getValue()));
         }
 
