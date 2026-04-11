@@ -334,8 +334,6 @@ public class NewsScraper {
                         .userAgent(USER_AGENT)
                         .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
                         .header("Accept-Language", "ca,es;q=0.8,en-US;q=0.5,en;q=0.3")
-                        .header("Accept-Encoding", "gzip, deflate, br")
-                        .header("Connection", "keep-alive")
                         .header("Upgrade-Insecure-Requests", "1")
                         .timeout(30000)
                         .ignoreHttpErrors(true)
