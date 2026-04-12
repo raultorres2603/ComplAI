@@ -131,6 +131,8 @@ public class TransparencyScraper {
             if (visitedCategoryUrls.contains(currentUrl)) continue;
             visitedCategoryUrls.add(currentUrl);
 
+            logger.info("Crawling [" + visitedCategoryUrls.size() + " visited, " + detailUrls.size() + " details]: " + currentUrl);
+
             try {
                 @SuppressWarnings("null")
                 Document doc = Jsoup.connect(currentUrl)
@@ -186,7 +188,11 @@ public class TransparencyScraper {
     private static List<Map<String, Object>> scrapeItems(Set<String> urls,
             ProcedureScraper.TransparencyConfig config) {
         List<Map<String, Object>> result = new ArrayList<>();
+        int total = urls.size();
+        int index = 0;
         for (String url : urls) {
+            index++;
+            logger.info("Scraping [" + index + "/" + total + "]: " + url);
             try {
                 @SuppressWarnings("null")
                 Document doc = Jsoup.connect(url)
