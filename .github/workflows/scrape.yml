@@ -7,7 +7,7 @@ name: Scrape and Upload
 #   complai-{type}-development  /  complai-{type}-production
 #
 # Required GitHub environment variables (set per environment):
-#   PROCEDURES_REGION, NEWS_REGION, EVENTS_REGION, CITYINFO_REGION, TRANSPARENCY_REGION
+#   PROCEDURES_REGION, NEWS_REGION, EVENTS_REGION, CITYINFO_REGION
 
 permissions:
   id-token: write
@@ -41,7 +41,6 @@ on:
           - news
           - events
           - cityinfo
-          - transparency
         default: all
 
 jobs:
@@ -153,24 +152,3 @@ jobs:
         run: |
           java -cp build/libs/complai-all.jar \
             cat.complai.scrapper.CityInfoScraper "${{ inputs.city }}"
-
-      # -----------------------------------------------------------------------
-      # TRANSPARENCY
-      # -----------------------------------------------------------------------
-      - name: Configure AWS credentials (transparency)
-        if: inputs.scraper == 'all' || inputs.scraper == 'transparency'
-        uses: aws-actions/configure-aws-credentials@v6
-        with:
-          role-to-assume: arn:aws:iam::134267836527:role/github-cdk-deploy-role
-          aws-region: ${{ vars.TRANSPARENCY_REGION }}
-          audience: sts.amazonaws.com
-          output-env-credentials: true
-
-      - name: Scrape transparency and upload to S3
-        if: inputs.scraper == 'all' || inputs.scraper == 'transparency'
-        env:
-          TRANSPARENCY_BUCKET: complai-transparency-${{ inputs.environment }}
-          TRANSPARENCY_REGION: ${{ vars.TRANSPARENCY_REGION }}
-        run: |
-          java -cp build/libs/complai-all.jar \
-            cat.complai.scrapper.TransparencyScraper "${{ inputs.city }}"

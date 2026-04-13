@@ -10,8 +10,7 @@ import cat.complai.openrouter.helpers.NewsRagHelperRegistry;
 import cat.complai.openrouter.helpers.ProcedureRagHelper;
 import cat.complai.openrouter.helpers.ProcedureRagHelperRegistry;
 import cat.complai.openrouter.helpers.RedactPromptBuilder;
-import cat.complai.openrouter.helpers.TransparencyRagHelper;
-import cat.complai.openrouter.helpers.TransparencyRagHelperRegistry;
+
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
@@ -155,7 +154,6 @@ class ProcedureContextServiceTest {
                                 new TestEventRegistry(Map.of("city-a", new CountingEventRagHelper(List.of()))),
                                 new TestNewsRegistry(Map.of("city-a", new CountingNewsRagHelper(List.of()))),
                                 new TestCityInfoRegistry(Map.of("city-a", new CountingCityInfoRagHelper(List.of()))),
-                                new TestTransparencyRegistry(Map.of()),
                                 new RedactPromptBuilder());
 
                 assertTrue(service.questionNeedsProcedureContext("Need resident parking badge renewal today",
@@ -176,7 +174,6 @@ class ProcedureContextServiceTest {
                                 new TestEventRegistry(Map.of("city-a", eventHelper)),
                                 new TestNewsRegistry(Map.of("city-a", new CountingNewsRagHelper(List.of()))),
                                 new TestCityInfoRegistry(Map.of("city-a", new CountingCityInfoRagHelper(List.of()))),
-                                new TestTransparencyRegistry(Map.of()),
                                 new RedactPromptBuilder());
 
                 assertTrue(service.questionNeedsEventContext("Can I join the neighborhood meetup tonight?", "city-a"));
@@ -198,7 +195,6 @@ class ProcedureContextServiceTest {
                                 new TestEventRegistry(Map.of("city-a", eventHelper)),
                                 new TestNewsRegistry(Map.of("city-a", new CountingNewsRagHelper(List.of()))),
                                 new TestCityInfoRegistry(Map.of("city-a", new CountingCityInfoRagHelper(List.of()))),
-                                new TestTransparencyRegistry(Map.of()),
                                 new RedactPromptBuilder());
 
                 ProcedureContextService.ContextRequirements keywordRequirements = service
@@ -237,7 +233,6 @@ class ProcedureContextServiceTest {
                                 new TestCityInfoRegistry(Map.of(
                                                 "city-a", new CountingCityInfoRagHelper(List.of()),
                                                 "city-b", new CountingCityInfoRagHelper(List.of()))),
-                                new TestTransparencyRegistry(Map.of()),
                                 new RedactPromptBuilder());
 
                 assertTrue(service.questionNeedsProcedureContext("Need resident parking badge renewal today",
@@ -261,7 +256,6 @@ class ProcedureContextServiceTest {
                                 new TestEventRegistry(Map.of("city-a", eventHelper)),
                                 new TestNewsRegistry(Map.of("city-a", new CountingNewsRagHelper(List.of()))),
                                 new TestCityInfoRegistry(Map.of("city-a", new CountingCityInfoRagHelper(List.of()))),
-                                new TestTransparencyRegistry(Map.of()),
                                 new RedactPromptBuilder());
 
                 ProcedureContextService.ContextRequirements procedureRequirements = service
@@ -291,7 +285,6 @@ class ProcedureContextServiceTest {
                                 new TestEventRegistry(Map.of("city-a", eventHelper)),
                                 new TestNewsRegistry(Map.of("city-a", new CountingNewsRagHelper(List.of()))),
                                 new TestCityInfoRegistry(Map.of("city-a", new CountingCityInfoRagHelper(List.of()))),
-                                new TestTransparencyRegistry(Map.of()),
                                 new RedactPromptBuilder());
 
                 ProcedureContextService.ContextRequirements requirements = service
@@ -321,7 +314,6 @@ class ProcedureContextServiceTest {
                                 new TestEventRegistry(Map.of("city-a", eventHelper)),
                                 new TestNewsRegistry(Map.of("city-a", newsHelper)),
                                 new TestCityInfoRegistry(Map.of("city-a", new CountingCityInfoRagHelper(List.of()))),
-                                new TestTransparencyRegistry(Map.of()),
                                 new RedactPromptBuilder());
 
                 ProcedureContextService.ContextRequirements requirements = service
@@ -347,7 +339,6 @@ class ProcedureContextServiceTest {
                                 new TestEventRegistry(Map.of("city-a", new CountingEventRagHelper(List.of()))),
                                 new TestNewsRegistry(Map.of("city-a", new CountingNewsRagHelper(List.of()))),
                                 new TestCityInfoRegistry(Map.of("city-a", cityInfoHelper)),
-                                new TestTransparencyRegistry(Map.of()),
                                 new RedactPromptBuilder());
 
                 ProcedureContextService.ContextRequirements requirements = service
@@ -496,37 +487,4 @@ class ProcedureContextServiceTest {
                 }
         }
 
-        private static final class TestTransparencyRegistry extends TransparencyRagHelperRegistry {
-                private final Map<String, TransparencyRagHelper> helpersByCity;
-
-                private TestTransparencyRegistry(Map<String, TransparencyRagHelper> helpersByCity) {
-                        this.helpersByCity = helpersByCity;
-                }
-
-                @Override
-                public TransparencyRagHelper getForCity(String cityId) {
-                        return helpersByCity.get(cityId);
-                }
-        }
-
-        private static final class CountingTransparencyRagHelper extends TransparencyRagHelper {
-                private final List<TransparencyRagHelper.TransparencyItem> items;
-                private final AtomicInteger getAllItemsCalls = new AtomicInteger();
-
-                private CountingTransparencyRagHelper(List<TransparencyRagHelper.TransparencyItem> items) {
-                        super("testcity");
-                        this.items = items;
-                }
-
-                @Override
-                public List<TransparencyRagHelper.TransparencyItem> getAllTransparencyItems() {
-                        getAllItemsCalls.incrementAndGet();
-                        return items;
-                }
-
-                @Override
-                public List<TransparencyRagHelper.TransparencyItem> search(String query) {
-                        return items;
-                }
-        }
 }

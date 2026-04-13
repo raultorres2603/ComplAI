@@ -10,8 +10,6 @@ import cat.complai.openrouter.helpers.NewsRagHelperRegistry;
 import cat.complai.openrouter.helpers.ProcedureRagHelper;
 import cat.complai.openrouter.helpers.ProcedureRagHelperRegistry;
 import cat.complai.openrouter.helpers.RedactPromptBuilder;
-import cat.complai.openrouter.helpers.TransparencyRagHelper;
-import cat.complai.openrouter.helpers.TransparencyRagHelperRegistry;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import java.util.ArrayList;
@@ -109,11 +107,6 @@ public class ProcedureContextService {
             "tourism", "turisme", "turismo", "visit", "visitar", "visita", "informacio",
             "informació", "informacion", "información");
 
-    private static final List<String> TRANSPARENCY_KEYWORDS = List.of(
-            "transparència", "transparencia", "transparency",
-            "contractes", "subvencions", "pressupost",
-            "licitació", "licitacion", "convenis", "factures");
-
     private static final List<String> CONVERSATIONAL_SHORT_CIRCUITS = List.of(
             "hello", "hi", "hey", "good morning", "good afternoon", "good evening",
             "hola", "bon dia", "bona tarda", "how are you", "what is the weather", "weather",
@@ -123,7 +116,6 @@ public class ProcedureContextService {
     private final EventRagHelperRegistry eventRagRegistry;
     private final NewsRagHelperRegistry newsRagRegistry;
     private final CityInfoRagHelperRegistry cityInfoRagRegistry;
-    private final TransparencyRagHelperRegistry transparencyRagRegistry;
     private final RedactPromptBuilder promptBuilder;
     private final Logger logger = Logger.getLogger(ProcedureContextService.class.getName());
     private final ConcurrentHashMap<String, CityDetectionIndex> detectionIndexByCity = new ConcurrentHashMap<>();
@@ -142,20 +134,18 @@ public class ProcedureContextService {
     public ProcedureContextService(ProcedureRagHelperRegistry ragRegistry, EventRagHelperRegistry eventRagRegistry,
             NewsRagHelperRegistry newsRagRegistry,
             CityInfoRagHelperRegistry cityInfoRagRegistry,
-            TransparencyRagHelperRegistry transparencyRagRegistry,
             RedactPromptBuilder promptBuilder) {
         this.ragRegistry = ragRegistry;
         this.eventRagRegistry = eventRagRegistry;
         this.newsRagRegistry = newsRagRegistry;
         this.cityInfoRagRegistry = cityInfoRagRegistry;
-        this.transparencyRagRegistry = transparencyRagRegistry;
         this.promptBuilder = promptBuilder;
     }
 
     public ProcedureContextService(ProcedureRagHelperRegistry ragRegistry, EventRagHelperRegistry eventRagRegistry,
             RedactPromptBuilder promptBuilder) {
         this(ragRegistry, eventRagRegistry, new NewsRagHelperRegistry(), new CityInfoRagHelperRegistry(),
-                new TransparencyRagHelperRegistry(), promptBuilder);
+                promptBuilder);
     }
 
     /**
@@ -276,35 +266,16 @@ public class ProcedureContextService {
         }
     }
 
-    public static class TransparencyContextResult {
-        private final String contextBlock;
-        private final List<Source> sources;
-
-        public TransparencyContextResult(String contextBlock, List<Source> sources) {
-            this.contextBlock = contextBlock;
-            this.sources = sources == null ? List.of() : Collections.unmodifiableList(new ArrayList<>(sources));
-        }
-
-        public String getContextBlock() {
-            return contextBlock;
-        }
-
-        public List<Source> getSources() {
-            return sources;
-        }
-    }
-
     /**
      * Captures which RAG context domains are required for a given query.
      */
     public static final class ContextRequirements {
-        private static final ContextRequirements NONE = new ContextRequirements(false, false, false, false, false);
+        private static final ContextRequirements NONE = new ContextRequirements(false, false, false, false);
 
         private final boolean needsProcedureContext;
         private final boolean needsEventContext;
         private final boolean needsNewsContext;
         private final boolean needsCityInfoContext;
-        private final boolean needsTransparencyContext;
 
         /**
          * Constructs a requirements descriptor.
@@ -317,17 +288,13 @@ public class ProcedureContextService {
          *                                 fetched
          * @param needsCityInfoContext     {@code true} if city-info context should be
          *                                 fetched
-         * @param needsTransparencyContext {@code true} if transparency context should
-         *                                 be
-         *                                 fetched
          */
         public ContextRequirements(boolean needsProcedureContext, boolean needsEventContext, boolean needsNewsContext,
-                boolean needsCityInfoContext, boolean needsTransparencyContext) {
+                boolean needsCityInfoContext) {
             this.needsProcedureContext = needsProcedureContext;
             this.needsEventContext = needsEventContext;
             this.needsNewsContext = needsNewsContext;
             this.needsCityInfoContext = needsCityInfoContext;
-            this.needsTransparencyContext = needsTransparencyContext;
         }
 
         /**
@@ -374,16 +341,11 @@ public class ProcedureContextService {
         public boolean needsCityInfoContext() {
             return needsCityInfoContext;
         }
-
-        public boolean needsTransparencyContext() {
-            return needsTransparencyContext;
-        }
     }
 
     private record CityDetectionIndex(TitleMatcher procedureMatcher, TitleMatcher eventMatcher,
-            TitleMatcher newsMatcher, TitleMatcher cityInfoMatcher, TitleMatcher transparencyMatcher,
-            int procedureTitleCount, int eventTitleCount, int newsTitleCount, int cityInfoTitleCount,
-            int transparencyTitleCount) {
+            TitleMatcher newsMatcher, TitleMatcher cityInfoMatcher,
+            int procedureTitleCount, int eventTitleCount, int newsTitleCount, int cityInfoTitleCount) {
     }
 
     private static final class TitleMatcher {
@@ -462,20 +424,12 @@ public class ProcedureContextService {
                 || containsAny(normalizedQuestion, MUNICIPAL_SERVICE_KEYWORDS);
         boolean needsEvent = containsAny(normalizedQuestion, EVENT_KEYWORDS);
         boolean needsNews = containsAny(normalizedQuestion, NEWS_KEYWORDS);
-        boolean needsTransparency = containsAny(normalizedQuestion, TRANSPARENCY_KEYWORDS);
-
-        if (needsTransparency) {
-            long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
-            logger.fine(() -> "Context detection completed from transparency keyword path - city=" + cityId
-                    + " durationMs=" + durationMs);
-            return new ContextRequirements(false, false, false, false, true);
-        }
 
         if (needsNews) {
             long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
             logger.fine(() -> "Context detection completed from news keyword path - city=" + cityId
                     + " procedure=false event=false news=true durationMs=" + durationMs);
-            return new ContextRequirements(false, false, true, false, false);
+            return new ContextRequirements(false, false, true, false);
         }
 
         if (!needsProcedure && !needsEvent && isClearlyConversational(normalizedQuestion)) {
@@ -492,14 +446,14 @@ public class ProcedureContextService {
                     + " event=" + finalNeedsEvent
                     + " news=false"
                     + " durationMs=" + durationMs);
-            return new ContextRequirements(finalNeedsProcedure, finalNeedsEvent, false, false, false);
+            return new ContextRequirements(finalNeedsProcedure, finalNeedsEvent, false, false);
         }
 
         if (needsProcedure && needsEvent) {
             long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
             logger.fine(() -> "Context detection completed from keyword path — city=" + cityId
                     + " procedure=true event=true news=false durationMs=" + durationMs);
-            return new ContextRequirements(true, true, false, false, false);
+            return new ContextRequirements(true, true, false, false);
         }
 
         CityDetectionIndex detectionIndex = getOrCreateDetectionIndex(cityId);
@@ -512,15 +466,7 @@ public class ProcedureContextService {
             logger.fine(() -> "Context detection completed from title path - city=" + cityId
                     + " procedure=false event=false news=true durationMs=" + durationMs
                     + " newsTitles=" + detectionIndex.newsTitleCount());
-            return new ContextRequirements(false, false, true, false, false);
-        }
-
-        boolean needsTransparencyByTitle = detectionIndex.transparencyMatcher().matches(normalizedQuestion);
-        if (needsTransparencyByTitle) {
-            long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
-            logger.fine(() -> "Context detection completed from transparency title path - city=" + cityId
-                    + " durationMs=" + durationMs);
-            return new ContextRequirements(false, false, false, false, true);
+            return new ContextRequirements(false, false, true, false);
         }
 
         boolean needsCityInfo = false;
@@ -542,7 +488,7 @@ public class ProcedureContextService {
                 + " procedureTitles=" + detectionIndex.procedureTitleCount()
                 + " eventTitles=" + detectionIndex.eventTitleCount()
                 + " cityInfoTitles=" + detectionIndex.cityInfoTitleCount());
-        return new ContextRequirements(finalNeedsProcedure, finalNeedsEvent, false, finalNeedsCityInfo, false);
+        return new ContextRequirements(finalNeedsProcedure, finalNeedsEvent, false, finalNeedsCityInfo);
     }
 
     public ProcedureContextResult buildProcedureContextResult(String query, String cityId) {
@@ -851,26 +797,22 @@ public class ProcedureContextService {
         List<String> normalizedEventTitles = loadNormalizedEventTitles(cityId);
         List<String> normalizedNewsTitles = loadNormalizedNewsTitles(cityId);
         List<String> normalizedCityInfoTitles = loadNormalizedCityInfoTitles(cityId);
-        List<String> normalizedTransparencyTitles = loadNormalizedTransparencyTitles(cityId);
 
         logger.info(() -> "Context detection index initialized — city=" + cityId
                 + " procedureTitles=" + normalizedProcedureTitles.size()
                 + " eventTitles=" + normalizedEventTitles.size()
                 + " newsTitles=" + normalizedNewsTitles.size()
-                + " cityInfoTitles=" + normalizedCityInfoTitles.size()
-                + " transparencyTitles=" + normalizedTransparencyTitles.size());
+                + " cityInfoTitles=" + normalizedCityInfoTitles.size());
 
         return new CityDetectionIndex(
                 TitleMatcher.fromTitles(normalizedProcedureTitles),
                 TitleMatcher.fromTitles(normalizedEventTitles),
                 TitleMatcher.fromTitles(normalizedNewsTitles),
                 TitleMatcher.fromTitles(normalizedCityInfoTitles),
-                TitleMatcher.fromTitles(normalizedTransparencyTitles),
                 normalizedProcedureTitles.size(),
                 normalizedEventTitles.size(),
                 normalizedNewsTitles.size(),
-                normalizedCityInfoTitles.size(),
-                normalizedTransparencyTitles.size());
+                normalizedCityInfoTitles.size());
     }
 
     private List<String> loadNormalizedProcedureTitles(String cityId) {
@@ -931,79 +873,6 @@ public class ProcedureContextService {
                     + " error=" + e.getMessage());
             return List.of();
         }
-    }
-
-    private List<String> loadNormalizedTransparencyTitles(String cityId) {
-        try {
-            TransparencyRagHelper helper = transparencyRagRegistry.getForCity(cityId);
-            return helper.getAllTransparencyItems().stream()
-                    .map(item -> normalize(item.title))
-                    .filter(title -> !title.isBlank())
-                    .distinct()
-                    .toList();
-        } catch (Exception e) {
-            logger.fine(() -> "Failed to initialize transparency detection titles for city=" + cityId
-                    + " error=" + e.getMessage());
-            return List.of();
-        }
-    }
-
-    public boolean questionNeedsTransparencyContext(String question, String cityId) {
-        return detectContextRequirements(question, cityId).needsTransparencyContext();
-    }
-
-    public TransparencyContextResult buildTransparencyContextResult(String query, String cityId) {
-        try {
-            TransparencyRagHelper helper = transparencyRagRegistry.getForCity(cityId);
-            List<TransparencyRagHelper.TransparencyItem> matches = helper.search(query);
-            if (matches.isEmpty()) {
-                return new TransparencyContextResult(null, List.of());
-            }
-            List<Source> sources = matches.stream()
-                    .map(item -> new Source(item.url, item.title))
-                    .filter(source -> source.getUrl() != null && !source.getUrl().isBlank())
-                    .toList();
-            String contextBlock = buildTransparencyContextBlockFromMatches(matches, cityId);
-            return new TransparencyContextResult(contextBlock, sources);
-        } catch (Exception e) {
-            logger.log(Level.WARNING, "Failed to build transparency context result for city=" + cityId
-                    + "; returning empty context: " + e.getMessage(), e);
-            return new TransparencyContextResult(null, List.of());
-        }
-    }
-
-    private String buildTransparencyContextBlockFromMatches(
-            List<TransparencyRagHelper.TransparencyItem> matches, String cityId) {
-        if (matches.isEmpty())
-            return "";
-        StringBuilder sb = new StringBuilder();
-        sb.append("TRANSPARENCY INFORMATION IN ").append(cityId).append(":\n\n");
-        for (int i = 0; i < matches.size(); i++) {
-            TransparencyRagHelper.TransparencyItem item = matches.get(i);
-            sb.append(i + 1).append(". ").append(item.title).append("\n");
-            if (item.section != null && !item.section.isBlank())
-                sb.append("   Section: ").append(item.section).append("\n");
-            if (item.body != null && !item.body.isBlank())
-                sb.append("   Details: ").append(item.body).append("\n");
-            if (item.url != null && !item.url.isBlank())
-                sb.append("   Source URL: ").append(item.url).append("\n");
-            sb.append("\n");
-        }
-        sb.append("INSTRUCTIONS:\n");
-        sb.append("- Base your answer on the transparency information above.\n");
-        sb.append("- Do not invent transparency items or URLs.\n");
-        sb.append("- MANDATORY: If you cite an item and it has a Source URL, include that URL in your answer.\n");
-        return sb.toString();
-    }
-
-    public CompletableFuture<TransparencyContextResult> buildTransparencyContextResultAsync(
-            String query, String cityId, Executor executor) {
-        return CompletableFuture.supplyAsync(() -> buildTransparencyContextResult(query, cityId), executor);
-    }
-
-    public CompletableFuture<TransparencyContextResult> buildTransparencyContextResultAsync(
-            String query, String cityId) {
-        return CompletableFuture.completedFuture(buildTransparencyContextResult(query, cityId));
     }
 
     private static String normalize(String value) {

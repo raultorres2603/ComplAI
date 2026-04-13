@@ -313,8 +313,6 @@ public class ProcedureScraper {
         public NewsConfig news;
         /** City-info configuration for scraping municipal information pages */
         public CityInfoConfig cityInfo;
-        /** Transparency portal configuration for scraping open-data pages */
-        public TransparencyConfig transparency;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -491,33 +489,4 @@ public class ProcedureScraper {
         public boolean whenBodyEmpty = true;
     }
 
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public static final class TransparencyConfig {
-        /** Base URL of the transparency portal. */
-        public String baseUrl;
-        /** Crawl configuration for category and detail link discovery. */
-        public TransparencyCrawlConfig crawl;
-        /** Field extraction rules keyed by output field name. Must contain "title". */
-        public Map<String, FieldExtractionRule> fields = new LinkedHashMap<>();
-        /** Optional skip rules. */
-        public SkipConfig skip;
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    public static final class TransparencyCrawlConfig {
-        /** CSS selector for same-scope category/section navigation links. */
-        public String categoryLinkSelector;
-        /** CSS selector that matches transparency content detail pages. */
-        public String detailLinkSelector;
-        /**
-         * Regex pattern — only category links whose href matches this are followed.
-         * Null = follow all discovered links.
-         */
-        public String categoryIncludePattern;
-        /**
-         * Regex pattern — category links whose href matches this are excluded.
-         * Null = no exclusion.
-         */
-        public String categoryExcludePattern;
-    }
 }

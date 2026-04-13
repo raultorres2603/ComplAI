@@ -279,24 +279,6 @@ class ProcedureScraperTest {
                 "seedThemeUrls must have 2 external utility sites");
     }
 
-    @Test
-    void elpratMapping_transparencySection_loadsSuccessfully() throws IOException {
-        ScraperMapping mapping = ProcedureScraper.loadMapping("elprat");
-
-        assertNotNull(mapping.transparency, "transparency config must be present");
-        assertEquals("https://seu-e.cat/ca/web/elpratdellobregat/govern-obert-i-transparencia",
-                mapping.transparency.baseUrl);
-        assertNotNull(mapping.transparency.crawl);
-        assertFalse(mapping.transparency.crawl.detailLinkSelector.isBlank());
-
-        assertTrue(mapping.transparency.fields.containsKey("title"),
-                "transparency fields must contain 'title'");
-        assertTrue(mapping.transparency.fields.containsKey("section"),
-                "transparency fields must contain 'section'");
-        assertTrue(mapping.transparency.fields.containsKey("body"),
-                "transparency fields must contain 'body'");
-    }
-
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------

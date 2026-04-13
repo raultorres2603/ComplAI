@@ -15,7 +15,6 @@ export class StorageStack extends cdk.Stack {
   readonly cityInfoBucket: s3.Bucket;
   readonly complaintsBucket: s3.Bucket;
   readonly feedbackBucket: s3.Bucket;
-  readonly transparencyBucket: s3.Bucket;
   // Stores the compiled fat JARs used by both Lambda functions.
   // Keeping deployment artifacts here lets CI upload the JAR once and reference
   // it with Code.fromBucket(), which means the CDK bootstrap bucket never
@@ -66,17 +65,6 @@ export class StorageStack extends cdk.Stack {
     // City-info corpus - read by Lambda at startup for city information fallback context.
     this.cityInfoBucket = new s3.Bucket(this, `ComplAICityInfoBucket-${environment}`, {
       bucketName: `complai-cityinfo-${environment}`,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      encryption: s3.BucketEncryption.S3_MANAGED,
-      versioned: false,
-      lifecycleRules: [{ expiration: cdk.Duration.days(365) }],
-    });
-
-    // Transparency corpus — scraped from the city's open-data/transparency portal.
-    // RETAIN in all environments: file is uploaded out-of-band and must survive stack updates.
-    this.transparencyBucket = new s3.Bucket(this, `ComplAITransparencyBucket-${environment}`, {
-      bucketName: `complai-transparency-${environment}`,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       encryption: s3.BucketEncryption.S3_MANAGED,
@@ -146,11 +134,6 @@ export class StorageStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'ComplAICityInfoBucketName', {
       value: this.cityInfoBucket.bucketName,
       description: `S3 bucket for city-info corpus (${environment})`,
-    });
-
-    new cdk.CfnOutput(this, 'ComplAITransparencyBucketName', {
-      value: this.transparencyBucket.bucketName,
-      description: `S3 bucket for transparency corpus (${environment})`,
     });
 
     new cdk.CfnOutput(this, 'ComplAIComplaintsBucketName', {

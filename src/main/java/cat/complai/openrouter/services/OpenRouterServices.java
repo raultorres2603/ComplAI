@@ -10,7 +10,6 @@ import cat.complai.openrouter.services.procedure.ProcedureContextService.Context
 import cat.complai.openrouter.services.procedure.ProcedureContextService.ProcedureContextResult;
 import cat.complai.openrouter.services.procedure.ProcedureContextService.NewsContextResult;
 import cat.complai.openrouter.services.procedure.ProcedureContextService.CityInfoContextResult;
-import cat.complai.openrouter.services.procedure.ProcedureContextService.TransparencyContextResult;
 import cat.complai.openrouter.interfaces.IOpenRouterService;
 import cat.complai.openrouter.dto.AskStreamResult;
 import cat.complai.openrouter.dto.OpenRouterResponseDto;
@@ -209,7 +208,6 @@ public class OpenRouterServices implements IOpenRouterService {
         ProcedureContextService.EventContextResult eventCtx = ragContexts.eventContext();
         NewsContextResult newsCtx = ragContexts.newsContext();
         CityInfoContextResult cityInfoCtx = ragContexts.cityInfoContext();
-        TransparencyContextResult transparencyCtx = ragContexts.transparencyContext();
 
         if (ragContexts.newsIntent() && (newsCtx == null || newsCtx.getSources().isEmpty())) {
             String fallbackMessage = buildNoNewsFoundMessage(detectedLanguage, cityId);
@@ -237,10 +235,6 @@ public class OpenRouterServices implements IOpenRouterService {
 
         if (cityInfoCtx != null && cityInfoCtx.getContextBlock() != null) {
             messages.add(Map.of("role", "system", "content", cityInfoCtx.getContextBlock()));
-        }
-
-        if (transparencyCtx != null && transparencyCtx.getContextBlock() != null) {
-            messages.add(Map.of("role", "system", "content", transparencyCtx.getContextBlock()));
         }
 
         // Add conversation history
@@ -298,9 +292,6 @@ public class OpenRouterServices implements IOpenRouterService {
         if (cityInfoCtx != null && cityInfoCtx.getSources() != null) {
             eventAndNewsSourcesForHash.addAll(cityInfoCtx.getSources());
         }
-        if (transparencyCtx != null && transparencyCtx.getSources() != null) {
-            eventAndNewsSourcesForHash.addAll(transparencyCtx.getSources());
-        }
         long eventContextHash = computeSourcesHash(eventAndNewsSourcesForHash);
 
         OpenRouterResponseDto response = aiResponseService.callOpenRouterAndExtract(messages, cityId, procContextHash,
@@ -313,8 +304,6 @@ public class OpenRouterServices implements IOpenRouterService {
         validateAndAddSources(mergedSources, eventCtx != null ? eventCtx.getSources() : null, "event");
         validateAndAddSources(mergedSources, newsCtx != null ? newsCtx.getSources() : null, "news");
         validateAndAddSources(mergedSources, cityInfoCtx != null ? cityInfoCtx.getSources() : null, "city_info");
-        validateAndAddSources(mergedSources, transparencyCtx != null ? transparencyCtx.getSources() : null,
-                "transparency");
 
         // Deduplicate ONCE after all sources are collected
         // This ensures symmetric handling and prevents double deduplication
@@ -461,7 +450,6 @@ public class OpenRouterServices implements IOpenRouterService {
         ProcedureContextService.EventContextResult eventCtx = ragContexts.eventContext();
         NewsContextResult newsCtx = ragContexts.newsContext();
         CityInfoContextResult cityInfoCtx = ragContexts.cityInfoContext();
-        TransparencyContextResult transparencyCtx = ragContexts.transparencyContext();
 
         if (ragContexts.newsIntent() && (newsCtx == null || newsCtx.getSources().isEmpty())) {
             String fallbackMessage = buildNoNewsFoundMessage(detectedLanguage, cityId);
@@ -477,8 +465,6 @@ public class OpenRouterServices implements IOpenRouterService {
             messages.add(Map.of("role", "system", "content", newsCtx.getContextBlock()));
         if (cityInfoCtx != null && cityInfoCtx.getContextBlock() != null)
             messages.add(Map.of("role", "system", "content", cityInfoCtx.getContextBlock()));
-        if (transparencyCtx != null && transparencyCtx.getContextBlock() != null)
-            messages.add(Map.of("role", "system", "content", transparencyCtx.getContextBlock()));
 
         var history = conversationService.getConversationHistory(conversationId);
         conversationService.addToMessages(messages, history);
@@ -490,8 +476,6 @@ public class OpenRouterServices implements IOpenRouterService {
         validateAndAddSources(validatedSources, eventCtx != null ? eventCtx.getSources() : null, "event");
         validateAndAddSources(validatedSources, newsCtx != null ? newsCtx.getSources() : null, "news");
         validateAndAddSources(validatedSources, cityInfoCtx != null ? cityInfoCtx.getSources() : null, "city_info");
-        validateAndAddSources(validatedSources, transparencyCtx != null ? transparencyCtx.getSources() : null,
-                "transparency");
 
         List<SseSources> allSources = validatedSources.stream()
                 .map(s -> new SseSources(s.getTitle(), s.getUrl()))
@@ -621,19 +605,17 @@ public class OpenRouterServices implements IOpenRouterService {
         long detectionDurationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - detectionStart);
 
         log.debug(
-                "{} context detection — conversationId={} procedure={} event={} news={} cityInfo={} transparency={} durationMs={}",
+                "{} context detection — conversationId={} procedure={} event={} news={} cityInfo={} durationMs={}",
                 operationName, conversationId,
                 requirements.needsProcedureContext(),
                 requirements.needsEventContext(),
                 requirements.needsNewsContext(),
                 requirements.needsCityInfoContext(),
-                requirements.needsTransparencyContext(),
                 detectionDurationMs);
 
         if (!requirements.needsProcedureContext() && !requirements.needsEventContext()
-                && !requirements.needsNewsContext() && !requirements.needsCityInfoContext()
-                && !requirements.needsTransparencyContext()) {
-            return new RagContexts(null, null, null, null, null, false);
+                && !requirements.needsNewsContext() && !requirements.needsCityInfoContext()) {
+            return new RagContexts(null, null, null, null, false);
         }
 
         if (requirements.needsNewsContext()) {
@@ -643,18 +625,7 @@ public class OpenRouterServices implements IOpenRouterService {
                     newsContext != null && newsContext.getSources() != null
                             ? newsContext.getSources().size()
                             : 0);
-            return new RagContexts(null, null, newsContext, null, null, true);
-        }
-
-        if (requirements.needsTransparencyContext()) {
-            TransparencyContextResult transparencyContext = safelyBuildTransparencyContext(
-                    question, cityId, conversationId, operationName);
-            log.debug("{} transparency retrieval completed — conversationId={} city={} hitCount={}",
-                    operationName, conversationId, cityId,
-                    transparencyContext != null && transparencyContext.getSources() != null
-                            ? transparencyContext.getSources().size()
-                            : 0);
-            return new RagContexts(null, null, null, null, transparencyContext, false);
+            return new RagContexts(null, null, newsContext, null, true);
         }
 
         if (requirements.needsProcedureContext() && requirements.needsEventContext()) {
@@ -678,28 +649,28 @@ public class OpenRouterServices implements IOpenRouterService {
             long ragDurationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - ragStart);
             log.debug("{} RAG build completed — conversationId={} mode=bounded-parallel durationMs={}",
                     operationName, conversationId, ragDurationMs);
-            return new RagContexts(procedureContext, eventContext, null, null, null, false);
+            return new RagContexts(procedureContext, eventContext, null, null, false);
         }
 
         if (requirements.needsProcedureContext()) {
             ProcedureContextResult procedureContext = safelyBuildProcedureContext(question, cityId, conversationId,
                     operationName);
-            return new RagContexts(procedureContext, null, null, null, null, false);
+            return new RagContexts(procedureContext, null, null, null, false);
         }
 
         if (requirements.needsEventContext()) {
             ProcedureContextService.EventContextResult eventContext = safelyBuildEventContext(question, cityId,
                     conversationId, operationName);
-            return new RagContexts(null, eventContext, null, null, null, false);
+            return new RagContexts(null, eventContext, null, null, false);
         }
 
         if (requirements.needsCityInfoContext()) {
             CityInfoContextResult cityInfoContext = safelyBuildCityInfoContext(question, cityId, conversationId,
                     operationName);
-            return new RagContexts(null, null, null, cityInfoContext, null, false);
+            return new RagContexts(null, null, null, cityInfoContext, false);
         }
 
-        return new RagContexts(null, null, null, null, null, false);
+        return new RagContexts(null, null, null, null, false);
     }
 
     private NewsContextResult safelyBuildNewsContext(String question, String cityId, String conversationId,
@@ -760,21 +731,6 @@ public class OpenRouterServices implements IOpenRouterService {
             return result;
         } catch (Exception e) {
             logRagFailure(operationName, conversationId, cityId, "cityinfo", e);
-            return null;
-        }
-    }
-
-    private TransparencyContextResult safelyBuildTransparencyContext(String question, String cityId,
-            String conversationId, String operationName) {
-        long start = System.nanoTime();
-        try {
-            TransparencyContextResult result = procedureContextService.buildTransparencyContextResult(question, cityId);
-            long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
-            log.debug("{} RAG build completed — conversationId={} mode=transparency-only durationMs={}",
-                    operationName, conversationId, durationMs);
-            return result;
-        } catch (Exception e) {
-            logRagFailure(operationName, conversationId, cityId, "transparency", e);
             return null;
         }
     }
@@ -842,7 +798,6 @@ public class OpenRouterServices implements IOpenRouterService {
             ProcedureContextService.EventContextResult eventContext,
             NewsContextResult newsContext,
             CityInfoContextResult cityInfoContext,
-            TransparencyContextResult transparencyContext,
             boolean newsIntent) {
     }
 
