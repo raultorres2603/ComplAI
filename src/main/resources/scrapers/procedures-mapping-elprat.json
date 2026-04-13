@@ -300,35 +300,5 @@
         "multiple": false
       }
     }
-  },
-  "transparency": {
-    "baseUrl": "https://seu-e.cat/ca/web/elpratdellobregat/govern-obert-i-transparencia",
-    "crawl": {
-      "categoryLinkSelector": "a[href*='/govern-obert-i-transparencia/']",
-      "detailLinkSelector": "a[href*='/govern-obert-i-transparencia/']",
-      "categoryIncludePattern": "^https://seu-e\\.cat/.*/govern-obert-i-transparencia/.*",
-      "categoryExcludePattern": "\\.(pdf|doc|docx|xls|xlsx|zip|csv)(\\?.*)?$"
-    },
-    "fields": {
-      "title": {
-        "selector": "h1, h2.titol-pagina, .titol-contingut, .page-title",
-        "multiple": false
-      },
-      "section": {
-        "selector": ".breadcrumbs a, .fil-ariadna a, .path-navigation a, ol.breadcrumb a",
-        "multiple": true
-      },
-      "body": {
-        "selector": ".col-contingut p, .cos-contingut p, .contingut-principal p, .cos-text p, main p",
-        "multiple": true
-      }
-    },
-    "skip": {
-      "whenTitleEmptyOrEquals": [
-        "Govern obert i transparència",
-        "Transparència",
-        "El Prat de Llobregat"
-      ]
-    }
   }
 }
