@@ -10,6 +10,7 @@
 #   - Docker (with the Compose plugin or standalone docker-compose)
 #   - AWS SAM CLI  (https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html)
 #   - Java 17 + Gradle wrapper in the project root
+#   - Python 3 with venv module
 #
 # Usage (Linux / macOS / WSL):
 #   cd sam/
@@ -25,6 +26,24 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+VENV_DIR="${SCRIPT_DIR}/venv"
+
+# ---------------------------------------------------------------------------
+# 0. Set up Python virtual environment and install dependencies.
+# ---------------------------------------------------------------------------
+if [ ! -d "${VENV_DIR}" ]; then
+  echo "[start-local] Creating Python virtual environment..."
+  python3 -m venv "${VENV_DIR}"
+fi
+
+echo "[start-local] Activating virtual environment..."
+source "${VENV_DIR}/bin/activate"
+
+echo "[start-local] Installing Python dependencies..."
+pip install -q boto3
+
 # Fail fast with a clear message if sam is not on PATH.
 # On Windows, sam is installed as a .exe and will not be found here unless
 # you are in WSL with the Windows PATH forwarded. Use start-local.ps1 instead.
@@ -33,9 +52,6 @@ if ! command -v sam &>/dev/null; then
   echo "[start-local] On Windows, run: .\\start-local.ps1  (in PowerShell)" >&2
   exit 1
 fi
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # ---------------------------------------------------------------------------
 # 1. Build the shadow JAR from the project root.
