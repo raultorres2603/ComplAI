@@ -31,27 +31,131 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 VENV_DIR="${SCRIPT_DIR}/venv"
 
 # ---------------------------------------------------------------------------
-# 0. Set up Python virtual environment and install dependencies.
+# Utility function: Check if a command exists on PATH.
 # ---------------------------------------------------------------------------
-if [ ! -d "${VENV_DIR}" ]; then
-  echo "[start-local] Creating Python virtual environment..."
-  python3 -m venv "${VENV_DIR}"
-fi
+check_command_exists() {
+  local cmd="$1"
+  local friendly_name="${2:-$cmd}"
+  if ! command -v "$cmd" &>/dev/null; then
+    echo "[start-local] ERROR: Required command '$friendly_name' not found on PATH." >&2
+    return 1
+  fi
+  return 0
+}
 
-echo "[start-local] Activating virtual environment..."
-source "${VENV_DIR}/bin/activate"
+# ---------------------------------------------------------------------------
+# Utility function: Check Python 3 installation and version.
+# ---------------------------------------------------------------------------
+check_python3() {
+  if ! check_command_exists "python3"; then
+    echo "[start-local] ERROR: Python 3 is not installed or not on PATH." >&2
+    echo "[start-local] On Ubuntu/Debian, install it with:" >&2
+    echo "[start-local]   sudo apt-get update && sudo apt-get install -y python3 python3-venv" >&2
+    return 1
+  fi
 
-echo "[start-local] Installing Python dependencies..."
-pip install -q boto3
+  # Check Python version (must be at least 3.8)
+  local py_version
+  py_version=$(python3 --version 2>&1 | awk '{print $2}')
+  local major_minor="${py_version%.*}"
+  local min_version="3.8"
 
-# Fail fast with a clear message if sam is not on PATH.
-# On Windows, sam is installed as a .exe and will not be found here unless
-# you are in WSL with the Windows PATH forwarded. Use start-local.ps1 instead.
-if ! command -v sam &>/dev/null; then
-  echo "[start-local] ERROR: 'sam' not found on PATH." >&2
+  if ! python3 -c "import sys; sys.exit(0 if sys.version_info >= (3, 8) else 1)" 2>/dev/null; then
+    echo "[start-local] ERROR: Python version $py_version is too old. Minimum required: $min_version" >&2
+    echo "[start-local] On Ubuntu/Debian, upgrade with:" >&2
+    echo "[start-local]   sudo apt-get install -y python3" >&2
+    return 1
+  fi
+
+  echo "[start-local] ✓ Python 3 ($py_version) is installed."
+  return 0
+}
+
+# ---------------------------------------------------------------------------
+# Utility function: Check if Docker and docker-compose are available.
+# ---------------------------------------------------------------------------
+check_docker() {
+  if ! check_command_exists "docker"; then
+    echo "[start-local] ERROR: Docker is not installed or not on PATH." >&2
+    echo "[start-local] On Ubuntu/Debian, install it with:" >&2
+    echo "[start-local]   sudo apt-get update && sudo apt-get install -y docker.io docker-compose" >&2
+    echo "[start-local] Then add your user to the docker group:" >&2
+    echo "[start-local]   sudo usermod -aG docker \$USER && newgrp docker" >&2
+    return 1
+  fi
+  echo "[start-local] ✓ Docker is installed."
+
+  # Check for docker-compose (either as plugin or standalone)
+  if docker compose version &>/dev/null; then
+    echo "[start-local] ✓ Docker Compose (plugin) is available."
+  elif command -v docker-compose &>/dev/null; then
+    echo "[start-local] ✓ Docker Compose (standalone) is available."
+  else
+    echo "[start-local] ERROR: Docker Compose is not installed or not available as a plugin." >&2
+    echo "[start-local] On Ubuntu/Debian, install it with:" >&2
+    echo "[start-local]   sudo apt-get install -y docker-compose" >&2
+    return 1
+  fi
+  return 0
+}
+
+# ---------------------------------------------------------------------------
+# Utility function: Check if Java/Gradle is available.
+# ---------------------------------------------------------------------------
+check_gradle() {
+  if [ ! -f "${PROJECT_ROOT}/gradlew" ]; then
+    echo "[start-local] ERROR: Gradle wrapper not found at ${PROJECT_ROOT}/gradlew" >&2
+    echo "[start-local] Make sure you are running this script from the sam/ directory of the ComplAI project." >&2
+    return 1
+  fi
+  echo "[start-local] ✓ Gradle wrapper is available."
+  return 0
+}
+
+# ---------------------------------------------------------------------------
+# 0. Validate all prerequisites before starting.
+# ---------------------------------------------------------------------------
+echo "[start-local] Checking prerequisites..."
+check_python3 || exit 1
+check_docker || exit 1
+check_gradle || exit 1
+check_command_exists "sam" "AWS SAM CLI" || {
   echo "[start-local] On Windows, run: .\\start-local.ps1  (in PowerShell)" >&2
   exit 1
+}
+echo "[start-local] ✓ AWS SAM CLI is installed."
+echo "[start-local] All prerequisites satisfied."
+echo ""
+
+# ---------------------------------------------------------------------------
+# 1. Set up Python virtual environment and install dependencies.
+# ---------------------------------------------------------------------------
+# Check if venv directory exists AND has critical files (pip, python3)
+if [ ! -d "${VENV_DIR}" ] || [ ! -f "${VENV_DIR}/bin/pip" ] || [ ! -f "${VENV_DIR}/bin/python3" ]; then
+  if [ -d "${VENV_DIR}" ]; then
+    echo "[start-local] Virtual environment directory exists but is incomplete/corrupted. Removing and recreating..."
+    rm -rf "${VENV_DIR}"
+  else
+    echo "[start-local] Creating Python virtual environment..."
+  fi
+  
+  if ! python3 -m venv "${VENV_DIR}" 2>/dev/null; then
+    echo "[start-local] ERROR: Failed to create Python virtual environment at ${VENV_DIR}" >&2
+    echo "[start-local] This may be due to missing venv module. On Ubuntu/Debian, install it with:" >&2
+    echo "[start-local]   sudo apt-get install -y python3-venv" >&2
+    exit 1
+  fi
+  echo "[start-local] ✓ Virtual environment created."
+else
+  echo "[start-local] ✓ Virtual environment already exists and is valid."
 fi
+
+echo "[start-local] Installing Python dependencies..."
+if ! "${VENV_DIR}/bin/pip" install boto3; then
+  echo "[start-local] ERROR: Failed to install Python dependencies." >&2
+  exit 1
+fi
+echo "[start-local] ✓ Python dependencies installed."
 
 # ---------------------------------------------------------------------------
 # 1. Build the shadow JAR from the project root.
@@ -156,7 +260,7 @@ sam local start-api \
   --port 3000 &
 SAM_API_PID=$!
 
-python3 "${SCRIPT_DIR}/sqs_worker_poller.py" \
+"${VENV_DIR}/bin/python3" "${SCRIPT_DIR}/sqs_worker_poller.py" \
   "${SCRIPT_DIR}/template.yaml" \
   "${SCRIPT_DIR}/env.json" &
 SQS_WORKER_PID=$!
