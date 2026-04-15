@@ -46,17 +46,33 @@ Before touching any agent, fully understand the request.
    | Code change + doc update | `planner` → `builder` → `reviewer` → `documentator` (planner/builder use `Explore` as needed) |
    | Need codebase facts | `planner` handles via `Explore` internally; do not prepend outside the orchestrator |
 
+1b. **Read task groups from `task.md`** (applies when a `planner` step precedes `builder` in the plan):
+    - Read the `## Independent Tasks` and `## Dependent Tasks` sections.
+    - Collect every independent task into a **concurrent tier**.
+    - For each dependent task, parse its `**Requires**:` field and record directed edges
+      (prerequisite task → dependent task).
+    - Topologically sort dependent tasks; tasks at the same depth whose prerequisites are all
+      satisfied form sub-concurrent tiers and may also be parallelized.
+    - The todo list must contain one labeled `[builder:<Task N>]` and one labeled
+      `[reviewer:<Task N>]` entry per task, ordered according to the tiers derived above.
+
 2. Write a `todo` list. Each item must be **one agent invocation**, named as:
    ```
    [AgentName] — <one-line description of what it must produce>
    ```
    Example:
    ```
-   [planner]      — Explore codebase and write task.md for the new PDF export endpoint
-   [builder]      — Implement task.md (PDF export endpoint + tests)
-   [reviewer]     — Validate builder output against task.md; emit PASS/FAIL report
-   [documentator] — Update README with the new PDF export endpoint
+   [planner]              — Explore codebase and write task.md (with ## Independent Tasks / ## Dependent Tasks groups)
+   [builder:Task 1]       — Implement Task 1 (independent — launches concurrently with other independent builders)
+   [builder:Task 2]       — Implement Task 2 (independent — launches concurrently with other independent builders)
+   [reviewer:Task 1]      — Validate Task 1 builder output against task.md § Task 1
+   [reviewer:Task 2]      — Validate Task 2 builder output against task.md § Task 2
+   [builder:Task 3]       — Implement Task 3 (requires Task 1 + Task 2 — starts only after both reviewers pass)
+   [reviewer:Task 3]      — Validate Task 3 builder output against task.md § Task 3
+   [documentator]         — Update documentation (runs once, after all reviewers across all tasks pass)
    ```
+
+   Labels like `[builder:Task 1]` denote a builder instance scoped to a specific task. Each instance receives only its own task block extracted from `task.md`, not the full file.
 
 3. Mark the first item **in-progress** before invoking any agent.
 
@@ -65,6 +81,19 @@ Before touching any agent, fully understand the request.
 ## Phase 2 — Delegate (with Retry Policy)
 
 For each agent in the plan, follow this sub-loop:
+
+### 2.0 — Task Group Scheduling
+
+Before invoking any builder, use the task tiers derived in Phase 1 Step 1b:
+
+1. **Launch all independent-tier builders simultaneously.** Each builder receives a scoped, self-contained prompt containing only its task's block extracted from `task.md` plus any prior-agent context relevant to that task.
+2. **After each independent builder finishes**, immediately launch its dedicated reviewer (do not wait for sibling builders).
+3. **Once all independent-tier reviewers have passed**, evaluate the dependency graph: any dependent task whose entire `**Requires**:` set is now complete becomes eligible. Launch those eligible dependent builders simultaneously (they form a sub-concurrent tier).
+4. **After each dependent builder finishes**, immediately launch its dedicated reviewer.
+5. **Repeat steps 3–4** until every dependent task is built and reviewed.
+6. **Only after every builder + reviewer pair across all tiers has a PASS verdict**, invoke the `documentator` once.
+
+If any reviewer returns FAIL, apply the Retry Policy to that specific builder only. Sibling builders and reviewers running in parallel are unaffected by a sibling's failure.
 
 ### 2.1 Compose the Delegation Prompt
 
@@ -89,6 +118,7 @@ Immediately after the agent returns, check all of the following:
 | No blocked state | Agent did not report being stuck or needing user input |
 | No destructive actions | Agent did not push, deploy, drop data, or bypass safety checks |
 | Correctness signal | For `builder`: build/test commands reported passing; for `planner`: `task.md` exists and has checkboxes; for `reviewer`: report ends with PASS or PASS WITH WARNINGS verdict; for `documentator`: the target doc section exists and is updated |
+| Parallel builder isolation | No two simultaneously running builder instances modified the same file; if a collision is detected, halt and reclassify the affected task as dependent before retrying |
 
 If **all checks pass**, mark the todo **completed** and post:
 ```
@@ -164,6 +194,20 @@ Do not continue the delegation plan until the user responds.
 
 ---
 
+## Parallel Execution Rules
+
+These rules govern simultaneous builder invocations:
+
+| Rule | Detail |
+|------|--------|
+| File isolation | Each parallel builder must operate on a disjoint set of files. If two independent tasks would touch the same file, reclassify the later task as dependent (`requires:` the earlier) before launching. |
+| Scoped prompts | Each builder instance receives only its own task block from `task.md`. Do not pass the full `task.md` to a parallel builder — extract and forward only the relevant section. |
+| Independent reviewer verdicts | Each reviewer evaluates its builder's output in isolation. A FAIL for one task does not block reviewers running for other tasks. |
+| Retry scope | A builder retry applies only to the failing task. Parallel sibling builders are unaffected. |
+| Documentator gate | The documentator must wait for **all** reviewer verdicts (across all tiers) to be PASS before starting. One unresolved FAIL blocks the documentator. |
+
+---
+
 ## Phase 3 — Inter-Agent Context Handoff
 
 When passing context from one agent to the next, always include:
@@ -210,6 +254,6 @@ If a section is not applicable (e.g. no documentation was updated), omit it.
 - **Never write code** — delegate to `builder`
 - **Never edit files** — delegate to the appropriate agent
 - **Never run shell commands** — delegate to `builder` or `Explore`
-- **Never parallelize dependent agents** — `builder` requires `planner`'s `task.md`
+- **Parallelize only independent tasks** — builder instances for tasks under ## Independent Tasks in task.md may run simultaneously; all other sequencing rules apply (planner always finishes before any builder; documentator always runs after all reviewers pass)
 - **Never skip validation** — always run §2.3 checks before marking an agent done
 - **Never proceed past a failed escalation** — wait for user input before continuing

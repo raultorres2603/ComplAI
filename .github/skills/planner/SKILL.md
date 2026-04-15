@@ -99,6 +99,8 @@ Produce a structured, fully populated `task.md` at the workspace root from a giv
 
 Overwrite `task.md` at the workspace root entirely. Use the exact structure below.
 
+Before structuring tasks, classify each planned task: a task is **Independent** if it has no prerequisites within the current plan (it can start immediately), and **Dependent** if it requires one or more other tasks to complete first. Apply the `**Requires**:` annotation to every dependent task as defined in the template below.
+
 ### `task.md` Structure
 
 ```markdown
@@ -137,7 +139,9 @@ Overwrite `task.md` at the workspace root entirely. Use the exact structure belo
 
 ---
 
-## Tasks
+## Independent Tasks
+
+> Tasks in this group have no dependencies on other tasks in this plan and **may be executed concurrently** by the builder.
 
 ### Task 1: <Title>
 
@@ -152,12 +156,19 @@ Overwrite `task.md` at the workspace root entirely. Use the exact structure belo
 
 ---
 
+## Dependent Tasks
+
+> Tasks in this group depend on one or more other tasks in this plan. The builder must not start a dependent task until all its prerequisites are complete **and** their reviewers have passed.
+> If there are no dependent tasks, write: `> None — all tasks in this plan are independent.` and omit task entries.
+
 ### Task 2: <Title>
+
+**Requires**: Task 1 — <Exact heading of Task 1>
 
 **Description**: <What this task accomplishes and why it exists>
 
 **Steps**:
-- [ ] <Atomic step>
+- [ ] <Atomic step — name the exact file/class to touch>
 - [ ] <...>
 
 **Progress**: 0 / N steps completed
@@ -200,6 +211,13 @@ If the task involves creating or updating **Architecture Overview** documentatio
 - It must represent **actual** codebase structure (layers: Controllers → Services → Repositories, AWS integrations, data flows, etc.).
 - No unverified or speculative components.
 - Diagrams ensure clarity for both implementation and documentation agents.
+
+### Quality Check
+
+- [ ] All tasks classified as Independent or Dependent
+- [ ] Every Dependent task carries a non-empty `**Requires**:` field listing exact prerequisite task headings
+- [ ] If no dependent tasks exist, `## Dependent Tasks` section is present with `> None — all tasks in this plan are independent.` notice
+- [ ] `task.md` renders correctly in GitHub Markdown
 
 ### Rules for writing tasks
 

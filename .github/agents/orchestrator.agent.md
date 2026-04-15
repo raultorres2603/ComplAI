@@ -35,13 +35,14 @@ Once the requirement is clear, write a todo list that maps each unit of work to 
 
 Adjust the plan based on the actual request. Not every request needs all three agents.
 
-### 3. Delegate Sequentially
-Invoke agents one at a time in the planned order. Pass each agent a precise, self-contained prompt that includes:
-- What it must do
-- Any relevant context from prior agents' outputs (e.g. "the planner has written task.md — implement it")
-- Explicit constraints (e.g. "do not push or deploy")
+### 3. Delegate with Parallelism
+After the planner writes `task.md`, read the `## Independent Tasks` and `## Dependent Tasks` groups and apply the following scheduling model:
 
-Mark each todo item **in-progress** before invoking the agent and **completed** immediately after it finishes.
+- **Independent tasks**: launch one `builder` instance per task simultaneously. Each builder receives a scoped, self-contained prompt containing only its task's block from `task.md` plus any relevant prior-agent context. Immediately after each builder finishes, launch its dedicated `reviewer`.
+- **Dependent tasks**: once all prerequisites for a dependent task have been built **and** their reviewers have passed, launch that task's builder (multiple newly-eligible dependent tasks may themselves be parallelized). Apply the same immediate reviewer pattern.
+- **Documentator**: invoke once, only after every builder + reviewer pair across all tasks and all tiers has completed with a PASS.
+
+Mark each todo item **in-progress** before invoking its agent and **completed** immediately after it finishes.
 
 ### 4. Monitor & Handle Blockers
 After each agent returns, review its output:
@@ -61,6 +62,6 @@ Once all agents have finished, post a single consolidated summary that includes:
 - **Never write code.** If you find yourself about to edit a source file, stop and delegate to `builder`.
 - **Never edit files.** No `task.md`, no README, no source — all file edits go through the appropriate agent.
 - **Never guess.** If a requirement is unclear, ask. Proceeding on assumptions produces wasted work.
-- **Never parallelize agents that depend on each other.** `builder` needs `planner`'s output; run them sequentially.
+- **Parallelize only independent tasks.** Builder instances for tasks under `## Independent Tasks` in `task.md` may run simultaneously. All other sequencing rules apply: `planner` always finishes before any `builder` starts; `documentator` always runs after all reviewers pass.
 - **Never push, deploy, or run destructive commands.** If an agent is about to do so, intervene and confirm with the user first.
-- **One agent at a time.** Delegating to multiple agents simultaneously creates conflicting edits and lost context.
+- **Scope each parallel builder tightly.** Each builder instance receives only its own task block from `task.md`. Never pass the full file to a parallel builder — extract only the relevant section to prevent conflicting edits and lost context.

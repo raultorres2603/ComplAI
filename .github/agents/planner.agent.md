@@ -14,6 +14,17 @@ If the requirement is unclear or ambiguous in any way, **ask the user to clarify
 
 Load and follow the [planner skill](./../skills/planner/SKILL.md) for the full step-by-step procedure, `task.md` structure, output format, and constraints.
 
+## Output Format
+
+The `task.md` produced by this agent must organize all tasks into two explicit groups:
+
+- **`## Independent Tasks`** — tasks that have no dependencies on any other task in the same plan; the orchestrator may launch their builders concurrently.
+- **`## Dependent Tasks`** — tasks that depend on one or more prerequisites; each must carry a `**Requires**: Task N — <exact title>` annotation. The builder must not start a dependent task until all listed prerequisites are complete and reviewed.
+
+If a group has no tasks, the section must still be present with a `> None` notice.
+
+See [planner skill — Phase 4](./../skills/planner/SKILL.md) for the full template, annotation syntax, and Quality Check.
+
 ## Architecture Documentation Standards
 
 When planning tasks that involve **Architecture Overview** or system design documentation:
