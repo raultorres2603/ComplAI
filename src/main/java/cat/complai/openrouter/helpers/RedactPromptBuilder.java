@@ -500,6 +500,25 @@ public class RedactPromptBuilder {
                 complaint.trim());
     }
 
+    public String buildProcedureClarificationMessage(List<String> candidateTitles, String language, String cityId) {
+        if (candidateTitles == null || candidateTitles.isEmpty()) {
+            return "";
+        }
+        String cityName = resolveCityDisplayName(cityId);
+        String preamble = switch (language == null ? "EN" : language) {
+            case "CA" -> "Trobo diverses opcions relacionades a " + cityName + ". Podries indicar quina t'interessa?";
+            case "ES" -> "Encuentro varias opciones relacionadas en " + cityName + ". \u00bfPodr\u00edas indicar cu\u00e1l te interesa?";
+            case "FR" -> "J'ai trouv\u00e9 plusieurs options li\u00e9es \u00e0 " + cityName + ". Pourriez-vous pr\u00e9ciser laquelle vous int\u00e9resse\u00a0?";
+            default -> "I found several related options in " + cityName + ". Could you specify which one you mean?";
+        };
+        StringBuilder ol = new StringBuilder("<ol>");
+        for (String title : candidateTitles) {
+            ol.append("<li>").append(title).append("</li>");
+        }
+        ol.append("</ol>");
+        return preamble + " " + ol;
+    }
+
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------

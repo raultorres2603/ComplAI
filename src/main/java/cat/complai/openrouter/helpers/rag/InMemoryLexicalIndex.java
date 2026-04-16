@@ -336,7 +336,7 @@ public final class InMemoryLexicalIndex<T> {
             double relativeFloor,
             double appliedThreshold) {
 
-        static <T> SearchResponse<T> empty(double absoluteFloor, double relativeFloor) {
+        public static <T> SearchResponse<T> empty(double absoluteFloor, double relativeFloor) {
             return new SearchResponse<>(List.of(), 0, 0, 0.0d, absoluteFloor, relativeFloor, absoluteFloor);
         }
     }

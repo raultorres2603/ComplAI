@@ -195,4 +195,51 @@ class RedactPromptBuilderTest {
         String withXX = builder.getSystemMessage("elprat", "XX");
         assertEquals(triLingual, withXX, "unrecognized language code must fall back to tri-lingual prompt");
     }
+
+    // -------------------------------------------------------------------------
+    // buildProcedureClarificationMessage tests
+    // -------------------------------------------------------------------------
+
+    @Test
+    void buildProcedureClarificationMessage_catalan_containsNumberedListAndCityName() {
+        var titles = java.util.List.of("Empadronament", "Certificat de residència");
+        String msg = builder.buildProcedureClarificationMessage(titles, "CA", "elprat");
+
+        assertTrue(msg.contains("Trobo diverses opcions"), "CA message must use Catalan preamble");
+        assertTrue(msg.contains("El Prat") || msg.contains("elprat"), "CA message must contain the city name");
+        assertTrue(msg.contains("<ol>"), "Message must contain an ordered list");
+        assertTrue(msg.contains("<li>Empadronament</li>"), "Message must list first title");
+        assertTrue(msg.contains("<li>Certificat de residència</li>"), "Message must list second title");
+        assertTrue(msg.contains("</ol>"), "Message must close the ordered list");
+    }
+
+    @Test
+    void buildProcedureClarificationMessage_spanish_containsNumberedList() {
+        var titles = java.util.List.of("Empadronamiento", "Certificado de residencia");
+        String msg = builder.buildProcedureClarificationMessage(titles, "ES", "elprat");
+
+        assertTrue(msg.contains("Encuentro varias opciones"), "ES message must use Spanish preamble");
+        assertTrue(msg.contains("<ol>"), "Message must contain an ordered list");
+        assertTrue(msg.contains("<li>Empadronamiento</li>"), "Message must list first title");
+        assertTrue(msg.contains("</ol>"), "Message must close the ordered list");
+    }
+
+    @Test
+    void buildProcedureClarificationMessage_english_containsNumberedList() {
+        var titles = java.util.List.of("Registration", "Certificate of residence");
+        String msg = builder.buildProcedureClarificationMessage(titles, "EN", "elprat");
+
+        assertTrue(msg.contains("I found several related options"), "EN message must use English preamble");
+        assertTrue(msg.contains("<ol>"), "Message must contain an ordered list");
+        assertTrue(msg.contains("<li>Registration</li>"), "Message must list first title");
+        assertTrue(msg.contains("</ol>"), "Message must close the ordered list");
+    }
+
+    @Test
+    void buildProcedureClarificationMessage_emptyList_returnsEmptyString() {
+        assertEquals("", builder.buildProcedureClarificationMessage(java.util.List.of(), "CA", "elprat"),
+                "Empty candidate list must return empty string");
+        assertEquals("", builder.buildProcedureClarificationMessage(null, "ES", "elprat"),
+                "Null candidate list must return empty string");
+    }
 }

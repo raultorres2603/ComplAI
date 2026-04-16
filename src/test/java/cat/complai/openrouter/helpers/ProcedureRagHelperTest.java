@@ -1,5 +1,6 @@
 package cat.complai.openrouter.helpers;
 
+import cat.complai.openrouter.helpers.rag.InMemoryLexicalIndex;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -210,5 +211,14 @@ class ProcedureRagHelperTest {
 
         // steps field was removed from SEARCH_FIELDS but stored
         assertNotNull(proc.steps, "steps field should be accessible");
+    }
+
+    @Test
+    void searchWithScores_returnsNonEmptyWithScores_forMatchingQuery() {
+        InMemoryLexicalIndex.SearchResponse<ProcedureRagHelper.Procedure> response =
+                procedureRagHelper.searchWithScores("recycling");
+
+        assertFalse(response.results().isEmpty(), "Should return at least one result for matching query");
+        assertTrue(response.bestScore() > 0, "Best score should be positive for a matching query");
     }
 }

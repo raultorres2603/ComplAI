@@ -10,6 +10,10 @@ import cat.complai.openrouter.helpers.NewsRagHelperRegistry;
 import cat.complai.openrouter.helpers.ProcedureRagHelper;
 import cat.complai.openrouter.helpers.ProcedureRagHelperRegistry;
 import cat.complai.openrouter.helpers.RedactPromptBuilder;
+import cat.complai.openrouter.helpers.rag.AmbiguityDetector;
+import cat.complai.openrouter.helpers.rag.InMemoryLexicalIndex;
+import cat.complai.openrouter.helpers.rag.RagJavaCalibration;
+import cat.complai.openrouter.services.conversation.ConversationManagementService;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import java.util.ArrayList;
@@ -19,6 +23,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -266,6 +271,9 @@ public class ProcedureContextService {
         }
     }
 
+    public record ProcedureAmbiguityResult(
+            List<ConversationManagementService.ClarificationCandidate> candidates) {}
+
     /**
      * Captures which RAG context domains are required for a given query.
      */
@@ -507,6 +515,52 @@ public class ProcedureContextService {
         } catch (Exception e) {
             logger.log(Level.WARNING, "Failed to build procedure context result for city=" + cityId
                     + "; returning empty context: " + e.getMessage(), e);
+            return new ProcedureContextResult(null, List.of());
+        }
+    }
+
+    public Optional<ProcedureAmbiguityResult> detectProcedureAmbiguity(String question, String cityId) {
+        try {
+            if (question == null || question.isBlank()) {
+                return Optional.empty();
+            }
+            if (!detectContextRequirements(question, cityId).needsProcedureContext()) {
+                return Optional.empty();
+            }
+            InMemoryLexicalIndex.SearchResponse<ProcedureRagHelper.Procedure> response =
+                    ragRegistry.getForCity(cityId).searchWithScores(question);
+            if (!AmbiguityDetector.isAmbiguous(response, RagJavaCalibration.procedure().absoluteFloor())) {
+                return Optional.empty();
+            }
+            List<ConversationManagementService.ClarificationCandidate> candidates =
+                    AmbiguityDetector.getTopCandidates(response, 3).stream()
+                            .map(sr -> new ConversationManagementService.ClarificationCandidate(
+                                    sr.source().procedureId, sr.source().title))
+                            .toList();
+            return Optional.of(new ProcedureAmbiguityResult(candidates));
+        } catch (Exception e) {
+            logger.log(Level.WARNING, "detectProcedureAmbiguity failed for city=" + cityId
+                    + ": " + e.getMessage(), e);
+            return Optional.empty();
+        }
+    }
+
+    public ProcedureContextResult buildProcedureContextResultForId(String procedureId, String cityId) {
+        try {
+            ProcedureRagHelper.Procedure procedure = ragRegistry.getForCity(cityId).getAllProcedures()
+                    .stream()
+                    .filter(p -> procedureId.equals(p.procedureId))
+                    .findFirst()
+                    .orElse(null);
+            if (procedure == null) {
+                return new ProcedureContextResult(null, List.of());
+            }
+            String contextBlock = promptBuilder.buildProcedureContextBlockFromMatches(List.of(procedure), cityId);
+            List<Source> sources = List.of(new Source(procedure.url, procedure.title));
+            return new ProcedureContextResult(contextBlock, sources);
+        } catch (Exception e) {
+            logger.log(Level.WARNING, "buildProcedureContextResultForId failed for procedureId=" + procedureId
+                    + " city=" + cityId + ": " + e.getMessage(), e);
             return new ProcedureContextResult(null, List.of());
         }
     }

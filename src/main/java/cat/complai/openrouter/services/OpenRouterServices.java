@@ -35,6 +35,7 @@ import reactor.core.publisher.Flux;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.text.Normalizer;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -115,6 +116,49 @@ public class OpenRouterServices implements IOpenRouterService {
         // Use Java's default hashCode (not cryptographically secure, but good for
         // caching)
         return sb.toString().hashCode();
+    }
+
+    private static OptionalInt resolveClarificationAnswer(
+            String answer, List<ConversationManagementService.ClarificationCandidate> candidates) {
+        if (answer == null || answer.isBlank() || candidates == null || candidates.isEmpty()) {
+            return OptionalInt.empty();
+        }
+        String normalized = Normalizer.normalize(answer.toLowerCase(Locale.ROOT), Normalizer.Form.NFD)
+                .replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
+
+        String trimmed = normalized.trim();
+        if (trimmed.length() == 1) {
+            char c = trimmed.charAt(0);
+            if (c >= '1' && c <= '9') {
+                int idx = c - '1';
+                if (idx < candidates.size()) {
+                    return OptionalInt.of(idx);
+                }
+            }
+        }
+
+        Map<String, Integer> ordinals = new HashMap<>();
+        ordinals.putAll(Map.of("primer", 0, "primera", 0, "first", 0, "1st", 0, "un", 0,
+                "segon", 1, "segunda", 1, "second", 1, "2nd", 1, "dos", 1));
+        ordinals.putAll(Map.of("tercer", 2, "tercera", 2, "third", 2, "3rd", 2, "tres", 2));
+        for (Map.Entry<String, Integer> entry : ordinals.entrySet()) {
+            if (normalized.contains(entry.getKey()) && entry.getValue() < candidates.size()) {
+                return OptionalInt.of(entry.getValue());
+            }
+        }
+
+        for (int i = 0; i < candidates.size(); i++) {
+            String title = candidates.get(i).title();
+            if (title != null) {
+                String normalizedTitle = Normalizer.normalize(title.toLowerCase(Locale.ROOT), Normalizer.Form.NFD)
+                        .replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
+                if (normalized.contains(normalizedTitle)) {
+                    return OptionalInt.of(i);
+                }
+            }
+        }
+
+        return OptionalInt.empty();
     }
 
     /**
@@ -199,6 +243,77 @@ public class OpenRouterServices implements IOpenRouterService {
                     cityId);
             return new OpenRouterResponseDto(true, clarificationMessage, null, 200, OpenRouterErrorCode.NONE, null,
                     List.of());
+        }
+
+        if (conversationId != null && !conversationId.isBlank()) {
+            List<ConversationManagementService.ClarificationCandidate> pending =
+                conversationService.getPendingClarification(conversationId);
+            if (pending != null && !pending.isEmpty()) {
+                conversationService.clearPendingClarification(conversationId);
+                OptionalInt resolved = resolveClarificationAnswer(question, pending);
+                if (resolved.isPresent()) {
+                    ConversationManagementService.ClarificationCandidate chosen =
+                        pending.get(resolved.getAsInt());
+                    ProcedureContextResult resolvedCtx =
+                        procedureContextService.buildProcedureContextResultForId(
+                            chosen.procedureId(), cityId);
+                    List<Map<String, Object>> resolvedMessages = new ArrayList<>();
+                    resolvedMessages.add(Map.of("role", "system", "content",
+                        promptBuilder.getSystemMessage(cityId, detectedLanguage)));
+                    if (resolvedCtx != null && resolvedCtx.getContextBlock() != null) {
+                        resolvedMessages.add(Map.of("role", "system", "content", resolvedCtx.getContextBlock()));
+                    }
+                    var resolvedHistory = conversationService.getConversationHistory(conversationId);
+                    conversationService.addToMessages(resolvedMessages, resolvedHistory);
+                    resolvedMessages.add(Map.of("role", "user",
+                        "content", question != null ? question.trim() : ""));
+                    long resolvedProcHash = computeSourcesHash(
+                        resolvedCtx != null ? resolvedCtx.getSources() : List.of());
+                    OpenRouterResponseDto resolvedResponse =
+                        aiResponseService.callOpenRouterAndExtract(
+                            resolvedMessages, cityId, resolvedProcHash, 0L);
+                    List<Source> resolvedSources = new ArrayList<>();
+                    validateAndAddSources(resolvedSources,
+                        resolvedCtx != null ? resolvedCtx.getSources() : null, "procedure");
+                    if (resolvedResponse.isSuccess() && !resolvedSources.isEmpty()) {
+                        List<Source> finalSources =
+                            procedureContextService.deDuplicateAndOrderSources(resolvedSources);
+                        resolvedResponse = new OpenRouterResponseDto(
+                            resolvedResponse.isSuccess(), resolvedResponse.getMessage(),
+                            resolvedResponse.getError(), resolvedResponse.getStatusCode(),
+                            resolvedResponse.getErrorCode(), resolvedResponse.getPdfData(),
+                            finalSources);
+                    }
+                    if (resolvedResponse.getMessage() != null) {
+                        conversationService.updateConversationHistory(
+                            conversationId, question, resolvedResponse.getMessage());
+                    }
+                    log.info("ask() clarification resolved — conversationId={} procedureId={}",
+                        conversationId, chosen.procedureId());
+                    return resolvedResponse;
+                }
+                // Resolution failed: fall through to normal RAG (cache already cleared)
+                log.info("ask() clarification unresolvable — falling back to normal RAG conversationId={}",
+                    conversationId);
+            }
+        }
+
+        if (conversationId != null && !conversationId.isBlank()) {
+            Optional<ProcedureContextService.ProcedureAmbiguityResult> ambiguity =
+                procedureContextService.detectProcedureAmbiguity(question, cityId);
+            if (ambiguity.isPresent()) {
+                List<ConversationManagementService.ClarificationCandidate> candidates =
+                    ambiguity.get().candidates();
+                conversationService.storePendingClarification(conversationId, candidates);
+                List<String> titles = candidates.stream().map(c -> c.title()).toList();
+                String clarificationMsg = promptBuilder.buildProcedureClarificationMessage(
+                    titles, detectedLanguage, cityId);
+                conversationService.updateConversationHistory(conversationId, question, clarificationMsg);
+                log.info("ask() procedure ambiguity clarification triggered — conversationId={} candidateCount={}",
+                    conversationId, candidates.size());
+                return new OpenRouterResponseDto(true, clarificationMsg, null, 200,
+                    OpenRouterErrorCode.NONE, null, List.of());
+            }
         }
 
         messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage(cityId, detectedLanguage)));
@@ -440,6 +555,127 @@ public class OpenRouterServices implements IOpenRouterService {
             log.info("streamAsk() event date-window clarification triggered - conversationId={} city={}",
                     conversationId, cityId);
             return buildFallbackStreamResult(clarificationMessage, conversationId, question);
+        }
+
+        if (conversationId != null && !conversationId.isBlank()) {
+            List<ConversationManagementService.ClarificationCandidate> streamPending =
+                conversationService.getPendingClarification(conversationId);
+            if (streamPending != null && !streamPending.isEmpty()) {
+                conversationService.clearPendingClarification(conversationId);
+                OptionalInt streamResolved = resolveClarificationAnswer(question, streamPending);
+                if (streamResolved.isPresent()) {
+                    ConversationManagementService.ClarificationCandidate streamChosen =
+                        streamPending.get(streamResolved.getAsInt());
+                    ProcedureContextResult streamResolvedCtx =
+                        procedureContextService.buildProcedureContextResultForId(
+                            streamChosen.procedureId(), cityId);
+                    List<Map<String, Object>> streamResolvedMsgs = new ArrayList<>();
+                    streamResolvedMsgs.add(Map.of("role", "system", "content",
+                        promptBuilder.getSystemMessage(cityId, detectedLanguage)));
+                    if (streamResolvedCtx != null && streamResolvedCtx.getContextBlock() != null) {
+                        streamResolvedMsgs.add(Map.of("role", "system", "content",
+                            streamResolvedCtx.getContextBlock()));
+                    }
+                    var streamResolvedHistory = conversationService.getConversationHistory(conversationId);
+                    conversationService.addToMessages(streamResolvedMsgs, streamResolvedHistory);
+                    streamResolvedMsgs.add(Map.of("role", "user",
+                        "content", question != null ? question.trim() : ""));
+
+                    List<Source> streamResolvedSrcs = new ArrayList<>();
+                    validateAndAddSources(streamResolvedSrcs,
+                        streamResolvedCtx != null ? streamResolvedCtx.getSources() : null, "procedure");
+                    List<SseSources> streamResolvedAllSources = streamResolvedSrcs.stream()
+                        .map(s -> new SseSources(s.getTitle(), s.getUrl()))
+                        .collect(Collectors.toList());
+
+                    final String srCapturedQuestion = question;
+                    final String srCapturedConvId = conversationId;
+                    final StringBuilder srAssembled = new StringBuilder();
+                    final java.util.concurrent.atomic.AtomicBoolean srHasEmitted =
+                        new java.util.concurrent.atomic.AtomicBoolean(false);
+
+                    log.info("streamAsk() clarification resolved — conversationId={} procedureId={}",
+                        conversationId, streamChosen.procedureId());
+
+                    OpenRouterStreamStartResult srStreamStart =
+                        httpWrapper.streamFromOpenRouter(streamResolvedMsgs);
+                    if (srStreamStart instanceof OpenRouterStreamStartResult.Error srErr) {
+                        return new AskStreamResult.Error(AskStreamErrorMapper.toResponseDto(srErr.failure()));
+                    }
+                    Publisher<String> srStream =
+                        ((OpenRouterStreamStartResult.Success) srStreamStart).stream();
+                    return new AskStreamResult.Success(Flux.from(srStream)
+                        .handle((raw, sink) -> {
+                            SseChunkParser.ParseResult parsed = SseChunkParser.parseLine(raw);
+                            if (parsed.state() == SseChunkParser.ParseState.MALFORMED) {
+                                sink.error(new IllegalStateException("Malformed upstream stream chunk"));
+                                return;
+                            }
+                            if (parsed.state() == SseChunkParser.ParseState.DELTA && parsed.delta() != null
+                                    && !parsed.delta().isEmpty()) {
+                                sink.next(parsed.delta());
+                            }
+                        })
+                        .cast(String.class)
+                        .doOnNext(delta -> {
+                            srAssembled.append(delta);
+                            srHasEmitted.set(true);
+                        })
+                        .map(delta -> {
+                            try {
+                                SseChunkEvent chunkEvt = new SseChunkEvent(delta);
+                                return objectMapper.writeValueAsString(chunkEvt);
+                            } catch (Exception e) {
+                                log.error("Failed to serialize resolved chunk", e);
+                                throw new RuntimeException("Chunk serialization failed", e);
+                            }
+                        })
+                        .concatWith(produceSourcesAndDone(streamResolvedAllSources, srCapturedConvId))
+                        .doOnComplete(() -> {
+                            String fullText = srAssembled.toString();
+                            if (srCapturedConvId != null && !srCapturedConvId.isBlank() && !fullText.isBlank()) {
+                                conversationService.updateConversationHistory(
+                                    srCapturedConvId, srCapturedQuestion, fullText);
+                            }
+                            log.info("streamAsk() resolved clarification completed — conversationId={}",
+                                srCapturedConvId);
+                        })
+                        .doOnError(e -> log.error(
+                            "streamAsk() error during resolved streaming — conversationId={}", srCapturedConvId, e))
+                        .onErrorResume(e -> {
+                            if (!srHasEmitted.get()) {
+                                return Flux.error(e);
+                            }
+                            try {
+                                SseErrorEvent errorEvent = AskStreamErrorMapper.toSseErrorEvent(e);
+                                String json = objectMapper.writeValueAsString(errorEvent);
+                                return Flux.just(json);
+                            } catch (Exception serEx) {
+                                log.error("streamAsk() failed to serialize resolved error event", serEx);
+                                return Flux.empty();
+                            }
+                        }));
+                }
+                // Resolution failed: fall through to normal RAG (cache already cleared)
+                log.info("streamAsk() clarification unresolvable — falling back to normal RAG conversationId={}",
+                    conversationId);
+            }
+        }
+
+        if (conversationId != null && !conversationId.isBlank()) {
+            Optional<ProcedureContextService.ProcedureAmbiguityResult> ambiguity =
+                procedureContextService.detectProcedureAmbiguity(question, cityId);
+            if (ambiguity.isPresent()) {
+                List<ConversationManagementService.ClarificationCandidate> candidates =
+                    ambiguity.get().candidates();
+                conversationService.storePendingClarification(conversationId, candidates);
+                List<String> titles = candidates.stream().map(c -> c.title()).toList();
+                String clarificationMsg = promptBuilder.buildProcedureClarificationMessage(
+                    titles, detectedLanguage, cityId);
+                log.info("streamAsk() procedure ambiguity clarification triggered — conversationId={} candidateCount={}",
+                    conversationId, candidates.size());
+                return buildFallbackStreamResult(clarificationMsg, conversationId, question);
+            }
         }
 
         List<Map<String, Object>> messages = new ArrayList<>();
