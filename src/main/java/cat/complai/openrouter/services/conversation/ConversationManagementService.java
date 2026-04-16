@@ -37,6 +37,7 @@ public class ConversationManagementService {
     private final int maxHistoryTurns;
     private final Cache<String, List<MessageEntry>> conversationCache;
     private final Cache<String, String> pendingComplaintCache;
+    private final Cache<String, List<ClarificationCandidate>> pendingClarificationCache;
 
     /**
      * Constructs the service with a configurable maximum conversation history
@@ -53,6 +54,10 @@ public class ConversationManagementService {
                 .maximumSize(10000)
                 .build();
         this.pendingComplaintCache = Caffeine.newBuilder()
+                .expireAfterWrite(30, TimeUnit.MINUTES)
+                .maximumSize(10000)
+                .build();
+        this.pendingClarificationCache = Caffeine.newBuilder()
                 .expireAfterWrite(30, TimeUnit.MINUTES)
                 .maximumSize(10000)
                 .build();
@@ -161,6 +166,26 @@ public class ConversationManagementService {
         }
     }
 
+    public void storePendingClarification(String conversationId, List<ClarificationCandidate> candidates) {
+        if (conversationId == null || conversationId.isBlank() || candidates == null) {
+            return;
+        }
+        pendingClarificationCache.put(conversationId, candidates);
+    }
+
+    public List<ClarificationCandidate> getPendingClarification(String conversationId) {
+        if (conversationId == null || conversationId.isBlank()) {
+            return null;
+        }
+        return pendingClarificationCache.getIfPresent(conversationId);
+    }
+
+    public void clearPendingClarification(String conversationId) {
+        if (conversationId != null && !conversationId.isBlank()) {
+            pendingClarificationCache.invalidate(conversationId);
+        }
+    }
+
     /**
      * Appends each entry from {@code history} as a role/content map to
      * {@code messages}.
@@ -183,5 +208,8 @@ public class ConversationManagementService {
      * @param content the message text
      */
     public record MessageEntry(String role, String content) {
+    }
+
+    public record ClarificationCandidate(String procedureId, String title) {
     }
 }

@@ -69,6 +69,8 @@ class OpenRouterServicesOrchestrationTest {
                 when(validationService.validateQuestion(anyString())).thenReturn(Optional.empty());
                 when(procedureContextService.requiresEventDateWindowClarification(anyString(), eq("elprat")))
                                 .thenReturn(false);
+                when(procedureContextService.detectProcedureAmbiguity(anyString(), anyString()))
+                                .thenReturn(Optional.empty());
                 when(procedureContextService.deDuplicateAndOrderSources(anyList()))
                                 .thenAnswer(invocation -> invocation.getArgument(0));
                 when(promptBuilder.getSystemMessage(eq("elprat"), anyString())).thenReturn("system");

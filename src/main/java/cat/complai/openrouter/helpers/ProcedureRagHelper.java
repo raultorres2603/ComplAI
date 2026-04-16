@@ -156,18 +156,22 @@ public class ProcedureRagHelper {
     }
 
     public List<Procedure> search(String query) {
+        return searchWithScores(query).results().stream().map(SearchResult::source).toList();
+    }
+
+    public InMemoryLexicalIndex.SearchResponse<Procedure> searchWithScores(String query) {
         if (query == null || query.isBlank())
-            return Collections.emptyList();
+            return InMemoryLexicalIndex.SearchResponse.empty(javaCalibration.absoluteFloor(), javaCalibration.relativeFloor());
 
         QueryContext context = QueryPreprocessor.preprocess(query);
         if (context.tokens().isEmpty()) {
-            return Collections.emptyList();
+            return InMemoryLexicalIndex.SearchResponse.empty(javaCalibration.absoluteFloor(), javaCalibration.relativeFloor());
         }
 
         return runJavaSearch(context, query.length());
     }
 
-    private List<Procedure> runJavaSearch(QueryContext context, int rawQueryLength) {
+    private InMemoryLexicalIndex.SearchResponse<Procedure> runJavaSearch(QueryContext context, int rawQueryLength) {
         List<String> queryTokens = context.tokens();
         List<String> expandedTokens = DeterministicQueryExpansion.expandProcedureQueryTokens(
             queryTokens,
@@ -182,14 +186,10 @@ public class ProcedureRagHelper {
             context.detectedLanguage());
         long latencyMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos);
 
-        List<Procedure> results = response.results().stream()
-                .map(SearchResult::source)
-                .toList();
-
         logger.fine(() -> "RAG SEARCH — type=PROCEDURE cityId=" + cityId
                 + " engine=java queryLength=" + rawQueryLength
                 + " queryLanguage=" + context.detectedLanguage()
-                + " resultCount=" + results.size()
+                + " resultCount=" + response.results().size()
                 + " candidateCount=" + response.candidateCount()
                 + " filteredCount=" + response.filteredCount()
                 + " bestScore=" + response.bestScore()
@@ -198,7 +198,7 @@ public class ProcedureRagHelper {
                 + " relativeFloor=" + response.relativeFloor()
                 + " appliedThreshold=" + response.appliedThreshold()
                 + " latencyMs=" + latencyMs);
-        return results;
+        return response;
     }
 
     /**
