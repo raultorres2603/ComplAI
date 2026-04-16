@@ -7,6 +7,7 @@ import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 import java.io.InputStream;
+import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -195,7 +196,7 @@ public class RedactPromptBuilder {
             return getSystemMessage(cityId);
         }
         CityConfig cfg = resolveCityConfig(cityId);
-        return switch (language) {
+        return switch (normalizeLanguageCode(language)) {
             case "CA" -> buildCatalanBlock(cfg);
             case "ES" -> buildSpanishBlock(cfg);
             case "EN" -> buildEnglishBlock(cfg);
@@ -505,7 +506,7 @@ public class RedactPromptBuilder {
             return "";
         }
         String cityName = resolveCityDisplayName(cityId);
-        String preamble = switch (language == null ? "EN" : language) {
+        String preamble = switch (normalizeLanguageCode(language)) {
             case "CA" -> "Trobo diverses opcions relacionades a " + cityName + ". Podries indicar quina t'interessa?";
             case "ES" -> "Encuentro varias opciones relacionadas en " + cityName + ". \u00bfPodr\u00edas indicar cu\u00e1l te interesa?";
             case "FR" -> "J'ai trouv\u00e9 plusieurs options li\u00e9es \u00e0 " + cityName + ". Pourriez-vous pr\u00e9ciser laquelle vous int\u00e9resse\u00a0?";
@@ -517,6 +518,29 @@ public class RedactPromptBuilder {
         }
         ol.append("</ol>");
         return preamble + " " + ol;
+    }
+
+    public static String normalizeLanguageCode(String language) {
+        if (language == null || language.isBlank()) {
+            return "EN";
+        }
+
+        String normalized = Normalizer.normalize(language, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "")
+                .toLowerCase(Locale.ROOT)
+                .replace('_', '-')
+                .trim();
+
+        if (normalized.startsWith("es") || normalized.equals("spanish") || normalized.equals("castellano")) {
+            return "ES";
+        }
+        if (normalized.startsWith("ca") || normalized.equals("catalan") || normalized.equals("catala")) {
+            return "CA";
+        }
+        if (normalized.startsWith("fr") || normalized.equals("french") || normalized.equals("francais")) {
+            return "FR";
+        }
+        return "EN";
     }
 
     // -------------------------------------------------------------------------

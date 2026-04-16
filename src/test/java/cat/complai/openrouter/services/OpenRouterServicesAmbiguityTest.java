@@ -112,6 +112,43 @@ class OpenRouterServicesAmbiguityTest {
     }
 
     @Test
+    void ask_ambiguousQuery_spanishDetected_returnsSpanishClarification() {
+        List<ConversationManagementService.ClarificationCandidate> candidates = List.of(
+                new ConversationManagementService.ClarificationCandidate("proc-1", "Tarjeta de aparcamiento"),
+                new ConversationManagementService.ClarificationCandidate("proc-2", "Vado permanente"));
+        ProcedureContextService.ProcedureAmbiguityResult ambiguityResult =
+                new ProcedureContextService.ProcedureAmbiguityResult(candidates);
+
+        when(procedureContextService.detectProcedureAmbiguity(anyString(), anyString()))
+                .thenReturn(Optional.of(ambiguityResult));
+        when(promptBuilder.buildProcedureClarificationMessage(anyList(), eq("ES"), eq("elprat")))
+                .thenReturn("Encuentro varias opciones relacionadas en El Prat.");
+
+        OpenRouterResponseDto response = service.ask("necesito un tramite de aparcamiento", "conv-1", "elprat");
+
+        assertTrue(response.isSuccess());
+        assertTrue(response.getMessage().contains("Encuentro varias opciones"));
+        verify(promptBuilder).buildProcedureClarificationMessage(anyList(), eq("ES"), eq("elprat"));
+    }
+
+    @Test
+    void ask_ambiguityFilteredBelowThreshold_skipsClarificationStorageAndReturnsNormalResponse() {
+        when(procedureContextService.detectProcedureAmbiguity(anyString(), anyString()))
+                .thenReturn(Optional.empty());
+        when(procedureContextService.detectContextRequirements(anyString(), anyString()))
+                .thenReturn(ProcedureContextService.ContextRequirements.none());
+
+        OpenRouterResponseDto response = service.ask("tramite aparcamiento municipal", "conv-1", "elprat");
+
+        assertTrue(response.isSuccess());
+        assertTrue("ok".equals(response.getMessage()));
+        verify(conversationService, never()).storePendingClarification(anyString(), anyList());
+        verify(conversationService, never()).updateConversationHistory(eq("conv-1"), anyString(),
+                eq("Encuentro varias opciones relacionadas en El Prat."));
+        verify(aiResponseService).callOpenRouterAndExtract(anyList(), anyString(), anyLong(), anyLong());
+    }
+
+    @Test
     void streamAsk_ambiguousQuery_returnsFallbackStreamWithClarification() {
         List<ConversationManagementService.ClarificationCandidate> candidates = List.of(
                 new ConversationManagementService.ClarificationCandidate("proc-1", "Llicència d'obres menors"),

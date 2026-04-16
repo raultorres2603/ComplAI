@@ -190,10 +190,10 @@ class RedactPromptBuilderTest {
     }
 
     @Test
-    void getSystemMessage_withUnknownCode_fallsBackToTriLingual() {
-        String triLingual = builder.getSystemMessage("elprat");
+    void getSystemMessage_withUnknownCode_fallsBackToEnglishBlock() {
         String withXX = builder.getSystemMessage("elprat", "XX");
-        assertEquals(triLingual, withXX, "unrecognized language code must fall back to tri-lingual prompt");
+        String withEN = builder.getSystemMessage("elprat", "EN");
+        assertEquals(withEN, withXX, "unrecognized language code must normalize to English");
     }
 
     // -------------------------------------------------------------------------
@@ -222,6 +222,21 @@ class RedactPromptBuilderTest {
         assertTrue(msg.contains("<ol>"), "Message must contain an ordered list");
         assertTrue(msg.contains("<li>Empadronamiento</li>"), "Message must list first title");
         assertTrue(msg.contains("</ol>"), "Message must close the ordered list");
+    }
+
+    @Test
+    void buildProcedureClarificationMessage_spanishLanguageVariants_useSpanishPreamble() {
+        var titles = java.util.List.of("Tarjeta de aparcamiento", "Vado permanente");
+
+        String withShortCode = builder.buildProcedureClarificationMessage(titles, "es", "elprat");
+        String withLocaleCode = builder.buildProcedureClarificationMessage(titles, "es-ES", "elprat");
+        String withLanguageName = builder.buildProcedureClarificationMessage(titles, "Spanish", "elprat");
+        String withCastellano = builder.buildProcedureClarificationMessage(titles, "castellano", "elprat");
+
+        assertTrue(withShortCode.contains("Encuentro varias opciones"));
+        assertTrue(withLocaleCode.contains("Encuentro varias opciones"));
+        assertTrue(withLanguageName.contains("Encuentro varias opciones"));
+        assertTrue(withCastellano.contains("Encuentro varias opciones"));
     }
 
     @Test

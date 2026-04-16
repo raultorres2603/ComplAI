@@ -232,7 +232,8 @@ public class OpenRouterServices implements IOpenRouterService {
         }
 
         List<Map<String, Object>> messages = new ArrayList<>();
-        String detectedLanguage = cat.complai.openrouter.helpers.LanguageDetector.detect(question);
+        String detectedLanguage = RedactPromptBuilder.normalizeLanguageCode(
+                cat.complai.openrouter.helpers.LanguageDetector.detect(question));
 
         if (procedureContextService.requiresEventDateWindowClarification(question, cityId)) {
             String clarificationMessage = buildEventDateWindowClarificationMessage(detectedLanguage);
@@ -548,7 +549,7 @@ public class OpenRouterServices implements IOpenRouterService {
         }
 
         // 2. Single-language system message + RAG
-        String detectedLanguage = LanguageDetector.detect(question);
+        String detectedLanguage = RedactPromptBuilder.normalizeLanguageCode(LanguageDetector.detect(question));
 
         if (procedureContextService.requiresEventDateWindowClarification(question, cityId)) {
             String clarificationMessage = buildEventDateWindowClarificationMessage(detectedLanguage);

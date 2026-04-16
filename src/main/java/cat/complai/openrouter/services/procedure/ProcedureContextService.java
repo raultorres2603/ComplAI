@@ -13,6 +13,7 @@ import cat.complai.openrouter.helpers.RedactPromptBuilder;
 import cat.complai.openrouter.helpers.rag.AmbiguityDetector;
 import cat.complai.openrouter.helpers.rag.InMemoryLexicalIndex;
 import cat.complai.openrouter.helpers.rag.RagJavaCalibration;
+import cat.complai.openrouter.helpers.rag.TokenNormalizer;
 import cat.complai.openrouter.services.conversation.ConversationManagementService;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -534,9 +535,13 @@ public class ProcedureContextService {
             }
             List<ConversationManagementService.ClarificationCandidate> candidates =
                     AmbiguityDetector.getTopCandidates(response, 3).stream()
+                            .filter(sr -> isCandidateRelevantToQuery(sr.source(), question))
                             .map(sr -> new ConversationManagementService.ClarificationCandidate(
                                     sr.source().procedureId, sr.source().title))
                             .toList();
+            if (candidates.size() < 2) {
+                return Optional.empty();
+            }
             return Optional.of(new ProcedureAmbiguityResult(candidates));
         } catch (Exception e) {
             logger.log(Level.WARNING, "detectProcedureAmbiguity failed for city=" + cityId
@@ -934,6 +939,38 @@ public class ProcedureContextService {
             return "";
         }
         return value.strip().toLowerCase(Locale.ROOT);
+    }
+
+    private static boolean isCandidateRelevantToQuery(ProcedureRagHelper.Procedure procedure, String query) {
+        if (procedure == null || query == null || query.isBlank()) {
+            return false;
+        }
+
+        List<String> queryTokens = tokenizeForRelevance(query);
+        if (queryTokens.isEmpty()) {
+            return false;
+        }
+
+        Set<String> candidateTokens = new LinkedHashSet<>();
+        candidateTokens.addAll(tokenizeForRelevance(procedure.title));
+        candidateTokens.addAll(tokenizeForRelevance(procedure.description));
+
+        for (String token : queryTokens) {
+            if (candidateTokens.contains(token)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static List<String> tokenizeForRelevance(String text) {
+        if (text == null || text.isBlank()) {
+            return List.of();
+        }
+        return TokenNormalizer.tokenize(text).stream()
+                .filter(token -> token.length() >= 3)
+                .filter(token -> !TITLE_STOP_WORDS.contains(token))
+                .toList();
     }
 
     private static boolean containsAny(String normalizedQuestion, List<String> keywords) {

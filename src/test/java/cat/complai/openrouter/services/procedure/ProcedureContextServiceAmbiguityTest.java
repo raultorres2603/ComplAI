@@ -80,10 +80,10 @@ class ProcedureContextServiceAmbiguityTest {
     @Test
     void detectProcedureAmbiguity_returnsCandidates_whenScoresNearlyEqual() {
         ProcedureRagHelper.Procedure proc1 = new ProcedureRagHelper.Procedure(
-                "proc-1", "Llicència d'obres menors", "Description1", "Reqs1", "Steps1",
+                "proc-1", "Llicència d'obres menors", "permit request", "Reqs1", "Steps1",
                 "https://example.com/proc-1");
         ProcedureRagHelper.Procedure proc2 = new ProcedureRagHelper.Procedure(
-                "proc-2", "Llicència d'obres majors", "Description2", "Reqs2", "Steps2",
+                "proc-2", "Llicència d'obres majors", "permit application", "Reqs2", "Steps2",
                 "https://example.com/proc-2");
 
         // Nearly equal scores — ratio 0.92/0.95 ≈ 0.969 > default threshold 0.85
@@ -107,6 +107,66 @@ class ProcedureContextServiceAmbiguityTest {
         assertEquals("Llicència d'obres menors", candidates.get(0).title());
         assertEquals("proc-2", candidates.get(1).procedureId());
         assertEquals("Llicència d'obres majors", candidates.get(1).title());
+    }
+
+    @Test
+    void detectProcedureAmbiguity_filtersUnrelatedHousing_whenParkingCandidatesExist() {
+        ProcedureRagHelper.Procedure parkingA = new ProcedureRagHelper.Procedure(
+                "proc-parking-a", "Tarjeta de aparcamiento municipal", "Solicitud de aparcamiento", "", "",
+                "https://example.com/parking-a");
+        ProcedureRagHelper.Procedure housing = new ProcedureRagHelper.Procedure(
+                "proc-housing", "Ayudas de vivienda social", "Subvenciones de alquiler", "", "",
+                "https://example.com/housing");
+        ProcedureRagHelper.Procedure parkingB = new ProcedureRagHelper.Procedure(
+                "proc-parking-b", "Aparcamiento en avenida Verge de Montserrat", "Permiso para estacionar", "", "",
+                "https://example.com/parking-b");
+
+        InMemoryLexicalIndex.SearchResponse<ProcedureRagHelper.Procedure> response =
+                new InMemoryLexicalIndex.SearchResponse<>(
+                        List.of(
+                                new SearchResult<>(parkingA, 0.96, 0),
+                                new SearchResult<>(housing, 0.95, 1),
+                                new SearchResult<>(parkingB, 0.94, 2)),
+                        0, 3, 0.96, 0.15, 0.45, 0.15);
+
+        when(ragRegistry.getForCity(CITY)).thenReturn(procedureRagHelper);
+        when(procedureRagHelper.searchWithScores("tramite aparcamiento municipal avenida verge montserrat"))
+                .thenReturn(response);
+
+        Optional<ProcedureContextService.ProcedureAmbiguityResult> result =
+                service.detectProcedureAmbiguity("tramite aparcamiento municipal avenida verge montserrat", CITY);
+
+        assertTrue(result.isPresent());
+        List<ConversationManagementService.ClarificationCandidate> candidates = result.get().candidates();
+        assertEquals(2, candidates.size());
+        assertEquals("proc-parking-a", candidates.get(0).procedureId());
+        assertEquals("proc-parking-b", candidates.get(1).procedureId());
+    }
+
+    @Test
+    void detectProcedureAmbiguity_returnsEmpty_whenRelevanceFilteringLeavesSingleCandidate() {
+        ProcedureRagHelper.Procedure parking = new ProcedureRagHelper.Procedure(
+                "proc-parking", "Tarjeta de aparcamiento municipal", "Solicitud de aparcamiento", "", "",
+                "https://example.com/parking");
+        ProcedureRagHelper.Procedure housing = new ProcedureRagHelper.Procedure(
+                "proc-housing", "Ayudas de vivienda social", "Subvenciones de alquiler", "", "",
+                "https://example.com/housing");
+
+        InMemoryLexicalIndex.SearchResponse<ProcedureRagHelper.Procedure> response =
+                new InMemoryLexicalIndex.SearchResponse<>(
+                        List.of(
+                                new SearchResult<>(parking, 0.95, 0),
+                                new SearchResult<>(housing, 0.94, 1)),
+                        0, 2, 0.95, 0.15, 0.45, 0.15);
+
+        when(ragRegistry.getForCity(CITY)).thenReturn(procedureRagHelper);
+        when(procedureRagHelper.searchWithScores("tramite aparcamiento municipal"))
+                .thenReturn(response);
+
+        Optional<ProcedureContextService.ProcedureAmbiguityResult> result =
+                service.detectProcedureAmbiguity("tramite aparcamiento municipal", CITY);
+
+        assertTrue(result.isEmpty());
     }
 
     @Test
