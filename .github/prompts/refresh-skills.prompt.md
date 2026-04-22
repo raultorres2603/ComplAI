@@ -34,20 +34,16 @@ Collect ground truth from these sources in parallel:
 Read every file below so you know what they currently say:
 - `.github/copilot-instructions.md`
 - `.github/agents/builder.agent.md`
-- `.github/agents/planner.agent.md`
-- `.github/agents/reviewer.agent.md`
-- `.github/agents/documentator.agent.md`
 - `.github/agents/orchestrator.agent.md`
-- `.github/skills/builder/SKILL.md`
-- `.github/skills/builder/references/package-map.md`
-- `.github/skills/builder/references/conventions.md`
-- `.github/skills/builder/references/test-patterns.md`
-- `.github/skills/planner/SKILL.md`
-- `.github/skills/reviewer/SKILL.md`
-- `.github/skills/documentator/SKILL.md`
-- `.github/skills/documentator/references/source-map.md`
-- `.github/skills/documentator/references/readme-sections.md`
-- `.github/skills/orchestrator/SKILL.md`
+- `.github/skills/planning/SKILL.md`
+- `.github/skills/implementation/SKILL.md`
+- `.github/skills/implementation/references/package-map.md`
+- `.github/skills/implementation/references/conventions.md`
+- `.github/skills/implementation/references/test-patterns.md`
+- `.github/skills/review/SKILL.md`
+- `.github/skills/documentation/SKILL.md`
+- `.github/skills/documentation/references/source-map.md`
+- `.github/skills/documentation/references/readme-sections.md`
 
 ---
 
@@ -77,6 +73,7 @@ If the drift list is **empty**, stop here and report: "No drift detected — all
 For each item in the drift list, apply the minimum targeted edit to the appropriate file:
 
 ### `package-map.md` patches
+- File is at `.github/skills/implementation/references/package-map.md`.
 - Add a new row to the relevant table for each **NEW_PACKAGE**.
 - Remove or mark deprecated rows for each **REMOVED_PACKAGE**.
 - Update the "Key Classes" column if class names changed.
@@ -86,8 +83,8 @@ For each item in the drift list, apply the minimum targeted edit to the appropri
 - Do not change the Code Style section unless a convention actually changed in `src/`.
 
 ### Agent file patches (`.github/agents/*.agent.md`)
-- Update the **Tech Stack** bullet list in any agent file that lists libraries, if those libraries changed.
-- Update tool lists only if the agent's workflow changed.
+- Update only `builder.agent.md` and `orchestrator.agent.md`.
+- Update tool lists only if an agent's workflow changed.
 
 ### `source-map.md` patches
 - Add new CDK resources or `src/main/resources/` files.
