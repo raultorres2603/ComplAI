@@ -63,15 +63,15 @@ export class WafStack extends cdk.Stack {
     webAcl.node.addDependency(httpApi);
 
     const stageArn = cdk.Fn.join('', [
-  'arn:aws:apigatewayv2:',
-  this.region,
-  ':',
-  this.account,
-  ':api/',
-  httpApi.apiId,
-  '/stages/',
-  httpApi.defaultStage!.stageName,
-]);
+      'arn:aws:apigatewayv2:',
+      this.region,
+      ':',
+      this.account,
+      ':api/',
+      httpApi.apiId,
+      '/stages/',
+      httpApi.defaultStage!.stageName,
+    ]);
 
     new wafv2.CfnWebACLAssociation(this, `ComplAIWebACLAssociation-${environment}`, {
       resourceArn: stageArn,
