@@ -5,7 +5,7 @@ import { DeploymentEnvironment } from '../deployment-environment';
 import { StorageStack } from '../storage-stack';
 import { QueueStack } from '../queue-stack';
 import { LambdaStack } from '../lambda-stack';
-import { WafStack } from '../waf-stack';
+import { EdgeStack } from '../edge-stack';
 
 const app = new cdk.App();
 
@@ -51,17 +51,20 @@ for (const environment of environments) {
     redactQueue: queueStack.redactQueue,
     feedbackQueue: queueStack.feedbackQueue,
     env: awsEnv,
+    crossRegionReferences: true,
   });
   lambdaStack.addDependency(storageStack);
   lambdaStack.addDependency(queueStack);
 
   if (environment === 'production') {
-    const wafStack = new WafStack(app, `ComplAIWafStack-${environment}`, {
+    const edgeStack = new EdgeStack(app, `ComplAIEdgeStack-${environment}`, {
       environment,
-      httpApi: lambdaStack.httpApi,
-      env: awsEnv,
+      httpApiId: lambdaStack.httpApi.apiId,
+      httpApiRegion: awsEnv.region,
+      env: { account: awsEnv.account, region: 'us-east-1' },
+      crossRegionReferences: true,
     });
-    wafStack.addDependency(lambdaStack);
+    edgeStack.addDependency(lambdaStack);
   }
 }
 

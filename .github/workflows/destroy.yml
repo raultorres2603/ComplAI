@@ -1,0 +1,123 @@
+# Workflow for destroying CDK stacks for a selected environment.
+#
+# Triggers:
+#   - Manual (workflow_dispatch) ONLY. Never triggered automatically.
+#
+# Safety gates:
+#   1. The user must type the environment name exactly in the `confirm` input.
+#   2. For production, the GitHub Environment "production" requires a manual
+#      approval from a configured reviewer before the destroy job runs.
+#
+# Destroy order (reverse dependency order):
+#   1. ComplAIEdgeStack-<env>   (production only, us-east-1)
+#   2. ComplAILambdaStack-<env>
+#   3. ComplAIQueueStack-<env>
+#   4. ComplAIStorageStack-<env>
+name: Destroy CDK Stacks
+
+# Grant the workflow permission to request OIDC id-tokens and read repository contents.
+permissions:
+  id-token: write
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment to destroy'
+        required: true
+        type: choice
+        options:
+          - development
+          - production
+      confirm:
+        description: 'Type the environment name exactly to confirm destruction (e.g. production)'
+        required: true
+        type: string
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Guard: validate the confirmation input before anything irreversible happens.
+  # ---------------------------------------------------------------------------
+  guard:
+    name: Validate destruction inputs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check confirmation matches environment
+        run: |
+          if [ "${{ inputs.confirm }}" != "${{ inputs.environment }}" ]; then
+            echo "ERROR: Confirmation '${{ inputs.confirm }}' does not match environment '${{ inputs.environment }}'." >&2
+            echo "You must type the environment name exactly to confirm destruction." >&2
+            exit 1
+          fi
+          echo "WARNING: You are about to DESTROY all CDK stacks for '${{ inputs.environment }}'."
+          echo "This action is IRREVERSIBLE. Proceeding..."
+
+  # ---------------------------------------------------------------------------
+  # Destroy: tear down CDK stacks in reverse dependency order.
+  # Bound to the GitHub Environment so that production requires a manual approval
+  # (configure a required reviewer in Settings → Environments → production).
+  # ---------------------------------------------------------------------------
+  destroy:
+    name: Destroy ${{ inputs.environment }} stacks
+    needs: guard
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::134267836527:role/github-cdk-deploy-role
+          aws-region: eu-west-1
+          audience: sts.amazonaws.com
+          output-env-credentials: true
+
+      - name: Set up Node.js for CDK
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install AWS CDK CLI
+        run: npm install -g aws-cdk
+
+      - name: Install CDK dependencies
+        run: cd cdk && npm install
+
+      - name: Build CDK TypeScript
+        run: cd cdk && npm run build
+
+      # Destroy EdgeStack first (production only). This stack lives in us-east-1.
+      # --exclusively prevents CDK from attempting to destroy dependency stacks
+      # a second time when they are processed in subsequent steps.
+      - name: Destroy edge stack (production only)
+        if: inputs.environment == 'production'
+        env:
+          TARGET_ENV: ${{ inputs.environment }}
+        run: |
+          cd cdk
+          npx cdk destroy "ComplAIEdgeStack-${TARGET_ENV}" --force --exclusively
+
+      - name: Destroy lambda stack
+        env:
+          TARGET_ENV: ${{ inputs.environment }}
+        run: |
+          cd cdk
+          npx cdk destroy "ComplAILambdaStack-${TARGET_ENV}" --force
+
+      - name: Destroy queue stack
+        env:
+          TARGET_ENV: ${{ inputs.environment }}
+        run: |
+          cd cdk
+          npx cdk destroy "ComplAIQueueStack-${TARGET_ENV}" --force
+
+      - name: Destroy storage stack
+        env:
+          TARGET_ENV: ${{ inputs.environment }}
+        run: |
+          cd cdk
+          npx cdk destroy "ComplAIStorageStack-${TARGET_ENV}" --force

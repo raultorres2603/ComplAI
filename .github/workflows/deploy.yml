@@ -309,14 +309,15 @@ jobs:
             --require-approval never \
             --outputs-file "../cdk-outputs-${TARGET_ENV}.json"
 
-      - name: Deploy WAF stack
+      - name: Deploy Edge stack (CloudFront + WAF)
         if: steps.target.outputs.environment == 'production'
         env:
           TARGET_ENV: ${{ steps.target.outputs.environment }}
         run: |
           cd cdk
-          npx cdk deploy "ComplAIWafStack-${TARGET_ENV}" \
-            --require-approval never
+          npx cdk deploy "ComplAIEdgeStack-${TARGET_ENV}" \
+            --require-approval never \
+            --exclusively
 
       - name: Upload CDK outputs
         uses: actions/upload-artifact@v4
