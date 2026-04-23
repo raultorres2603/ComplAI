@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
-import { Construct } from 'constructs';
 import { DeploymentEnvironment } from '../deployment-environment';
 import { StorageStack } from '../storage-stack';
 import { QueueStack } from '../queue-stack';
