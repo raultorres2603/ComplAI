@@ -89,7 +89,7 @@ jobs:
           PROCEDURES_BUCKET: complai-procedures-${{ inputs.environment }}
         run: |
           java -cp build/libs/complai-all.jar \
-            cat.complai.scrapper.ProcedureScraper "${{ inputs.city }}"
+            cat.complai.utilities.scraper.ProcedureScraper "${{ inputs.city }}"
 
       # -----------------------------------------------------------------------
       # NEWS
@@ -110,7 +110,7 @@ jobs:
           NEWS_REGION: ${{ vars.NEWS_REGION }}
         run: |
           java -cp build/libs/complai-all.jar \
-            cat.complai.scrapper.NewsScraper "${{ inputs.city }}"
+            cat.complai.utilities.scraper.NewsScraper "${{ inputs.city }}"
 
       # -----------------------------------------------------------------------
       # EVENTS
@@ -130,7 +130,7 @@ jobs:
           EVENTS_BUCKET: complai-events-${{ inputs.environment }}
         run: |
           java -cp build/libs/complai-all.jar \
-            cat.complai.scrapper.EventScraper "${{ inputs.city }}"
+            cat.complai.utilities.scraper.EventScraper "${{ inputs.city }}"
 
       # -----------------------------------------------------------------------
       # CITYINFO
@@ -151,4 +151,4 @@ jobs:
           CITYINFO_REGION: ${{ vars.CITYINFO_REGION }}
         run: |
           java -cp build/libs/complai-all.jar \
-            cat.complai.scrapper.CityInfoScraper "${{ inputs.city }}"
+            cat.complai.utilities.scraper.CityInfoScraper "${{ inputs.city }}"
