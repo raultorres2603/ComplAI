@@ -7,7 +7,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
 /**
- * Thread-safe cache of per-city {@link NewsRagHelper} instances.
+ * Thread-safe cache of per-city {@link RagHelper} instances for city news.
  *
  * <p>
  * Building the in-memory retrieval index is expensive (S3 I/O + index
@@ -25,7 +25,7 @@ public class NewsRagHelperRegistry {
 
     private static final Logger logger = Logger.getLogger(NewsRagHelperRegistry.class.getName());
 
-    private final ConcurrentHashMap<String, NewsRagHelper> helpersByCity = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, RagHelper<RagHelper.News>> helpersByCity = new ConcurrentHashMap<>();
 
     /**
      * Constructs the registry.
@@ -35,22 +35,21 @@ public class NewsRagHelperRegistry {
     }
 
     /**
-     * Returns a cached {@link NewsRagHelper} for the given city, building it lazily
-     * on
-     * first access.
+     * Returns a cached {@link RagHelper} for the given city's news, building it
+     * lazily on first access.
      *
      * @param cityId the city identifier
      * @return the news RAG helper
      */
-    public NewsRagHelper getForCity(String cityId) {
+    public RagHelper<RagHelper.News> getForCity(String cityId) {
         return helpersByCity.computeIfAbsent(cityId, this::buildHelper);
     }
 
-    private NewsRagHelper buildHelper(String cityId) {
+    private RagHelper<RagHelper.News> buildHelper(String cityId) {
         long startTime = System.currentTimeMillis();
-        NewsRagHelper helper = new NewsRagHelper(cityId);
+        RagHelper<RagHelper.News> helper = RagHelper.forNews(cityId);
         long latency = System.currentTimeMillis() - startTime;
-        int newsCount = helper.getAllNews().size();
+        int newsCount = helper.getAll().size();
         logger.info(() -> "RAG INDEX BUILD - helper=NewsRagHelper cityId=" + cityId
                 + " latencyMs=" + latency + " news=" + newsCount);
         return helper;

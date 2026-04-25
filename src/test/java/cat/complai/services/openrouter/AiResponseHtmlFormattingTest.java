@@ -4,7 +4,7 @@ import cat.complai.utilities.http.HttpWrapper;
 import cat.complai.dto.http.HttpDto;
 import cat.complai.dto.openrouter.OpenRouterResponseDto;
 import cat.complai.helpers.openrouter.EventRagHelperRegistry;
-import cat.complai.helpers.openrouter.ProcedureRagHelper;
+import cat.complai.helpers.openrouter.RagHelper;
 import cat.complai.helpers.openrouter.ProcedureRagHelperRegistry;
 import cat.complai.helpers.openrouter.RedactPromptBuilder;
 import cat.complai.services.openrouter.ai.AiResponseProcessingService;
@@ -15,7 +15,6 @@ import cat.complai.services.openrouter.validation.InputValidationService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
@@ -50,21 +49,17 @@ public class AiResponseHtmlFormattingTest {
      */
     static class TestHtmlFormattingWrapper extends HttpWrapper {
         private String nextResponse = "Test response";
-        private List<ProcedureRagHelper.Procedure> fakeProcedures = List.of();
+        private List<RagHelper.Procedure> fakeProcedures = List.of();
 
         public final ProcedureRagHelperRegistry ragRegistry = new ProcedureRagHelperRegistry() {
             @Override
-            public ProcedureRagHelper getForCity(String cityId) {
-                try {
-                    return new ProcedureRagHelper(cityId) {
-                        @Override
-                        public List<ProcedureRagHelper.Procedure> search(String query) {
-                            return fakeProcedures;
-                        }
-                    };
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
+            public RagHelper<RagHelper.Procedure> getForCity(String cityId) {
+                return new RagHelper<>(cityId, RagHelper.procedureDomainConfig()) {
+                    @Override
+                    public List<RagHelper.Procedure> search(String query) {
+                        return fakeProcedures;
+                    }
+                };
             }
         };
 
@@ -72,7 +67,7 @@ public class AiResponseHtmlFormattingTest {
             this.nextResponse = response;
         }
 
-        public void setFakeProcedures(List<ProcedureRagHelper.Procedure> procs) {
+        public void setFakeProcedures(List<RagHelper.Procedure> procs) {
             this.fakeProcedures = procs;
         }
 

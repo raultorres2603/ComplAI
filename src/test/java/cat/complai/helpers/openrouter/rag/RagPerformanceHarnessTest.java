@@ -1,7 +1,6 @@
 package cat.complai.helpers.openrouter.rag;
 
-import cat.complai.helpers.openrouter.EventRagHelper;
-import cat.complai.helpers.openrouter.ProcedureRagHelper;
+import cat.complai.helpers.openrouter.RagHelper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -19,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class RagPerformanceHarnessTest {
 
     @Test
-    void reportsProcedureHelperLatency() throws IOException {
+    void reportsProcedureHelperLatency() {
         Metrics javaEngine = runProcedureMetrics();
 
         System.out.println("PERF procedure java initMs=" + javaEngine.initMs + " p50Ms=" + javaEngine.p50Ms + " p95Ms="
@@ -35,7 +34,7 @@ class RagPerformanceHarnessTest {
     }
 
     @Test
-    void reportsEventHelperLatency() throws IOException {
+    void reportsEventHelperLatency() {
         Metrics javaEngine = runEventMetrics();
 
         System.out.println("PERF event java initMs=" + javaEngine.initMs + " p50Ms=" + javaEngine.p50Ms + " p95Ms="
@@ -53,9 +52,9 @@ class RagPerformanceHarnessTest {
         assertTrue(javaEngine.p95Ms >= 0);
     }
 
-    private Metrics runProcedureMetrics() throws IOException {
+    private Metrics runProcedureMetrics() {
         long initStart = System.nanoTime();
-        ProcedureRagHelper helper = new ProcedureRagHelper("testcity");
+        RagHelper<RagHelper.Procedure> helper = RagHelper.forProcedures("testcity");
         long initMs = nanosToMs(System.nanoTime() - initStart);
 
         List<String> queries = List.of("recycling", "waste", "requirements", "steps", "municipal procedure");
@@ -74,9 +73,9 @@ class RagPerformanceHarnessTest {
         return toMetrics(initMs, latencies);
     }
 
-    private Metrics runEventMetrics() throws IOException {
+    private Metrics runEventMetrics() {
         long initStart = System.nanoTime();
-        EventRagHelper helper = new EventRagHelper("testcity");
+        RagHelper<RagHelper.Event> helper = RagHelper.forEvents("testcity");
         long initMs = nanosToMs(System.nanoTime() - initStart);
 
         List<String> queries = List.of("festival", "cinema", "concert", "cultural", "kids");
@@ -116,7 +115,7 @@ class RagPerformanceHarnessTest {
     }
 
     @Test
-    void reportsBenchmarkGateMetrics() throws IOException {
+    void reportsBenchmarkGateMetrics() throws java.io.IOException {
         List<BenchmarkEntry> all = loadBenchmarkManifest();
         List<BenchmarkEntry> procAll = all.stream().filter(e -> "procedure".equals(e.domain())).toList();
         List<BenchmarkEntry> evAll = all.stream().filter(e -> "event".equals(e.domain())).toList();
@@ -125,8 +124,8 @@ class RagPerformanceHarnessTest {
         List<BenchmarkEntry> evTune = evAll.stream().filter(e -> "tune".equals(e.split())).toList();
         List<BenchmarkEntry> evHoldout = evAll.stream().filter(e -> "holdout".equals(e.split())).toList();
 
-        ProcedureRagHelper procJava = new ProcedureRagHelper("testcity");
-        EventRagHelper evJava = new EventRagHelper("testcity");
+        RagHelper<RagHelper.Procedure> procJava = RagHelper.forProcedures("testcity");
+        RagHelper<RagHelper.Event> evJava = RagHelper.forEvents("testcity");
 
         LabeledMetrics procLabeledTune = computeLabeledMetrics(procTune,
                 q -> procJava.search(q).stream().map(r -> r.procedureId).limit(3).toList());

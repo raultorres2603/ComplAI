@@ -4,26 +4,25 @@ import cat.complai.helpers.openrouter.rag.InMemoryLexicalIndex;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class ProcedureRagHelperTest {
 
-    private ProcedureRagHelper procedureRagHelper;
+    private RagHelper<RagHelper.Procedure> procedureRagHelper;
 
     @BeforeEach
-    void setup() throws IOException {
+    void setup() {
         // Use testcity which currently ships 2 procedures in procedures-testcity.json
-        procedureRagHelper = new ProcedureRagHelper("testcity");
+        procedureRagHelper = RagHelper.forProcedures("testcity");
     }
 
     @Test
     void search_returnsMaxThreeResults() {
         // Broad query that should match procedures
         String query = "waste recycling";
-        List<ProcedureRagHelper.Procedure> results = procedureRagHelper.search(query);
+        List<RagHelper.Procedure> results = procedureRagHelper.search(query);
 
         assertTrue(results.size() <= 3, "Should return at most 3 results, but got " + results.size());
     }
@@ -32,7 +31,7 @@ class ProcedureRagHelperTest {
     void search_fewerResultsIfFewMatches() {
         // Query matching only recycling/waste-specific procedures
         String query = "recycling center waste management";
-        List<ProcedureRagHelper.Procedure> results = procedureRagHelper.search(query);
+        List<RagHelper.Procedure> results = procedureRagHelper.search(query);
 
         // Should return results respecting max 3 limit
         assertTrue(results.size() <= 3, "Should respect max 3 limit");
@@ -40,35 +39,35 @@ class ProcedureRagHelperTest {
 
     @Test
     void search_emptyQuery_returnsEmpty() {
-        List<ProcedureRagHelper.Procedure> results = procedureRagHelper.search("");
+        List<RagHelper.Procedure> results = procedureRagHelper.search("");
         assertTrue(results.isEmpty(), "Empty query should return empty list");
     }
 
     @Test
     void search_nullQuery_returnsEmpty() {
-        List<ProcedureRagHelper.Procedure> results = procedureRagHelper.search(null);
+        List<RagHelper.Procedure> results = procedureRagHelper.search(null);
         assertTrue(results.isEmpty(), "Null query should return empty list");
     }
 
     @Test
     void getAllProcedures_returnsFull() {
-        List<ProcedureRagHelper.Procedure> allProcedures = procedureRagHelper.getAllProcedures();
+        List<RagHelper.Procedure> allProcedures = procedureRagHelper.getAll();
 
         // Should return all procedures from the current test fixture (unrestricted)
-        assertEquals(2, allProcedures.size(), "getAllProcedures() should return all procedures");
+        assertEquals(2, allProcedures.size(), "getAll() should return all procedures");
     }
 
     @Test
     void search_returnsTopResultsByRelevance() {
         // Specific query that should match procedures
         String query = "requirements steps documentation";
-        List<ProcedureRagHelper.Procedure> results = procedureRagHelper.search(query);
+        List<RagHelper.Procedure> results = procedureRagHelper.search(query);
 
         assertTrue(results.size() <= 3, "Should return at most 3 results");
 
         // Results should be properly structured
         if (!results.isEmpty()) {
-            for (ProcedureRagHelper.Procedure proc : results) {
+            for (RagHelper.Procedure proc : results) {
                 assertNotNull(proc.procedureId);
                 assertNotNull(proc.title);
                 assertFalse(proc.procedureId.isBlank());
@@ -80,10 +79,10 @@ class ProcedureRagHelperTest {
     @Test
     void search_preserves_procedureFields() {
         String query = "recycling";
-        List<ProcedureRagHelper.Procedure> results = procedureRagHelper.search(query);
+        List<RagHelper.Procedure> results = procedureRagHelper.search(query);
 
         assertTrue(results.size() > 0, "Should find recycling procedure");
-        ProcedureRagHelper.Procedure procedure = results.get(0);
+        RagHelper.Procedure procedure = results.get(0);
 
         // Verify all important fields are preserved
         assertNotNull(procedure.procedureId);
@@ -97,7 +96,7 @@ class ProcedureRagHelperTest {
     void search_respects_maxThreeLimit_evenWithBroadQuery() {
         // Query that might match all available procedures and more
         String query = "procedure steps requirements";
-        List<ProcedureRagHelper.Procedure> results = procedureRagHelper.search(query);
+        List<RagHelper.Procedure> results = procedureRagHelper.search(query);
 
         // Should never exceed MAX_RESULTS of 3
         assertTrue(results.size() <= 3, "Should never exceed MAX_RESULTS of 3");
@@ -105,7 +104,7 @@ class ProcedureRagHelperTest {
 
     @Test
     void search_javaEngine_returnsRelevantResults() {
-        List<ProcedureRagHelper.Procedure> results = procedureRagHelper.search("recycling");
+        List<RagHelper.Procedure> results = procedureRagHelper.search("recycling");
 
         assertFalse(results.isEmpty());
         assertTrue(results.size() <= 3);
@@ -114,17 +113,17 @@ class ProcedureRagHelperTest {
 
     @Test
     void search_javaEngine_handlesAccentAndWhitespaceNormalization() {
-        List<ProcedureRagHelper.Procedure> results = procedureRagHelper.search("  tràmit   recycling  ");
+        List<RagHelper.Procedure> results = procedureRagHelper.search("  tràmit   recycling  ");
 
         assertFalse(results.isEmpty());
         assertEquals("p1", results.get(0).procedureId);
     }
 
     @Test
-    void search_isDeterministicAcrossHelperInstances() throws IOException {
-        ProcedureRagHelper secondHelper = new ProcedureRagHelper("testcity");
-        List<ProcedureRagHelper.Procedure> firstResults = procedureRagHelper.search("waste recycling");
-        List<ProcedureRagHelper.Procedure> secondResults = secondHelper.search("waste recycling");
+    void search_isDeterministicAcrossHelperInstances() {
+        RagHelper<RagHelper.Procedure> secondHelper = RagHelper.forProcedures("testcity");
+        List<RagHelper.Procedure> firstResults = procedureRagHelper.search("waste recycling");
+        List<RagHelper.Procedure> secondResults = secondHelper.search("waste recycling");
 
         assertEquals(firstResults.size(), secondResults.size());
         if (!firstResults.isEmpty()) {
@@ -143,7 +142,7 @@ class ProcedureRagHelperTest {
         // Fields like 'requirements' and 'steps' are stored but not searched
 
         String queryTitle = "recycling";
-        List<ProcedureRagHelper.Procedure> resultsFromTitle = procedureRagHelper.search(queryTitle);
+        List<RagHelper.Procedure> resultsFromTitle = procedureRagHelper.search(queryTitle);
         assertTrue(resultsFromTitle.size() > 0, "Should find procedures matching title field");
     }
 
@@ -153,10 +152,10 @@ class ProcedureRagHelperTest {
         // description (1.0)
 
         String query = "recycling";
-        List<ProcedureRagHelper.Procedure> results = procedureRagHelper.search(query);
+        List<RagHelper.Procedure> results = procedureRagHelper.search(query);
 
         if (!results.isEmpty()) {
-            ProcedureRagHelper.Procedure firstResult = results.get(0);
+            RagHelper.Procedure firstResult = results.get(0);
             // Top result should be most relevant (likely title match due to boost)
             assertTrue(firstResult.title.toLowerCase().contains("recycling")
                     || firstResult.description.toLowerCase().contains("recycling"),
@@ -169,13 +168,13 @@ class ProcedureRagHelperTest {
         // Step 2 validation: Verify that MIN_RELEVANCE_SCORE threshold is applied
 
         String query = "waste";
-        List<ProcedureRagHelper.Procedure> results = procedureRagHelper.search(query);
+        List<RagHelper.Procedure> results = procedureRagHelper.search(query);
 
         // Results should all have relevance above the threshold
         assertTrue(results.size() <= 3, "Relevance filtering should limit results to MAX_RESULTS=3");
 
         // All results should match the query with reasonable relevance
-        for (ProcedureRagHelper.Procedure proc : results) {
+        for (RagHelper.Procedure proc : results) {
             assertTrue(
                     proc.title.toLowerCase().contains("waste") ||
                             proc.description.toLowerCase().contains("waste"),
@@ -190,10 +189,10 @@ class ProcedureRagHelperTest {
         // This validates the Conservative implementation (Store.YES for removed fields)
 
         String query = "recycling";
-        List<ProcedureRagHelper.Procedure> results = procedureRagHelper.search(query);
+        List<RagHelper.Procedure> results = procedureRagHelper.search(query);
 
         assertTrue(results.size() > 0, "Should find recycling procedure");
-        ProcedureRagHelper.Procedure proc = results.get(0);
+        RagHelper.Procedure proc = results.get(0);
 
         // requirements field was removed from SEARCH_FIELDS but stored
         assertNotNull(proc.requirements, "requirements field should be accessible");
@@ -204,10 +203,10 @@ class ProcedureRagHelperTest {
         // Step 1 validation: Steps field should still be accessible
 
         String query = "recycling";
-        List<ProcedureRagHelper.Procedure> results = procedureRagHelper.search(query);
+        List<RagHelper.Procedure> results = procedureRagHelper.search(query);
 
         assertTrue(results.size() > 0, "Should find recycling procedure");
-        ProcedureRagHelper.Procedure proc = results.get(0);
+        RagHelper.Procedure proc = results.get(0);
 
         // steps field was removed from SEARCH_FIELDS but stored
         assertNotNull(proc.steps, "steps field should be accessible");
@@ -215,7 +214,7 @@ class ProcedureRagHelperTest {
 
     @Test
     void searchWithScores_returnsNonEmptyWithScores_forMatchingQuery() {
-        InMemoryLexicalIndex.SearchResponse<ProcedureRagHelper.Procedure> response =
+        InMemoryLexicalIndex.SearchResponse<RagHelper.Procedure> response =
                 procedureRagHelper.searchWithScores("recycling");
 
         assertFalse(response.results().isEmpty(), "Should return at least one result for matching query");

@@ -1,28 +1,28 @@
 package cat.complai.helpers.openrouter;
 
+import cat.complai.helpers.openrouter.RagHelper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class EventRagHelperTest {
 
-    private EventRagHelper eventRagHelper;
+    private RagHelper<RagHelper.Event> eventRagHelper;
 
     @BeforeEach
-    void setup() throws IOException {
+    void setup() {
         // Use testcity which currently ships 5 events in events-testcity.json
-        eventRagHelper = new EventRagHelper("testcity");
+        eventRagHelper = RagHelper.forEvents("testcity");
     }
 
     @Test
     void search_returnsMaxThreeResults() {
         // Broad query that should match multiple events
         String query = "festival concert event";
-        List<EventRagHelper.Event> results = eventRagHelper.search(query);
+        List<RagHelper.Event> results = eventRagHelper.search(query);
 
         assertTrue(results.size() <= 3, "Should return at most 3 results, but got " + results.size());
     }
@@ -31,7 +31,7 @@ class EventRagHelperTest {
     void search_fewerResultsIfFewMatches() {
         // Query that matches only specific events
         String query = "cinema film";
-        List<EventRagHelper.Event> results = eventRagHelper.search(query);
+        List<RagHelper.Event> results = eventRagHelper.search(query);
 
         // Should return 1 or fewer results (Film Festival match)
         assertTrue(results.size() <= 3, "Should respect max 3 limit");
@@ -42,19 +42,19 @@ class EventRagHelperTest {
 
     @Test
     void search_emptyQuery_returnsEmpty() {
-        List<EventRagHelper.Event> results = eventRagHelper.search("");
+        List<RagHelper.Event> results = eventRagHelper.search("");
         assertTrue(results.isEmpty(), "Empty query should return empty list");
     }
 
     @Test
     void search_nullQuery_returnsEmpty() {
-        List<EventRagHelper.Event> results = eventRagHelper.search(null);
+        List<RagHelper.Event> results = eventRagHelper.search(null);
         assertTrue(results.isEmpty(), "Null query should return empty list");
     }
 
     @Test
     void getAllEvents_returnsFull() {
-        List<EventRagHelper.Event> allEvents = eventRagHelper.getAllEvents();
+        List<RagHelper.Event> allEvents = eventRagHelper.getAll();
 
         // Should return all events from the current test fixture (unrestricted)
         assertEquals(5, allEvents.size(), "getAllEvents() should return all events");
@@ -64,7 +64,7 @@ class EventRagHelperTest {
     void search_returnsTopResultsByRelevance() {
         // Specific query that should match multiple events
         String query = "cultural performance";
-        List<EventRagHelper.Event> results = eventRagHelper.search(query);
+        List<RagHelper.Event> results = eventRagHelper.search(query);
 
         assertTrue(results.size() <= 3, "Should return at most 3 results");
 
@@ -79,10 +79,10 @@ class EventRagHelperTest {
     @Test
     void search_preserves_eventFields() {
         String query = "festival";
-        List<EventRagHelper.Event> results = eventRagHelper.search(query);
+        List<RagHelper.Event> results = eventRagHelper.search(query);
 
         assertTrue(results.size() > 0, "Should find festival event");
-        EventRagHelper.Event event = results.get(0);
+        RagHelper.Event event = results.get(0);
 
         // Verify all important fields are preserved
         assertNotNull(event.eventId);
@@ -104,12 +104,12 @@ class EventRagHelperTest {
 
         // Query that matches on title (primary field with boost)
         String queryTitle = "festival";
-        List<EventRagHelper.Event> resultsFromTitle = eventRagHelper.search(queryTitle);
+        List<RagHelper.Event> resultsFromTitle = eventRagHelper.search(queryTitle);
         assertTrue(resultsFromTitle.size() > 0, "Should find events matching title field");
 
         // Query that matches on description
         String queryDesc = "event description";
-        List<EventRagHelper.Event> resultsFromDesc = eventRagHelper.search(queryDesc);
+        List<RagHelper.Event> resultsFromDesc = eventRagHelper.search(queryDesc);
         assertTrue(resultsFromDesc.size() >= 0, "Should find or not find events based on description");
 
         // Both fields should be searchable (title + description indexed)
@@ -124,12 +124,12 @@ class EventRagHelperTest {
 
         // Query that matches in both title and description
         String query = "festival";
-        List<EventRagHelper.Event> results = eventRagHelper.search(query);
+        List<RagHelper.Event> results = eventRagHelper.search(query);
 
         // If results exist, the first result should be most relevant (likely title
         // match)
         if (!results.isEmpty()) {
-            EventRagHelper.Event firstResult = results.get(0);
+            RagHelper.Event firstResult = results.get(0);
             // Verify the top result is meaningful (would be title-focused due to boost)
             assertTrue(firstResult.title.toLowerCase().contains("festival")
                     || firstResult.description.toLowerCase().contains("festival"),
@@ -145,14 +145,14 @@ class EventRagHelperTest {
 
         // A very generic query that might match weakly across many events
         String query = "event";
-        List<EventRagHelper.Event> results = eventRagHelper.search(query);
+        List<RagHelper.Event> results = eventRagHelper.search(query);
 
         // If results are returned, they should all be meaningfully related to the
         // query.
         assertTrue(results.size() <= 3, "Relevance filtering should limit results to MAX_RESULTS=3");
 
         // All results should at least have title or description matching the query
-        for (EventRagHelper.Event event : results) {
+        for (RagHelper.Event event : results) {
             assertTrue(
                     event.title.toLowerCase().contains("event") ||
                             event.description.toLowerCase().contains("event"),
@@ -166,14 +166,14 @@ class EventRagHelperTest {
         // Specific queries should match fewer items but all with high relevance
 
         String query = "cinema film";
-        List<EventRagHelper.Event> results = eventRagHelper.search(query);
+        List<RagHelper.Event> results = eventRagHelper.search(query);
 
         // Should return fewer results for a specific query
         assertTrue(results.size() <= 3, "Specific query should return limited, high-relevance results");
 
         // Top result should be clearly relevant
         if (!results.isEmpty()) {
-            EventRagHelper.Event topResult = results.get(0);
+            RagHelper.Event topResult = results.get(0);
             // Cinema query should match cinema/film events
             assertTrue(
                     topResult.eventType.toLowerCase().contains("cinema") ||
@@ -190,10 +190,10 @@ class EventRagHelperTest {
         // This validates the Conservative implementation (Store.YES for removed fields)
 
         String query = "festival";
-        List<EventRagHelper.Event> results = eventRagHelper.search(query);
+        List<RagHelper.Event> results = eventRagHelper.search(query);
 
         assertTrue(results.size() > 0, "Should find festival event");
-        EventRagHelper.Event event = results.get(0);
+        RagHelper.Event event = results.get(0);
 
         // eventType was removed from SEARCH_FIELDS but stored (not null)
         assertNotNull(event.eventType, "eventType field should be accessible even though not indexed");
@@ -205,10 +205,10 @@ class EventRagHelperTest {
         // Step 1 validation: Location field should still be accessible
 
         String query = "festival";
-        List<EventRagHelper.Event> results = eventRagHelper.search(query);
+        List<RagHelper.Event> results = eventRagHelper.search(query);
 
         assertTrue(results.size() > 0, "Should find festival event");
-        EventRagHelper.Event event = results.get(0);
+        RagHelper.Event event = results.get(0);
 
         // location was removed from SEARCH_FIELDS but stored
         assertNotNull(event.location, "location field should be accessible");
@@ -217,11 +217,11 @@ class EventRagHelperTest {
 
     @Test
     void search_javaEngine_returnsRelevantResults() {
-        List<EventRagHelper.Event> results = eventRagHelper.search("cinema film");
+        List<RagHelper.Event> results = eventRagHelper.search("cinema film");
 
         assertFalse(results.isEmpty());
         assertTrue(results.size() <= 3);
-        EventRagHelper.Event topResult = results.get(0);
+        RagHelper.Event topResult = results.get(0);
         assertTrue(topResult.eventType.equalsIgnoreCase("Cinema")
                 || topResult.title.toLowerCase().contains("film")
                 || topResult.description.toLowerCase().contains("cinema"));
@@ -229,17 +229,17 @@ class EventRagHelperTest {
 
     @Test
     void search_javaEngine_handlesAccentAndPunctuationNormalization() {
-        List<EventRagHelper.Event> results = eventRagHelper.search("  cinèma, film!  ");
+        List<RagHelper.Event> results = eventRagHelper.search("  cinèma, film!  ");
 
         assertFalse(results.isEmpty());
         assertTrue(results.stream().anyMatch(event -> event.eventType.equalsIgnoreCase("Cinema")));
     }
 
     @Test
-    void search_isDeterministicAcrossHelperInstances() throws IOException {
-        EventRagHelper secondHelper = new EventRagHelper("testcity");
-        List<EventRagHelper.Event> firstResults = eventRagHelper.search("festival concert event");
-        List<EventRagHelper.Event> secondResults = secondHelper.search("festival concert event");
+    void search_isDeterministicAcrossHelperInstances() {
+        RagHelper<RagHelper.Event> secondHelper = RagHelper.forEvents("testcity");
+        List<RagHelper.Event> firstResults = eventRagHelper.search("festival concert event");
+        List<RagHelper.Event> secondResults = secondHelper.search("festival concert event");
 
         assertEquals(firstResults.size(), secondResults.size());
         if (!firstResults.isEmpty()) {

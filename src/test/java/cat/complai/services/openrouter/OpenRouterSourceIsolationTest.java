@@ -5,7 +5,7 @@ import cat.complai.dto.http.HttpDto;
 import cat.complai.dto.openrouter.OpenRouterResponseDto;
 import cat.complai.dto.openrouter.Source;
 import cat.complai.helpers.openrouter.EventRagHelperRegistry;
-import cat.complai.helpers.openrouter.ProcedureRagHelper;
+import cat.complai.helpers.openrouter.RagHelper;
 import cat.complai.helpers.openrouter.ProcedureRagHelperRegistry;
 import cat.complai.helpers.openrouter.RedactPromptBuilder;
 import cat.complai.services.openrouter.ai.AiResponseProcessingService;
@@ -16,7 +16,6 @@ import cat.complai.services.openrouter.validation.InputValidationService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -64,21 +63,17 @@ public class OpenRouterSourceIsolationTest {
      */
     static class TestFakeWrapper extends HttpWrapper {
         private String nextResponse = "Test response";
-        private List<ProcedureRagHelper.Procedure> fakeProcedures = List.of();
+        private List<RagHelper.Procedure> fakeProcedures = List.of();
 
         public final ProcedureRagHelperRegistry ragRegistry = new ProcedureRagHelperRegistry() {
             @Override
-            public ProcedureRagHelper getForCity(String cityId) {
-                try {
-                    return new ProcedureRagHelper(cityId) {
-                        @Override
-                        public List<ProcedureRagHelper.Procedure> search(String query) {
-                            return fakeProcedures;
-                        }
-                    };
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
+            public RagHelper<RagHelper.Procedure> getForCity(String cityId) {
+                return new RagHelper<>(cityId, RagHelper.procedureDomainConfig()) {
+                    @Override
+                    public List<RagHelper.Procedure> search(String query) {
+                        return fakeProcedures;
+                    }
+                };
             }
         };
 
@@ -86,7 +81,7 @@ public class OpenRouterSourceIsolationTest {
             this.nextResponse = response;
         }
 
-        public void setFakeProcedures(List<ProcedureRagHelper.Procedure> procs) {
+        public void setFakeProcedures(List<RagHelper.Procedure> procs) {
             this.fakeProcedures = procs;
         }
 
@@ -105,10 +100,10 @@ public class OpenRouterSourceIsolationTest {
         OpenRouterServices svc = createOpenRouterService(wrapper);
 
         // First request: Query about recycling program
-        List<ProcedureRagHelper.Procedure> recyclingProcs = List.of(
-                new ProcedureRagHelper.Procedure("r1", "Recycling Program", "Desc", "Req", "Steps",
+        List<RagHelper.Procedure> recyclingProcs = List.of(
+                new RagHelper.Procedure("r1", "Recycling Program", "Desc", "Req", "Steps",
                         "https://example.com/recycling"),
-                new ProcedureRagHelper.Procedure("r2", "Waste Disposal", "Desc", "Req", "Steps",
+                new RagHelper.Procedure("r2", "Waste Disposal", "Desc", "Req", "Steps",
                         "https://example.com/waste"));
         wrapper.setFakeProcedures(recyclingProcs);
         wrapper.setNextResponse("Recycling answer");
@@ -125,10 +120,10 @@ public class OpenRouterSourceIsolationTest {
         assertTrue(hasRecycling1, "First response should contain recycling source");
 
         // Second request: Query about building permits (DIFFERENT sources)
-        List<ProcedureRagHelper.Procedure> buildingProcs = List.of(
-                new ProcedureRagHelper.Procedure("b1", "Building Permits", "Desc", "Req", "Steps",
+        List<RagHelper.Procedure> buildingProcs = List.of(
+                new RagHelper.Procedure("b1", "Building Permits", "Desc", "Req", "Steps",
                         "https://example.com/permits"),
-                new ProcedureRagHelper.Procedure("b2", "Renovation Guidelines", "Desc", "Req", "Steps",
+                new RagHelper.Procedure("b2", "Renovation Guidelines", "Desc", "Req", "Steps",
                         "https://example.com/renovation"));
         wrapper.setFakeProcedures(buildingProcs);
         wrapper.setNextResponse("Building answer");
@@ -200,10 +195,10 @@ public class OpenRouterSourceIsolationTest {
         OpenRouterServices svc = createOpenRouterService(wrapper);
 
         // Create procedures with duplicate URLs (should be deduplicated)
-        List<ProcedureRagHelper.Procedure> procs = List.of(
-                new ProcedureRagHelper.Procedure("p1", "Title 1", "Desc", "Req", "Steps",
+        List<RagHelper.Procedure> procs = List.of(
+                new RagHelper.Procedure("p1", "Title 1", "Desc", "Req", "Steps",
                         "https://example.com/same"),
-                new ProcedureRagHelper.Procedure("p2", "Title 2", "Desc", "Req", "Steps",
+                new RagHelper.Procedure("p2", "Title 2", "Desc", "Req", "Steps",
                         "https://example.com/same")); // Duplicate URL
         wrapper.setFakeProcedures(procs);
         wrapper.setNextResponse("Response with dedup");

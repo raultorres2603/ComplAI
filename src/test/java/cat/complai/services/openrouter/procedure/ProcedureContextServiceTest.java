@@ -1,21 +1,17 @@
 package cat.complai.services.openrouter.procedure;
 
 import cat.complai.dto.openrouter.Source;
-import cat.complai.helpers.openrouter.CityInfoRagHelper;
 import cat.complai.helpers.openrouter.CityInfoRagHelperRegistry;
-import cat.complai.helpers.openrouter.EventRagHelper;
 import cat.complai.helpers.openrouter.EventRagHelperRegistry;
-import cat.complai.helpers.openrouter.NewsRagHelper;
 import cat.complai.helpers.openrouter.NewsRagHelperRegistry;
-import cat.complai.helpers.openrouter.ProcedureRagHelper;
 import cat.complai.helpers.openrouter.ProcedureRagHelperRegistry;
+import cat.complai.helpers.openrouter.RagHelper;
 import cat.complai.helpers.openrouter.RedactPromptBuilder;
 
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -146,7 +142,7 @@ class ProcedureContextServiceTest {
         @Test
         void detectContextRequirements_reusesNormalizedProcedureTitlesPerCity() throws Exception {
                 CountingProcedureRagHelper procedureHelper = new CountingProcedureRagHelper(
-                                List.of(new ProcedureRagHelper.Procedure("p1", "Resident Parking Badge Renewal", "", "",
+                                List.of(new RagHelper.Procedure("p1", "Resident Parking Badge Renewal", "", "",
                                                 "",
                                                 "https://example.com/procedure")));
                 ProcedureContextService service = new ProcedureContextService(
@@ -166,7 +162,7 @@ class ProcedureContextServiceTest {
         @Test
         void detectContextRequirements_reusesNormalizedEventTitlesPerCity() throws Exception {
                 CountingEventRagHelper eventHelper = new CountingEventRagHelper(
-                                List.of(new EventRagHelper.Event("e1", "Neighborhood Meetup", "", "", "", "", "", "",
+                                List.of(new RagHelper.Event("e1", "Neighborhood Meetup", "", "", "", "", "", "",
                                                 "",
                                                 "https://example.com/event")));
                 ProcedureContextService service = new ProcedureContextService(
@@ -184,11 +180,11 @@ class ProcedureContextServiceTest {
         @Test
         void detectContextRequirements_keywordAndConversationalShortCircuitsSkipTitleIndexLookup() throws Exception {
                 CountingProcedureRagHelper procedureHelper = new CountingProcedureRagHelper(
-                                List.of(new ProcedureRagHelper.Procedure("p1", "Resident Parking Badge Renewal", "", "",
+                                List.of(new RagHelper.Procedure("p1", "Resident Parking Badge Renewal", "", "",
                                                 "",
                                                 "https://example.com/procedure")));
                 CountingEventRagHelper eventHelper = new CountingEventRagHelper(
-                                List.of(new EventRagHelper.Event("e1", "Moonlight Concert", "", "", "", "", "", "", "",
+                                List.of(new RagHelper.Event("e1", "Moonlight Concert", "", "", "", "", "", "", "",
                                                 "https://example.com/event")));
                 ProcedureContextService service = new ProcedureContextService(
                                 new TestProcedureRegistry(Map.of("city-a", procedureHelper)),
@@ -215,11 +211,11 @@ class ProcedureContextServiceTest {
         @Test
         void detectContextRequirements_keepsCityScopedIsolationForDirectTitleMatches() throws Exception {
                 CountingProcedureRagHelper cityAHelper = new CountingProcedureRagHelper(
-                                List.of(new ProcedureRagHelper.Procedure("p1", "Resident Parking Badge Renewal", "", "",
+                                List.of(new RagHelper.Procedure("p1", "Resident Parking Badge Renewal", "", "",
                                                 "",
                                                 "https://example.com/a")));
                 CountingProcedureRagHelper cityBHelper = new CountingProcedureRagHelper(
-                                List.of(new ProcedureRagHelper.Procedure("p2", "Beach Access Permit", "", "", "",
+                                List.of(new RagHelper.Procedure("p2", "Beach Access Permit", "", "", "",
                                                 "https://example.com/b")));
 
                 ProcedureContextService service = new ProcedureContextService(
@@ -245,11 +241,11 @@ class ProcedureContextServiceTest {
         @Test
         void detectContextRequirements_matchesDirectProcedureAndEventTitlesSeparately() throws Exception {
                 CountingProcedureRagHelper procedureHelper = new CountingProcedureRagHelper(
-                                List.of(new ProcedureRagHelper.Procedure("p1", "Resident Parking Badge Renewal", "", "",
+                                List.of(new RagHelper.Procedure("p1", "Resident Parking Badge Renewal", "", "",
                                                 "",
                                                 "https://example.com/procedure")));
                 CountingEventRagHelper eventHelper = new CountingEventRagHelper(
-                                List.of(new EventRagHelper.Event("e1", "Moonlight Concert", "", "", "", "", "", "", "",
+                                List.of(new RagHelper.Event("e1", "Moonlight Concert", "", "", "", "", "", "", "",
                                                 "https://example.com/event")));
                 ProcedureContextService service = new ProcedureContextService(
                                 new TestProcedureRegistry(Map.of("city-a", procedureHelper)),
@@ -274,11 +270,11 @@ class ProcedureContextServiceTest {
         @Test
         void detectContextRequirements_ambiguousQueryUsesTitleIndexLookup() throws Exception {
                 CountingProcedureRagHelper procedureHelper = new CountingProcedureRagHelper(
-                                List.of(new ProcedureRagHelper.Procedure("p1", "Resident Parking Badge Renewal", "", "",
+                                List.of(new RagHelper.Procedure("p1", "Resident Parking Badge Renewal", "", "",
                                                 "",
                                                 "https://example.com/procedure")));
                 CountingEventRagHelper eventHelper = new CountingEventRagHelper(
-                                List.of(new EventRagHelper.Event("e1", "Moonlight Concert", "", "", "", "", "", "", "",
+                                List.of(new RagHelper.Event("e1", "Moonlight Concert", "", "", "", "", "", "", "",
                                                 "https://example.com/event")));
                 ProcedureContextService service = new ProcedureContextService(
                                 new TestProcedureRegistry(Map.of("city-a", procedureHelper)),
@@ -300,13 +296,13 @@ class ProcedureContextServiceTest {
         @Test
         void detectContextRequirements_newsIntent_skipsProcedureAndEventTitleIndexes() throws Exception {
                 CountingProcedureRagHelper procedureHelper = new CountingProcedureRagHelper(List.of(
-                                new ProcedureRagHelper.Procedure("p1", "Resident Parking Badge Renewal", "", "", "",
+                                new RagHelper.Procedure("p1", "Resident Parking Badge Renewal", "", "", "",
                                                 "https://example.com/procedure")));
                 CountingEventRagHelper eventHelper = new CountingEventRagHelper(List.of(
-                                new EventRagHelper.Event("e1", "Moonlight Concert", "", "", "", "", "", "", "",
+                                new RagHelper.Event("e1", "Moonlight Concert", "", "", "", "", "", "", "",
                                                 "https://example.com/event")));
                 CountingNewsRagHelper newsHelper = new CountingNewsRagHelper(List.of(
-                                new NewsRagHelper.News("n1", "Latest municipal recycling update", "", "", "", "", "",
+                                new RagHelper.News("n1", "Latest municipal recycling update", "", "", "", "", "",
                                                 "https://example.com/news")));
 
                 ProcedureContextService service = new ProcedureContextService(
@@ -331,7 +327,7 @@ class ProcedureContextServiceTest {
         @Test
         void detectContextRequirements_cityInfoFallback_triggersWhenNoProcedureEventNewsMatch() throws Exception {
                 CountingCityInfoRagHelper cityInfoHelper = new CountingCityInfoRagHelper(List.of(
-                                new CityInfoRagHelper.CityInfo("c1", "Turisme", "Punts d'interès", "", "", "",
+                                new RagHelper.CityInfo("c1", "Turisme", "Punts d'interès", "", "", "",
                                                 "https://example.com/cityinfo")));
 
                 ProcedureContextService service = new ProcedureContextService(
@@ -352,137 +348,137 @@ class ProcedureContextServiceTest {
         }
 
         private static final class TestProcedureRegistry extends ProcedureRagHelperRegistry {
-                private final Map<String, ProcedureRagHelper> helpersByCity;
+                private final Map<String, RagHelper<RagHelper.Procedure>> helpersByCity;
 
-                private TestProcedureRegistry(Map<String, ProcedureRagHelper> helpersByCity) {
+                private TestProcedureRegistry(Map<String, RagHelper<RagHelper.Procedure>> helpersByCity) {
                         this.helpersByCity = helpersByCity;
                 }
 
                 @Override
-                public ProcedureRagHelper getForCity(String cityId) {
+                public RagHelper<RagHelper.Procedure> getForCity(String cityId) {
                         return helpersByCity.get(cityId);
                 }
         }
 
         private static final class TestEventRegistry extends EventRagHelperRegistry {
-                private final Map<String, EventRagHelper> helpersByCity;
+                private final Map<String, RagHelper<RagHelper.Event>> helpersByCity;
 
-                private TestEventRegistry(Map<String, EventRagHelper> helpersByCity) {
+                private TestEventRegistry(Map<String, RagHelper<RagHelper.Event>> helpersByCity) {
                         this.helpersByCity = helpersByCity;
                 }
 
                 @Override
-                public EventRagHelper getForCity(String cityId) {
+                public RagHelper<RagHelper.Event> getForCity(String cityId) {
                         return helpersByCity.get(cityId);
                 }
         }
 
         private static final class TestNewsRegistry extends NewsRagHelperRegistry {
-                private final Map<String, NewsRagHelper> helpersByCity;
+                private final Map<String, RagHelper<RagHelper.News>> helpersByCity;
 
-                private TestNewsRegistry(Map<String, NewsRagHelper> helpersByCity) {
+                private TestNewsRegistry(Map<String, RagHelper<RagHelper.News>> helpersByCity) {
                         this.helpersByCity = helpersByCity;
                 }
 
                 @Override
-                public NewsRagHelper getForCity(String cityId) {
+                public RagHelper<RagHelper.News> getForCity(String cityId) {
                         return helpersByCity.get(cityId);
                 }
         }
 
         private static final class TestCityInfoRegistry extends CityInfoRagHelperRegistry {
-                private final Map<String, CityInfoRagHelper> helpersByCity;
+                private final Map<String, RagHelper<RagHelper.CityInfo>> helpersByCity;
 
-                private TestCityInfoRegistry(Map<String, CityInfoRagHelper> helpersByCity) {
+                private TestCityInfoRegistry(Map<String, RagHelper<RagHelper.CityInfo>> helpersByCity) {
                         this.helpersByCity = helpersByCity;
                 }
 
                 @Override
-                public CityInfoRagHelper getForCity(String cityId) {
+                public RagHelper<RagHelper.CityInfo> getForCity(String cityId) {
                         return helpersByCity.get(cityId);
                 }
         }
 
-        private static final class CountingProcedureRagHelper extends ProcedureRagHelper {
-                private final List<ProcedureRagHelper.Procedure> procedures;
+        private static final class CountingProcedureRagHelper extends RagHelper<RagHelper.Procedure> {
+                private final List<RagHelper.Procedure> procedures;
                 private final AtomicInteger getAllProceduresCalls = new AtomicInteger();
 
-                private CountingProcedureRagHelper(List<ProcedureRagHelper.Procedure> procedures) throws IOException {
-                        super("testcity");
+                private CountingProcedureRagHelper(List<RagHelper.Procedure> procedures) {
+                        super("testcity", RagHelper.procedureDomainConfig());
                         this.procedures = procedures;
                 }
 
                 @Override
-                public List<ProcedureRagHelper.Procedure> getAllProcedures() {
+                public List<RagHelper.Procedure> getAll() {
                         getAllProceduresCalls.incrementAndGet();
                         return procedures;
                 }
 
                 @Override
-                public List<ProcedureRagHelper.Procedure> search(String query) {
+                public List<RagHelper.Procedure> search(String query) {
                         return procedures;
                 }
         }
 
-        private static final class CountingEventRagHelper extends EventRagHelper {
-                private final List<EventRagHelper.Event> events;
+        private static final class CountingEventRagHelper extends RagHelper<RagHelper.Event> {
+                private final List<RagHelper.Event> events;
                 private final AtomicInteger getAllEventsCalls = new AtomicInteger();
 
-                private CountingEventRagHelper(List<EventRagHelper.Event> events) throws IOException {
-                        super("testcity");
+                private CountingEventRagHelper(List<RagHelper.Event> events) {
+                        super("testcity", RagHelper.eventDomainConfig());
                         this.events = events;
                 }
 
                 @Override
-                public List<EventRagHelper.Event> getAllEvents() {
+                public List<RagHelper.Event> getAll() {
                         getAllEventsCalls.incrementAndGet();
                         return events;
                 }
 
                 @Override
-                public List<EventRagHelper.Event> search(String query) {
+                public List<RagHelper.Event> search(String query) {
                         return events;
                 }
         }
 
-        private static final class CountingNewsRagHelper extends NewsRagHelper {
-                private final List<NewsRagHelper.News> news;
+        private static final class CountingNewsRagHelper extends RagHelper<RagHelper.News> {
+                private final List<RagHelper.News> news;
                 private final AtomicInteger getAllNewsCalls = new AtomicInteger();
 
-                private CountingNewsRagHelper(List<NewsRagHelper.News> news) {
-                        super("testcity");
+                private CountingNewsRagHelper(List<RagHelper.News> news) {
+                        super("testcity", RagHelper.newsDomainConfig());
                         this.news = news;
                 }
 
                 @Override
-                public List<NewsRagHelper.News> getAllNews() {
+                public List<RagHelper.News> getAll() {
                         getAllNewsCalls.incrementAndGet();
                         return news;
                 }
 
                 @Override
-                public List<NewsRagHelper.News> search(String query) {
+                public List<RagHelper.News> search(String query) {
                         return news;
                 }
         }
 
-        private static final class CountingCityInfoRagHelper extends CityInfoRagHelper {
-                private final List<CityInfoRagHelper.CityInfo> cityInfo;
+        private static final class CountingCityInfoRagHelper extends RagHelper<RagHelper.CityInfo> {
+                private final List<RagHelper.CityInfo> cityInfo;
                 private final AtomicInteger getAllCityInfoCalls = new AtomicInteger();
 
-                private CountingCityInfoRagHelper(List<CityInfoRagHelper.CityInfo> cityInfo) {
-                        super("testcity");
+                private CountingCityInfoRagHelper(List<RagHelper.CityInfo> cityInfo) {
+                        super("testcity", RagHelper.cityInfoDomainConfig());
                         this.cityInfo = cityInfo;
                 }
 
                 @Override
-                public List<CityInfoRagHelper.CityInfo> getAllCityInfo() {
+                public List<RagHelper.CityInfo> getAll() {
                         getAllCityInfoCalls.incrementAndGet();
                         return cityInfo;
                 }
 
                 @Override
-                public List<CityInfoRagHelper.CityInfo> search(String query) {
+                public List<RagHelper.CityInfo> search(String query) {
                         return cityInfo;
                 }
         }
