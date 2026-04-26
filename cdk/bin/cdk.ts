@@ -9,40 +9,12 @@ import { EdgeStack } from '../edge-stack';
 
 const app = new cdk.App();
 
-function toStackPattern(selector: string): RegExp {
-  const escaped = selector.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
-  return new RegExp(`^${escaped}$`);
-}
-
-function parseCliSelection() {
-  const argv = process.argv.slice(2);
-  const command = argv.find((arg) => !arg.startsWith('-'))?.toLowerCase();
-  const commandIndex = command ? argv.findIndex((arg) => arg.toLowerCase() === command) : -1;
-  const stackSelectors = commandIndex >= 0
-    ? argv
-        .slice(commandIndex + 1)
-        .filter((arg) => !arg.startsWith('-'))
-        .filter((arg) => arg.includes('Stack') || arg.includes('*'))
-    : [];
-
-  return {
-    command,
-    exclusively: argv.includes('--exclusively'),
-    selectors: stackSelectors,
-  };
-}
-
-function isStackRequested(stackName: string, selectors: string[]): boolean {
-  if (selectors.length === 0) {
-    return true;
-  }
-  return selectors.some((selector) => toStackPattern(selector).test(stackName));
-}
-
-const cliSelection = parseCliSelection();
-const destroyWithSelectors = cliSelection.command === 'destroy' && cliSelection.selectors.length > 0;
-const instantiateOnlyRequestedStacks =
-  (cliSelection.exclusively && cliSelection.selectors.length > 0) || destroyWithSelectors;
+// Detect destroy command from process.argv reliably.
+// ALL stacks must always be instantiated so CDK can match stack IDs to
+// CloudFormation stacks for any command (deploy, destroy, diff, synth).
+// The only effect of this flag is to tell LambdaStack to skip local JAR
+// artifact validation, which is irrelevant during a destroy.
+const isDestroyMode = process.argv.slice(2).some((arg) => arg.toLowerCase() === 'destroy');
 
 const awsEnv = {
   account: '134267836527',
@@ -52,7 +24,8 @@ const awsEnv = {
 // One set of stacks per environment. Stack names include the environment suffix
 // so CI can target a specific environment with:
 //   cdk deploy 'ComplAI*Stack-<environment>'
-// CDK synthesises all stacks but the workflow deploys only the chosen environment.
+// CDK synthesises all stacks but the workflow deploys/destroys only the chosen
+// environment based on the stack selectors passed to the CLI.
 const environments: DeploymentEnvironment[] = ['development', 'production'];
 
 for (const environment of environments) {
@@ -61,31 +34,15 @@ for (const environment of environments) {
   const lambdaStackName = `ComplAILambdaStack-${environment}`;
   const edgeStackName = `ComplAIEdgeStack-${environment}`;
 
-  const requestedStorage = isStackRequested(storageStackName, cliSelection.selectors);
-  const requestedQueue = isStackRequested(queueStackName, cliSelection.selectors);
-  const requestedLambda = isStackRequested(lambdaStackName, cliSelection.selectors);
-  const requestedEdge = isStackRequested(edgeStackName, cliSelection.selectors);
-  const detachedEdgeDestroy =
-    cliSelection.command === 'destroy' && instantiateOnlyRequestedStacks && requestedEdge && !requestedLambda;
+  const storageStack = new StorageStack(app, storageStackName, {
+    environment,
+    env: awsEnv,
+  });
 
-  const wantsEdge = !instantiateOnlyRequestedStacks || requestedEdge;
-  const wantsLambda = !instantiateOnlyRequestedStacks || requestedLambda || (requestedEdge && !detachedEdgeDestroy);
-  const wantsStorage = !instantiateOnlyRequestedStacks || requestedStorage || wantsLambda;
-  const wantsQueue = !instantiateOnlyRequestedStacks || requestedQueue || wantsLambda;
-
-  const storageStack = wantsStorage
-    ? new StorageStack(app, storageStackName, {
-        environment,
-        env: awsEnv,
-      })
-    : undefined;
-
-  const queueStack = wantsQueue
-    ? new QueueStack(app, queueStackName, {
-        environment,
-        env: awsEnv,
-      })
-    : undefined;
+  const queueStack = new QueueStack(app, queueStackName, {
+    environment,
+    env: awsEnv,
+  });
 
   // LambdaStack no longer receives bucket construct objects from StorageStack.
   // Buckets are resolved inside LambdaStack via fromBucketName, which produces
@@ -102,42 +59,26 @@ for (const environment of environments) {
   // If the queue's logical ID in QueueStack ever needs to change, deploy
   // LambdaStack first (with --exclusively) to drop the import before updating
   // QueueStack, the same technique used for the StorageStack migration.
-  let lambdaStack: LambdaStack | undefined;
-  if (wantsLambda) {
-    lambdaStack = new LambdaStack(app, lambdaStackName, {
-      environment,
-      redactQueue: queueStack!.redactQueue,
-      feedbackQueue: queueStack!.feedbackQueue,
-      allowMissingLocalArtifactsForDestroy: cliSelection.command === 'destroy',
-      env: awsEnv,
-      crossRegionReferences: true,
-    });
-    lambdaStack.addDependency(storageStack!);
-    lambdaStack.addDependency(queueStack!);
-  }
+  const lambdaStack = new LambdaStack(app, lambdaStackName, {
+    environment,
+    redactQueue: queueStack.redactQueue,
+    feedbackQueue: queueStack.feedbackQueue,
+    isDestroyMode,
+    env: awsEnv,
+    crossRegionReferences: true,
+  });
+  lambdaStack.addDependency(storageStack);
+  lambdaStack.addDependency(queueStack);
 
-  if (environment === 'production' && wantsEdge) {
-    const detachedHttpApiId = process.env.EDGE_HTTP_API_ID
-      || app.node.tryGetContext('edgeHttpApiId')
-      || `edge-detached-${environment}`;
-
-    if (!lambdaStack && !detachedEdgeDestroy) {
-      throw new Error(
-        `Cannot instantiate ${edgeStackName} without ${lambdaStackName}. ` +
-        `For edge-only destroy with --exclusively, this is handled automatically.`,
-      );
-    }
-
+  if (environment === 'production') {
     const edgeStack = new EdgeStack(app, edgeStackName, {
       environment,
-      httpApiId: lambdaStack ? lambdaStack.httpApi.apiId : detachedHttpApiId,
+      httpApiId: lambdaStack.httpApi.apiId,
       httpApiRegion: awsEnv.region,
       env: { account: awsEnv.account, region: 'us-east-1' },
       crossRegionReferences: true,
     });
-    if (lambdaStack) {
-      edgeStack.addDependency(lambdaStack);
-    }
+    edgeStack.addDependency(lambdaStack);
   }
 }
 

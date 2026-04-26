@@ -30,8 +30,10 @@ export interface LambdaStackProps extends cdk.StackProps {
   // the EventSourceMapping logical ID — remains stable.
   readonly redactQueue: sqs.IQueue;
   readonly feedbackQueue: sqs.IQueue;
-  // Destroy should not fail app startup when local build artifacts are missing.
-  readonly allowMissingLocalArtifactsForDestroy?: boolean;
+  // When true (destroy command), skip local JAR artifact validation and use a
+  // placeholder S3 code reference. All stacks must still be instantiated so CDK
+  // can match stack IDs to CloudFormation stacks for the destroy operation.
+  readonly isDestroyMode?: boolean;
 }
 
 export class LambdaStack extends cdk.Stack {
@@ -40,7 +42,7 @@ export class LambdaStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: LambdaStackProps) {
     super(scope, id, props);
 
-    const { environment, redactQueue, feedbackQueue, allowMissingLocalArtifactsForDestroy } = props;
+    const { environment, redactQueue, feedbackQueue, isDestroyMode } = props;
 
     // Reconstruct cross-stack bucket references from their deterministic names
     // rather than accepting CDK construct objects as props. Passing construct
@@ -111,7 +113,7 @@ export class LambdaStack extends cdk.Stack {
       if (explicit) {
         const candidate = path.isAbsolute(explicit) ? explicit : path.resolve(__dirname, '..', '..', explicit);
         if (!fs.existsSync(candidate)) {
-          if (allowMissingLocalArtifactsForDestroy) {
+          if (isDestroyMode) {
             code = lambda.Code.fromBucket(deploymentsBucket, `destroy-placeholder-${environment}.jar`);
             jarPath = undefined;
           } else {
@@ -123,7 +125,7 @@ export class LambdaStack extends cdk.Stack {
       } else {
         const libsDir = path.resolve(__dirname, '..', '..', 'build', 'libs');
         if (!fs.existsSync(libsDir)) {
-          if (allowMissingLocalArtifactsForDestroy) {
+          if (isDestroyMode) {
             code = lambda.Code.fromBucket(deploymentsBucket, `destroy-placeholder-${environment}.jar`);
             jarPath = undefined;
           } else {
@@ -132,7 +134,7 @@ export class LambdaStack extends cdk.Stack {
         } else {
           const jars = fs.readdirSync(libsDir).filter((f: string) => f.endsWith('.jar'));
           if (jars.length === 0) {
-            if (allowMissingLocalArtifactsForDestroy) {
+            if (isDestroyMode) {
               code = lambda.Code.fromBucket(deploymentsBucket, `destroy-placeholder-${environment}.jar`);
               jarPath = undefined;
             } else {
@@ -141,7 +143,7 @@ export class LambdaStack extends cdk.Stack {
           } else {
             const allJar = jars.find((f: string) => f.includes('-all.jar') || f.endsWith('-all.jar'));
             if (!allJar) {
-              if (allowMissingLocalArtifactsForDestroy) {
+              if (isDestroyMode) {
                 code = lambda.Code.fromBucket(deploymentsBucket, `destroy-placeholder-${environment}.jar`);
                 jarPath = undefined;
               } else {
