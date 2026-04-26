@@ -1,9 +1,6 @@
 {
   "name": "complai-cdk",
   "version": "1.0.0",
-  "bin": {
-    "cdk": "dist/bin/cdk.js"
-  },
   "scripts": {
     "build": "tsc",
     "prepare": "npm run build",
