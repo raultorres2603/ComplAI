@@ -40,7 +40,9 @@ function isStackRequested(stackName: string, selectors: string[]): boolean {
 }
 
 const cliSelection = parseCliSelection();
-const instantiateOnlyRequestedStacks = cliSelection.exclusively && cliSelection.selectors.length > 0;
+const destroyWithSelectors = cliSelection.command === 'destroy' && cliSelection.selectors.length > 0;
+const instantiateOnlyRequestedStacks =
+  (cliSelection.exclusively && cliSelection.selectors.length > 0) || destroyWithSelectors;
 
 const awsEnv = {
   account: '134267836527',
@@ -106,6 +108,7 @@ for (const environment of environments) {
       environment,
       redactQueue: queueStack!.redactQueue,
       feedbackQueue: queueStack!.feedbackQueue,
+      allowMissingLocalArtifactsForDestroy: cliSelection.command === 'destroy',
       env: awsEnv,
       crossRegionReferences: true,
     });

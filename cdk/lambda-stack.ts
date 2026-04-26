@@ -30,6 +30,8 @@ export interface LambdaStackProps extends cdk.StackProps {
   // the EventSourceMapping logical ID — remains stable.
   readonly redactQueue: sqs.IQueue;
   readonly feedbackQueue: sqs.IQueue;
+  // Destroy should not fail app startup when local build artifacts are missing.
+  readonly allowMissingLocalArtifactsForDestroy?: boolean;
 }
 
 export class LambdaStack extends cdk.Stack {
@@ -38,7 +40,7 @@ export class LambdaStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: LambdaStackProps) {
     super(scope, id, props);
 
-    const { environment, redactQueue, feedbackQueue } = props;
+    const { environment, redactQueue, feedbackQueue, allowMissingLocalArtifactsForDestroy } = props;
 
     // Reconstruct cross-stack bucket references from their deterministic names
     // rather than accepting CDK construct objects as props. Passing construct
@@ -95,7 +97,7 @@ export class LambdaStack extends cdk.Stack {
     // which stages via the bootstrap bucket.  This keeps the local workflow
     // unchanged and avoids requiring developers to pre-upload the JAR.
     // -----------------------------------------------------------------------
-    let code: lambda.Code;
+    let code: lambda.Code | undefined;
     const deploymentJarKey = process.env.DEPLOYMENT_JAR_KEY ?? this.node.tryGetContext('jarS3Key');
     if (deploymentJarKey) {
       code = lambda.Code.fromBucket(deploymentsBucket, deploymentJarKey);
@@ -108,19 +110,56 @@ export class LambdaStack extends cdk.Stack {
       let jarPath: string | undefined;
       if (explicit) {
         const candidate = path.isAbsolute(explicit) ? explicit : path.resolve(__dirname, '..', '..', explicit);
-        if (!fs.existsSync(candidate)) throw new Error(`Configured JAR_PATH does not exist: ${candidate}`);
-        jarPath = candidate;
+        if (!fs.existsSync(candidate)) {
+          if (allowMissingLocalArtifactsForDestroy) {
+            code = lambda.Code.fromBucket(deploymentsBucket, `destroy-placeholder-${environment}.jar`);
+            jarPath = undefined;
+          } else {
+            throw new Error(`Configured JAR_PATH does not exist: ${candidate}`);
+          }
+        } else {
+          jarPath = candidate;
+        }
       } else {
         const libsDir = path.resolve(__dirname, '..', '..', 'build', 'libs');
-        if (!fs.existsSync(libsDir)) throw new Error(`Expected build/libs not found at ${libsDir}. Run './gradlew clean shadowJar'.`);
-        const jars = fs.readdirSync(libsDir).filter((f: string) => f.endsWith('.jar'));
-        if (jars.length === 0) throw new Error(`No JARs found in ${libsDir}. Run './gradlew clean shadowJar'.`);
-        const allJar = jars.find((f: string) => f.includes('-all.jar') || f.endsWith('-all.jar'));
-        if (!allJar) throw new Error(`No '*-all.jar' found in ${libsDir}. Set JAR_PATH env to the produced jar or produce a shadow JAR.`);
-        jarPath = path.join(libsDir, allJar);
+        if (!fs.existsSync(libsDir)) {
+          if (allowMissingLocalArtifactsForDestroy) {
+            code = lambda.Code.fromBucket(deploymentsBucket, `destroy-placeholder-${environment}.jar`);
+            jarPath = undefined;
+          } else {
+            throw new Error(`Expected build/libs not found at ${libsDir}. Run './gradlew clean shadowJar'.`);
+          }
+        } else {
+          const jars = fs.readdirSync(libsDir).filter((f: string) => f.endsWith('.jar'));
+          if (jars.length === 0) {
+            if (allowMissingLocalArtifactsForDestroy) {
+              code = lambda.Code.fromBucket(deploymentsBucket, `destroy-placeholder-${environment}.jar`);
+              jarPath = undefined;
+            } else {
+              throw new Error(`No JARs found in ${libsDir}. Run './gradlew clean shadowJar'.`);
+            }
+          } else {
+            const allJar = jars.find((f: string) => f.includes('-all.jar') || f.endsWith('-all.jar'));
+            if (!allJar) {
+              if (allowMissingLocalArtifactsForDestroy) {
+                code = lambda.Code.fromBucket(deploymentsBucket, `destroy-placeholder-${environment}.jar`);
+                jarPath = undefined;
+              } else {
+                throw new Error(`No '*-all.jar' found in ${libsDir}. Set JAR_PATH env to the produced jar or produce a shadow JAR.`);
+              }
+            } else {
+              jarPath = path.join(libsDir, allJar);
+            }
+          }
+        }
       }
-      if (!jarPath || !fs.existsSync(jarPath)) throw new Error(`Unable to determine JAR path. Computed: ${jarPath}`);
-      code = lambda.Code.fromAsset(jarPath);
+      if (!code) {
+        if (!jarPath || !fs.existsSync(jarPath)) throw new Error(`Unable to determine JAR path. Computed: ${jarPath}`);
+        code = lambda.Code.fromAsset(jarPath);
+      }
+    }
+    if (!code) {
+      throw new Error('Unable to configure Lambda code source.');
     }
 
     // Explicit log group so we control retention and can attach metric filters.
