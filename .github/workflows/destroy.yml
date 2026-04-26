@@ -97,6 +97,7 @@ jobs:
         if: inputs.environment == 'production'
         env:
           TARGET_ENV: ${{ inputs.environment }}
+          CDK_DESTROY_MODE: "1"
         run: |
           cd cdk
           npx cdk destroy "ComplAIEdgeStack-${TARGET_ENV}" --force --exclusively
@@ -104,6 +105,7 @@ jobs:
       - name: Destroy lambda stack
         env:
           TARGET_ENV: ${{ inputs.environment }}
+          CDK_DESTROY_MODE: "1"
         run: |
           cd cdk
           npx cdk destroy "ComplAILambdaStack-${TARGET_ENV}" --force
@@ -111,6 +113,7 @@ jobs:
       - name: Destroy queue stack
         env:
           TARGET_ENV: ${{ inputs.environment }}
+          CDK_DESTROY_MODE: "1"
         run: |
           cd cdk
           npx cdk destroy "ComplAIQueueStack-${TARGET_ENV}" --force
@@ -118,6 +121,7 @@ jobs:
       - name: Destroy storage stack
         env:
           TARGET_ENV: ${{ inputs.environment }}
+          CDK_DESTROY_MODE: "1"
         run: |
           cd cdk
           npx cdk destroy "ComplAIStorageStack-${TARGET_ENV}" --force

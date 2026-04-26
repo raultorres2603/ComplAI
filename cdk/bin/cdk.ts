@@ -9,12 +9,25 @@ import { EdgeStack } from '../edge-stack';
 
 const app = new cdk.App();
 
-// Detect destroy command from process.argv reliably.
+// Detect destroy command so LambdaStack can skip local JAR artifact validation.
+//
+// Two detection strategies are used together because CDK CLI does NOT pass the
+// subcommand ('destroy') to the app subprocess — it only forwards --output and
+// --context flags.  Relying solely on process.argv therefore never triggers when
+// the app is invoked by the CDK CLI (cdk destroy ...).
+//
+// Strategy 1 — direct invocation (local dev / manual testing):
+//   node dist/bin/cdk.js destroy ...  → 'destroy' appears in process.argv
+// Strategy 2 — CDK CLI invocation (CI / npx cdk destroy):
+//   Set CDK_DESTROY_MODE=1 in the environment before calling cdk destroy.
+//   The CI workflow must export this variable so the app subprocess inherits it.
+//
 // ALL stacks must always be instantiated so CDK can match stack IDs to
 // CloudFormation stacks for any command (deploy, destroy, diff, synth).
-// The only effect of this flag is to tell LambdaStack to skip local JAR
-// artifact validation, which is irrelevant during a destroy.
-const isDestroyMode = process.argv.slice(2).some((arg) => arg.toLowerCase() === 'destroy');
+const isDestroyMode =
+  process.argv.slice(2).some((arg) => arg.toLowerCase() === 'destroy') ||
+  process.env.CDK_DESTROY_MODE === '1' ||
+  process.env.CDK_DESTROY_MODE === 'true';
 
 const awsEnv = {
   account: '134267836527',
@@ -35,11 +48,13 @@ for (const environment of environments) {
   const edgeStackName = `ComplAIEdgeStack-${environment}`;
 
   const storageStack = new StorageStack(app, storageStackName, {
+    stackName: storageStackName,
     environment,
     env: awsEnv,
   });
 
   const queueStack = new QueueStack(app, queueStackName, {
+    stackName: queueStackName,
     environment,
     env: awsEnv,
   });
@@ -60,6 +75,7 @@ for (const environment of environments) {
   // LambdaStack first (with --exclusively) to drop the import before updating
   // QueueStack, the same technique used for the StorageStack migration.
   const lambdaStack = new LambdaStack(app, lambdaStackName, {
+    stackName: lambdaStackName,
     environment,
     redactQueue: queueStack.redactQueue,
     feedbackQueue: queueStack.feedbackQueue,
@@ -72,6 +88,7 @@ for (const environment of environments) {
 
   if (environment === 'production') {
     const edgeStack = new EdgeStack(app, edgeStackName, {
+      stackName: edgeStackName,
       environment,
       httpApiId: lambdaStack.httpApi.apiId,
       httpApiRegion: awsEnv.region,
