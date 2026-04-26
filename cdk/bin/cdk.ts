@@ -9,6 +9,39 @@ import { EdgeStack } from '../edge-stack';
 
 const app = new cdk.App();
 
+function toStackPattern(selector: string): RegExp {
+  const escaped = selector.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
+  return new RegExp(`^${escaped}$`);
+}
+
+function parseCliSelection() {
+  const argv = process.argv.slice(2);
+  const command = argv.find((arg) => !arg.startsWith('-'))?.toLowerCase();
+  const commandIndex = command ? argv.findIndex((arg) => arg.toLowerCase() === command) : -1;
+  const stackSelectors = commandIndex >= 0
+    ? argv
+        .slice(commandIndex + 1)
+        .filter((arg) => !arg.startsWith('-'))
+        .filter((arg) => arg.includes('Stack') || arg.includes('*'))
+    : [];
+
+  return {
+    command,
+    exclusively: argv.includes('--exclusively'),
+    selectors: stackSelectors,
+  };
+}
+
+function isStackRequested(stackName: string, selectors: string[]): boolean {
+  if (selectors.length === 0) {
+    return true;
+  }
+  return selectors.some((selector) => toStackPattern(selector).test(stackName));
+}
+
+const cliSelection = parseCliSelection();
+const instantiateOnlyRequestedStacks = cliSelection.exclusively && cliSelection.selectors.length > 0;
+
 const awsEnv = {
   account: '134267836527',
   region: 'eu-west-1',
@@ -21,15 +54,36 @@ const awsEnv = {
 const environments: DeploymentEnvironment[] = ['development', 'production'];
 
 for (const environment of environments) {
-  const storageStack = new StorageStack(app, `ComplAIStorageStack-${environment}`, {
-    environment,
-    env: awsEnv,
-  });
+  const storageStackName = `ComplAIStorageStack-${environment}`;
+  const queueStackName = `ComplAIQueueStack-${environment}`;
+  const lambdaStackName = `ComplAILambdaStack-${environment}`;
+  const edgeStackName = `ComplAIEdgeStack-${environment}`;
 
-  const queueStack = new QueueStack(app, `ComplAIQueueStack-${environment}`, {
-    environment,
-    env: awsEnv,
-  });
+  const requestedStorage = isStackRequested(storageStackName, cliSelection.selectors);
+  const requestedQueue = isStackRequested(queueStackName, cliSelection.selectors);
+  const requestedLambda = isStackRequested(lambdaStackName, cliSelection.selectors);
+  const requestedEdge = isStackRequested(edgeStackName, cliSelection.selectors);
+  const detachedEdgeDestroy =
+    cliSelection.command === 'destroy' && instantiateOnlyRequestedStacks && requestedEdge && !requestedLambda;
+
+  const wantsEdge = !instantiateOnlyRequestedStacks || requestedEdge;
+  const wantsLambda = !instantiateOnlyRequestedStacks || requestedLambda || (requestedEdge && !detachedEdgeDestroy);
+  const wantsStorage = !instantiateOnlyRequestedStacks || requestedStorage || wantsLambda;
+  const wantsQueue = !instantiateOnlyRequestedStacks || requestedQueue || wantsLambda;
+
+  const storageStack = wantsStorage
+    ? new StorageStack(app, storageStackName, {
+        environment,
+        env: awsEnv,
+      })
+    : undefined;
+
+  const queueStack = wantsQueue
+    ? new QueueStack(app, queueStackName, {
+        environment,
+        env: awsEnv,
+      })
+    : undefined;
 
   // LambdaStack no longer receives bucket construct objects from StorageStack.
   // Buckets are resolved inside LambdaStack via fromBucketName, which produces
@@ -46,25 +100,41 @@ for (const environment of environments) {
   // If the queue's logical ID in QueueStack ever needs to change, deploy
   // LambdaStack first (with --exclusively) to drop the import before updating
   // QueueStack, the same technique used for the StorageStack migration.
-  const lambdaStack = new LambdaStack(app, `ComplAILambdaStack-${environment}`, {
-    environment,
-    redactQueue: queueStack.redactQueue,
-    feedbackQueue: queueStack.feedbackQueue,
-    env: awsEnv,
-    crossRegionReferences: true,
-  });
-  lambdaStack.addDependency(storageStack);
-  lambdaStack.addDependency(queueStack);
-
-  if (environment === 'production') {
-    const edgeStack = new EdgeStack(app, `ComplAIEdgeStack-${environment}`, {
+  let lambdaStack: LambdaStack | undefined;
+  if (wantsLambda) {
+    lambdaStack = new LambdaStack(app, lambdaStackName, {
       environment,
-      httpApiId: lambdaStack.httpApi.apiId,
+      redactQueue: queueStack!.redactQueue,
+      feedbackQueue: queueStack!.feedbackQueue,
+      env: awsEnv,
+      crossRegionReferences: true,
+    });
+    lambdaStack.addDependency(storageStack!);
+    lambdaStack.addDependency(queueStack!);
+  }
+
+  if (environment === 'production' && wantsEdge) {
+    const detachedHttpApiId = process.env.EDGE_HTTP_API_ID
+      || app.node.tryGetContext('edgeHttpApiId')
+      || `edge-detached-${environment}`;
+
+    if (!lambdaStack && !detachedEdgeDestroy) {
+      throw new Error(
+        `Cannot instantiate ${edgeStackName} without ${lambdaStackName}. ` +
+        `For edge-only destroy with --exclusively, this is handled automatically.`,
+      );
+    }
+
+    const edgeStack = new EdgeStack(app, edgeStackName, {
+      environment,
+      httpApiId: lambdaStack ? lambdaStack.httpApi.apiId : detachedHttpApiId,
       httpApiRegion: awsEnv.region,
       env: { account: awsEnv.account, region: 'us-east-1' },
       crossRegionReferences: true,
     });
-    edgeStack.addDependency(lambdaStack);
+    if (lambdaStack) {
+      edgeStack.addDependency(lambdaStack);
+    }
   }
 }
 
