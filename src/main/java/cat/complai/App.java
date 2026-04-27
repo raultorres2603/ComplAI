@@ -10,7 +10,7 @@ import io.micronaut.runtime.Micronaut;
  * RAG data.
  * AWS SDK clients (S3, SQS) are initialized on startup (low overhead,
  * necessary).
- * RAG helper indexes ({@link cat.complai.helpers.openrouter.ProcedureRagHelperRegistry},\n * {@link cat.complai.helpers.openrouter.EventRagHelperRegistry}) are
+ * RAG helper indexes ({@link cat.complai.helpers.openrouter.RagHelperRegistry}) are
  * built lazily
  * on first request for each city using ConcurrentHashMap.computeIfAbsent().
  * 

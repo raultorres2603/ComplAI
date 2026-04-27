@@ -3,8 +3,8 @@ package cat.complai.services.openrouter.procedure;
 import cat.complai.helpers.openrouter.CityInfoRagHelperRegistry;
 import cat.complai.helpers.openrouter.EventRagHelperRegistry;
 import cat.complai.helpers.openrouter.NewsRagHelperRegistry;
-import cat.complai.helpers.openrouter.RagHelper;
 import cat.complai.helpers.openrouter.ProcedureRagHelperRegistry;
+import cat.complai.helpers.openrouter.RagHelper;
 import cat.complai.helpers.openrouter.RedactPromptBuilder;
 import cat.complai.helpers.openrouter.rag.InMemoryLexicalIndex;
 import cat.complai.helpers.openrouter.rag.SearchResult;
@@ -36,8 +36,7 @@ class ProcedureContextServiceAmbiguityTest {
     @Mock
     RedactPromptBuilder promptBuilder;
     @Mock
-    @SuppressWarnings("unchecked")
-    RagHelper procedureRagHelper;
+    RagHelper<RagHelper.Procedure> procedureRagHelper;
 
     ProcedureContextService service;
 

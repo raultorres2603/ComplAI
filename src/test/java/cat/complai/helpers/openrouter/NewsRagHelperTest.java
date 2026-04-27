@@ -1,6 +1,5 @@
 package cat.complai.helpers.openrouter;
 
-import cat.complai.helpers.openrouter.RagHelper;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

@@ -1,10 +1,6 @@
 package cat.complai.helpers.openrouter;
 
-import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
-
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.logging.Logger;
 
 /**
  * Thread-safe cache of per-city {@link RagHelper} instances for city events.
@@ -20,37 +16,12 @@ import java.util.logging.Logger;
  * that carries that city in the JWT.
  */
 @Singleton
-public class EventRagHelperRegistry {
-
-    private static final Logger logger = Logger.getLogger(EventRagHelperRegistry.class.getName());
-
-    private final ConcurrentHashMap<String, RagHelper<RagHelper.Event>> helpersByCity = new ConcurrentHashMap<>();
+public class EventRagHelperRegistry extends RagHelperRegistry<RagHelper.Event> {
 
     /**
-     * Constructs the registry.
+     * Constructs the registry for event RAG helpers.
      */
-    @Inject
     public EventRagHelperRegistry() {
-    }
-
-    /**
-     * Returns a cached {@link RagHelper} for the given city's events, building it
-     * lazily on first access. Subsequent calls for the same city return the same instance.
-     *
-     * @param cityId the city identifier
-     * @return the event RAG helper
-     */
-    public RagHelper<RagHelper.Event> getForCity(String cityId) {
-        return helpersByCity.computeIfAbsent(cityId, this::buildHelper);
-    }
-
-    private RagHelper<RagHelper.Event> buildHelper(String cityId) {
-        long startTime = System.currentTimeMillis();
-        RagHelper<RagHelper.Event> helper = RagHelper.forEvents(cityId);
-        long latency = System.currentTimeMillis() - startTime;
-        int eventCount = helper.getAll().size();
-        logger.info(() -> "RAG INDEX BUILD — helper=EventRagHelper cityId=" + cityId
-                + " latencyMs=" + latency + " events=" + eventCount);
-        return helper;
+        super(RagHelper::forEvents, "EventRagHelper", "events");
     }
 }
