@@ -23,4 +23,4 @@ sam/event.json
 cdk/package-lock.json
 task.md
 .vscode/settings.json
-bin/
+bin

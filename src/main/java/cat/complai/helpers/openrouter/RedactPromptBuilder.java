@@ -317,7 +317,7 @@ public class RedactPromptBuilder {
      * Returns {@code null} when no matches are found or the index fails to load.
      */
     public String buildProcedureContextBlock(String query, String cityId) {
-        ProcedureRagHelper helper;
+        RagHelper<RagHelper.Procedure> helper;
         try {
             helper = ragRegistry.getForCity(cityId);
         } catch (Exception e) {
@@ -325,18 +325,18 @@ public class RedactPromptBuilder {
                     + "; skipping RAG context: " + e.getMessage(), e);
             return null;
         }
-        List<ProcedureRagHelper.Procedure> matches = helper.search(query);
+        List<RagHelper.Procedure> matches = helper.search(query);
         return buildProcedureContextBlockFromMatches(matches, cityId);
     }
 
-    public String buildProcedureContextBlockFromMatches(List<ProcedureRagHelper.Procedure> matches, String cityId) {
+    public String buildProcedureContextBlockFromMatches(List<RagHelper.Procedure> matches, String cityId) {
         if (matches == null || matches.isEmpty())
             return null;
 
         String cityName = resolveCityConfig(cityId).cityName();
         StringBuilder sb = new StringBuilder();
         sb.append("CONTEXT FROM MUNICIPAL PROCEDURES:\n\n");
-        for (ProcedureRagHelper.Procedure p : matches) {
+        for (RagHelper.Procedure p : matches) {
             sb.append("---\n");
             sb.append("**").append(p.title).append("**\n");
             // Prefer HTML anchor tags in the RAG context and ensure they open in a new tab

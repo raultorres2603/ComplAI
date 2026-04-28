@@ -1,14 +1,11 @@
 package cat.complai.services.openrouter.procedure;
 
 import cat.complai.dto.openrouter.Source;
-import cat.complai.helpers.openrouter.CityInfoRagHelper;
 import cat.complai.helpers.openrouter.CityInfoRagHelperRegistry;
-import cat.complai.helpers.openrouter.EventRagHelper;
 import cat.complai.helpers.openrouter.EventRagHelperRegistry;
-import cat.complai.helpers.openrouter.NewsRagHelper;
 import cat.complai.helpers.openrouter.NewsRagHelperRegistry;
-import cat.complai.helpers.openrouter.ProcedureRagHelper;
 import cat.complai.helpers.openrouter.ProcedureRagHelperRegistry;
+import cat.complai.helpers.openrouter.RagHelper;
 import cat.complai.helpers.openrouter.RedactPromptBuilder;
 import cat.complai.helpers.openrouter.rag.AmbiguityDetector;
 import cat.complai.helpers.openrouter.rag.InMemoryLexicalIndex;
@@ -122,6 +119,7 @@ public class ProcedureContextService {
     private final EventRagHelperRegistry eventRagRegistry;
     private final NewsRagHelperRegistry newsRagRegistry;
     private final CityInfoRagHelperRegistry cityInfoRagRegistry;
+    @SuppressWarnings("unused")
     private final RedactPromptBuilder promptBuilder;
     private final Logger logger = Logger.getLogger(ProcedureContextService.class.getName());
     private final ConcurrentHashMap<String, CityDetectionIndex> detectionIndexByCity = new ConcurrentHashMap<>();
@@ -502,8 +500,8 @@ public class ProcedureContextService {
 
     public ProcedureContextResult buildProcedureContextResult(String query, String cityId) {
         try {
-            ProcedureRagHelper helper = ragRegistry.getForCity(cityId);
-            List<ProcedureRagHelper.Procedure> matches = helper.search(query);
+            RagHelper<RagHelper.Procedure> helper = ragRegistry.getForCity(cityId);
+            List<RagHelper.Procedure> matches = helper.search(query);
             if (matches.isEmpty()) {
                 return new ProcedureContextResult(null, List.of());
             }
@@ -528,7 +526,7 @@ public class ProcedureContextService {
             if (!detectContextRequirements(question, cityId).needsProcedureContext()) {
                 return Optional.empty();
             }
-            InMemoryLexicalIndex.SearchResponse<ProcedureRagHelper.Procedure> response =
+            InMemoryLexicalIndex.SearchResponse<RagHelper.Procedure> response =
                     ragRegistry.getForCity(cityId).searchWithScores(question);
             if (!AmbiguityDetector.isAmbiguous(response, RagJavaCalibration.procedure().absoluteFloor())) {
                 return Optional.empty();
@@ -552,7 +550,7 @@ public class ProcedureContextService {
 
     public ProcedureContextResult buildProcedureContextResultForId(String procedureId, String cityId) {
         try {
-            ProcedureRagHelper.Procedure procedure = ragRegistry.getForCity(cityId).getAllProcedures()
+            RagHelper.Procedure procedure = ragRegistry.getForCity(cityId).getAll()
                     .stream()
                     .filter(p -> procedureId.equals(p.procedureId))
                     .findFirst()
@@ -581,8 +579,8 @@ public class ProcedureContextService {
 
     public EventContextResult buildEventContextResult(String query, String cityId) {
         try {
-            EventRagHelper helper = eventRagRegistry.getForCity(cityId);
-            List<EventRagHelper.Event> matches = helper.search(query);
+            RagHelper<RagHelper.Event> helper = eventRagRegistry.getForCity(cityId);
+            List<RagHelper.Event> matches = helper.search(query);
             if (matches.isEmpty()) {
                 return new EventContextResult(null, List.of());
             }
@@ -627,8 +625,8 @@ public class ProcedureContextService {
 
     public NewsContextResult buildNewsContextResult(String query, String cityId) {
         try {
-            NewsRagHelper helper = newsRagRegistry.getForCity(cityId);
-            List<NewsRagHelper.News> matches = helper.search(query);
+            RagHelper<RagHelper.News> helper = newsRagRegistry.getForCity(cityId);
+            List<RagHelper.News> matches = helper.search(query);
             if (matches.isEmpty()) {
                 return new NewsContextResult(null, List.of());
             }
@@ -649,8 +647,8 @@ public class ProcedureContextService {
 
     public CityInfoContextResult buildCityInfoContextResult(String query, String cityId) {
         try {
-            CityInfoRagHelper helper = cityInfoRagRegistry.getForCity(cityId);
-            List<CityInfoRagHelper.CityInfo> matches = helper.search(query);
+            RagHelper<RagHelper.CityInfo> helper = cityInfoRagRegistry.getForCity(cityId);
+            List<RagHelper.CityInfo> matches = helper.search(query);
             if (matches.isEmpty()) {
                 return new CityInfoContextResult(null, List.of());
             }
@@ -669,7 +667,7 @@ public class ProcedureContextService {
         }
     }
 
-    private String buildNewsContextBlockFromMatches(List<NewsRagHelper.News> matches, String cityId) {
+    private String buildNewsContextBlockFromMatches(List<RagHelper.News> matches, String cityId) {
         if (matches.isEmpty()) {
             return "";
         }
@@ -678,7 +676,7 @@ public class ProcedureContextService {
         sb.append("CONTEXT FROM CITY NEWS IN ").append(cityId).append(":\n\n");
 
         for (int i = 0; i < matches.size(); i++) {
-            NewsRagHelper.News item = matches.get(i);
+            RagHelper.News item = matches.get(i);
             sb.append(i + 1).append(". ").append(item.title).append("\n");
             if (item.publishedAt != null && !item.publishedAt.isBlank()) {
                 sb.append("   Published: ").append(item.publishedAt).append("\n");
@@ -705,7 +703,7 @@ public class ProcedureContextService {
         return sb.toString();
     }
 
-    private String buildEventContextBlockFromMatches(List<EventRagHelper.Event> matches, String cityId) {
+    private String buildEventContextBlockFromMatches(List<RagHelper.Event> matches, String cityId) {
         if (matches.isEmpty())
             return "";
 
@@ -713,7 +711,7 @@ public class ProcedureContextService {
         sb.append("Events in ").append(cityId).append(":\n\n");
 
         for (int i = 0; i < matches.size(); i++) {
-            EventRagHelper.Event event = matches.get(i);
+            RagHelper.Event event = matches.get(i);
             sb.append(i + 1).append(". ").append(event.title).append("\n");
 
             if (event.date != null && !event.date.isBlank()) {
@@ -752,7 +750,7 @@ public class ProcedureContextService {
         return sb.toString();
     }
 
-    private String buildCityInfoContextBlockFromMatches(List<CityInfoRagHelper.CityInfo> matches, String cityId) {
+    private String buildCityInfoContextBlockFromMatches(List<RagHelper.CityInfo> matches, String cityId) {
         if (matches.isEmpty()) {
             return "";
         }
@@ -761,7 +759,7 @@ public class ProcedureContextService {
         sb.append("CITY INFORMATION IN ").append(cityId).append(":\n\n");
 
         for (int i = 0; i < matches.size(); i++) {
-            CityInfoRagHelper.CityInfo item = matches.get(i);
+            RagHelper.CityInfo item = matches.get(i);
             sb.append(i + 1).append(". ").append(item.title).append("\n");
             if (item.theme != null && !item.theme.isBlank()) {
                 sb.append("   Theme: ").append(item.theme).append("\n");
@@ -876,8 +874,8 @@ public class ProcedureContextService {
 
     private List<String> loadNormalizedProcedureTitles(String cityId) {
         try {
-            ProcedureRagHelper helper = ragRegistry.getForCity(cityId);
-            return helper.getAllProcedures().stream()
+            RagHelper<RagHelper.Procedure> helper = ragRegistry.getForCity(cityId);
+            return helper.getAll().stream()
                     .map(procedure -> normalize(procedure.title))
                     .filter(title -> !title.isBlank())
                     .distinct()
@@ -891,8 +889,8 @@ public class ProcedureContextService {
 
     private List<String> loadNormalizedEventTitles(String cityId) {
         try {
-            EventRagHelper helper = eventRagRegistry.getForCity(cityId);
-            return helper.getAllEvents().stream()
+            RagHelper<RagHelper.Event> helper = eventRagRegistry.getForCity(cityId);
+            return helper.getAll().stream()
                     .map(event -> normalize(event.title))
                     .filter(title -> !title.isBlank())
                     .distinct()
@@ -906,8 +904,8 @@ public class ProcedureContextService {
 
     private List<String> loadNormalizedNewsTitles(String cityId) {
         try {
-            NewsRagHelper helper = newsRagRegistry.getForCity(cityId);
-            return helper.getAllNews().stream()
+            RagHelper<RagHelper.News> helper = newsRagRegistry.getForCity(cityId);
+            return helper.getAll().stream()
                     .map(item -> normalize(item.title))
                     .filter(title -> !title.isBlank())
                     .distinct()
@@ -921,8 +919,8 @@ public class ProcedureContextService {
 
     private List<String> loadNormalizedCityInfoTitles(String cityId) {
         try {
-            CityInfoRagHelper helper = cityInfoRagRegistry.getForCity(cityId);
-            return helper.getAllCityInfo().stream()
+            RagHelper<RagHelper.CityInfo> helper = cityInfoRagRegistry.getForCity(cityId);
+            return helper.getAll().stream()
                     .map(item -> normalize(item.title))
                     .filter(title -> !title.isBlank())
                     .distinct()
@@ -941,7 +939,7 @@ public class ProcedureContextService {
         return value.strip().toLowerCase(Locale.ROOT);
     }
 
-    private static boolean isCandidateRelevantToQuery(ProcedureRagHelper.Procedure procedure, String query) {
+    private static boolean isCandidateRelevantToQuery(RagHelper.Procedure procedure, String query) {
         if (procedure == null || query == null || query.isBlank()) {
             return false;
         }

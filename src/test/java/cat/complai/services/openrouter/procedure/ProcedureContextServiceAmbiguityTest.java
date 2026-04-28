@@ -3,8 +3,8 @@ package cat.complai.services.openrouter.procedure;
 import cat.complai.helpers.openrouter.CityInfoRagHelperRegistry;
 import cat.complai.helpers.openrouter.EventRagHelperRegistry;
 import cat.complai.helpers.openrouter.NewsRagHelperRegistry;
-import cat.complai.helpers.openrouter.ProcedureRagHelper;
 import cat.complai.helpers.openrouter.ProcedureRagHelperRegistry;
+import cat.complai.helpers.openrouter.RagHelper;
 import cat.complai.helpers.openrouter.RedactPromptBuilder;
 import cat.complai.helpers.openrouter.rag.InMemoryLexicalIndex;
 import cat.complai.helpers.openrouter.rag.SearchResult;
@@ -36,7 +36,7 @@ class ProcedureContextServiceAmbiguityTest {
     @Mock
     RedactPromptBuilder promptBuilder;
     @Mock
-    ProcedureRagHelper procedureRagHelper;
+    RagHelper<RagHelper.Procedure> procedureRagHelper;
 
     ProcedureContextService service;
 
@@ -59,11 +59,11 @@ class ProcedureContextServiceAmbiguityTest {
 
     @Test
     void detectProcedureAmbiguity_returnsEmpty_whenSearchReturnsOneResult() {
-        ProcedureRagHelper.Procedure proc = new ProcedureRagHelper.Procedure(
+        RagHelper.Procedure proc = new RagHelper.Procedure(
                 "proc-1", "Llicència d'obres", "Description", "Reqs", "Steps",
                 "https://example.com/proc-1");
 
-        InMemoryLexicalIndex.SearchResponse<ProcedureRagHelper.Procedure> response =
+        InMemoryLexicalIndex.SearchResponse<RagHelper.Procedure> response =
                 new InMemoryLexicalIndex.SearchResponse<>(
                         List.of(new SearchResult<>(proc, 0.9, 0)),
                         0, 1, 0.9, 0.15, 0.45, 0.15);
@@ -79,15 +79,15 @@ class ProcedureContextServiceAmbiguityTest {
 
     @Test
     void detectProcedureAmbiguity_returnsCandidates_whenScoresNearlyEqual() {
-        ProcedureRagHelper.Procedure proc1 = new ProcedureRagHelper.Procedure(
+        RagHelper.Procedure proc1 = new RagHelper.Procedure(
                 "proc-1", "Llicència d'obres menors", "permit request", "Reqs1", "Steps1",
                 "https://example.com/proc-1");
-        ProcedureRagHelper.Procedure proc2 = new ProcedureRagHelper.Procedure(
+        RagHelper.Procedure proc2 = new RagHelper.Procedure(
                 "proc-2", "Llicència d'obres majors", "permit application", "Reqs2", "Steps2",
                 "https://example.com/proc-2");
 
         // Nearly equal scores — ratio 0.92/0.95 ≈ 0.969 > default threshold 0.85
-        InMemoryLexicalIndex.SearchResponse<ProcedureRagHelper.Procedure> response =
+        InMemoryLexicalIndex.SearchResponse<RagHelper.Procedure> response =
                 new InMemoryLexicalIndex.SearchResponse<>(
                         List.of(
                                 new SearchResult<>(proc1, 0.95, 0),
@@ -111,17 +111,17 @@ class ProcedureContextServiceAmbiguityTest {
 
     @Test
     void detectProcedureAmbiguity_filtersUnrelatedHousing_whenParkingCandidatesExist() {
-        ProcedureRagHelper.Procedure parkingA = new ProcedureRagHelper.Procedure(
+        RagHelper.Procedure parkingA = new RagHelper.Procedure(
                 "proc-parking-a", "Tarjeta de aparcamiento municipal", "Solicitud de aparcamiento", "", "",
                 "https://example.com/parking-a");
-        ProcedureRagHelper.Procedure housing = new ProcedureRagHelper.Procedure(
+        RagHelper.Procedure housing = new RagHelper.Procedure(
                 "proc-housing", "Ayudas de vivienda social", "Subvenciones de alquiler", "", "",
                 "https://example.com/housing");
-        ProcedureRagHelper.Procedure parkingB = new ProcedureRagHelper.Procedure(
+        RagHelper.Procedure parkingB = new RagHelper.Procedure(
                 "proc-parking-b", "Aparcamiento en avenida Verge de Montserrat", "Permiso para estacionar", "", "",
                 "https://example.com/parking-b");
 
-        InMemoryLexicalIndex.SearchResponse<ProcedureRagHelper.Procedure> response =
+        InMemoryLexicalIndex.SearchResponse<RagHelper.Procedure> response =
                 new InMemoryLexicalIndex.SearchResponse<>(
                         List.of(
                                 new SearchResult<>(parkingA, 0.96, 0),
@@ -145,14 +145,14 @@ class ProcedureContextServiceAmbiguityTest {
 
     @Test
     void detectProcedureAmbiguity_returnsEmpty_whenRelevanceFilteringLeavesSingleCandidate() {
-        ProcedureRagHelper.Procedure parking = new ProcedureRagHelper.Procedure(
+        RagHelper.Procedure parking = new RagHelper.Procedure(
                 "proc-parking", "Tarjeta de aparcamiento municipal", "Solicitud de aparcamiento", "", "",
                 "https://example.com/parking");
-        ProcedureRagHelper.Procedure housing = new ProcedureRagHelper.Procedure(
+        RagHelper.Procedure housing = new RagHelper.Procedure(
                 "proc-housing", "Ayudas de vivienda social", "Subvenciones de alquiler", "", "",
                 "https://example.com/housing");
 
-        InMemoryLexicalIndex.SearchResponse<ProcedureRagHelper.Procedure> response =
+        InMemoryLexicalIndex.SearchResponse<RagHelper.Procedure> response =
                 new InMemoryLexicalIndex.SearchResponse<>(
                         List.of(
                                 new SearchResult<>(parking, 0.95, 0),
@@ -171,12 +171,12 @@ class ProcedureContextServiceAmbiguityTest {
 
     @Test
     void buildProcedureContextResultForId_returnsContext_whenFound() {
-        ProcedureRagHelper.Procedure proc = new ProcedureRagHelper.Procedure(
+        RagHelper.Procedure proc = new RagHelper.Procedure(
                 "proc-1", "Llicència d'obres menors", "Description", "Reqs", "Steps",
                 "https://example.com/proc-1");
 
         when(ragRegistry.getForCity(CITY)).thenReturn(procedureRagHelper);
-        when(procedureRagHelper.getAllProcedures()).thenReturn(List.of(proc));
+        when(procedureRagHelper.getAll()).thenReturn(List.of(proc));
         when(promptBuilder.buildProcedureContextBlockFromMatches(List.of(proc), CITY))
                 .thenReturn("CONTEXT BLOCK");
 
@@ -193,7 +193,7 @@ class ProcedureContextServiceAmbiguityTest {
     @Test
     void buildProcedureContextResultForId_returnsEmpty_whenNotFound() {
         when(ragRegistry.getForCity(CITY)).thenReturn(procedureRagHelper);
-        when(procedureRagHelper.getAllProcedures()).thenReturn(List.of());
+        when(procedureRagHelper.getAll()).thenReturn(List.of());
 
         ProcedureContextService.ProcedureContextResult result =
                 service.buildProcedureContextResultForId("proc-unknown", CITY);

@@ -38,8 +38,6 @@ class LazyInitializationTest {
         ProcedureRagHelperRegistry newProcRegistry = new ProcedureRagHelperRegistry();
         EventRagHelperRegistry newEventRegistry = new EventRagHelperRegistry();
 
-        // Both should have been created with empty ConcurrentHashMap
-        // We can't directly access the map, but we test indirectly via the next test
         assertNotNull(newProcRegistry, "ProcedureRagHelperRegistry should be instantiated");
         assertNotNull(newEventRegistry, "EventRagHelperRegistry should be instantiated");
     }
@@ -50,16 +48,16 @@ class LazyInitializationTest {
         String testCity = "testcity"; // Use test city with actual data files
 
         // First call should trigger initialization
-        ProcedureRagHelper helper1 = procedureRegistry.getForCity(testCity);
-        assertNotNull(helper1, "ProcedureRagHelper should be initialized on first call");
-        assertNotNull(helper1.getAllProcedures(), "Procedures should be loaded");
-        assertTrue(helper1.getAllProcedures().size() > 0, "Procedures list should not be empty");
+        RagHelper<RagHelper.Procedure> helper1 = procedureRegistry.getForCity(testCity);
+        assertNotNull(helper1, "RagHelper for procedures should be initialized on first call");
+        assertNotNull(helper1.getAll(), "Procedures should be loaded");
+        assertTrue(helper1.getAll().size() > 0, "Procedures list should not be empty");
 
         // Same test for EventRagHelper
-        EventRagHelper eventHelper1 = eventRegistry.getForCity(testCity);
-        assertNotNull(eventHelper1, "EventRagHelper should be initialized on first call");
-        assertNotNull(eventHelper1.getAllEvents(), "Events should be loaded");
-        assertTrue(eventHelper1.getAllEvents().size() > 0, "Events list should not be empty");
+        RagHelper<RagHelper.Event> eventHelper1 = eventRegistry.getForCity(testCity);
+        assertNotNull(eventHelper1, "RagHelper for events should be initialized on first call");
+        assertNotNull(eventHelper1.getAll(), "Events should be loaded");
+        assertTrue(eventHelper1.getAll().size() > 0, "Events list should not be empty");
     }
 
     @Test
@@ -68,20 +66,21 @@ class LazyInitializationTest {
         String testCity = "testcity"; // Use test city with actual data files
 
         // First call
-        ProcedureRagHelper helper1 = procedureRegistry.getForCity(testCity);
+        RagHelper<RagHelper.Procedure> helper1 = procedureRegistry.getForCity(testCity);
 
         // Second call should return the same instance
-        ProcedureRagHelper helper2 = procedureRegistry.getForCity(testCity);
+        RagHelper<RagHelper.Procedure> helper2 = procedureRegistry.getForCity(testCity);
 
-        assertSame(helper1, helper2, "Second call should return same cached instance for ProcedureRagHelper");
+        assertSame(helper1, helper2, "Second call should return same cached instance for procedures");
 
-        // Same test for EventRagHelper
-        EventRagHelper eventHelper1 = eventRegistry.getForCity(testCity);
-        EventRagHelper eventHelper2 = eventRegistry.getForCity(testCity);
+        // Same test for events
+        RagHelper<RagHelper.Event> eventHelper1 = eventRegistry.getForCity(testCity);
+        RagHelper<RagHelper.Event> eventHelper2 = eventRegistry.getForCity(testCity);
 
-        assertSame(eventHelper1, eventHelper2, "Second call should return same cached instance for EventRagHelper");
+        assertSame(eventHelper1, eventHelper2, "Second call should return same cached instance for events");
     }
 
+    @SuppressWarnings("unchecked")
     @Test
     @DisplayName("Different cities can be initialized concurrently")
     @Timeout(10) // 10 second timeout
@@ -89,7 +88,7 @@ class LazyInitializationTest {
         String testCity = "testcity"; // Use test city with actual data files
         CountDownLatch latch = new CountDownLatch(2);
         ExecutorService executor = Executors.newFixedThreadPool(2);
-        ProcedureRagHelper[] helpers = new ProcedureRagHelper[2];
+        RagHelper<RagHelper.Procedure>[] helpers = new RagHelper[2];
 
         try {
             executor.submit(() -> {
@@ -120,6 +119,7 @@ class LazyInitializationTest {
         }
     }
 
+    @SuppressWarnings("unchecked")
     @Test
     @DisplayName("Concurrent requests for same city initialize only once")
     @Timeout(10) // 10 second timeout
@@ -131,7 +131,7 @@ class LazyInitializationTest {
 
         // Use AtomicInteger to track how many different instances we got
         // If lazy init is working correctly, all threads should get the same instance
-        ProcedureRagHelper[] helperInstances = new ProcedureRagHelper[5];
+        RagHelper<RagHelper.Procedure>[] helperInstances = new RagHelper[5];
 
         try {
             for (int i = 0; i < 5; i++) {
@@ -139,7 +139,7 @@ class LazyInitializationTest {
                 executor.submit(() -> {
                     try {
                         startLatch.await(); // Wait for all threads to start simultaneously
-                        ProcedureRagHelper helper = procedureRegistry.getForCity(testCity);
+                        RagHelper<RagHelper.Procedure> helper = procedureRegistry.getForCity(testCity);
                         helperInstances[index] = helper;
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();

@@ -12,9 +12,9 @@ class NewsRagHelperTest {
 
     @Test
     void search_relatedQuery_returnsRankedResults() {
-        NewsRagHelper helper = new NewsRagHelper("testcity");
+        RagHelper<RagHelper.News> helper = RagHelper.forNews("testcity");
 
-        List<NewsRagHelper.News> results = helper.search("latest recycling news in the city");
+        List<RagHelper.News> results = helper.search("latest recycling news in the city");
 
         assertFalse(results.isEmpty());
         assertTrue(results.size() <= 3);
@@ -23,9 +23,9 @@ class NewsRagHelperTest {
 
     @Test
     void search_unrelatedQuery_returnsEmpty() {
-        NewsRagHelper helper = new NewsRagHelper("testcity");
+        RagHelper<RagHelper.News> helper = RagHelper.forNews("testcity");
 
-        List<NewsRagHelper.News> results = helper.search("martian taxation policy");
+        List<RagHelper.News> results = helper.search("martian taxation policy");
 
         assertTrue(results.isEmpty());
     }

@@ -17,7 +17,6 @@ import cat.complai.services.openrouter.ai.AiResponseProcessingService;
 import cat.complai.services.openrouter.conversation.ConversationManagementService;
 import cat.complai.services.openrouter.procedure.ProcedureContextService;
 import cat.complai.services.openrouter.cache.ResponseCacheService;
-import cat.complai.helpers.openrouter.EventRagHelperRegistry;
 import cat.complai.services.openrouter.validation.InputValidationService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -36,10 +35,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import cat.complai.dto.openrouter.RedactAcceptedDto;
+import cat.complai.dto.sqs.RedactSqsMessage;
 import cat.complai.utilities.s3.S3PdfUploader;
 import cat.complai.utilities.sqs.SqsComplaintPublisher;
-import cat.complai.dto.sqs.RedactSqsMessage;
-
+import cat.complai.helpers.openrouter.EventRagHelperRegistry;
 import cat.complai.helpers.openrouter.ProcedureRagHelperRegistry;
 import cat.complai.helpers.openrouter.RedactPromptBuilder;
 
@@ -1065,7 +1064,8 @@ public class OpenRouterControllerIntegrationTest {
             AiResponseProcessingService aiResponseService = new AiResponseProcessingService(httpWrapper, cacheService,
                     30);
             ProcedureContextService procedureContextService = new ProcedureContextService(
-                    new ProcedureRagHelperRegistry(), new EventRagHelperRegistry(),
+                    new ProcedureRagHelperRegistry(),
+                    new EventRagHelperRegistry(),
                     new RedactPromptBuilder());
             return new OpenRouterServices(validationService, conversationService, aiResponseService,
                     procedureContextService, new RedactPromptBuilder(), httpWrapper,

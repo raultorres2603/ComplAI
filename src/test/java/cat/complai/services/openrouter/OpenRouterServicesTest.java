@@ -5,16 +5,15 @@ import cat.complai.dto.http.HttpDto;
 import cat.complai.dto.openrouter.ComplainantIdentity;
 import cat.complai.dto.openrouter.OpenRouterResponseDto;
 import cat.complai.dto.openrouter.Source;
-import cat.complai.helpers.openrouter.ProcedureRagHelperRegistry;
 import cat.complai.helpers.openrouter.EventRagHelperRegistry;
-import cat.complai.helpers.openrouter.ProcedureRagHelper;
+import cat.complai.helpers.openrouter.ProcedureRagHelperRegistry;
+import cat.complai.helpers.openrouter.RagHelper;
 import cat.complai.services.openrouter.ai.AiResponseProcessingService;
 import cat.complai.services.openrouter.conversation.ConversationManagementService;
 import cat.complai.services.openrouter.procedure.ProcedureContextService;
 import cat.complai.services.openrouter.validation.InputValidationService;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -53,20 +52,16 @@ public class OpenRouterServicesTest {
     static class ScenarioFakeWrapper extends HttpWrapper {
         // Add a field to allow test to override the next response
         private String nextResponse = null;
-        private List<ProcedureRagHelper.Procedure> fakeProcedures = List.of();
+        private List<RagHelper.Procedure> fakeProcedures = List.of();
         private final ProcedureRagHelperRegistry ragRegistry = new ProcedureRagHelperRegistry() {
             @Override
-            public ProcedureRagHelper getForCity(String cityId) {
-                try {
-                    return new ProcedureRagHelper(cityId) {
-                        @Override
-                        public List<ProcedureRagHelper.Procedure> search(String query) {
-                            return fakeProcedures;
-                        }
-                    };
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
+            public RagHelper<RagHelper.Procedure> getForCity(String cityId) {
+                return new RagHelper<>(cityId, RagHelper.procedureDomainConfig()) {
+                    @Override
+                    public List<RagHelper.Procedure> search(String query) {
+                        return fakeProcedures;
+                    }
+                };
             }
         };
         public List<Map<String, Object>> lastMessages;
@@ -75,7 +70,7 @@ public class OpenRouterServicesTest {
             this.nextResponse = response;
         }
 
-        public void overrideFakeProcedures(List<ProcedureRagHelper.Procedure> fakeProcedures) {
+        public void overrideFakeProcedures(List<RagHelper.Procedure> fakeProcedures) {
             this.fakeProcedures = fakeProcedures;
         }
 
@@ -165,10 +160,10 @@ public class OpenRouterServicesTest {
     void ask_withProcedureMatches_includesSources() {
         ScenarioFakeWrapper wrapper = new ScenarioFakeWrapper();
         OpenRouterServices svc = createOpenRouterService(wrapper);
-        List<ProcedureRagHelper.Procedure> fakeProcs = List.of(
-                new ProcedureRagHelper.Procedure("p1", "Recycling", "Desc", "Req", "Steps",
+        List<RagHelper.Procedure> fakeProcs = List.of(
+                new RagHelper.Procedure("p1", "Recycling", "Desc", "Req", "Steps",
                         "https://example.com/recycling"),
-                new ProcedureRagHelper.Procedure("p2", "Waste", "Desc", "Req", "Steps", "https://example.com/waste"));
+                new RagHelper.Procedure("p2", "Waste", "Desc", "Req", "Steps", "https://example.com/waste"));
         wrapper.overrideFakeProcedures(fakeProcs);
         wrapper.overrideNextResponse("Answer about recycling");
 
