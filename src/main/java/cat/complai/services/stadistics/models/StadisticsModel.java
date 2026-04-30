@@ -1,23 +1,9 @@
 package cat.complai.services.stadistics.models;
 
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import io.micronaut.core.annotation.Introspected;
-import jakarta.inject.Inject;
-import software.amazon.awssdk.regions.Region;
-import software.amazon.awssdk.services.cloudwatchlogs.CloudWatchLogsClient;
-import software.amazon.awssdk.services.cloudwatchlogs.model.FilterLogEventsRequest;
-import software.amazon.awssdk.services.cloudwatchlogs.model.FilterLogEventsResponse;
-
 @Introspected
 public class StadisticsModel {
-
-    @Inject
-    private final static Logger logger = LoggerFactory.getLogger(StadisticsModel.class.getName());
 
     private int totalAskInteractions;
     private int totalFeedbacks;
@@ -33,12 +19,24 @@ public class StadisticsModel {
         return totalAskInteractions;
     }
 
+    public void setTotalAskInteractions(int totalAskInteractions) {
+        this.totalAskInteractions = totalAskInteractions;
+    }
+
     public int getTotalFeedbacks() {
         return totalFeedbacks;
     }
 
+    public void setTotalFeedbacks(int totalFeedbacks) {
+        this.totalFeedbacks = totalFeedbacks;
+    }
+
     public int getTotalRedactInteractions() {
         return totalRedactInteractions;
+    }
+
+    public void setTotalRedactInteractions(int totalRedactInteractions) {
+        this.totalRedactInteractions = totalRedactInteractions;
     }
 
     @Override
