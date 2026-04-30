@@ -6,15 +6,12 @@ import java.time.temporal.ChronoUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.amazonaws.services.lambda.runtime.events.CloudWatchLogsEvent;
-
 import io.micronaut.core.annotation.Introspected;
 import jakarta.inject.Inject;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.cloudwatchlogs.CloudWatchLogsClient;
 import software.amazon.awssdk.services.cloudwatchlogs.model.FilterLogEventsRequest;
 import software.amazon.awssdk.services.cloudwatchlogs.model.FilterLogEventsResponse;
-import software.amazon.awssdk.services.cloudwatchlogs.model.FilteredLogEvent;
 
 @Introspected
 public class StadisticsModel {
@@ -26,7 +23,6 @@ public class StadisticsModel {
     private int totalAskInteractions;
     private int totalFeedbacks;
     private int totalRedactInteractions;
-    private CloudWatchLogsEvent cloudWatchClient;
     private final String logGroupAsk = "/aws/lambda/ComplAILambda-" + System.getenv("ENVIRONMENT");
     private final String logGroupRedact = "/aws/lambda/ComplAIRedactLambda-" + System.getenv("ENVIRONMENT");
     private final String logGroupFeedback = "/aws/lambda/ComplAIFeedbackWorkerLambda-" + System.getenv("ENVIRONMENT");
@@ -36,18 +32,17 @@ public class StadisticsModel {
         this.totalAskInteractions = totalAskInteractions();
         this.totalFeedbacks = totalFeedbacks();
         this.totalRedactInteractions = totalRedactInteractions();
-        this.cloudWatchClient = new CloudWatchLogsEvent();
     }
 
     private int totalRedactInteractions() {
         logger.info("Fetching total redact interactions from CloudWatch Logs for log group: {}", logGroupRedact);
         // get the total redact interactions from cloudwatch logs
         try (CloudWatchLogsClient logsClient = CloudWatchLogsClient.builder()
-                .region(Region.US_EAST_1) // Change to your region
+                .region(Region.EU_WEST_1) // Change to your region
                 .build()) {
 
             // Define the time range (e.g., the last 1 hour)
-            long startTime = Instant.now().minus(1, ChronoUnit.HOURS).toEpochMilli();
+            long startTime = Instant.now().minus(7, ChronoUnit.DAYS).toEpochMilli();
             long endTime = Instant.now().toEpochMilli();
 
             // Build the request
