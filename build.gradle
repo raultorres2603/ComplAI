@@ -11,10 +11,11 @@ repositories {
 }
 
 dependencies {
-        testImplementation("org.mockito:mockito-core:5.2.0")
-        testImplementation("org.mockito:mockito-inline:5.2.0")
+    testImplementation("org.mockito:mockito-core:5.2.0")
+    testImplementation("org.mockito:mockito-inline:5.2.0")
     implementation("com.amazonaws:aws-lambda-java-events")
     implementation("io.micronaut:micronaut-http-client")
+    implementation("io.micronaut.email:micronaut-email-amazon-ses")
     // Reactor support for SSE streaming on @Client interfaces (Publisher<String> return type)
     implementation("io.micronaut.reactor:micronaut-reactor")
     // Micronaut JSON support via Jackson - provides JsonMapper bean
