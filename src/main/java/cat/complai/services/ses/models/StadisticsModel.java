@@ -19,7 +19,6 @@ public class StadisticsModel {
     @Inject
     private final static Logger logger = LoggerFactory.getLogger(StadisticsModel.class.getName());
 
-    private String topCategory;
     private int totalAskInteractions;
     private int totalFeedbacks;
     private int totalRedactInteractions;
@@ -28,7 +27,6 @@ public class StadisticsModel {
     private final String logGroupFeedback = "/aws/lambda/ComplAIFeedbackWorkerLambda-" + System.getenv("ENVIRONMENT");
 
     public StadisticsModel() {
-        this.topCategory = topCategory();
         this.totalAskInteractions = totalAskInteractions();
         this.totalFeedbacks = totalFeedbacks();
         this.totalRedactInteractions = totalRedactInteractions();
@@ -50,9 +48,7 @@ public class StadisticsModel {
                     .logGroupName(logGroupRedact)
                     .startTime(startTime)
                     .endTime(endTime)
-                    // .filterPattern("ERROR") // Optional: Only fetch logs containing specific
-                    // words
-                    .limit(100) // Optional: Limit the number of returned events
+                    .filterPattern("POST /complai/redact received") // Optional: Only fetch logs containing specific
                     .build();
 
             // Fetch the logs
@@ -72,51 +68,85 @@ public class StadisticsModel {
     }
 
     private int totalFeedbacks() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'totalFeedbacks'");
+        logger.info("Fetching total feedback interactions from CloudWatch Logs for log group: {}", logGroupFeedback);
+        // get the total feedback interactions from cloudwatch logs
+        try (CloudWatchLogsClient logsClient = CloudWatchLogsClient.builder()
+                .region(Region.EU_WEST_1) // Change to your region
+                .build()) {
+
+            // Define the time range (e.g., the last 1 hour)
+            long startTime = Instant.now().minus(7, ChronoUnit.DAYS).toEpochMilli();
+            long endTime = Instant.now().toEpochMilli();
+
+            // Build the request
+            FilterLogEventsRequest request = FilterLogEventsRequest.builder()
+                    .logGroupName(logGroupFeedback)
+                    .startTime(startTime)
+                    .endTime(endTime)
+                    .filterPattern("POST /complai/feedback received") // Optional: Only fetch logs containing specific
+                    .build();
+
+            // Fetch the logs
+            try {
+                FilterLogEventsResponse response = logsClient.filterLogEvents(request);
+                int totalInteractions = response.events().size();
+                logger.info("Total feedback interactions found: {}", totalInteractions);
+                return totalInteractions;
+            } catch (Exception e) {
+                logger.error("Error fetching feedback interactions from CloudWatch Logs: {}", e.getMessage());
+                return 0; // Return 0 or handle as needed
+            }
+        } catch (Exception e) {
+            logger.error("Error fetching feedback interactions from CloudWatch Logs: {}", e.getMessage());
+            return 0; // Return 0 or handle as needed
+        }
     }
 
     private int totalAskInteractions() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'totalAskInteractions'");
-    }
+        logger.info("Fetching total ask interactions from CloudWatch Logs for log group: {}", logGroupAsk);
+        // get the total ask interactions from cloudwatch logs
+        try (CloudWatchLogsClient logsClient = CloudWatchLogsClient.builder()
+                .region(Region.EU_WEST_1) // Change to your region
+                .build()) {
 
-    private String topCategory() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'topCategory'");
-    }
+            // Define the time range (e.g., the last 1 hour)
+            long startTime = Instant.now().minus(7, ChronoUnit.DAYS).toEpochMilli();
+            long endTime = Instant.now().toEpochMilli();
 
-    // Getters and Setters
-    public String getTopCategory() {
-        return topCategory;
-    }
+            // Build the request
+            FilterLogEventsRequest request = FilterLogEventsRequest.builder()
+                    .logGroupName(logGroupAsk)
+                    .startTime(startTime)
+                    .endTime(endTime)
+                    .filterPattern("POST /complai/ask (stream) received") // Optional: Only fetch logs containing
+                                                                          // specific
+                    .build();
 
-    public void setTopCategory(String topCategory) {
-        this.topCategory = topCategory;
+            // Fetch the logs
+            try {
+                FilterLogEventsResponse response = logsClient.filterLogEvents(request);
+                int totalInteractions = response.events().size();
+                logger.info("Total ask interactions found: {}", totalInteractions);
+                return totalInteractions;
+            } catch (Exception e) {
+                logger.error("Error fetching ask interactions from CloudWatch Logs: {}", e.getMessage());
+                return 0; // Return 0 or handle as needed
+            }
+        } catch (Exception e) {
+            logger.error("Error fetching ask interactions from CloudWatch Logs: {}", e.getMessage());
+            return 0; // Return 0 or handle as needed
+        }
     }
-
     public int getTotalAskInteractions() {
         return totalAskInteractions;
-    }
-
-    public void setTotalAskInteractions(int totalAskInteractions) {
-        this.totalAskInteractions = totalAskInteractions;
     }
 
     public int getTotalFeedbacks() {
         return totalFeedbacks;
     }
 
-    public void setTotalFeedbacks(int totalFeedbacks) {
-        this.totalFeedbacks = totalFeedbacks;
-    }
-
     public int getTotalRedactInteractions() {
         return totalRedactInteractions;
-    }
-
-    public void setTotalRedactInteractions(int totalRedactInteractions) {
-        this.totalRedactInteractions = totalRedactInteractions;
     }
 
     @Override
@@ -124,7 +154,6 @@ public class StadisticsModel {
         // Build a block of text with the statistics
         StringBuilder sb = new StringBuilder();
         sb.append("Stadistics Report:\n");
-        sb.append("Top Category: ").append(topCategory).append("\n");
         sb.append("Total Ask Interactions: ").append(totalAskInteractions).append("\n");
         sb.append("Total Feedbacks: ").append(totalFeedbacks).append("\n");
         sb.append("Total Redact Interactions: ").append(totalRedactInteractions).append("\n");
