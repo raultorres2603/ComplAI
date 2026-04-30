@@ -30,7 +30,7 @@ public class EmailService implements IEmailService {
     }
 
     @Override
-    public void sendStadistics(String to, String subject, StadisticsModel body) throws Exception {
+    public void sendStadistics(String to, String subject, StadisticsModel body) {
         // Starting sending mail
         logger.info("Starting to send email to: {}", to);
         SendEmailRequest emailRequest = SendEmailRequest.builder()
@@ -46,7 +46,6 @@ public class EmailService implements IEmailService {
             logger.error("Email rejected by SES: {}", e.awsErrorDetails().errorMessage());
         } catch (Exception e) {
             logger.error("Failed to send email: {}", e.getMessage());
-            throw new Exception("Failed to send email: " + e.getMessage(), e);
         }
 
     }

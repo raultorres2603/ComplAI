@@ -14,7 +14,8 @@ public class StadisticsModel {
     public StadisticsModel() {
     }
 
-    public StadisticsModel(String topCategory, int totalAskInteractions, int totalFeedbacks, int totalRedactInteractions) {
+    public StadisticsModel(String topCategory, int totalAskInteractions, int totalFeedbacks,
+            int totalRedactInteractions) {
         this.topCategory = topCategory;
         this.totalAskInteractions = totalAskInteractions;
         this.totalFeedbacks = totalFeedbacks;
@@ -54,4 +55,15 @@ public class StadisticsModel {
         this.totalRedactInteractions = totalRedactInteractions;
     }
 
+    @Override
+    public String toString() {
+        // Build a block of text with the statistics
+        StringBuilder sb = new StringBuilder();
+        sb.append("Stadistics Report:\n");
+        sb.append("Top Category: ").append(topCategory).append("\n");
+        sb.append("Total Ask Interactions: ").append(totalAskInteractions).append("\n");
+        sb.append("Total Feedbacks: ").append(totalFeedbacks).append("\n");
+        sb.append("Total Redact Interactions: ").append(totalRedactInteractions).append("\n");
+        return sb.toString();
+    }
 }
