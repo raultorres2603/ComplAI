@@ -1,4 +1,4 @@
-package cat.complai.services.ses.models;
+package cat.complai.services.stadistics;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -6,31 +6,20 @@ import java.time.temporal.ChronoUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.micronaut.core.annotation.Introspected;
-import jakarta.inject.Inject;
+import cat.complai.services.stadistics.models.StadisticsModel;
+import jakarta.inject.Singleton;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.cloudwatchlogs.CloudWatchLogsClient;
 import software.amazon.awssdk.services.cloudwatchlogs.model.FilterLogEventsRequest;
 import software.amazon.awssdk.services.cloudwatchlogs.model.FilterLogEventsResponse;
 
-@Introspected
-public class StadisticsModel {
+@Singleton
+public class StadisticsService implements IStadisticsService {
 
-    @Inject
-    private final static Logger logger = LoggerFactory.getLogger(StadisticsModel.class.getName());
-
-    private int totalAskInteractions;
-    private int totalFeedbacks;
-    private int totalRedactInteractions;
+    private final Logger logger = LoggerFactory.getLogger(StadisticsService.class.getName());
     private final String logGroupAsk = "/aws/lambda/ComplAILambda-" + System.getenv("ENVIRONMENT");
     private final String logGroupRedact = "/aws/lambda/ComplAIRedactLambda-" + System.getenv("ENVIRONMENT");
     private final String logGroupFeedback = "/aws/lambda/ComplAIFeedbackWorkerLambda-" + System.getenv("ENVIRONMENT");
-
-    public StadisticsModel() {
-        this.totalAskInteractions = totalAskInteractions();
-        this.totalFeedbacks = totalFeedbacks();
-        this.totalRedactInteractions = totalRedactInteractions();
-    }
 
     private int totalRedactInteractions() {
         logger.info("Fetching total redact interactions from CloudWatch Logs for log group: {}", logGroupRedact);
@@ -59,11 +48,11 @@ public class StadisticsModel {
                 return totalInteractions;
             } catch (Exception e) {
                 logger.error("Error fetching redact interactions from CloudWatch Logs: {}", e.getMessage());
-                return 0; // Return 0 or handle as needed
+                throw new RuntimeException("Error fetching redact interactions from CloudWatch Logs", e);
             }
         } catch (Exception e) {
             logger.error("Error fetching redact interactions from CloudWatch Logs: {}", e.getMessage());
-            return 0; // Return 0 or handle as needed
+            throw new RuntimeException("Error fetching redact interactions from CloudWatch Logs", e);
         }
     }
 
@@ -94,11 +83,11 @@ public class StadisticsModel {
                 return totalInteractions;
             } catch (Exception e) {
                 logger.error("Error fetching feedback interactions from CloudWatch Logs: {}", e.getMessage());
-                return 0; // Return 0 or handle as needed
+                throw new RuntimeException("Error fetching feedback interactions from CloudWatch Logs", e);
             }
         } catch (Exception e) {
             logger.error("Error fetching feedback interactions from CloudWatch Logs: {}", e.getMessage());
-            return 0; // Return 0 or handle as needed
+            throw new RuntimeException("Error fetching feedback interactions from CloudWatch Logs", e);
         }
     }
 
@@ -119,7 +108,6 @@ public class StadisticsModel {
                     .startTime(startTime)
                     .endTime(endTime)
                     .filterPattern("POST /complai/ask (stream) received") // Optional: Only fetch logs containing
-                                                                          // specific
                     .build();
 
             // Fetch the logs
@@ -130,33 +118,18 @@ public class StadisticsModel {
                 return totalInteractions;
             } catch (Exception e) {
                 logger.error("Error fetching ask interactions from CloudWatch Logs: {}", e.getMessage());
-                return 0; // Return 0 or handle as needed
+                throw new RuntimeException("Error fetching ask interactions from CloudWatch Logs", e);
             }
         } catch (Exception e) {
             logger.error("Error fetching ask interactions from CloudWatch Logs: {}", e.getMessage());
-            return 0; // Return 0 or handle as needed
+            throw new RuntimeException("Error fetching ask interactions from CloudWatch Logs", e);
         }
-    }
-    public int getTotalAskInteractions() {
-        return totalAskInteractions;
-    }
-
-    public int getTotalFeedbacks() {
-        return totalFeedbacks;
-    }
-
-    public int getTotalRedactInteractions() {
-        return totalRedactInteractions;
     }
 
     @Override
-    public String toString() {
-        // Build a block of text with the statistics
-        StringBuilder sb = new StringBuilder();
-        sb.append("Stadistics Report:\n");
-        sb.append("Total Ask Interactions: ").append(totalAskInteractions).append("\n");
-        sb.append("Total Feedbacks: ").append(totalFeedbacks).append("\n");
-        sb.append("Total Redact Interactions: ").append(totalRedactInteractions).append("\n");
-        return sb.toString();
+    public StadisticsModel generateStadisticsReport() {
+        // TODO: Implement the logic to generate the statistics report
+        return new StadisticsModel();
     }
+
 }

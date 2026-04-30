@@ -3,7 +3,8 @@ package cat.complai.services.ses;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import cat.complai.services.ses.models.StadisticsModel;
+import cat.complai.services.stadistics.StadisticsService;
+import cat.complai.services.stadistics.models.StadisticsModel;
 import io.micronaut.context.annotation.Value;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -19,6 +20,8 @@ public class EmailService implements IEmailService {
     private static final Logger logger = LoggerFactory.getLogger(EmailService.class.getName());
     private final String fromEmail;
     private final SesClient sesClient;
+    @Inject
+    private StadisticsService stadisticsService;
 
     @Inject
     public EmailService(
@@ -32,7 +35,7 @@ public class EmailService implements IEmailService {
     @Override
     public void sendStadistics(String to, String subject) {
         // Build the email body from the StadisticsModel
-        StadisticsModel body = new StadisticsModel();
+        StadisticsModel body = stadisticsService.generateStadisticsReport();
         // Starting sending mail
         logger.info("Starting to send email to: {}", to);
         SendEmailRequest emailRequest = SendEmailRequest.builder()
