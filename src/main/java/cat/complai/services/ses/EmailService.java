@@ -30,7 +30,9 @@ public class EmailService implements IEmailService {
     }
 
     @Override
-    public void sendStadistics(String to, String subject, StadisticsModel body) {
+    public void sendStadistics(String to, String subject) {
+        // Build the email body from the StadisticsModel
+        StadisticsModel body = new StadisticsModel();
         // Starting sending mail
         logger.info("Starting to send email to: {}", to);
         SendEmailRequest emailRequest = SendEmailRequest.builder()

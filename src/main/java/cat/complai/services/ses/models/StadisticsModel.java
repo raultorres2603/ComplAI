@@ -10,16 +10,31 @@ public class StadisticsModel {
     private int totalFeedbacks;
     private int totalRedactInteractions;
 
-    // Constructors
     public StadisticsModel() {
+        this.topCategory = topCategory();
+        this.totalAskInteractions = totalAskInteractions();
+        this.totalFeedbacks = totalFeedbacks();
+        this.totalRedactInteractions = totalRedactInteractions();
     }
 
-    public StadisticsModel(String topCategory, int totalAskInteractions, int totalFeedbacks,
-            int totalRedactInteractions) {
-        this.topCategory = topCategory;
-        this.totalAskInteractions = totalAskInteractions;
-        this.totalFeedbacks = totalFeedbacks;
-        this.totalRedactInteractions = totalRedactInteractions;
+    private int totalRedactInteractions() {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'totalRedactInteractions'");
+    }
+
+    private int totalFeedbacks() {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'totalFeedbacks'");
+    }
+
+    private int totalAskInteractions() {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'totalAskInteractions'");
+    }
+
+    private String topCategory() {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'topCategory'");
     }
 
     // Getters and Setters
