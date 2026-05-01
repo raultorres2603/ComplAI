@@ -244,7 +244,13 @@ export class LambdaStack extends cdk.Stack {
         // OidcIdentityTokenValidator bean.
         RATE_LIMIT_REQUESTS_PER_MINUTE: process.env.RATE_LIMIT_REQUESTS_PER_MINUTE || '20',
         COMPLAI_DEFAULT_CITY_ID: process.env.COMPLAI_DEFAULT_CITY_ID || 'elprat',
-
+        // SES Configuration — sender email per environment (from GitHub Actions secrets)
+        // Development: SES_FROM_EMAIL_DEV, Production: SES_FROM_EMAIL_PROD
+        // Email must be verified in SES before sending. See cdk/README.md for setup.
+        AWS_SES_FROM_EMAIL: environment === 'production'
+          ? process.env.SES_FROM_EMAIL_PROD || ''
+          : process.env.SES_FROM_EMAIL_DEV || '',
+        AWS_SES_REGION: process.env.AWS_SES_REGION || 'eu-west-1'
       },
       role: lambdaRole,
       logGroup: logGroup
@@ -262,6 +268,28 @@ export class LambdaStack extends cdk.Stack {
     eventsBucket.grantRead(lambdaRole);
     newsBucket.grantRead(lambdaRole);
     cityInfoBucket.grantRead(lambdaRole);
+
+    // API Lambda needs SES permissions to send complaint-related emails.
+    // The condition restricts sending to the configured sender email address.
+    // Both ses:SendEmail and ses:SendRawEmail are included for compatibility.
+    const sesFromEmail = environment === 'production'
+      ? process.env.SES_FROM_EMAIL_PROD || ''
+      : process.env.SES_FROM_EMAIL_DEV || '';
+    if (sesFromEmail) {
+      lambdaRole.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          sid: 'SesSendEmailFromVerifiedIdentity',
+          effect: iam.Effect.ALLOW,
+          actions: ['ses:SendEmail', 'ses:SendRawEmail'],
+          resources: ['*'],
+          conditions: {
+            StringEquals: {
+              'ses:FromAddress': sesFromEmail,
+            },
+          },
+        }),
+      );
+    }
 
     const lambdaIntegration = new HttpLambdaIntegration(
       `ComplAILambdaIntegration-${environment}`,
@@ -388,11 +416,34 @@ export class LambdaStack extends cdk.Stack {
         // Response caching configuration for OpenRouter API responses
         RESPONSE_CACHE_ENABLED: process.env.RESPONSE_CACHE_ENABLED || 'true',
         RESPONSE_CACHE_TTL_MINUTES: process.env.RESPONSE_CACHE_TTL_MINUTES || '10',
-        RESPONSE_CACHE_MAX_ENTRIES: process.env.RESPONSE_CACHE_MAX_ENTRIES || '500'
+        RESPONSE_CACHE_MAX_ENTRIES: process.env.RESPONSE_CACHE_MAX_ENTRIES || '500',
+        // SES Configuration — sender email per environment (from GitHub Actions secrets)
+        AWS_SES_FROM_EMAIL: environment === 'production'
+          ? process.env.SES_FROM_EMAIL_PROD || ''
+          : process.env.SES_FROM_EMAIL_DEV || '',
+        AWS_SES_REGION: process.env.AWS_SES_REGION || 'eu-west-1'
       },
       role: workerRole,
       logGroup: workerLogGroup
     });
+
+    // Worker role needs SES permissions if it sends complaint-related emails.
+    // The condition restricts sending to the configured sender email address.
+    if (sesFromEmail) {
+      workerRole.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          sid: 'SesSendEmailFromVerifiedIdentity',
+          effect: iam.Effect.ALLOW,
+          actions: ['ses:SendEmail', 'ses:SendRawEmail'],
+          resources: ['*'],
+          conditions: {
+            StringEquals: {
+              'ses:FromAddress': sesFromEmail,
+            },
+          },
+        }),
+      );
+    }
 
     const feedbackWorkerFn = new lambda.Function(this, `ComplAIFeedbackWorkerLambda-${environment}`, {
       runtime: JAVA_25,
@@ -407,11 +458,34 @@ export class LambdaStack extends cdk.Stack {
         FEEDBACK_QUEUE_URL: feedbackQueue.queueUrl,
         FEEDBACK_BUCKET_NAME: feedbackBucket.bucketName,
         FEEDBACK_QUEUE_REGION: this.region,
+        // SES Configuration — sender email per environment (from GitHub Actions secrets)
+        AWS_SES_FROM_EMAIL: environment === 'production'
+          ? process.env.SES_FROM_EMAIL_PROD || ''
+          : process.env.SES_FROM_EMAIL_DEV || '',
+        AWS_SES_REGION: process.env.AWS_SES_REGION || 'eu-west-1',
         ...(process.env.AWS_ENDPOINT_URL ? { AWS_ENDPOINT_URL: process.env.AWS_ENDPOINT_URL } : {})
       },
       role: feedbackWorkerRole,
       logGroup: feedbackWorkerLogGroup
     });
+
+    // Feedback worker role needs SES permissions if it sends feedback-related emails.
+    // The condition restricts sending to the configured sender email address.
+    if (sesFromEmail) {
+      feedbackWorkerRole.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          sid: 'SesSendEmailFromVerifiedIdentity',
+          effect: iam.Effect.ALLOW,
+          actions: ['ses:SendEmail', 'ses:SendRawEmail'],
+          resources: ['*'],
+          conditions: {
+            StringEquals: {
+              'ses:FromAddress': sesFromEmail,
+            },
+          },
+        }),
+      );
+    }
 
     // Wire SQS → worker Lambda.
     // batchSize=1: each complaint is independent and takes ~30s; batching adds

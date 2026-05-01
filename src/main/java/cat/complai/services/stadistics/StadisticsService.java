@@ -47,12 +47,12 @@ public class StadisticsService implements IStadisticsService {
                 logger.info("Total redact interactions found: {}", totalInteractions);
                 return totalInteractions;
             } catch (Exception e) {
-                logger.error("Error fetching redact interactions from CloudWatch Logs: {}", e.getMessage());
-                throw new RuntimeException("Error fetching redact interactions from CloudWatch Logs", e);
+                logger.error("Error filtering redact interactions from CloudWatch Logs: {}", e.getMessage());
+                throw new RuntimeException("Error filtering redact interactions from CloudWatch Logs", e);
             }
         } catch (Exception e) {
-            logger.error("Error fetching redact interactions from CloudWatch Logs: {}", e.getMessage());
-            throw new RuntimeException("Error fetching redact interactions from CloudWatch Logs", e);
+            logger.error("Error building CloudWatch connection for redact interactions: {}", e.getMessage());
+            throw new RuntimeException("Error building CloudWatch connection", e);
         }
     }
 
@@ -82,12 +82,12 @@ public class StadisticsService implements IStadisticsService {
                 logger.info("Total feedback interactions found: {}", totalInteractions);
                 return totalInteractions;
             } catch (Exception e) {
-                logger.error("Error fetching feedback interactions from CloudWatch Logs: {}", e.getMessage());
-                throw new RuntimeException("Error fetching feedback interactions from CloudWatch Logs", e);
+                logger.error("Error filtering feedback interactions from CloudWatch Logs: {}", e.getMessage());
+                throw new RuntimeException("Error filtering feedback interactions from CloudWatch Logs", e);
             }
         } catch (Exception e) {
-            logger.error("Error fetching feedback interactions from CloudWatch Logs: {}", e.getMessage());
-            throw new RuntimeException("Error fetching feedback interactions from CloudWatch Logs", e);
+            logger.error("Error building CloudWatch connection for feedback interactions: {}", e.getMessage());
+            throw new RuntimeException("Error building CloudWatch connection", e);
         }
     }
 
@@ -117,12 +117,12 @@ public class StadisticsService implements IStadisticsService {
                 logger.info("Total ask interactions found: {}", totalInteractions);
                 return totalInteractions;
             } catch (Exception e) {
-                logger.error("Error fetching ask interactions from CloudWatch Logs: {}", e.getMessage());
-                throw new RuntimeException("Error fetching ask interactions from CloudWatch Logs", e);
+                logger.error("Error filtering ask interactions from CloudWatch Logs: {}", e.getMessage());
+                throw new RuntimeException("Error filtering ask interactions from CloudWatch Logs", e);
             }
         } catch (Exception e) {
-            logger.error("Error fetching ask interactions from CloudWatch Logs: {}", e.getMessage());
-            throw new RuntimeException("Error fetching ask interactions from CloudWatch Logs", e);
+            logger.error("Error building CloudWatch connection: {}", e.getMessage());
+            throw new RuntimeException("Error building CloudWatch connection", e);
         }
     }
 

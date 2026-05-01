@@ -225,6 +225,7 @@ Resources:
       Role: !GetAtt ComplAILambdaRole.Arn
       Environment:
         Variables:
+          ENVIRONMENT: !Ref Environment
           OPENROUTER_API_KEY: !Ref OpenRouterApiKey
           PROCEDURES_BUCKET: !Ref ProceduresBucket
           PROCEDURES_REGION: !Ref LambdaRegion
