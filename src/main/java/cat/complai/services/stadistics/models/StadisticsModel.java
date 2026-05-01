@@ -1,7 +1,7 @@
 package cat.complai.services.stadistics.models;
 
-
 import io.micronaut.core.annotation.Introspected;
+
 @Introspected
 public class StadisticsModel {
 
@@ -9,10 +9,10 @@ public class StadisticsModel {
     private int totalFeedbacks;
     private int totalRedactInteractions;
 
-    public StadisticsModel() {
-        this.totalAskInteractions = 0;
-        this.totalFeedbacks = 0;
-        this.totalRedactInteractions = 0;
+    public StadisticsModel(int totalAskInteractions, int totalRedactInteractions, int totalFeedbacks) {
+        this.totalAskInteractions = totalAskInteractions;
+        this.totalFeedbacks = totalFeedbacks;
+        this.totalRedactInteractions = totalRedactInteractions;
     }
 
     public int getTotalAskInteractions() {

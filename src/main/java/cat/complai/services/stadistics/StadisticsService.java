@@ -128,8 +128,14 @@ public class StadisticsService implements IStadisticsService {
 
     @Override
     public StadisticsModel generateStadisticsReport() {
-        // TODO: Implement the logic to generate the statistics report
-        return new StadisticsModel();
+        logger.info("Generating statistics report...");
+        int totalAsk = totalAskInteractions();
+        int totalRedact = totalRedactInteractions();
+        int totalFeedback = totalFeedbacks();
+
+        StadisticsModel report = new StadisticsModel(totalAsk, totalRedact, totalFeedback);
+        logger.info("Statistics report generated: {}", report);
+        return report;
     }
 
 }
