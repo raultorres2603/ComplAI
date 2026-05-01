@@ -22,6 +22,14 @@ Parameters:
     Type: String
     Default: ''
     Description: API key for city 'elprat'. Generate with ApiKeyGenerator CLI.
+  SesFromEmail:
+    Type: String
+    Default: ''
+    Description: Sender email for SES (passed from CI or manually)
+  SesRegion:
+    Type: String
+    Default: eu-west-1
+    Description: AWS region for SES (passed from CI or manually)
 Conditions:
   IsProduction: !Equals [!Ref Environment, production]
 
@@ -35,6 +43,8 @@ Globals:
         OPENROUTER_API_KEY: !Ref OpenRouterApiKey
         AWS_ENDPOINT_URL: "http://localhost:4566"
         COMPLAINTS_REGION: !Ref LambdaRegion
+        AWS_SES_REGION: !Ref SesRegion
+        AWS_SES_FROM_EMAIL: !Ref SesFromEmail
 
 Resources:
   ComplAILambdaRole:
@@ -244,6 +254,8 @@ Resources:
           COMPLAINTS_BUCKET: !Ref ComplaintsBucket
           COMPLAINTS_REGION: !Ref LambdaRegion
           COMPLAI_DEFAULT_CITY_ID: elprat
+          AWS_SES_REGION: !Ref LambdaRegion
+          AWS_SES_FROM_EMAIL: !Ref SesFromEmail
 
       Events:
         ProxyRoot:
@@ -281,6 +293,8 @@ Resources:
           NEWS_BUCKET: !Ref NewsBucket
           NEWS_REGION: !Ref LambdaRegion
           AWS_ENDPOINT_URL: "http://host.docker.internal:4566"
+          AWS_SES_REGION: !Ref LambdaRegion
+          AWS_SES_FROM_EMAIL: !Ref SesFromEmail
       Events:
         SQSTrigger:
           Type: SQS
@@ -306,6 +320,8 @@ Resources:
           FEEDBACK_BUCKET_NAME: !Ref FeedbackBucket
           FEEDBACK_QUEUE_REGION: !Ref LambdaRegion
           AWS_ENDPOINT_URL: "http://host.docker.internal:4566"
+          AWS_SES_REGION: !Ref LambdaRegion
+          AWS_SES_FROM_EMAIL: !Ref SesFromEmail
       Events:
         SQSTrigger:
           Type: SQS
