@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import cat.complai.config.SesConfiguration;
+import cat.complai.exceptions.ses.SesEmailException;
 import cat.complai.services.stadistics.StadisticsService;
 import cat.complai.services.stadistics.models.StadisticsModel;
 import io.micronaut.context.annotation.Bean;
@@ -11,6 +12,7 @@ import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.ses.SesClient;
+import software.amazon.awssdk.services.ses.model.MailFromDomainNotVerifiedException;
 import software.amazon.awssdk.services.ses.model.MessageRejectedException;
 import software.amazon.awssdk.services.ses.model.SendEmailRequest;
 import software.amazon.awssdk.services.ses.model.SendEmailResponse;
@@ -117,11 +119,14 @@ public class EmailService implements IEmailService {
         } catch (MessageRejectedException e) {
             logger.error("Email rejected by SES (address not verified or blacklisted): {}",
                     e.awsErrorDetails().errorMessage());
-            throw new RuntimeException(
+            throw new SesEmailException(
                     "SES rejected the email: " + e.awsErrorDetails().errorMessage(), e);
+        } catch (MailFromDomainNotVerifiedException e) {
+            logger.error("Sender domain is not verified in SES: {}", e.getMessage());
+            throw new SesEmailException("Sender domain is not verified in SES", e);
         } catch (Exception e) {
             logger.error("Failed to send statistics report email: {}", e.getMessage(), e);
-            throw new RuntimeException("Error sending email via SES: " + e.getMessage(), e);
+            throw new SesEmailException("Error sending email via SES: " + e.getMessage(), e);
         }
     }
 

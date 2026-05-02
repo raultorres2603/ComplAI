@@ -54,6 +54,16 @@ public class SesConfiguration {
     private String region = "eu-west-1";
 
     /**
+     * The recipient email address for statistics reports.
+     * 
+     * Injected from: AWS_SES_RECIPIENT_EMAIL environment variable
+     * Required: YES
+     */
+    @NotBlank(message = "aws.ses.recipient-email is required. Set AWS_SES_RECIPIENT_EMAIL environment variable.")
+    @Email(message = "aws.ses.recipient-email must be a valid email address")
+    private String recipientEmail;
+
+    /**
      * Constructs an empty SesConfiguration.
      * Properties are set via dependency injection from application.properties.
      */
@@ -66,10 +76,12 @@ public class SesConfiguration {
      *
      * @param fromEmail The verified sender email address
      * @param region    The AWS region for SES
+     * @param recipientEmail The recipient email address for reports
      */
-    public SesConfiguration(String fromEmail, String region) {
+    public SesConfiguration(String fromEmail, String region, String recipientEmail) {
         this.fromEmail = fromEmail;
         this.region = region;
+        this.recipientEmail = recipientEmail;
     }
 
     /**
@@ -109,12 +121,29 @@ public class SesConfiguration {
         this.region = region;
     }
 
+    /**
+     * Gets the recipient email address for statistics reports.
+     *
+     * @return The email address to receive statistics reports
+     */
+    public String getRecipientEmail() {
+        return recipientEmail;
+    }
+
+    /**
+     * Sets the recipient email address for statistics reports.
+     *
+     * @param recipientEmail The email address to receive statistics reports
+     */
+    public void setRecipientEmail(String recipientEmail) {
+        this.recipientEmail = recipientEmail;
+    }
+
     @Override
     public String toString() {
         return "SesConfiguration{" +
                 "fromEmail='" + maskEmail(fromEmail) + '\'' +
-                ", region='" + region + '\'' +
-                '}';
+                ", region='" + region + '\'' +                ", recipientEmail='" + maskEmail(recipientEmail) + "'" +                '}';
     }
 
     /**

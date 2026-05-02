@@ -6,12 +6,14 @@ import java.time.temporal.ChronoUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import cat.complai.exceptions.ses.CloudWatchLogsException;
 import cat.complai.services.stadistics.models.StadisticsModel;
 import jakarta.inject.Singleton;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.cloudwatchlogs.CloudWatchLogsClient;
 import software.amazon.awssdk.services.cloudwatchlogs.model.FilterLogEventsRequest;
 import software.amazon.awssdk.services.cloudwatchlogs.model.FilterLogEventsResponse;
+import software.amazon.awssdk.services.cloudwatchlogs.model.ServiceUnavailableException;
 
 @Singleton
 public class StadisticsService implements IStadisticsService {
@@ -46,13 +48,16 @@ public class StadisticsService implements IStadisticsService {
                 int totalInteractions = response.events().size();
                 logger.info("Total redact interactions found: {}", totalInteractions);
                 return totalInteractions;
+            } catch (ServiceUnavailableException e) {
+                logger.error("CloudWatch Logs service is currently unavailable: {}", e.getMessage());
+                throw new CloudWatchLogsException("CloudWatch Logs service is currently unavailable", e);
             } catch (Exception e) {
                 logger.error("Error filtering redact interactions from CloudWatch Logs: {}", e.getMessage());
-                throw new RuntimeException("Error filtering redact interactions from CloudWatch Logs", e);
+                throw new CloudWatchLogsException("Error filtering redact interactions from CloudWatch Logs", e);
             }
         } catch (Exception e) {
             logger.error("Error building CloudWatch connection for redact interactions: {}", e.getMessage());
-            throw new RuntimeException("Error building CloudWatch connection", e);
+            throw new CloudWatchLogsException("Error building CloudWatch connection", e);
         }
     }
 
@@ -81,13 +86,16 @@ public class StadisticsService implements IStadisticsService {
                 int totalInteractions = response.events().size();
                 logger.info("Total feedback interactions found: {}", totalInteractions);
                 return totalInteractions;
+            } catch (ServiceUnavailableException e) {
+                logger.error("CloudWatch Logs service is currently unavailable: {}", e.getMessage());
+                throw new CloudWatchLogsException("CloudWatch Logs service is currently unavailable", e);
             } catch (Exception e) {
                 logger.error("Error filtering feedback interactions from CloudWatch Logs: {}", e.getMessage());
-                throw new RuntimeException("Error filtering feedback interactions from CloudWatch Logs", e);
+                throw new CloudWatchLogsException("Error filtering feedback interactions from CloudWatch Logs", e);
             }
         } catch (Exception e) {
             logger.error("Error building CloudWatch connection for feedback interactions: {}", e.getMessage());
-            throw new RuntimeException("Error building CloudWatch connection", e);
+            throw new CloudWatchLogsException("Error building CloudWatch connection", e);
         }
     }
 
@@ -116,13 +124,16 @@ public class StadisticsService implements IStadisticsService {
                 int totalInteractions = response.events().size();
                 logger.info("Total ask interactions found: {}", totalInteractions);
                 return totalInteractions;
+            } catch (ServiceUnavailableException e) {
+                logger.error("CloudWatch Logs service is currently unavailable: {}", e.getMessage());
+                throw new CloudWatchLogsException("CloudWatch Logs service is currently unavailable", e);
             } catch (Exception e) {
                 logger.error("Error filtering ask interactions from CloudWatch Logs: {}", e.getMessage());
-                throw new RuntimeException("Error filtering ask interactions from CloudWatch Logs", e);
+                throw new CloudWatchLogsException("Error filtering ask interactions from CloudWatch Logs", e);
             }
         } catch (Exception e) {
             logger.error("Error building CloudWatch connection: {}", e.getMessage());
-            throw new RuntimeException("Error building CloudWatch connection", e);
+            throw new CloudWatchLogsException("Error building CloudWatch connection", e);
         }
     }
 
