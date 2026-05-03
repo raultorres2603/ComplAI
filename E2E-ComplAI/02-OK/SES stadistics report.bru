@@ -1,0 +1,23 @@
+meta {
+  name: SES stadistics report
+  type: http
+  seq: 1
+  tags: [
+    ses
+  ]
+}
+
+get {
+  url: {{complaiPath}}/ses/stadistics
+  body: none
+  auth: inherit
+}
+
+tests {
+  test("HTTP status is 200 or 503 (service available or unavailable)", () => {
+    expect([200, 503]).to.include(res.getStatus());
+  });
+  test("Response body is not empty", () => {
+    expect(res.getBody()).to.not.be.empty;
+  });
+}

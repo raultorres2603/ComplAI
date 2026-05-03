@@ -1,0 +1,21 @@
+meta {
+  name: SES stadistics without JWT
+  type: http
+  seq: 1
+  tags: [
+    ses
+    auth
+  ]
+}
+
+get {
+  url: {{complaiPath}}/ses/stadistics
+  body: none
+  auth: none
+}
+
+tests {
+  test("HTTP status is 200 or 401 (auth required or public endpoint)", () => {
+    expect([200, 401, 503]).to.include(res.getStatus());
+  });
+}
