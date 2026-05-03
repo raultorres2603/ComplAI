@@ -3,7 +3,8 @@ package cat.complai.services.ses;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import cat.complai.config.SesConfiguration;
+import cat.complai.config.SesSenderConfig;
+import cat.complai.exceptions.ses.CloudWatchLogsException;
 import cat.complai.exceptions.ses.SesEmailException;
 import cat.complai.services.stadistics.StadisticsService;
 import cat.complai.services.stadistics.models.StadisticsModel;
@@ -20,15 +21,15 @@ import software.amazon.awssdk.services.ses.model.SendEmailResponse;
 /**
  * Email service for sending notifications via Amazon SES (Simple Email
  * Service).
- * 
+ *
  * This service handles:
  * - Sending statistics reports to administrators
  * - Sending complaint confirmations to users (future enhancement)
  * - Error handling and logging for all SES operations
- * 
- * Configuration: Injected from SesConfiguration bean (aws.ses.* properties)
+ *
+ * Configuration: Injected from SesSenderConfig (aws.ses.* properties)
  * Depends on verified sender email in AWS SES console
- * 
+ *
  * @author ComplAI Team
  * @version 1.0
  */
@@ -44,19 +45,19 @@ public class EmailService implements IEmailService {
     private StadisticsService stadisticsService;
 
     /**
-     * Constructs the EmailService with SES configuration.
+     * Constructs the EmailService with SES sender configuration.
      *
-     * @param sesConfig The SesConfiguration bean containing fromEmail and region
+     * @param senderConfig The SesSenderConfig containing fromEmail and region
      * @throws IllegalArgumentException if fromEmail is blank or invalid
      * @throws IllegalStateException    if SES client cannot be initialized
      */
     @Inject
-    public EmailService(SesConfiguration sesConfig) {
-        if (sesConfig == null) {
-            throw new IllegalArgumentException("SesConfiguration bean is required");
+    public EmailService(SesSenderConfig senderConfig) {
+        if (senderConfig == null) {
+            throw new IllegalArgumentException("SesSenderConfig bean is required");
         }
 
-        this.fromEmail = sesConfig.getFromEmail();
+        this.fromEmail = senderConfig.getFromEmail();
 
         if (this.fromEmail == null || this.fromEmail.isBlank()) {
             throw new IllegalArgumentException(
@@ -64,7 +65,7 @@ public class EmailService implements IEmailService {
                             "Set AWS_SES_FROM_EMAIL environment variable and ensure it's a valid email.");
         }
 
-        String region = sesConfig.getRegion();
+        String region = senderConfig.getRegion();
         if (region == null || region.isBlank()) {
             region = "eu-west-1";
         }
@@ -89,7 +90,7 @@ public class EmailService implements IEmailService {
      * @throws IllegalArgumentException if to or subject is invalid
      */
     @Override
-    public void sendStadistics(String to, String subject) {
+    public void sendStadistics(String to, String subject) throws SesEmailException, CloudWatchLogsException {
         if (to == null || to.isBlank()) {
             logger.error("Recipient email address is required");
             throw new IllegalArgumentException("Recipient email address cannot be empty");

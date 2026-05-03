@@ -3,7 +3,8 @@ package cat.complai.controllers.ses;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import cat.complai.services.ses.EmailService;
+import cat.complai.config.SesRecipientProvider;
+import cat.complai.services.ses.IEmailService;
 import cat.complai.exceptions.ses.SesEmailException;
 import cat.complai.exceptions.ses.CloudWatchLogsException;
 import io.micronaut.http.HttpResponse;
@@ -15,21 +16,21 @@ import io.micronaut.http.HttpStatus;
 @Controller("/ses")
 public class SesController {
 
-    private final EmailService emailService;
-    private final String recipientEmail;
+    private final IEmailService emailService;
+    private final SesRecipientProvider recipientProvider;
     private final static Logger logger = LoggerFactory.getLogger(SesController.class);
 
     @Inject
-    public SesController(EmailService emailService, cat.complai.config.SesConfiguration sesConfig) {
+    public SesController(IEmailService emailService, SesRecipientProvider recipientProvider) {
         this.emailService = emailService;
-        this.recipientEmail = sesConfig.getRecipientEmail();
+        this.recipientProvider = recipientProvider;
     }
 
     @Get("/stadistics")
     public HttpResponse<String> sendStadisticsReport() {
         logger.info("Received request to send statistics report via SES");
         try {
-            emailService.sendStadistics(this.recipientEmail, "Usage Statistics Report");
+            emailService.sendStadistics(recipientProvider.getRecipientEmail(), "Usage Statistics Report");
             logger.info("Statistics report sent successfully via SES");
             return HttpResponse.ok("Statistics report sent successfully");
         } catch (CloudWatchLogsException e) {

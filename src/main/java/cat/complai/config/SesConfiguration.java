@@ -7,16 +7,16 @@ import jakarta.validation.constraints.NotBlank;
 
 /**
  * Amazon SES (Simple Email Service) configuration bean.
- * 
+ *
  * Properties are bound from application.properties with the prefix "aws.ses".
  * All configuration values are injected from environment variables at runtime.
- * 
+ *
  * Example application.properties:
  * {@code
  * aws.ses.from-email=${AWS_SES_FROM_EMAIL:}
  * aws.ses.region=${AWS_SES_REGION:eu-west-1}
  * }
- * 
+ *
  * Environment Variables (GitHub Actions):
  * - AWS_SES_FROM_EMAIL: The verified sender email address in AWS SES
  * Required for all environments (dev, staging, prod)
@@ -24,13 +24,13 @@ import jakarta.validation.constraints.NotBlank;
  * - AWS_SES_REGION: AWS region for SES service
  * Default: eu-west-1
  * Example: eu-west-1, us-east-1
- * 
+ *
  * @author ComplAI Team
  * @version 1.0
  */
 @Introspected
 @ConfigurationProperties("aws.ses")
-public class SesConfiguration {
+public class SesConfiguration implements SesRecipientProvider, SesSenderConfig {
 
     /**
      * The verified sender email address in Amazon SES.

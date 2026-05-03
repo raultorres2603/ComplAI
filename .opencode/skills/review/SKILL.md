@@ -2,6 +2,7 @@
 name: review
 description: "Implementation validation workflow. Use when: implementation is complete and needs to be verified against the plan, tests need to be confirmed passing, code quality needs auditing, or a pass/fail verdict is needed before documenting. Reads the plan from session memory."
 argument-hint: "Describe what was implemented (e.g. 'Review the notification endpoint just implemented')"
+compatibility: opencode
 ---
 
 # Review Skill

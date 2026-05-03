@@ -2,6 +2,7 @@
 name: documentation
 description: "Documentation workflow. Use when: writing or updating README, generating project documentation, documenting architecture, documenting API endpoints, documenting infrastructure, producing technical or non-technical documentation."
 argument-hint: "Describe what to document (e.g. 'Update the README with the new API endpoints' or 'Regenerate the full README')"
+compatibility: opencode
 ---
 
 # Documentation Skill

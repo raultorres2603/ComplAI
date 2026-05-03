@@ -1,26 +1,37 @@
 package cat.complai.services.ses;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import java.lang.reflect.Field;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import org.mockito.junit.jupiter.MockitoExtension;
+
 import cat.complai.config.SesConfiguration;
 import cat.complai.exceptions.ses.SesEmailException;
 import cat.complai.services.stadistics.StadisticsService;
 import cat.complai.services.stadistics.models.StadisticsModel;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
 import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
 import software.amazon.awssdk.services.ses.SesClient;
 import software.amazon.awssdk.services.ses.model.MailFromDomainNotVerifiedException;
 import software.amazon.awssdk.services.ses.model.MessageRejectedException;
 import software.amazon.awssdk.services.ses.model.SendEmailRequest;
 import software.amazon.awssdk.services.ses.model.SendEmailResponse;
-
-import java.lang.reflect.Field;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for {@link EmailService}.
@@ -33,6 +44,8 @@ import static org.mockito.Mockito.*;
  * 
  * @author ComplAI Team
  */
+@ExtendWith(MockitoExtension.class)
+@DisplayName("EmailService Unit Tests")
 class EmailServiceTest {
 
     private static final String TEST_FROM_EMAIL = "noreply@complai.test";
@@ -80,34 +93,108 @@ class EmailServiceTest {
         field.set(target, value);
     }
 
-    // ==================== Validation Tests ====================
+    /**
+     * Nested test class for constructor validation tests.
+     */
+    @Nested
+    @DisplayName("Constructor Validation Tests")
+    class ConstructorValidationTests {
 
-    @Test
-    void testSendStadisticsWithNullToThrowsIllegalArgumentException() {
-        assertThrows(IllegalArgumentException.class, () -> {
-            emailService.sendStadistics(null, TEST_SUBJECT);
-        });
+        @Test
+        @DisplayName("Constructor throws IllegalArgumentException when SesConfiguration is null")
+        void testConstructorThrowsExceptionWhenSesConfigurationIsNull() {
+            assertThrows(IllegalArgumentException.class, () -> {
+                new EmailService(null);
+            });
+        }
+
+        @Test
+        @DisplayName("Constructor throws IllegalArgumentException when fromEmail is null")
+        void testConstructorThrowsExceptionWhenFromEmailIsNull() {
+            SesConfiguration mockConfig = org.mockito.Mockito.mock(SesConfiguration.class);
+            try {
+                MockitoAnnotations.openMocks(this);
+                when(mockConfig.getFromEmail()).thenReturn(null);
+
+                assertThrows(IllegalArgumentException.class, () -> {
+                    new EmailService(mockConfig);
+                });
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Test
+        @DisplayName("Constructor throws IllegalArgumentException when fromEmail is blank")
+        void testConstructorThrowsExceptionWhenFromEmailIsBlank() {
+            SesConfiguration mockConfig = org.mockito.Mockito.mock(SesConfiguration.class);
+            try {
+                MockitoAnnotations.openMocks(this);
+                when(mockConfig.getFromEmail()).thenReturn("   ");
+
+                assertThrows(IllegalArgumentException.class, () -> {
+                    new EmailService(mockConfig);
+                });
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
 
-    @Test
-    void testSendStadisticsWithBlankToThrowsIllegalArgumentException() {
-        assertThrows(IllegalArgumentException.class, () -> {
-            emailService.sendStadistics("   ", TEST_SUBJECT);
-        });
-    }
+    /**
+     * Nested test class for input validation tests.
+     */
+    @Nested
+    @DisplayName("Input Validation Tests")
+    class InputValidationTests {
 
-    @Test
-    void testSendStadisticsWithNullSubjectThrowsIllegalArgumentException() {
-        assertThrows(IllegalArgumentException.class, () -> {
-            emailService.sendStadistics(TEST_TO_EMAIL, null);
-        });
-    }
+        @Test
+        @DisplayName("sendStadistics throws IllegalArgumentException when 'to' is null")
+        void testSendStadisticsWithNullToThrowsIllegalArgumentException() {
+            assertThrows(IllegalArgumentException.class, () -> {
+                emailService.sendStadistics(null, TEST_SUBJECT);
+            });
+        }
 
-    @Test
-    void testSendStadisticsWithBlankSubjectThrowsIllegalArgumentException() {
-        assertThrows(IllegalArgumentException.class, () -> {
-            emailService.sendStadistics(TEST_TO_EMAIL, "   ");
-        });
+        @Test
+        @DisplayName("sendStadistics throws IllegalArgumentException when 'to' is empty")
+        void testSendStadisticsWithEmptyToThrowsIllegalArgumentException() {
+            assertThrows(IllegalArgumentException.class, () -> {
+                emailService.sendStadistics("", TEST_SUBJECT);
+            });
+        }
+
+        @Test
+        @DisplayName("sendStadistics throws IllegalArgumentException when 'to' is blank")
+        void testSendStadisticsWithBlankToThrowsIllegalArgumentException() {
+            assertThrows(IllegalArgumentException.class, () -> {
+                emailService.sendStadistics("   ", TEST_SUBJECT);
+            });
+        }
+
+        @Test
+        @DisplayName("sendStadistics throws IllegalArgumentException when 'subject' is null")
+        void testSendStadisticsWithNullSubjectThrowsIllegalArgumentException() {
+            assertThrows(IllegalArgumentException.class, () -> {
+                emailService.sendStadistics(TEST_TO_EMAIL, null);
+            });
+        }
+
+        @Test
+        @DisplayName("sendStadistics throws IllegalArgumentException when 'subject' is empty")
+        void testSendStadisticsWithEmptySubjectThrowsIllegalArgumentException() {
+            assertThrows(IllegalArgumentException.class, () -> {
+                emailService.sendStadistics(TEST_TO_EMAIL, "");
+            });
+        }
+
+        @Test
+        @DisplayName("sendStadistics throws IllegalArgumentException when 'subject' is blank")
+        void testSendStadisticsWithBlankSubjectThrowsIllegalArgumentException() {
+            assertThrows(IllegalArgumentException.class, () -> {
+                emailService.sendStadistics(TEST_TO_EMAIL, "   ");
+            });
+        }
     }
 
     // ==================== Success Case ====================
@@ -305,11 +392,10 @@ class EmailServiceTest {
         when(sesClient.sendEmail(any(SendEmailRequest.class)))
                 .thenReturn(mockResponse);
 
-        StadisticsModel mockStadistics = new StadisticsModel(10, 5, 3);
         String expectedStadisticsContent = "Statistics: 10 queries, 5 feedback";
+        StadisticsModel mockStadistics = new StadisticsModel(10, 5, 3);
 
-        // Mock the toString() method of StadisticsModel to return expected content
-        when(mockStadistics.toString()).thenReturn(expectedStadisticsContent);
+        // Mock the stadisticsService to return our mock with the expected content
         when(stadisticsService.generateStadisticsReport())
                 .thenReturn(mockStadistics);
 
@@ -324,7 +410,14 @@ class EmailServiceTest {
 
         assertNotNull(capturedRequest.message().body(), "Email body must not be null");
         assertNotNull(capturedRequest.message().body().text(), "Email text body must not be null");
-        assertEquals(expectedStadisticsContent, capturedRequest.message().body().text().data(),
-                "Email body must contain statistics report");
+
+        // Verify the statistics report is included in the email body
+        String emailBodyContent = capturedRequest.message().body().text().data();
+        assertTrue(emailBodyContent.contains("Stadistics Report"),
+                "Email body must contain 'Stadistics Report'");
+        assertTrue(emailBodyContent.contains("Total Ask Interactions: 10"),
+                "Email body must contain total ask interactions");
+        assertTrue(emailBodyContent.contains("Total Feedbacks: 3"),
+                "Email body must contain total feedbacks");
     }
 }

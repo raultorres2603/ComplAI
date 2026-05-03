@@ -138,7 +138,7 @@ public class StadisticsService implements IStadisticsService {
     }
 
     @Override
-    public StadisticsModel generateStadisticsReport() {
+    public StadisticsModel generateStadisticsReport() throws CloudWatchLogsException {
         logger.info("Generating statistics report...");
         int totalAsk = totalAskInteractions();
         int totalRedact = totalRedactInteractions();
