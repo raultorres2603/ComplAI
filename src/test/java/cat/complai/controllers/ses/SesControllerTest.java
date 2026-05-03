@@ -61,7 +61,7 @@ public class SesControllerTest {
     // Helper method to call endpoint
     private HttpResponse<String> callEndpoint() {
         return client.toBlocking()
-                .exchange(HttpRequest.GET("/ses/stadistics").header("X-Api-Key", TEST_API_KEY), String.class);
+                .exchange(HttpRequest.GET("/complai/ses/stadistics").header("X-Api-Key", TEST_API_KEY), String.class);
     }
 
     /**
