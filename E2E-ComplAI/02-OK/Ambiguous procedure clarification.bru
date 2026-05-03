@@ -1,7 +1,7 @@
 meta {
   name: Ambiguous procedure clarification
   type: http
-  seq: 12
+  seq: 10
   tags: [
     ask
     clarification
@@ -25,11 +25,11 @@ tests {
   test("HTTP 200 on ambiguous query", () => {
     expect(res.getStatus()).to.equal(200);
   });
-
+  
   test("Response is successful", () => {
     expect(res.getBody().success).to.equal(true);
   });
-
+  
   test("Turn 1 clarification contains ordered list (<ol>)", () => {
     const rawBody = res.getBody();
     const bodyText = typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody);

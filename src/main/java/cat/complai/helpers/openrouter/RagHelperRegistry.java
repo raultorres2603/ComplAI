@@ -20,7 +20,7 @@ import java.util.logging.Logger;
  *            {@link RagHelper.Procedure})
  */
 @Singleton
-public class RagHelperRegistry<T> {
+public abstract class RagHelperRegistry<T> {
 
     private static final Logger logger = Logger.getLogger(RagHelperRegistry.class.getName());
 
