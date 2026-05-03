@@ -1,8 +1,5 @@
 package cat.complai.helpers.openrouter;
 
-import jakarta.inject.Inject;
-import jakarta.inject.Singleton;
-
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.logging.Logger;
@@ -19,7 +16,6 @@ import java.util.logging.Logger;
  *            {@link RagHelper.Event}, {@link RagHelper.CityInfo},
  *            {@link RagHelper.Procedure})
  */
-@Singleton
 public abstract class RagHelperRegistry<T> {
 
     private static final Logger logger = Logger.getLogger(RagHelperRegistry.class.getName());
@@ -36,8 +32,7 @@ public abstract class RagHelperRegistry<T> {
      * @param helperName name used in log messages (e.g., "NewsRagHelper")
      * @param itemLabel  label for items in log messages (e.g., "news")
      */
-    @Inject
-    public RagHelperRegistry(Function<String, RagHelper<T>> factory, String helperName, String itemLabel) {
+    protected RagHelperRegistry(Function<String, RagHelper<T>> factory, String helperName, String itemLabel) {
         this.factory = factory;
         this.helperName = helperName;
         this.itemLabel = itemLabel;
