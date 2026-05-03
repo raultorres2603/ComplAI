@@ -26,6 +26,10 @@ Parameters:
     Type: String
     Default: ''
     Description: Sender email for SES (passed from CI or manually)
+  SesRecipientEmail:
+    Type: String
+    Default: ''
+    Description: Recipient email for SES statistics reports
   SesRegion:
     Type: String
     Default: eu-west-1
@@ -45,6 +49,7 @@ Globals:
         COMPLAINTS_REGION: !Ref LambdaRegion
         AWS_SES_REGION: !Ref SesRegion
         AWS_SES_FROM_EMAIL: !Ref SesFromEmail
+        AWS_SES_RECIPIENT_EMAIL: !Ref SesRecipientEmail
 
 Resources:
   ComplAILambdaRole:
