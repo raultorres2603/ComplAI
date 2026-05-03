@@ -10,7 +10,7 @@ package cat.complai.config;
  * @author ComplAI Team
  * @version 1.0
  */
-public interface SesSenderConfig {
+public interface ISesSenderConfig {
 
     /**
      * Gets the verified sender email address.

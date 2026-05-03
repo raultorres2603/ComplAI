@@ -1,7 +1,7 @@
 package cat.complai.controllers.ses;
 
-import cat.complai.config.SesRecipientProvider;
-import cat.complai.config.SesSenderConfig;
+import cat.complai.config.ISesRecipientProvider;
+import cat.complai.config.ISesSenderConfig;
 import cat.complai.services.ses.IEmailService;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Replaces;
@@ -29,18 +29,18 @@ public class SesControllerTestFactory {
 
     @Primary
     @Singleton
-    @Replaces(SesRecipientProvider.class)
-    public SesRecipientProvider sesRecipientProvider() {
-        SesRecipientProvider provider = mock(SesRecipientProvider.class);
+    @Replaces(ISesRecipientProvider.class)
+    public ISesRecipientProvider sesRecipientProvider() {
+        ISesRecipientProvider provider = mock(ISesRecipientProvider.class);
         when(provider.getRecipientEmail()).thenReturn(RECIPIENT_EMAIL);
         return provider;
     }
 
     @Primary
     @Singleton
-    @Replaces(SesSenderConfig.class)
-    public SesSenderConfig sesSenderConfig() {
-        SesSenderConfig config = mock(SesSenderConfig.class);
+    @Replaces(ISesSenderConfig.class)
+    public ISesSenderConfig sesSenderConfig() {
+        ISesSenderConfig config = mock(ISesSenderConfig.class);
         when(config.getFromEmail()).thenReturn("noreply@test.com");
         when(config.getRegion()).thenReturn("eu-west-1");
         return config;

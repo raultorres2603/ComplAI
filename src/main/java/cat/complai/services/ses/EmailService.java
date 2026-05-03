@@ -3,7 +3,7 @@ package cat.complai.services.ses;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import cat.complai.config.SesSenderConfig;
+import cat.complai.config.ISesSenderConfig;
 import cat.complai.exceptions.ses.CloudWatchLogsException;
 import cat.complai.exceptions.ses.SesEmailException;
 import cat.complai.services.stadistics.StadisticsService;
@@ -52,7 +52,7 @@ public class EmailService implements IEmailService {
      * @throws IllegalStateException    if SES client cannot be initialized
      */
     @Inject
-    public EmailService(SesSenderConfig senderConfig) {
+    public EmailService(ISesSenderConfig senderConfig) {
         if (senderConfig == null) {
             throw new IllegalArgumentException("SesSenderConfig bean is required");
         }

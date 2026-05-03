@@ -30,7 +30,7 @@ import jakarta.validation.constraints.NotBlank;
  */
 @Introspected
 @ConfigurationProperties("aws.ses")
-public class SesConfiguration implements SesRecipientProvider, SesSenderConfig {
+public class SesConfiguration implements ISesRecipientProvider, ISesSenderConfig {
 
     /**
      * The verified sender email address in Amazon SES.
@@ -74,8 +74,8 @@ public class SesConfiguration implements SesRecipientProvider, SesSenderConfig {
      * Constructs a SesConfiguration with explicit values.
      * Used for testing or manual instantiation.
      *
-     * @param fromEmail The verified sender email address
-     * @param region    The AWS region for SES
+     * @param fromEmail      The verified sender email address
+     * @param region         The AWS region for SES
      * @param recipientEmail The recipient email address for reports
      */
     public SesConfiguration(String fromEmail, String region, String recipientEmail) {
@@ -143,7 +143,7 @@ public class SesConfiguration implements SesRecipientProvider, SesSenderConfig {
     public String toString() {
         return "SesConfiguration{" +
                 "fromEmail='" + maskEmail(fromEmail) + '\'' +
-                ", region='" + region + '\'' +                ", recipientEmail='" + maskEmail(recipientEmail) + "'" +                '}';
+                ", region='" + region + '\'' + ", recipientEmail='" + maskEmail(recipientEmail) + "'" + '}';
     }
 
     /**

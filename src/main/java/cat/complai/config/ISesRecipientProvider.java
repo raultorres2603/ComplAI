@@ -10,7 +10,7 @@ package cat.complai.config;
  * @author ComplAI Team
  * @version 1.0
  */
-public interface SesRecipientProvider {
+public interface ISesRecipientProvider {
 
     /**
      * Gets the recipient email address for statistics reports.

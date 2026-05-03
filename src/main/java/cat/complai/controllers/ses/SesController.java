@@ -3,7 +3,7 @@ package cat.complai.controllers.ses;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import cat.complai.config.SesRecipientProvider;
+import cat.complai.config.ISesRecipientProvider;
 import cat.complai.services.ses.IEmailService;
 import cat.complai.exceptions.ses.SesEmailException;
 import cat.complai.exceptions.ses.CloudWatchLogsException;
@@ -17,11 +17,11 @@ import io.micronaut.http.HttpStatus;
 public class SesController {
 
     private final IEmailService emailService;
-    private final SesRecipientProvider recipientProvider;
+    private final ISesRecipientProvider recipientProvider;
     private final static Logger logger = LoggerFactory.getLogger(SesController.class);
 
     @Inject
-    public SesController(IEmailService emailService, SesRecipientProvider recipientProvider) {
+    public SesController(IEmailService emailService, ISesRecipientProvider recipientProvider) {
         this.emailService = emailService;
         this.recipientProvider = recipientProvider;
     }

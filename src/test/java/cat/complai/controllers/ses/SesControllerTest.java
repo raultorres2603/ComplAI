@@ -1,6 +1,6 @@
 package cat.complai.controllers.ses;
 
-import cat.complai.config.SesRecipientProvider;
+import cat.complai.config.ISesRecipientProvider;
 import cat.complai.services.stadistics.IStadisticsService;
 import cat.complai.services.stadistics.models.StadisticsModel;
 import io.micronaut.context.annotation.Primary;
@@ -42,7 +42,7 @@ public class SesControllerTest {
     HttpClient client;
 
     @Inject
-    SesRecipientProvider recipientProvider;
+    ISesRecipientProvider recipientProvider;
 
     /**
      * Stub StadisticsService that returns test data without calling AWS.
