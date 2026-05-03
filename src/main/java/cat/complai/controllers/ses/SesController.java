@@ -13,7 +13,7 @@ import io.micronaut.http.annotation.Get;
 import jakarta.inject.Inject;
 import io.micronaut.http.HttpStatus;
 
-@Controller("/ses")
+@Controller("/complai/ses")
 public class SesController {
 
     private final IEmailService emailService;
