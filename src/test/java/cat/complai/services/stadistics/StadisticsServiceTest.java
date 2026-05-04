@@ -3,7 +3,10 @@ package cat.complai.services.stadistics;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,6 +17,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import cat.complai.services.stadistics.models.ComplaintFile;
+import cat.complai.services.stadistics.models.FeedbackFile;
 import cat.complai.services.stadistics.models.StadisticsModel;
 import software.amazon.awssdk.services.cloudwatchlogs.model.FilterLogEventsResponse;
 import software.amazon.awssdk.services.cloudwatchlogs.model.FilteredLogEvent;
@@ -299,6 +304,108 @@ class StadisticsServiceTest {
                     "Redact interactions should be updated to 13");
             assertEquals(17, report.getTotalFeedbacks(),
                     "Feedbacks should be updated to 17");
+        }
+
+        /**
+         * Test: Verify toString() includes feedback files.
+         * Scenario: Create report with feedback files, verify toString() output
+         * Expected: String contains feedback file info
+         */
+        @Test
+        @DisplayName("Should include feedback files in toString() output")
+        void testToStringIncludesFeedbackFiles() throws MalformedURLException {
+            // Arrange
+            ArrayList<FeedbackFile> feedbackFiles = new ArrayList<>();
+            feedbackFiles.add(new FeedbackFile("fb-001.json", new URL("https://example.com/fb-001.json")));
+            feedbackFiles.add(new FeedbackFile("fb-002.json", new URL("https://example.com/fb-002.json")));
+
+            ArrayList<ComplaintFile> complaintFiles = new ArrayList<>();
+            complaintFiles.add(new ComplaintFile("complaint-001.pdf", new URL("https://example.com/complaint-001.pdf")));
+
+            StadisticsModel report = new StadisticsModel(10, 5, 3, complaintFiles, feedbackFiles);
+
+            // Act
+            String reportString = report.toString();
+
+            // Assert
+            assertTrue(reportString.contains("Feedback files: 2"),
+                    "toString should contain feedback file count");
+            assertTrue(reportString.contains("fb-001.json"),
+                    "toString should contain feedback file name");
+        }
+
+        /**
+         * Test: Verify getFeedbackFile returns correct list.
+         * Scenario: Create report with feedback files, verify getter
+         * Expected: Returns the same list that was set
+         */
+        @Test
+        @DisplayName("Should correctly get feedback file list")
+        void testGetFeedbackFile() throws MalformedURLException {
+            // Arrange
+            ArrayList<FeedbackFile> feedbackFiles = new ArrayList<>();
+            feedbackFiles.add(new FeedbackFile("test-fb.json", new URL("https://example.com/test.json")));
+
+            ArrayList<ComplaintFile> complaintFiles = new ArrayList<>();
+
+            // Act
+            StadisticsModel report = new StadisticsModel(5, 3, 2, complaintFiles, feedbackFiles);
+
+            // Assert
+            assertEquals(1, report.getFeedbackFile().size());
+            assertEquals("test-fb.json", report.getFeedbackFile().get(0).getFileName());
+        }
+
+        /**
+         * Test: Verify backward-compatible constructor sets empty file lists.
+         * Scenario: Use 3-arg constructor
+         * Expected: Both complaintFile and feedbackFile are empty lists
+         */
+        @Test
+        @DisplayName("Should set empty file lists with backward-compatible constructor")
+        void testBackwardCompatibleConstructor() {
+            // Arrange & Act
+            StadisticsModel report = new StadisticsModel(10, 5, 3);
+
+            // Assert
+            assertNotNull(report.getComplaintFile(), "Complaint file list should not be null");
+            assertNotNull(report.getFeedbackFile(), "Feedback file list should not be null");
+            assertTrue(report.getComplaintFile().isEmpty(), "Complaint file list should be empty");
+            assertTrue(report.getFeedbackFile().isEmpty(), "Feedback file list should be empty");
+        }
+
+        /**
+         * Test: Verify FeedbackFile model works correctly.
+         * Scenario: Create and verify FeedbackFile
+         * Expected: All fields are accessible
+         */
+        @Test
+        @DisplayName("Should create FeedbackFile with correct values")
+        void testFeedbackFileModel() throws MalformedURLException {
+            // Arrange
+            URL url = new URL("https://example.com/feedback.json");
+            FeedbackFile feedbackFile = new FeedbackFile("feedback.json", url);
+
+            // Assert
+            assertEquals("feedback.json", feedbackFile.getFileName());
+            assertEquals(url, feedbackFile.getUrl());
+        }
+
+        /**
+         * Test: Verify ComplaintFile model works correctly.
+         * Scenario: Create and verify ComplaintFile
+         * Expected: All fields are accessible
+         */
+        @Test
+        @DisplayName("Should create ComplaintFile with correct values")
+        void testComplaintFileModel() throws MalformedURLException {
+            // Arrange
+            URL url = new URL("https://example.com/complaint.pdf");
+            ComplaintFile complaintFile = new ComplaintFile("complaint.pdf", url);
+
+            // Assert
+            assertEquals("complaint.pdf", complaintFile.getFileName());
+            assertEquals(url, complaintFile.getUrl());
         }
     }
 
