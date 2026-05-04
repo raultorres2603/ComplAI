@@ -91,10 +91,16 @@ public class S3ComplaintLister {
 
             ListObjectsV2Response response = s3Client.listObjectsV2(request);
 
+            // DEBUG: Log raw S3 response
+            logger.info(() -> "Total objects in S3 response: " + response.contents().size());
+            for (S3Object obj : response.contents()) {
+                logger.info(() -> "Object key: " + obj.key() + ", lastModified: " + obj.lastModified());
+            }
+
             for (S3Object s3Object : response.contents()) {
                 // Filter by last modified date (last 7 days)
                 Instant lastModified = s3Object.lastModified();
-                if (lastModified.isAfter(sevenDaysAgo)) {
+                if (lastModified.isBefore(sevenDaysAgo)) {
                     String key = s3Object.key();
                     String fileName = extractFileName(key);
                     String presignedUrl = generatePresignedUrl(key);
