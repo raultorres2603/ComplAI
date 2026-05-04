@@ -11,21 +11,23 @@ public class StadisticsModel {
     private int totalFeedbacks;
     private int totalRedactInteractions;
     private ArrayList<ComplaintFile> complaintFile;
+    private ArrayList<FeedbackFile> feedbackFile;
 
     public StadisticsModel(int totalAskInteractions, int totalRedactInteractions, int totalFeedbacks,
-            ArrayList<ComplaintFile> complaintFile) {
+            ArrayList<ComplaintFile> complaintFile, ArrayList<FeedbackFile> feedbackFile) {
         this.totalAskInteractions = totalAskInteractions;
         this.totalFeedbacks = totalFeedbacks;
         this.totalRedactInteractions = totalRedactInteractions;
         this.complaintFile = complaintFile;
+        this.feedbackFile = feedbackFile;
     }
 
     /**
      * Backward-compatible constructor for tests and existing code.
-     * Defaults complaintFile to an empty list.
+     * Defaults complaintFile and feedbackFile to empty lists.
      */
     public StadisticsModel(int totalAskInteractions, int totalRedactInteractions, int totalFeedbacks) {
-        this(totalAskInteractions, totalRedactInteractions, totalFeedbacks, new ArrayList<>());
+        this(totalAskInteractions, totalRedactInteractions, totalFeedbacks, new ArrayList<>(), new ArrayList<>());
     }
 
     public ArrayList<ComplaintFile> getComplaintFile() {
@@ -34,6 +36,14 @@ public class StadisticsModel {
 
     public void setComplaintFile(ArrayList<ComplaintFile> complaintFile) {
         this.complaintFile = complaintFile;
+    }
+
+    public ArrayList<FeedbackFile> getFeedbackFile() {
+        return feedbackFile;
+    }
+
+    public void setFeedbackFile(ArrayList<FeedbackFile> feedbackFile) {
+        this.feedbackFile = feedbackFile;
     }
 
     public int getTotalAskInteractions() {

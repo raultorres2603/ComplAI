@@ -27,8 +27,8 @@ import java.util.logging.Logger;
  *
  * <p>Security:
  * <ul>
- *   <li>JWT authentication is enforced by JwtAuthFilter before the controller is reached</li>
- *   <li>City context is extracted from the JWT claim and stored in request attributes</li>
+ *   <li>API key authentication is enforced by ApiKeyAuthFilter before the controller is reached</li>
+ *   <li>City context is extracted from the API key and stored in request attributes</li>
  *   <li>No OIDC identity validation is required; users self-identify via userName and idUser</li>
  * </ul>
  */
@@ -59,12 +59,12 @@ public class FeedbackController {
      * <ul>
      *   <li>202 Accepted: Feedback queued successfully</li>
      *   <li>400 Bad Request: Missing or invalid fields (userName, idUser, message)</li>
-     *   <li>401 Unauthorized: Missing or invalid JWT</li>
+     *   <li>401 Unauthorized: Missing or invalid API key</li>
      *   <li>500 Internal Server Error: SQS publish failed</li>
      * </ul>
      *
      * @param request the feedback request body
-     * @param httpRequest the HTTP request (to extract city from JWT)
+     * @param httpRequest the HTTP request (to extract city from API key)
      * @return HTTP response with appropriate status and body
      */
     @Post("/feedback")
@@ -72,7 +72,7 @@ public class FeedbackController {
         // Extract city from the API key claim (set by ApiKeyAuthFilter)
         String city = httpRequest.getAttribute(ApiKeyAuthFilter.CITY_ATTRIBUTE, String.class)
                 .orElseThrow(() -> new IllegalStateException(
-                        "city attribute missing from request — JWT filter should have set it"));
+                        "city attribute missing from request — API key filter should have set it"));
 
         long startTime = System.currentTimeMillis();
         logger.info(() -> "POST /complai/feedback received — city=" + city);
