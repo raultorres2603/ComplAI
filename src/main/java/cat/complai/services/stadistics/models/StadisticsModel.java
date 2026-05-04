@@ -75,14 +75,22 @@ public class StadisticsModel {
         // Build a block of text with the statistics
         StringBuilder sb = new StringBuilder();
         sb.append("Stadistics Report:\n");
-        sb.append("Total Ask Interactions: ").append(totalAskInteractions).append("\n");
-        sb.append("Total Feedbacks: ").append(totalFeedbacks).append("\n");
-        sb.append("Total Redact Interactions: ").append(totalRedactInteractions).append("\n");
+        sb.append("Total Ask logs: ").append(totalAskInteractions).append("\n");
+        sb.append("Total Feedback logs: ").append(totalFeedbacks).append("\n");
+        sb.append("Total Redact logs: ").append(totalRedactInteractions).append("\n");
         sb.append("Complaint Files: ").append(complaintFile.size()).append("\n");
         // For each complaint file, add its name with a "Click here" link
         for (ComplaintFile file : complaintFile) {
             String url = file.getUrl() != null ? file.getUrl().toString() : "";
-            sb.append("- ").append(file.getFileName()).append(": <a href=\"").append(url).append("\">Click here</a> (clicking will go to PDF)\n");
+            sb.append("- ").append(file.getFileName()).append(": <a href=\"").append(url)
+                    .append("\">Click here</a>\n");
+        }
+        sb.append("Feedback files: ").append(feedbackFile.size()).append("\n");
+        // For each feedback file, add its name with a "Click here" link
+        for (FeedbackFile file : feedbackFile) {
+            String url = file.getUrl() != null ? file.getUrl().toString() : "";
+            sb.append("- ").append(file.getFileName()).append(": <a href=\"").append(url)
+                    .append("\">Click here</a>\n");
         }
         return sb.toString();
     }
