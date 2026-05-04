@@ -265,7 +265,8 @@ export class LambdaStack extends cdk.Stack {
         AWS_SES_FROM_EMAIL: process.env.SES_FROM_EMAIL || '',
         AWS_SES_TO_EMAIL: process.env.SES_TO_EMAIL || '',
         AWS_SES_REGION: process.env.AWS_SES_REGION || 'eu-west-1',
-        ENVIRONMENT: environment
+        ENVIRONMENT: environment,
+        FEEDBACK_BUCKET_NAME: feedbackBucket.bucketName,
       },
       role: lambdaRole,
       logGroup: logGroup
