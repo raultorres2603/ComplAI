@@ -415,9 +415,9 @@ class EmailServiceTest {
         String emailBodyContent = capturedRequest.message().body().html().data();
         assertTrue(emailBodyContent.contains("Stadistics Report"),
                 "Email body must contain 'Stadistics Report'");
-        assertTrue(emailBodyContent.contains("Total Ask Interactions: 10"),
-                "Email body must contain total ask interactions");
-        assertTrue(emailBodyContent.contains("Total Feedbacks: 3"),
-                "Email body must contain total feedbacks");
+        assertTrue(emailBodyContent.contains("Total Ask logs: 10"),
+                "Email body must contain total ask logs");
+        assertTrue(emailBodyContent.contains("Total Feedback logs: 3"),
+                "Email body must contain total feedback logs");
     }
 }
