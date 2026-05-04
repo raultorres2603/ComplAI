@@ -392,7 +392,6 @@ class EmailServiceTest {
         when(sesClient.sendEmail(any(SendEmailRequest.class)))
                 .thenReturn(mockResponse);
 
-        String expectedStadisticsContent = "Statistics: 10 queries, 5 feedback";
         StadisticsModel mockStadistics = new StadisticsModel(10, 5, 3);
 
         // Mock the stadisticsService to return our mock with the expected content
