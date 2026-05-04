@@ -244,9 +244,10 @@ export class LambdaStack extends cdk.Stack {
         // OidcIdentityTokenValidator bean.
         RATE_LIMIT_REQUESTS_PER_MINUTE: process.env.RATE_LIMIT_REQUESTS_PER_MINUTE || '20',
         COMPLAI_DEFAULT_CITY_ID: process.env.COMPLAI_DEFAULT_CITY_ID || 'elprat',
-        // SES Configuration — sender email from GitHub Environment Variable (SES_FROM_EMAIL)
+        // SES Configuration — sender and recipient emails from GitHub Environment Variables
         // Email must be verified in SES before sending. See cdk/README.md for setup.
         AWS_SES_FROM_EMAIL: process.env.SES_FROM_EMAIL || '',
+        AWS_SES_TO_EMAIL: process.env.SES_TO_EMAIL || '',
         AWS_SES_REGION: process.env.AWS_SES_REGION || 'eu-west-1'
       },
       role: lambdaRole,
@@ -412,8 +413,9 @@ export class LambdaStack extends cdk.Stack {
         RESPONSE_CACHE_ENABLED: process.env.RESPONSE_CACHE_ENABLED || 'true',
         RESPONSE_CACHE_TTL_MINUTES: process.env.RESPONSE_CACHE_TTL_MINUTES || '10',
         RESPONSE_CACHE_MAX_ENTRIES: process.env.RESPONSE_CACHE_MAX_ENTRIES || '500',
-        // SES Configuration — sender email from GitHub Environment Variable (SES_FROM_EMAIL)
+        // SES Configuration — sender and recipient emails from GitHub Environment Variables
         AWS_SES_FROM_EMAIL: process.env.SES_FROM_EMAIL || '',
+        AWS_SES_TO_EMAIL: process.env.SES_TO_EMAIL || '',
         AWS_SES_REGION: process.env.AWS_SES_REGION || 'eu-west-1'
       },
       role: workerRole,
@@ -451,8 +453,9 @@ export class LambdaStack extends cdk.Stack {
         FEEDBACK_QUEUE_URL: feedbackQueue.queueUrl,
         FEEDBACK_BUCKET_NAME: feedbackBucket.bucketName,
         FEEDBACK_QUEUE_REGION: this.region,
-        // SES Configuration — sender email from GitHub Environment Variable (SES_FROM_EMAIL)
+        // SES Configuration — sender and recipient emails from GitHub Environment Variables
         AWS_SES_FROM_EMAIL: process.env.SES_FROM_EMAIL || '',
+        AWS_SES_TO_EMAIL: process.env.SES_TO_EMAIL || '',
         AWS_SES_REGION: process.env.AWS_SES_REGION || 'eu-west-1',
         ...(process.env.AWS_ENDPOINT_URL ? { AWS_ENDPOINT_URL: process.env.AWS_ENDPOINT_URL } : {})
       },
