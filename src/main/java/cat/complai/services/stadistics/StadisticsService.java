@@ -38,8 +38,8 @@ public class StadisticsService implements IStadisticsService {
             FilterLogEventsRequest request = FilterLogEventsRequest.builder()
                     .logGroupName(logGroupRedact)
                     .startTime(startTime)
+                    .filterPattern("redact received")
                     .endTime(endTime)
-                    .filterPattern("POST /complai/redact received") // Optional: Only fetch logs containing specific
                     .build();
 
             // Fetch the logs
@@ -77,7 +77,7 @@ public class StadisticsService implements IStadisticsService {
                     .logGroupName(logGroupFeedback)
                     .startTime(startTime)
                     .endTime(endTime)
-                    .filterPattern("POST /complai/feedback received") // Optional: Only fetch logs containing specific
+                    .filterPattern("feedback received")
                     .build();
 
             // Fetch the logs
@@ -115,7 +115,7 @@ public class StadisticsService implements IStadisticsService {
                     .logGroupName(logGroupAsk)
                     .startTime(startTime)
                     .endTime(endTime)
-                    .filterPattern("POST /complai/ask (stream) received") // Optional: Only fetch logs containing
+                    .filterPattern("ask (stream) received")
                     .build();
 
             // Fetch the logs
