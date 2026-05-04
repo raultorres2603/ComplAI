@@ -284,6 +284,7 @@ export class LambdaStack extends cdk.Stack {
     eventsBucket.grantRead(lambdaRole);
     newsBucket.grantRead(lambdaRole);
     cityInfoBucket.grantRead(lambdaRole);
+    feedbackBucket.grantRead(lambdaRole);
 
     // API Lambda needs SES permissions to send complaint-related emails.
     // The condition restricts sending to the configured sender email address.

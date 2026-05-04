@@ -40,9 +40,9 @@ public class S3FeedbackLister {
 
     private final Logger logger = Logger.getLogger(S3FeedbackLister.class.getName());
 
-    @Inject
+@Inject
     public S3FeedbackLister(
-            @Value("${FEEDBACK_BUCKET_NAME:complai-feedback-development}") String bucketName,
+            @Value("${FEEDBACK_BUCKET_NAME:}") String bucketName,
             @Value("${FEEDBACK_QUEUE_REGION:eu-west-1}") String region,
             @Value("${AWS_ENDPOINT_URL:}") String endpointUrl) {
         this.bucketName = bucketName;
