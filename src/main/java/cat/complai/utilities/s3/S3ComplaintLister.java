@@ -100,7 +100,8 @@ public class S3ComplaintLister {
             for (S3Object s3Object : response.contents()) {
                 // Filter by last modified date (last 7 days)
                 Instant lastModified = s3Object.lastModified();
-                if (lastModified.isBefore(sevenDaysAgo)) {
+                // Include only files modified within the last 7 days (i.e., after sevenDaysAgo)
+                if (lastModified.isAfter(sevenDaysAgo)) {
                     String key = s3Object.key();
                     String fileName = extractFileName(key);
                     String presignedUrl = generatePresignedUrl(key);

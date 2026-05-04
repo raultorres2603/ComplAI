@@ -69,9 +69,10 @@ public class StadisticsModel {
         sb.append("Total Feedbacks: ").append(totalFeedbacks).append("\n");
         sb.append("Total Redact Interactions: ").append(totalRedactInteractions).append("\n");
         sb.append("Complaint Files: ").append(complaintFile.size()).append("\n");
-        // For each complaint file, add its name and URL
+        // For each complaint file, add its name with a "Click here" link
         for (ComplaintFile file : complaintFile) {
-            sb.append("- ").append(file.getFileName()).append(": ").append(file.getUrl()).append("\n");
+            String url = file.getUrl() != null ? file.getUrl().toString() : "";
+            sb.append("- ").append(file.getFileName()).append(": <a href=\"").append(url).append("\">Click here</a> (clicking will go to PDF)\n");
         }
         return sb.toString();
     }

@@ -109,7 +109,7 @@ public class EmailService implements IEmailService {
         SendEmailRequest emailRequest = SendEmailRequest.builder()
                 .destination(d -> d.toAddresses(to))
                 .message(m -> m.subject(s -> s.data(subject))
-                        .body(b -> b.text(t -> t.data(body.toString()))))
+                        .body(b -> b.html(h -> h.data(body.toString()))))
                 .source(fromEmail)
                 .build();
 

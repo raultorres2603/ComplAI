@@ -409,10 +409,10 @@ class EmailServiceTest {
         SendEmailRequest capturedRequest = requestCaptor.getValue();
 
         assertNotNull(capturedRequest.message().body(), "Email body must not be null");
-        assertNotNull(capturedRequest.message().body().text(), "Email text body must not be null");
+        assertNotNull(capturedRequest.message().body().html(), "Email HTML body must not be null");
 
         // Verify the statistics report is included in the email body
-        String emailBodyContent = capturedRequest.message().body().text().data();
+        String emailBodyContent = capturedRequest.message().body().html().data();
         assertTrue(emailBodyContent.contains("Stadistics Report"),
                 "Email body must contain 'Stadistics Report'");
         assertTrue(emailBodyContent.contains("Total Ask Interactions: 10"),
