@@ -20,7 +20,7 @@ public class StadisticsService implements IStadisticsService {
 
     private final Logger logger = LoggerFactory.getLogger(StadisticsService.class.getName());
     private final String logGroupAsk = "/aws/lambda/ComplAILambda-" + System.getenv("ENVIRONMENT");
-    private final String logGroupRedact = "/aws/lambda/ComplAIRedactLambda-" + System.getenv("ENVIRONMENT");
+    private final String logGroupRedact = "/aws/lambda/ComplAIRedactorLambda-" + System.getenv("ENVIRONMENT");
     private final String logGroupFeedback = "/aws/lambda/ComplAIFeedbackWorkerLambda-" + System.getenv("ENVIRONMENT");
 
     private int totalRedactInteractions() {
@@ -38,7 +38,6 @@ public class StadisticsService implements IStadisticsService {
             FilterLogEventsRequest request = FilterLogEventsRequest.builder()
                     .logGroupName(logGroupRedact)
                     .startTime(startTime)
-                    .filterPattern("redact received")
                     .endTime(endTime)
                     .build();
 
@@ -77,7 +76,6 @@ public class StadisticsService implements IStadisticsService {
                     .logGroupName(logGroupFeedback)
                     .startTime(startTime)
                     .endTime(endTime)
-                    .filterPattern("feedback received")
                     .build();
 
             // Fetch the logs
@@ -115,7 +113,6 @@ public class StadisticsService implements IStadisticsService {
                     .logGroupName(logGroupAsk)
                     .startTime(startTime)
                     .endTime(endTime)
-                    .filterPattern("ask (stream) received")
                     .build();
 
             // Fetch the logs
