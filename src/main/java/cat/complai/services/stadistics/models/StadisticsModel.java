@@ -72,25 +72,31 @@ public class StadisticsModel {
 
     @Override
     public String toString() {
-        // Build a block of text with the statistics
+        // Build HTML with labels and ul tags for files
         StringBuilder sb = new StringBuilder();
-        sb.append("Stadistics Report:\n");
-        sb.append("Total Ask logs: ").append(totalAskInteractions).append("\n");
-        sb.append("Total Feedback logs: ").append(totalFeedbacks).append("\n");
-        sb.append("Total Redact logs: ").append(totalRedactInteractions).append("\n");
-        sb.append("Complaint Files: ").append(complaintFile.size()).append("\n");
-        // For each complaint file, add its name with a "Click here" link
-        for (ComplaintFile file : complaintFile) {
-            String url = file.getUrl() != null ? file.getUrl().toString() : "";
-            sb.append("- ").append(file.getFileName()).append(": <a href=\"").append(url)
-                    .append("\">Click here</a>\n");
+        sb.append("<p><strong>Stadistics Report:</strong></p>\n");
+        sb.append("<p><strong>Total Ask logs:</strong> ").append(totalAskInteractions).append("</p>\n");
+        sb.append("<p><strong>Total Feedback logs:</strong> ").append(totalFeedbacks).append("</p>\n");
+        sb.append("<p><strong>Total Redact logs:</strong> ").append(totalRedactInteractions).append("</p>\n");
+        sb.append("<p><strong>Complaint Files:</strong> ").append(complaintFile.size()).append("</p>\n");
+        if (!complaintFile.isEmpty()) {
+            sb.append("<ul>\n");
+            for (ComplaintFile file : complaintFile) {
+                String url = file.getUrl() != null ? file.getUrl().toString() : "";
+                sb.append("  <li>").append(file.getFileName()).append(": <a href=\"").append(url)
+                        .append("\">Click here</a></li>\n");
+            }
+            sb.append("</ul>\n");
         }
-        sb.append("Feedback files: ").append(feedbackFile.size()).append("\n");
-        // For each feedback file, add its name with a "Click here" link
-        for (FeedbackFile file : feedbackFile) {
-            String url = file.getUrl() != null ? file.getUrl().toString() : "";
-            sb.append("- ").append(file.getFileName()).append(": <a href=\"").append(url)
-                    .append("\">Click here</a>\n");
+        sb.append("<p><strong>Feedback files:</strong> ").append(feedbackFile.size()).append("</p>\n");
+        if (!feedbackFile.isEmpty()) {
+            sb.append("<ul>\n");
+            for (FeedbackFile file : feedbackFile) {
+                String url = file.getUrl() != null ? file.getUrl().toString() : "";
+                sb.append("  <li>").append(file.getFileName()).append(": <a href=\"").append(url)
+                        .append("\">Click here</a></li>\n");
+            }
+            sb.append("</ul>\n");
         }
         return sb.toString();
     }
