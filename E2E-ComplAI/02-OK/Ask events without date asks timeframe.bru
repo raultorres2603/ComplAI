@@ -1,7 +1,7 @@
 meta {
   name: Ask events without date asks timeframe
   type: http
-  seq: 10
+  seq: 8
   tags: [
     ask
     revised
@@ -25,7 +25,7 @@ tests {
   test("HTTP status is successful", () => {
     expect(res.getStatus()).to.be.lessThan(500);
   });
-
+  
   test("Response asks for date range", () => {
     const rawBody = res.getBody();
     const bodyText = (typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody)).toLowerCase();

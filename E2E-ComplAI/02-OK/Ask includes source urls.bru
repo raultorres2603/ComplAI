@@ -1,7 +1,7 @@
 meta {
   name: Ask includes source urls
   type: http
-  seq: 11
+  seq: 9
   tags: [
     ask
     revised
@@ -25,13 +25,13 @@ tests {
   test("HTTP status is successful", () => {
     expect(res.getStatus()).to.be.lessThan(500);
   });
-
+  
   test("SSE output includes sources event", () => {
     const rawBody = res.getBody();
     const bodyText = (typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody)).toLowerCase();
     expect(bodyText.includes('"type":"sources"')).to.equal(true);
   });
-
+  
   test("SSE sources include source URLs", () => {
     const rawBody = res.getBody();
     const bodyText = (typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody)).toLowerCase();

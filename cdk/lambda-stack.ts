@@ -88,6 +88,20 @@ export class LambdaStack extends cdk.Stack {
     // Attach AWS managed policy for basic Lambda logging
     lambdaRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'));
 
+    // Allow reading from CloudWatch Logs for statistics/stadistics queries
+    lambdaRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        sid: 'FilterLogEvents',
+        effect: iam.Effect.ALLOW,
+        actions: ['logs:FilterLogEvents'],
+        resources: [
+          `arn:aws:logs:${this.region}:${this.account}:log-group:/aws/lambda/ComplAILambda-${environment}:*`,
+          `arn:aws:logs:${this.region}:${this.account}:log-group:/aws/lambda/ComplAIRedactorLambda-${environment}:*`,
+          `arn:aws:logs:${this.region}:${this.account}:log-group:/aws/lambda/ComplAIFeedbackWorkerLambda-${environment}:*`,
+        ],
+      }),
+    );
+
     // --- Lambda code source ------------------------------------------------
     // CI path: the GitHub Actions workflow uploads the fat JAR to the
     // deployments bucket before calling `cdk deploy`, then sets
@@ -188,6 +202,8 @@ export class LambdaStack extends cdk.Stack {
     const lambdaFn = new lambda.Function(this, `ComplAILambda-${environment}`, {
       runtime: JAVA_25,
       architecture: lambda.Architecture.ARM_64,
+      // Explicit function name to ensure it matches the log group and is under the 64-char limit.
+      functionName: `ComplAILambda-${environment}`,
       // The project uses the Micronaut APIGateway V2 runtime; use the Micronaut
       // APIGateway v2 HTTP event function handler which the Micronaut build
       // packages in the shadow JAR.
@@ -244,7 +260,12 @@ export class LambdaStack extends cdk.Stack {
         // OidcIdentityTokenValidator bean.
         RATE_LIMIT_REQUESTS_PER_MINUTE: process.env.RATE_LIMIT_REQUESTS_PER_MINUTE || '20',
         COMPLAI_DEFAULT_CITY_ID: process.env.COMPLAI_DEFAULT_CITY_ID || 'elprat',
-
+        // SES Configuration — sender and recipient emails from GitHub Environment Variables
+        // Email must be verified in SES before sending. See cdk/README.md for setup.
+        AWS_SES_FROM_EMAIL: process.env.SES_FROM_EMAIL || '',
+        AWS_SES_TO_EMAIL: process.env.SES_TO_EMAIL || '',
+        AWS_SES_REGION: process.env.AWS_SES_REGION || 'eu-west-1',
+        ENVIRONMENT: environment
       },
       role: lambdaRole,
       logGroup: logGroup
@@ -262,6 +283,26 @@ export class LambdaStack extends cdk.Stack {
     eventsBucket.grantRead(lambdaRole);
     newsBucket.grantRead(lambdaRole);
     cityInfoBucket.grantRead(lambdaRole);
+
+    // API Lambda needs SES permissions to send complaint-related emails.
+    // The condition restricts sending to the configured sender email address.
+    // Both ses:SendEmail and ses:SendRawEmail are included for compatibility.
+    const sesFromEmail = process.env.SES_FROM_EMAIL || '';
+    if (sesFromEmail) {
+      lambdaRole.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          sid: 'SesSendEmailFromVerifiedIdentity',
+          effect: iam.Effect.ALLOW,
+          actions: ['ses:SendEmail', 'ses:SendRawEmail'],
+          resources: ['*'],
+          conditions: {
+            StringEquals: {
+              'ses:FromAddress': sesFromEmail,
+            },
+          },
+        }),
+      );
+    }
 
     const lambdaIntegration = new HttpLambdaIntegration(
       `ComplAILambdaIntegration-${environment}`,
@@ -357,6 +398,8 @@ export class LambdaStack extends cdk.Stack {
     const workerFn = new lambda.Function(this, `ComplAIRedactorLambda-${environment}`, {
       runtime: JAVA_25,
       architecture: lambda.Architecture.ARM_64,
+      // Explicit function name to ensure it matches the log group and is under the 64-char limit.
+      functionName: `ComplAIRedactorLambda-${environment}`,
       // Same shadow JAR, different handler class — no separate build needed.
       handler: 'cat.complai.worker.RedactWorkerHandler::handleRequest',
       code,
@@ -388,15 +431,39 @@ export class LambdaStack extends cdk.Stack {
         // Response caching configuration for OpenRouter API responses
         RESPONSE_CACHE_ENABLED: process.env.RESPONSE_CACHE_ENABLED || 'true',
         RESPONSE_CACHE_TTL_MINUTES: process.env.RESPONSE_CACHE_TTL_MINUTES || '10',
-        RESPONSE_CACHE_MAX_ENTRIES: process.env.RESPONSE_CACHE_MAX_ENTRIES || '500'
+        RESPONSE_CACHE_MAX_ENTRIES: process.env.RESPONSE_CACHE_MAX_ENTRIES || '500',
+        // SES Configuration — sender and recipient emails from GitHub Environment Variables
+        AWS_SES_FROM_EMAIL: process.env.SES_FROM_EMAIL || '',
+        AWS_SES_TO_EMAIL: process.env.SES_TO_EMAIL || '',
+        AWS_SES_REGION: process.env.AWS_SES_REGION || 'eu-west-1'
       },
       role: workerRole,
       logGroup: workerLogGroup
     });
 
+    // Worker role needs SES permissions if it sends complaint-related emails.
+    // The condition restricts sending to the configured sender email address.
+    if (sesFromEmail) {
+      workerRole.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          sid: 'SesSendEmailFromVerifiedIdentity',
+          effect: iam.Effect.ALLOW,
+          actions: ['ses:SendEmail', 'ses:SendRawEmail'],
+          resources: ['*'],
+          conditions: {
+            StringEquals: {
+              'ses:FromAddress': sesFromEmail,
+            },
+          },
+        }),
+      );
+    }
+
     const feedbackWorkerFn = new lambda.Function(this, `ComplAIFeedbackWorkerLambda-${environment}`, {
       runtime: JAVA_25,
       architecture: lambda.Architecture.ARM_64,
+      // Explicit function name to ensure it matches the log group and is under the 64-char limit.
+      functionName: `ComplAIFeedbackWorkerLambda-${environment}`,
       // Handler must match the feedback worker: FeedbackWorkerHandler::handleRequest
       handler: 'cat.complai.feedback.worker.FeedbackWorkerHandler::handleRequest',
       code,
@@ -407,11 +474,33 @@ export class LambdaStack extends cdk.Stack {
         FEEDBACK_QUEUE_URL: feedbackQueue.queueUrl,
         FEEDBACK_BUCKET_NAME: feedbackBucket.bucketName,
         FEEDBACK_QUEUE_REGION: this.region,
+        // SES Configuration — sender and recipient emails from GitHub Environment Variables
+        AWS_SES_FROM_EMAIL: process.env.SES_FROM_EMAIL || '',
+        AWS_SES_TO_EMAIL: process.env.SES_TO_EMAIL || '',
+        AWS_SES_REGION: process.env.AWS_SES_REGION || 'eu-west-1',
         ...(process.env.AWS_ENDPOINT_URL ? { AWS_ENDPOINT_URL: process.env.AWS_ENDPOINT_URL } : {})
       },
       role: feedbackWorkerRole,
       logGroup: feedbackWorkerLogGroup
     });
+
+    // Feedback worker role needs SES permissions if it sends feedback-related emails.
+    // The condition restricts sending to the configured sender email address.
+    if (sesFromEmail) {
+      feedbackWorkerRole.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          sid: 'SesSendEmailFromVerifiedIdentity',
+          effect: iam.Effect.ALLOW,
+          actions: ['ses:SendEmail', 'ses:SendRawEmail'],
+          resources: ['*'],
+          conditions: {
+            StringEquals: {
+              'ses:FromAddress': sesFromEmail,
+            },
+          },
+        }),
+      );
+    }
 
     // Wire SQS → worker Lambda.
     // batchSize=1: each complaint is independent and takes ~30s; batching adds

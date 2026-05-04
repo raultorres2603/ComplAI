@@ -2,6 +2,7 @@
 name: implementation
 description: "Code implementation workflow. Use when: writing new code, adding endpoints or services, modifying existing behaviour, writing tests, fixing bugs, adding infrastructure. Reads the plan from session memory and implements each step following project conventions."
 argument-hint: "Point to the plan in session memory or describe what to implement"
+compatibility: opencode
 ---
 
 # Implementation Skill

@@ -15,12 +15,13 @@ Serverless AI backend for municipal assistance in El Prat de Llobregat: citizen 
 8. [Getting Started (Local)](#getting-started-local)
 9. [Testing](#testing)
 10. [Infrastructure (CDK)](#infrastructure-cdk)
-11. [Performance Optimizations](#performance-optimizations)
-12. [Conversation History (Multi-turn)](#conversation-history-multi-turn)
-13. [PDF Complaint Generation](#pdf-complaint-generation)
-14. [AI Identity and Behaviour](#ai-identity-and-behaviour)
-15. [Contributing](#contributing)
-16. [License](#license)
+11. [Configuration](#configuration)
+12. [Performance Optimizations](#performance-optimizations)
+13. [Conversation History (Multi-turn)](#conversation-history-multi-turn)
+14. [PDF Complaint Generation](#pdf-complaint-generation)
+15. [AI Identity and Behaviour](#ai-identity-and-behaviour)
+16. [Contributing](#contributing)
+17. [License](#license)
 
 ## Project Overview
 ComplAI is the backend of a public-service assistant for residents of El Prat de Llobregat.
@@ -194,6 +195,46 @@ npm run build
 npx cdk synth
 npx cdk deploy 'ComplAI*Stack-development'
 ```
+
+## Configuration
+
+### Amazon SES (Simple Email Service)
+
+ComplAI uses Amazon SES for sending complaint statistics reports and notifications.
+
+**Configuration Bean**: `cat.complai.config.SesConfiguration` (`@ConfigurationProperties("aws.ses")`)
+
+**Required GitHub Actions Secrets**:
+| Secret | Description | Example |
+|---|---|---|
+| `AWS_SES_FROM_EMAIL` | Verified sender email in AWS SES | `noreply@elprathq.cat` |
+| `AWS_SES_REGION` | AWS region for SES (optional) | `eu-west-1` |
+
+**Environment Variable Mapping** (application.properties):
+```properties
+aws.ses.from-email=${AWS_SES_FROM_EMAIL:}
+aws.ses.region=${AWS_SES_REGION:eu-west-1}
+```
+
+**Pre-deployment Requirements**:
+1. Verify the sender email in AWS SES console (sandbox or production mode)
+2. For production, request production access quota increase (AWS approval required)
+3. Ensure Lambda execution role has `ses:SendEmail` permission (configured in CDK lambda-stack.ts)
+
+**Micronaut Configuration**:
+- SES configuration is injected into `EmailService` via dependency injection
+- Application startup will fail immediately if `AWS_SES_FROM_EMAIL` is missing or invalid
+- Per-environment configuration is supported via separate environment variable values in GitHub Actions
+
+**Local Testing**:
+- Use test email values in `src/test/resources/application.properties`
+- Mock SES client in unit tests (no real AWS calls)
+- For SAM local testing, set environment variables in `sam/env.json`
+
+**Validation**:
+- Email validation performed at application startup via `@Email` annotation
+- Invalid or missing sender email causes immediate startup failure (fail-fast)
+- SES SDK errors are logged with context for troubleshooting
 
 ## Performance Optimizations
 - Conversation cache with TTL and turn cap.

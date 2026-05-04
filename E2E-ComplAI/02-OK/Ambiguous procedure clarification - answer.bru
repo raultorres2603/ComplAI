@@ -1,7 +1,7 @@
 meta {
   name: Ambiguous procedure clarification - answer
   type: http
-  seq: 13
+  seq: 11
   tags: [
     ask
     clarification
@@ -25,23 +25,23 @@ tests {
   test("HTTP 200 on clarification answer", () => {
     expect(res.getStatus()).to.equal(200);
   });
-
+  
   test("Response is successful", () => {
     expect(res.getBody().success).to.equal(true);
   });
-
+  
   test("Turn 2 response is not a clarification (no <ol>)", () => {
     const rawBody = res.getBody();
     const bodyText = typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody);
     expect(bodyText.includes("<ol>")).to.equal(false);
   });
-
+  
   test("SSE output includes sources event", () => {
     const rawBody = res.getBody();
     const bodyText = typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody);
     expect(bodyText.includes('"type":"sources"')).to.equal(true);
   });
-
+  
   test("Sources event contains at least one entry", () => {
     const rawBody = res.getBody();
     const bodyText = typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody);

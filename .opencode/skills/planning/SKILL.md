@@ -2,6 +2,7 @@
 name: planning
 description: "Requirements analysis and planning workflow. Use when: the request is unclear, a new feature needs to be broken down, implementation steps need to be created, or acceptance criteria need to be defined. Produces a structured plan in session memory. Uses vscode/askQuestions to clarify ambiguities interactively."
 argument-hint: "Describe the feature or requirement to plan"
+compatibility: opencode
 ---
 
 # Planning Skill
