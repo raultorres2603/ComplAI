@@ -96,6 +96,8 @@ export class LambdaStack extends cdk.Stack {
         actions: ['logs:FilterLogEvents'],
         resources: [
           `arn:aws:logs:${this.region}:${this.account}:log-group:/aws/lambda/ComplAILambda-${environment}:*`,
+          `arn:aws:logs:${this.region}:${this.account}:log-group:/aws/lambda/ComplAIRedactorLambda-${environment}:*`,
+          `arn:aws:logs:${this.region}:${this.account}:log-group:/aws/lambda/ComplAIFeedbackWorkerLambda-${environment}:*`,
         ],
       }),
     );
@@ -200,6 +202,8 @@ export class LambdaStack extends cdk.Stack {
     const lambdaFn = new lambda.Function(this, `ComplAILambda-${environment}`, {
       runtime: JAVA_25,
       architecture: lambda.Architecture.ARM_64,
+      // Explicit function name to ensure it matches the log group and is under the 64-char limit.
+      functionName: `ComplAILambda-${environment}`,
       // The project uses the Micronaut APIGateway V2 runtime; use the Micronaut
       // APIGateway v2 HTTP event function handler which the Micronaut build
       // packages in the shadow JAR.
@@ -394,6 +398,8 @@ export class LambdaStack extends cdk.Stack {
     const workerFn = new lambda.Function(this, `ComplAIRedactorLambda-${environment}`, {
       runtime: JAVA_25,
       architecture: lambda.Architecture.ARM_64,
+      // Explicit function name to ensure it matches the log group and is under the 64-char limit.
+      functionName: `ComplAIRedactorLambda-${environment}`,
       // Same shadow JAR, different handler class — no separate build needed.
       handler: 'cat.complai.worker.RedactWorkerHandler::handleRequest',
       code,
@@ -456,6 +462,8 @@ export class LambdaStack extends cdk.Stack {
     const feedbackWorkerFn = new lambda.Function(this, `ComplAIFeedbackWorkerLambda-${environment}`, {
       runtime: JAVA_25,
       architecture: lambda.Architecture.ARM_64,
+      // Explicit function name to ensure it matches the log group and is under the 64-char limit.
+      functionName: `ComplAIFeedbackWorkerLambda-${environment}`,
       // Handler must match the feedback worker: FeedbackWorkerHandler::handleRequest
       handler: 'cat.complai.feedback.worker.FeedbackWorkerHandler::handleRequest',
       code,
