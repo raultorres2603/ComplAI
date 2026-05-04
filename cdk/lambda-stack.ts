@@ -467,7 +467,7 @@ export class LambdaStack extends cdk.Stack {
       // Explicit function name to ensure it matches the log group and is under the 64-char limit.
       functionName: `ComplAIFeedbackWorkerLambda-${environment}`,
       // Handler must match the feedback worker: FeedbackWorkerHandler::handleRequest
-      handler: 'cat.complai.feedback.worker.FeedbackWorkerHandler::handleRequest',
+      handler: 'cat.complai.services.worker.FeedbackWorkerHandler::handleRequest',
       code,
       memorySize: 512,  // Feedback processing is lighter than AI redaction
       timeout: cdk.Duration.seconds(60),
