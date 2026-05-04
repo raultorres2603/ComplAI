@@ -36,18 +36,17 @@ This CDK project defines the complete AWS infrastructure for ComplAI:
 The CDK stacks require these GitHub Actions secrets to be configured in your repository:
 
 **Development environment (Development repository):**
-- `SES_FROM_EMAIL_DEV`: Verified SES sender email for development (e.g., `no-reply-dev@example.com`)
 - `OPENROUTER_API_KEY`: OpenRouter API key for AI responses (both dev and prod)
 - `API_KEY_ELPRAT`: API key for El Prat municipality (both dev and prod)
 - `COMPLAI_CORS_ALLOWED_ORIGIN`: CORS allowed origin for development (defaults to GitHub Pages URL)
 
 **Production environment (Production repository/branch):**
-- `SES_FROM_EMAIL_PROD`: Verified SES sender email for production (e.g., `no-reply@example.com`)
 - `OPENROUTER_API_KEY`: Same as development or different key if needed
 - `API_KEY_ELPRAT`: Same as development or different key if needed
 - `COMPLAI_CORS_ALLOWED_ORIGIN`: CORS allowed origin for production
 
 **Optional overrides (both environments):**
+- `SES_FROM_EMAIL`: Verified SES sender email (e.g., `no-reply@example.com`) — set as a GitHub Environment Variable
 - `OPENROUTER_MODEL`: Custom OpenRouter model (defaults to `openrouter/free`)
 - `OPENROUTER_REQUEST_TIMEOUT_SECONDS`: Request timeout (defaults to `60`)
 - `OPENROUTER_OVERALL_TIMEOUT_SECONDS`: Overall timeout (defaults to `60`)
@@ -72,7 +71,7 @@ Before the first deployment, you must verify sender email addresses in AWS SES:
 1. **Login to AWS Console** → Services → SES → Email Addresses
 2. **Verify Sender Email**:
    - Click "Verify a New Email Address"
-   - Enter the `SES_FROM_EMAIL_DEV` address
+   - Enter the email address you set as `SES_FROM_EMAIL` in your GitHub Environment
    - AWS sends a verification email to that address
    - Click the verification link in the email
 3. **Verify Test Recipients** (Sandbox only):
@@ -105,8 +104,8 @@ Before the first deployment, you must verify sender email addresses in AWS SES:
 
 The sender email address is passed to Lambda via environment variables and must match the verified SES identity:
 
-- **Development**: Uses `SES_FROM_EMAIL_DEV` from GitHub Actions secrets
-- **Production**: Uses `SES_FROM_EMAIL_PROD` from GitHub Actions secrets
+- Set `SES_FROM_EMAIL` as a GitHub Environment Variable (not a secret) in both the **development** and **production** environments
+- The workflow automatically uses the correct value based on which environment you're deploying to
 
 The IAM policy includes a condition that restricts sending to only the configured sender address, ensuring emails can only be sent from verified identities.
 
@@ -162,16 +161,16 @@ The GitHub Actions workflow handles:
 4. Two separate deployments: Development and Production
 
 GitHub Actions passes environment variables to CDK automatically:
-- Secrets are injected as environment variables (e.g., `SES_FROM_EMAIL_DEV`)
-- CDK reads them via `process.env.SES_FROM_EMAIL_DEV` in TypeScript
+- Secrets are injected as environment variables (e.g., `OPENROUTER_API_KEY`)
+- Environment Variables (like `SES_FROM_EMAIL`) are passed via `vars.*`
+- CDK reads them via `process.env.SES_FROM_EMAIL` in TypeScript
 
 ### Manual Deployment (For Testing)
 
-To deploy locally with test secrets:
+To deploy locally with test values:
 
 ```bash
-export SES_FROM_EMAIL_DEV="test@example.com"
-export SES_FROM_EMAIL_PROD="prod@example.com"
+export SES_FROM_EMAIL="test@example.com"
 export OPENROUTER_API_KEY="sk-..."
 export API_KEY_ELPRAT="your-key"
 
@@ -272,7 +271,7 @@ aws sns list-subscriptions-by-topic --topic-arn arn:aws:sns:REGION:ACCOUNT:Compl
 
 **Solution**:
 1. Verify the sender email in AWS SES console
-2. Check that `SES_FROM_EMAIL_DEV`/`SES_FROM_EMAIL_PROD` matches verified email
+2. Check that `SES_FROM_EMAIL` environment variable matches verified email
 3. If in Sandbox, verify recipient email too
 4. Wait 1-2 minutes after verification, then retry
 

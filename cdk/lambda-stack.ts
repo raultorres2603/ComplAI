@@ -244,12 +244,9 @@ export class LambdaStack extends cdk.Stack {
         // OidcIdentityTokenValidator bean.
         RATE_LIMIT_REQUESTS_PER_MINUTE: process.env.RATE_LIMIT_REQUESTS_PER_MINUTE || '20',
         COMPLAI_DEFAULT_CITY_ID: process.env.COMPLAI_DEFAULT_CITY_ID || 'elprat',
-        // SES Configuration — sender email per environment (from GitHub Actions secrets)
-        // Development: SES_FROM_EMAIL_DEV, Production: SES_FROM_EMAIL_PROD
+        // SES Configuration — sender email from GitHub Environment Variable (SES_FROM_EMAIL)
         // Email must be verified in SES before sending. See cdk/README.md for setup.
-        AWS_SES_FROM_EMAIL: environment === 'production'
-          ? process.env.SES_FROM_EMAIL_PROD || ''
-          : process.env.SES_FROM_EMAIL_DEV || '',
+        AWS_SES_FROM_EMAIL: process.env.SES_FROM_EMAIL || '',
         AWS_SES_REGION: process.env.AWS_SES_REGION || 'eu-west-1'
       },
       role: lambdaRole,
@@ -272,9 +269,7 @@ export class LambdaStack extends cdk.Stack {
     // API Lambda needs SES permissions to send complaint-related emails.
     // The condition restricts sending to the configured sender email address.
     // Both ses:SendEmail and ses:SendRawEmail are included for compatibility.
-    const sesFromEmail = environment === 'production'
-      ? process.env.SES_FROM_EMAIL_PROD || ''
-      : process.env.SES_FROM_EMAIL_DEV || '';
+    const sesFromEmail = process.env.SES_FROM_EMAIL || '';
     if (sesFromEmail) {
       lambdaRole.addToPrincipalPolicy(
         new iam.PolicyStatement({
@@ -417,10 +412,8 @@ export class LambdaStack extends cdk.Stack {
         RESPONSE_CACHE_ENABLED: process.env.RESPONSE_CACHE_ENABLED || 'true',
         RESPONSE_CACHE_TTL_MINUTES: process.env.RESPONSE_CACHE_TTL_MINUTES || '10',
         RESPONSE_CACHE_MAX_ENTRIES: process.env.RESPONSE_CACHE_MAX_ENTRIES || '500',
-        // SES Configuration — sender email per environment (from GitHub Actions secrets)
-        AWS_SES_FROM_EMAIL: environment === 'production'
-          ? process.env.SES_FROM_EMAIL_PROD || ''
-          : process.env.SES_FROM_EMAIL_DEV || '',
+        // SES Configuration — sender email from GitHub Environment Variable (SES_FROM_EMAIL)
+        AWS_SES_FROM_EMAIL: process.env.SES_FROM_EMAIL || '',
         AWS_SES_REGION: process.env.AWS_SES_REGION || 'eu-west-1'
       },
       role: workerRole,
@@ -458,10 +451,8 @@ export class LambdaStack extends cdk.Stack {
         FEEDBACK_QUEUE_URL: feedbackQueue.queueUrl,
         FEEDBACK_BUCKET_NAME: feedbackBucket.bucketName,
         FEEDBACK_QUEUE_REGION: this.region,
-        // SES Configuration — sender email per environment (from GitHub Actions secrets)
-        AWS_SES_FROM_EMAIL: environment === 'production'
-          ? process.env.SES_FROM_EMAIL_PROD || ''
-          : process.env.SES_FROM_EMAIL_DEV || '',
+        // SES Configuration — sender email from GitHub Environment Variable (SES_FROM_EMAIL)
+        AWS_SES_FROM_EMAIL: process.env.SES_FROM_EMAIL || '',
         AWS_SES_REGION: process.env.AWS_SES_REGION || 'eu-west-1',
         ...(process.env.AWS_ENDPOINT_URL ? { AWS_ENDPOINT_URL: process.env.AWS_ENDPOINT_URL } : {})
       },

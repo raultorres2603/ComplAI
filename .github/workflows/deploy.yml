@@ -280,6 +280,7 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
           API_KEY_ELPRAT: ${{ secrets.API_KEY_ELPRAT }}
+          SES_FROM_EMAIL: ${{ vars.SES_FROM_EMAIL }}
           TARGET_ENV: ${{ steps.target.outputs.environment }}
           # DEPLOYMENT_JAR_KEY is written to $GITHUB_ENV in the Upload JAR step.
           # Re-expose it explicitly here so the step contract is obvious.
