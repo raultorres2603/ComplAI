@@ -88,6 +88,18 @@ export class LambdaStack extends cdk.Stack {
     // Attach AWS managed policy for basic Lambda logging
     lambdaRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'));
 
+    // Allow reading from CloudWatch Logs for statistics/stadistics queries
+    lambdaRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        sid: 'FilterLogEvents',
+        effect: iam.Effect.ALLOW,
+        actions: ['logs:FilterLogEvents'],
+        resources: [
+          `arn:aws:logs:${this.region}:${this.account}:log-group:/aws/lambda/ComplAILambda-${environment}:*`,
+        ],
+      }),
+    );
+
     // --- Lambda code source ------------------------------------------------
     // CI path: the GitHub Actions workflow uploads the fat JAR to the
     // deployments bucket before calling `cdk deploy`, then sets
