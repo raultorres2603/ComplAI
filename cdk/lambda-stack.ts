@@ -248,7 +248,8 @@ export class LambdaStack extends cdk.Stack {
         // Email must be verified in SES before sending. See cdk/README.md for setup.
         AWS_SES_FROM_EMAIL: process.env.SES_FROM_EMAIL || '',
         AWS_SES_TO_EMAIL: process.env.SES_TO_EMAIL || '',
-        AWS_SES_REGION: process.env.AWS_SES_REGION || 'eu-west-1'
+        AWS_SES_REGION: process.env.AWS_SES_REGION || 'eu-west-1',
+        ENVIRONMENT: environment
       },
       role: lambdaRole,
       logGroup: logGroup
