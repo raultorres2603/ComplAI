@@ -401,7 +401,7 @@ export class LambdaStack extends cdk.Stack {
       // Explicit function name to ensure it matches the log group and is under the 64-char limit.
       functionName: `ComplAIRedactorLambda-${environment}`,
       // Same shadow JAR, different handler class — no separate build needed.
-      handler: 'cat.complai.worker.RedactWorkerHandler::handleRequest',
+      handler: 'cat.complai.services.worker.RedactWorkerHandler::handleRequest',
       code,
       memorySize: 1024,
       // Must be ≤ SQS visibility timeout (90s). Lambda extends visibility automatically
