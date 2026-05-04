@@ -2,12 +2,16 @@ package cat.complai.services.stadistics;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import cat.complai.exceptions.ses.CloudWatchLogsException;
+import cat.complai.services.stadistics.models.ComplaintFile;
 import cat.complai.services.stadistics.models.StadisticsModel;
+import cat.complai.utilities.s3.S3ComplaintLister;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.cloudwatchlogs.CloudWatchLogsClient;
@@ -22,6 +26,13 @@ public class StadisticsService implements IStadisticsService {
     private final String logGroupAsk = "/aws/lambda/ComplAILambda-" + System.getenv("ENVIRONMENT");
     private final String logGroupRedact = "/aws/lambda/ComplAIRedactorLambda-" + System.getenv("ENVIRONMENT");
     private final String logGroupFeedback = "/aws/lambda/ComplAIFeedbackWorkerLambda-" + System.getenv("ENVIRONMENT");
+
+    private final S3ComplaintLister s3ComplaintLister;
+
+    @Inject
+    public StadisticsService(S3ComplaintLister s3ComplaintLister) {
+        this.s3ComplaintLister = s3ComplaintLister;
+    }
 
     private int totalRedactInteractions() {
         logger.info("Fetching total redact interactions from CloudWatch Logs for log group: {}", logGroupRedact);
@@ -141,9 +152,33 @@ public class StadisticsService implements IStadisticsService {
         int totalRedact = totalRedactInteractions();
         int totalFeedback = totalFeedbacks();
 
-        StadisticsModel report = new StadisticsModel(totalAsk, totalRedact, totalFeedback);
+        // Get complaint files from S3
+        ArrayList<ComplaintFile> complaintFiles = getComplaintFiles();
+
+        StadisticsModel report = new StadisticsModel(totalAsk, totalRedact, totalFeedback, complaintFiles);
         logger.info("Statistics report generated: {}", report);
         return report;
+    }
+
+    private ArrayList<ComplaintFile> getComplaintFiles() {
+        logger.info("Fetching complaint files from S3...");
+
+        try {
+            ArrayList<ComplaintFile> files = new ArrayList<>();
+            var entries = s3ComplaintLister.listComplaintFiles();
+
+            for (S3ComplaintLister.ComplaintFileEntry entry : entries) {
+                // Convert String URL to java.net.URL
+                java.net.URL url = new java.net.URL(entry.getUrl());
+                files.add(new ComplaintFile(entry.getFileName(), url));
+            }
+
+            logger.info("Found {} complaint files from S3", files.size());
+            return files;
+        } catch (Exception e) {
+            logger.error("Error fetching complaint files from S3: {}", e.getMessage());
+            throw new RuntimeException("Failed to fetch complaint files: " + e.getMessage(), e);
+        }
     }
 
 }
