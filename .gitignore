@@ -24,3 +24,4 @@ cdk/package-lock.json
 task.md
 .vscode/settings.json
 bin
+opencode.json
