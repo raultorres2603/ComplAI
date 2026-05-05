@@ -252,12 +252,12 @@ class StadisticsServiceTest {
         }
 
         /**
-         * Test: Verify report toString() output.
+         * Test: Verify report toString() output returns HTML format.
          * Scenario: Convert report to string representation
-         * Expected: String contains expected format and values
+         * Expected: String contains HTML tags with expected values
          */
         @Test
-        @DisplayName("Should generate correct toString() output")
+        @DisplayName("Should generate HTML-formatted toString() output")
         void testReportToString() {
             // Arrange
             StadisticsModel report = new StadisticsModel(10, 5, 3);
@@ -267,8 +267,16 @@ class StadisticsServiceTest {
 
             // Assert
             assertNotNull(reportString, "toString should not be null");
-            assertTrue(reportString.contains("Stadistics Report"),
-                    "Report string should contain 'Stadistics Report'");
+            // Verify HTML structure
+            assertTrue(reportString.contains("<p><strong>Stadistics Report:</strong></p>"),
+                    "Report should contain HTML header");
+            assertTrue(reportString.contains("<p><strong>Total Ask logs:</strong> 10</p>"),
+                    "Report should contain ask interactions in HTML format");
+            assertTrue(reportString.contains("<p><strong>Total Feedback logs:</strong> 3</p>"),
+                    "Report should contain feedbacks in HTML format");
+            assertTrue(reportString.contains("<p><strong>Total Redact logs:</strong> 5</p>"),
+                    "Report should contain redact interactions in HTML format");
+            // Verify numeric values are present
             assertTrue(reportString.contains("10"), "Report should contain ask interactions (10)");
             assertTrue(reportString.contains("5"), "Report should contain redact interactions (5)");
             assertTrue(reportString.contains("3"), "Report should contain feedbacks (3)");
@@ -305,12 +313,12 @@ class StadisticsServiceTest {
         }
 
         /**
-         * Test: Verify toString() includes feedback files.
+         * Test: Verify toString() includes feedback files in HTML format.
          * Scenario: Create report with feedback files, verify toString() output
-         * Expected: String contains feedback file info
+         * Expected: String contains HTML-formatted feedback file info
          */
         @Test
-        @DisplayName("Should include feedback files in toString() output")
+        @DisplayName("Should include feedback files in HTML-formatted toString() output")
         void testToStringIncludesFeedbackFiles() throws MalformedURLException {
             // Arrange
             ArrayList<FeedbackFile> feedbackFiles = new ArrayList<>();
@@ -325,11 +333,17 @@ class StadisticsServiceTest {
             // Act
             String reportString = report.toString();
 
-            // Assert
-            assertTrue(reportString.contains("Feedback files: 2"),
-                    "toString should contain feedback file count");
+            // Assert - Verify HTML format for feedback files section
+            assertTrue(reportString.contains("<p><strong>Feedback files:</strong> 2</p>"),
+                    "toString should contain feedback file count in HTML format");
+            assertTrue(reportString.contains("<ul>"), "toString should contain ul tag for file list");
             assertTrue(reportString.contains("fb-001.json"),
                     "toString should contain feedback file name");
+            assertTrue(reportString.contains("fb-002.json"),
+                    "toString should contain second feedback file name");
+            // Verify HTML anchor tags for links
+            assertTrue(reportString.contains("<a href=\""),
+                    "toString should contain anchor tags for file links");
         }
 
         /**

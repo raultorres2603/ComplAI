@@ -410,13 +410,15 @@ class EmailServiceTest {
         assertNotNull(capturedRequest.message().body(), "Email body must not be null");
         assertNotNull(capturedRequest.message().body().html(), "Email HTML body must not be null");
 
-        // Verify the statistics report is included in the email body
+        // Verify the statistics report is included in the email body (HTML format)
         String emailBodyContent = capturedRequest.message().body().html().data();
         assertTrue(emailBodyContent.contains("Stadistics Report"),
                 "Email body must contain 'Stadistics Report'");
-        assertTrue(emailBodyContent.contains("Total Ask logs: 10"),
-                "Email body must contain total ask logs");
-        assertTrue(emailBodyContent.contains("Total Feedback logs: 3"),
-                "Email body must contain total feedback logs");
+        assertTrue(emailBodyContent.contains("<p><strong>Total Ask logs:</strong> 10</p>"),
+                "Email body must contain total ask logs in HTML format");
+        assertTrue(emailBodyContent.contains("<p><strong>Total Feedback logs:</strong> 3</p>"),
+                "Email body must contain total feedback logs in HTML format");
+        assertTrue(emailBodyContent.contains("<p><strong>Total Redact logs:</strong> 5</p>"),
+                "Email body must contain total redact logs in HTML format");
     }
 }
