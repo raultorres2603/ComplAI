@@ -7,7 +7,9 @@ import * as fs from 'fs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import * as events from 'aws-cdk-lib/aws-events';
 import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
+import * as eventsTargets from 'aws-cdk-lib/aws-events-targets';
 import { DeploymentEnvironment } from './deployment-environment';
 import { HttpApi, HttpMethod, CorsHttpMethod, PayloadFormatVersion, CfnStage } from 'aws-cdk-lib/aws-apigatewayv2';
 import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
@@ -521,6 +523,98 @@ export class LambdaStack extends cdk.Stack {
       reportBatchItemFailures: true,
     }));
 
+    // -------------------------------------------------------------------------
+    // Scheduled Lambda — sends weekly statistics report via SES every Monday 03:00.
+    // -------------------------------------------------------------------------
+    const scheduledReportRole = new iam.Role(this, `ComplAIScheduledReportRole-${environment}`, {
+      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+      description: `IAM role for ComplAI scheduled report Lambda (${environment})`,
+    });
+    scheduledReportRole.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
+    );
+    // Allow CloudWatch Logs for statistics queries (FilterLogEvents)
+    scheduledReportRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        sid: 'ScheduledReportCloudWatchLogs',
+        effect: iam.Effect.ALLOW,
+        actions: ['logs:FilterLogEvents'],
+        resources: [
+          `arn:aws:logs:${this.region}:${this.account}:log-group:/aws/lambda/ComplAILambda-${environment}:*`,
+          `arn:aws:logs:${this.region}:${this.account}:log-group:/aws/lambda/ComplAIRedactorLambda-${environment}:*`,
+          `arn:aws:logs:${this.region}:${this.account}:log-group:/aws/lambda/ComplAIFeedbackWorkerLambda-${environment}:*`,
+        ],
+      }),
+    );
+    // Read from procedures, events, news, cityinfo buckets (StadisticsService reads these)
+    proceduresBucket.grantRead(scheduledReportRole);
+    eventsBucket.grantRead(scheduledReportRole);
+    newsBucket.grantRead(scheduledReportRole);
+    cityInfoBucket.grantRead(scheduledReportRole);
+    // Allow SES send email from the verified sender address
+    if (sesFromEmail) {
+      scheduledReportRole.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          sid: 'ScheduledReportSesSendEmail',
+          effect: iam.Effect.ALLOW,
+          actions: ['ses:SendEmail', 'ses:SendRawEmail'],
+          resources: ['*'],
+          conditions: {
+            StringEquals: {
+              'ses:FromAddress': sesFromEmail,
+            },
+          },
+        }),
+      );
+    }
+
+    const scheduledReportLogGroup = new logs.LogGroup(this, `ComplAIScheduledReportLogGroup-${environment}`, {
+      logGroupName: `/aws/lambda/ComplAIScheduledReportLambda-${environment}`,
+      retention: logRetention,
+      removalPolicy: environment === 'production'
+        ? cdk.RemovalPolicy.RETAIN
+        : cdk.RemovalPolicy.DESTROY,
+    });
+
+    const scheduledReportFn = new lambda.Function(this, `ComplAIScheduledReportLambda-${environment}`, {
+      runtime: JAVA_25,
+      architecture: lambda.Architecture.ARM_64,
+      functionName: `ComplAIScheduledReportLambda-${environment}`,
+      handler: 'cat.complai.services.ses.SesScheduledReportHandler::handleRequest',
+      code,
+      memorySize: 512,
+      timeout: cdk.Duration.seconds(60),
+      environment: {
+        AWS_SES_FROM_EMAIL: process.env.SES_FROM_EMAIL || '',
+        AWS_SES_TO_EMAIL: process.env.SES_TO_EMAIL || '',
+        AWS_SES_REGION: process.env.AWS_SES_REGION || 'eu-west-1',
+        ENVIRONMENT: environment,
+        PROCEDURES_BUCKET: proceduresBucket.bucketName,
+        PROCEDURES_REGION: this.region,
+        EVENTS_BUCKET: eventsBucket.bucketName,
+        EVENTS_REGION: this.region,
+        NEWS_BUCKET: newsBucket.bucketName,
+        NEWS_REGION: this.region,
+        CITYINFO_BUCKET: cityInfoBucket.bucketName,
+        CITYINFO_REGION: this.region,
+        COMPLAINTS_BUCKET: complaintsBucket.bucketName,
+        COMPLAINTS_REGION: this.region,
+        FEEDBACK_BUCKET_NAME: feedbackBucket.bucketName,
+        // Allow LocalStack endpoint for local development
+        ...(process.env.AWS_ENDPOINT_URL ? { AWS_ENDPOINT_URL: process.env.AWS_ENDPOINT_URL } : {}),
+      },
+      role: scheduledReportRole,
+      logGroup: scheduledReportLogGroup,
+    });
+
+    // EventBridge rule: run every Monday at 03:00 (server time)
+    new events.Rule(this, `ComplAIScheduledReportRule-${environment}`, {
+      ruleName: `ComplAIScheduledReportRule-${environment}`,
+      description: 'Triggers the statistics report Lambda every Monday at 03:00',
+      schedule: events.Schedule.expression('cron(0 3 ? * MON *)'),
+      targets: [new eventsTargets.LambdaFunction(scheduledReportFn)],
+    });
+
     // AuditLogger emits JSON lines like:
     //   {"ts":"...","endpoint":"/complai/ask","requestHash":"...","errorCode":0,"latencyMs":312,"outputFormat":"","language":""}
     // We attach metric filters to the log group to make error rates and slow
@@ -596,6 +690,16 @@ export class LambdaStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'ComplAIApiGatewayEndpoint', {
       value: httpApi.apiEndpoint,
       description: `HTTP API Gateway endpoint URL for ComplAI (${environment})`,
+    });
+
+    new cdk.CfnOutput(this, 'ComplAIScheduledReportLambdaName', {
+      value: scheduledReportFn.functionName,
+      description: `Name of the scheduled statistics report Lambda function (${environment})`,
+    });
+
+    new cdk.CfnOutput(this, 'ComplAIScheduledReportLogGroupName', {
+      value: scheduledReportLogGroup.logGroupName,
+      description: `CloudWatch Log Group for the scheduled report Lambda function (${environment})`,
     });
   }
 }

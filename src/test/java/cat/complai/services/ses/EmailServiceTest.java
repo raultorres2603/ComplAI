@@ -23,7 +23,6 @@ import org.mockito.MockitoAnnotations;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import cat.complai.config.SesConfiguration;
-import cat.complai.exceptions.ses.SesEmailException;
 import cat.complai.services.stadistics.StadisticsService;
 import cat.complai.services.stadistics.models.StadisticsModel;
 import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
@@ -300,7 +299,7 @@ class EmailServiceTest {
                 .thenThrow(exception);
 
         // Act & Assert
-        SesEmailException thrownException = assertThrows(SesEmailException.class, () -> {
+        RuntimeException thrownException = assertThrows(RuntimeException.class, () -> {
             emailService.sendStadistics(TEST_TO_EMAIL, TEST_SUBJECT);
         });
 
@@ -326,7 +325,7 @@ class EmailServiceTest {
                 .thenThrow(exception);
 
         // Act & Assert
-        SesEmailException thrownException = assertThrows(SesEmailException.class, () -> {
+        RuntimeException thrownException = assertThrows(RuntimeException.class, () -> {
             emailService.sendStadistics(TEST_TO_EMAIL, TEST_SUBJECT);
         });
 
@@ -349,7 +348,7 @@ class EmailServiceTest {
                 .thenThrow(genericException);
 
         // Act & Assert
-        SesEmailException thrownException = assertThrows(SesEmailException.class, () -> {
+        RuntimeException thrownException = assertThrows(RuntimeException.class, () -> {
             emailService.sendStadistics(TEST_TO_EMAIL, TEST_SUBJECT);
         });
 

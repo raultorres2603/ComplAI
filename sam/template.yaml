@@ -34,6 +34,10 @@ Parameters:
     Type: String
     Default: eu-west-1
     Description: AWS region for SES (passed from CI or manually)
+  SesReportingEnabled:
+    Type: String
+    Default: 'true'
+    Description: Enable scheduled statistics report Lambda (set to 'false' to disable local poller)
 Conditions:
   IsProduction: !Equals [!Ref Environment, production]
 
@@ -82,6 +86,21 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
 
+  ComplAIScheduledReportRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub ComplAIScheduledReportRole-${Environment}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Description: !Sub IAM role for ComplAI scheduled report Lambda (${Environment}) — SES + CloudWatch Logs
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
   ComplAILogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
@@ -92,6 +111,12 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub /aws/lambda/${ComplAIRedactorFunction}
+      RetentionInDays: !If [IsProduction, 90, 7]
+
+  ComplAIScheduledReportLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${ComplAIScheduledReportFunction}
       RetentionInDays: !If [IsProduction, 90, 7]
 
   ComplAIErrorMetricFilter:
@@ -335,6 +360,72 @@ Resources:
             BatchSize: 1
             FunctionResponseTypes:
               - ReportBatchItemFailures
+
+  ComplAIScheduledReportFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../build/libs/complai-all.jar
+      Handler: cat.complai.services.ses.SesScheduledReportHandler::handleRequest
+      Runtime: java25
+      Architectures: [x86_64]
+      MemorySize: 512
+      Timeout: 60
+      Role: !GetAtt ComplAIScheduledReportRole.Arn
+      Environment:
+        Variables:
+          AWS_ENDPOINT_URL: "http://host.docker.internal:4566"
+          AWS_SES_REGION: !Ref LambdaRegion
+          AWS_SES_FROM_EMAIL: !Ref SesFromEmail
+          SES_REPORTING_ENABLED: !Ref SesReportingEnabled
+
+  # IAM Policy for the scheduled report role — inline (SAM doesn't support managed policy for custom role)
+  ComplAIScheduledReportPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ComplAIScheduledReportPolicy-${Environment}
+      Roles:
+        - !Ref ComplAIScheduledReportRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: ses:SendEmail
+            Resource: "*"
+            Condition:
+              StringEquals:
+                ses:FromAddress: !Ref SesFromEmail
+          - Effect: Allow
+            Action:
+              - logs:FilterLogEvents
+            Resource:
+              - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/ComplAILambda-${Environment}:*
+              - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/ComplAIRedactorLambda-${Environment}:*
+              - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/ComplAIFeedbackWorkerLambda-${Environment}:*
+
+  ComplAIScheduledReportFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../build/libs/complai-all.jar
+      Handler: cat.complai.services.ses.SesScheduledReportHandler::handleRequest
+      Runtime: java25
+      Architectures: [x86_64]
+      MemorySize: 512
+      Timeout: 60
+      Role: !GetAtt ComplAIScheduledReportRole.Arn
+      Environment:
+        Variables:
+          AWS_ENDPOINT_URL: "http://host.docker.internal:4566"
+          AWS_SES_REGION: !Ref LambdaRegion
+          AWS_SES_FROM_EMAIL: !Ref SesFromEmail
+          PROCEDURES_BUCKET: !Ref ProceduresBucket
+          EVENTS_BUCKET: !Ref EventsBucket
+          COMPLAINTS_BUCKET: !Ref ComplaintsBucket
+          FEEDBACK_BUCKET_NAME: !Ref FeedbackBucket
+      Events:
+        ScheduledReport:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 3 ? * MON *)
 
 Outputs:
   ComplAILambdaFunctionName:

@@ -265,14 +265,19 @@ SAM_API_PID=$!
   "${SCRIPT_DIR}/env.json" &
 SQS_WORKER_PID=$!
 
+"${VENV_DIR}/bin/python3" "${SCRIPT_DIR}/ses_scheduled_poller.py" \
+  "${SCRIPT_DIR}/template.yaml" \
+  "${SCRIPT_DIR}/env.json" &
+SES_SCHEDULED_PID=$!
+
 # ---------------------------------------------------------------------------
 # 5. Clean up both background processes on Ctrl-C / SIGTERM.
 # ---------------------------------------------------------------------------
 cleanup() {
   echo ""
-  echo "[start-local] Shutting down SAM API and SQS worker poller..."
-  kill "${SAM_API_PID}" "${SQS_WORKER_PID}" 2>/dev/null || true
-  wait "${SAM_API_PID}" "${SQS_WORKER_PID}" 2>/dev/null || true
+  echo "[start-local] Shutting down SAM API, SQS worker poller, and SES scheduled poller..."
+  kill "${SAM_API_PID}" "${SQS_WORKER_PID}" "${SES_SCHEDULED_PID}" 2>/dev/null || true
+  wait "${SAM_API_PID}" "${SQS_WORKER_PID}" "${SES_SCHEDULED_PID}" 2>/dev/null || true
   echo "[start-local] Stopped. LocalStack is still running — run 'docker compose down' to stop it."
   exit 0
 }
