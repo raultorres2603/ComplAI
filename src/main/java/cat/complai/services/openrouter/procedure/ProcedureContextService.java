@@ -3,6 +3,7 @@ package cat.complai.services.openrouter.procedure;
 import cat.complai.dto.openrouter.Source;
 import cat.complai.helpers.openrouter.CityInfoRagHelperRegistry;
 import cat.complai.helpers.openrouter.EventRagHelperRegistry;
+import cat.complai.helpers.openrouter.GencatProcedureRagHelperRegistry;
 import cat.complai.helpers.openrouter.NewsRagHelperRegistry;
 import cat.complai.helpers.openrouter.ProcedureRagHelperRegistry;
 import cat.complai.helpers.openrouter.RagHelper;
@@ -60,6 +61,11 @@ public class ProcedureContextService {
             "where can i", "how can i", "steps", "step by step", "process",
             "recycling", "waste", "garbage", "trash", "center", "collection");
 
+    private static final List<String> GENERALITAT_KEYWORDS = List.of(
+            "generalitat", "generalitat de catalunya", "catalan government",
+            "gencat", "gencat procediment", "tramit gencat",
+            "govern catala", "catalunya", "catalan");
+
     private static final List<String> MUNICIPAL_SERVICE_KEYWORDS = List.of(
             "ajuntament", "city hall", "municipal", "council");
 
@@ -116,6 +122,7 @@ public class ProcedureContextService {
             "tell me a joke", "who are you", "what's your name", "thank you", "thanks");
 
     private final ProcedureRagHelperRegistry ragRegistry;
+    private final GencatProcedureRagHelperRegistry gencatRagRegistry;
     private final EventRagHelperRegistry eventRagRegistry;
     private final NewsRagHelperRegistry newsRagRegistry;
     private final CityInfoRagHelperRegistry cityInfoRagRegistry;
@@ -128,6 +135,7 @@ public class ProcedureContextService {
      * Constructs the service with all RAG helper registries and the prompt builder.
      *
      * @param ragRegistry         registry for procedure RAG helpers
+     * @param gencatRagRegistry registry for gencat procedure RAG helpers (fallback)
      * @param eventRagRegistry    registry for event RAG helpers
      * @param newsRagRegistry     registry for news RAG helpers
      * @param cityInfoRagRegistry registry for city-info RAG helpers
@@ -135,21 +143,39 @@ public class ProcedureContextService {
      *                            city
      */
     @Inject
-    public ProcedureContextService(ProcedureRagHelperRegistry ragRegistry, EventRagHelperRegistry eventRagRegistry,
+    public ProcedureContextService(ProcedureRagHelperRegistry ragRegistry,
+            GencatProcedureRagHelperRegistry gencatRagRegistry,
+            EventRagHelperRegistry eventRagRegistry,
             NewsRagHelperRegistry newsRagRegistry,
             CityInfoRagHelperRegistry cityInfoRagRegistry,
             RedactPromptBuilder promptBuilder) {
         this.ragRegistry = ragRegistry;
+        this.gencatRagRegistry = gencatRagRegistry;
         this.eventRagRegistry = eventRagRegistry;
         this.newsRagRegistry = newsRagRegistry;
         this.cityInfoRagRegistry = cityInfoRagRegistry;
         this.promptBuilder = promptBuilder;
     }
 
+    /**
+     * Convenience constructor with all registries (used by tests).
+     */
+    public ProcedureContextService(ProcedureRagHelperRegistry ragRegistry,
+            EventRagHelperRegistry eventRagRegistry,
+            NewsRagHelperRegistry newsRagRegistry,
+            CityInfoRagHelperRegistry cityInfoRagRegistry,
+            RedactPromptBuilder promptBuilder) {
+        this(ragRegistry, new GencatProcedureRagHelperRegistry(), eventRagRegistry, newsRagRegistry,
+                cityInfoRagRegistry, promptBuilder);
+    }
+
+    /**
+     * Convenience constructor (used by tests).
+     */
     public ProcedureContextService(ProcedureRagHelperRegistry ragRegistry, EventRagHelperRegistry eventRagRegistry,
             RedactPromptBuilder promptBuilder) {
-        this(ragRegistry, eventRagRegistry, new NewsRagHelperRegistry(), new CityInfoRagHelperRegistry(),
-                promptBuilder);
+        this(ragRegistry, new GencatProcedureRagHelperRegistry(), eventRagRegistry, new NewsRagHelperRegistry(),
+                new CityInfoRagHelperRegistry(), promptBuilder);
     }
 
     /**
@@ -498,18 +524,68 @@ public class ProcedureContextService {
         return new ContextRequirements(finalNeedsProcedure, finalNeedsEvent, false, finalNeedsCityInfo);
     }
 
+    /**
+     * Checks if the query is asking about Generalitat procedures.
+     *
+     * @param question the user's question
+     * @return true if the question mentions generalitat
+     */
+    public boolean isAskingGencatProcedures(String question) {
+        if (question == null || question.isBlank()) {
+            return false;
+        }
+        String normalized = question.toLowerCase(Locale.ROOT);
+        return containsAny(normalized, GENERALITAT_KEYWORDS)
+                || normalized.contains("generalitat")
+                || normalized.contains("gencat")
+                || normalized.contains("catalan government");
+    }
+
     public ProcedureContextResult buildProcedureContextResult(String query, String cityId) {
+        return buildProcedureContextResult(query, cityId, false);
+    }
+
+    /**
+     * Builds procedure context result with optional fallback to gencat procedures.
+     *
+     * @param query      the search query
+     * @param cityId    the city identifier
+     * @param forceGencat whether to force using gencat procedures instead of city-specific
+     * @return procedure context result
+     */
+    public ProcedureContextResult buildProcedureContextResult(String query, String cityId, boolean forceGencat) {
         try {
-            RagHelper<RagHelper.Procedure> helper = ragRegistry.getForCity(cityId);
+            // Determine which registry to use
+            RagHelper<RagHelper.Procedure> helper;
+            String effectiveCityId;
+            boolean useGencat = forceGencat || isAskingGencatProcedures(query);
+
+            if (useGencat) {
+                helper = gencatRagRegistry.getForCity("gencat");
+                effectiveCityId = "gencat";
+                logger.info("Using gencat fallback for procedure query: " + query);
+            } else {
+                helper = ragRegistry.getForCity(cityId);
+                effectiveCityId = cityId;
+            }
+
             List<RagHelper.Procedure> matches = helper.search(query);
+
+            // If no matches from city procedures and not already using gencat, try fallback
+            if (matches.isEmpty() && !useGencat) {
+                logger.info("No city procedure matches for query: " + query + ", trying gencat fallback");
+                return buildProcedureContextResult(query, cityId, true);
+            }
+
             if (matches.isEmpty()) {
                 return new ProcedureContextResult(null, List.of());
             }
+
             List<Source> sources = matches.stream()
                     .map(p -> new Source(p.url, p.title))
                     .filter(source -> source.getUrl() != null && !source.getUrl().isBlank())
                     .toList();
-            String contextBlock = promptBuilder.buildProcedureContextBlockFromMatches(matches, cityId);
+            String contextBlock = promptBuilder.buildProcedureContextBlockFromMatches(matches, effectiveCityId);
             return new ProcedureContextResult(contextBlock, sources);
         } catch (Exception e) {
             logger.log(Level.WARNING, "Failed to build procedure context result for city=" + cityId

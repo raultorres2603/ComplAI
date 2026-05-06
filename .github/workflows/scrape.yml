@@ -38,6 +38,7 @@ on:
         options:
           - all
           - procedures
+          - gencat
           - news
           - events
           - cityinfo
@@ -90,6 +91,26 @@ jobs:
         run: |
           java -cp build/libs/complai-all.jar \
             cat.complai.utilities.scraper.ProcedureScraper "${{ inputs.city }}"
+
+      # -----------------------------------------------------------------------
+      # GENCAT PROCEDURES
+      # -----------------------------------------------------------------------
+      - name: Configure AWS credentials (gencat procedures)
+        if: inputs.scraper == 'all' || inputs.scraper == 'gencat'
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::134267836527:role/github-cdk-deploy-role
+          aws-region: ${{ vars.PROCEDURES_REGION }}
+          audience: sts.amazonaws.com
+          output-env-credentials: true
+
+      - name: Scrape gencat procedures and upload to S3
+        if: inputs.scraper == 'all' || inputs.scraper == 'gencat'
+        env:
+          PROCEDURES_BUCKET: complai-procedures-${{ inputs.environment }}
+        run: |
+          java -cp build/libs/complai-all.jar \
+            cat.complai.utilities.scraper.GencatProcedureScraper
 
       # -----------------------------------------------------------------------
       # NEWS
