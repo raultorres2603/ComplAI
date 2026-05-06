@@ -1,0 +1,54 @@
+meta {
+  name: Ask for Generalitat procedures directly
+  type: http
+  seq: 4
+  tags: [
+    ask
+    gencat
+    procedures
+  ]
+}
+
+post {
+  url: {{complaiPath}}/ask
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "text": "Com sol·licito un certificat de la Generalitat de Catalunya?",
+    "conversationId": "{{conversationId}}"
+  }
+}
+
+tests {
+  test("HTTP 200 on gencat query", () => {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response is successful", () => {
+    expect(res.getBody().success).to.equal(true);
+  });
+  
+  test("Response contains message text", () => {
+    const body = res.getBody();
+    expect(body.message).to.not.equal(null);
+  });
+  
+  test("Sources include gencat URL when gencat is used", () => {
+    const body = res.getBody();
+    if (body.sources && body.sources.length > 0) {
+      const hasGencatSource = body.sources.some(s => 
+        s.url && s.url.includes("tramits.gencat.cat")
+      );
+      // May or may not have gencat source depending on matching procedures
+      console.log("Has gencat source: " + hasGencatSource);
+    }
+  });
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

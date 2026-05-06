@@ -280,6 +280,59 @@ class ProcedureScraperTest {
     }
 
     // -------------------------------------------------------------------------
+    // gencat mapping — Generalitat de Catalunya procedures
+    // -------------------------------------------------------------------------
+
+    @Test
+    void gencatMapping_loadsSuccessfully() throws IOException {
+        ScraperMapping mapping = ProcedureScraper.loadMapping("gencat");
+
+        assertNotNull(mapping, "Mapping must not be null");
+        assertFalse(mapping.baseUrl.isBlank(), "baseUrl must be present");
+        assertFalse(mapping.s3Region.isBlank(), "s3Region must be present");
+        assertNotNull(mapping.crawl, "crawl config must be present");
+        assertFalse(mapping.crawl.detailLinkSelector.isBlank(), "detailLinkSelector must be present");
+        assertTrue(mapping.fields.containsKey("title"), "fields must contain 'title'");
+        assertTrue(mapping.fields.containsKey("description"), "fields must contain 'description'");
+        assertTrue(mapping.fields.containsKey("requirements"), "fields must contain 'description'");
+    }
+
+    @Test
+    void gencatMapping_titleField_isSingle() throws IOException {
+        ScraperMapping mapping = ProcedureScraper.loadMapping("gencat");
+        FieldExtractionRule title = mapping.fields.get("title");
+        assertNotNull(title);
+        assertFalse(title.multiple, "'title' must use multiple=false (selectFirst)");
+    }
+
+    @Test
+    void gencatMapping_descriptionField_isSingle() throws IOException {
+        ScraperMapping mapping = ProcedureScraper.loadMapping("gencat");
+        FieldExtractionRule description = mapping.fields.get("description");
+        assertNotNull(description);
+        assertFalse(description.multiple,
+                "'description' must use multiple=false (selectFirst)");
+    }
+
+    @Test
+    void gencatMapping_requirementsField_isMultiple() throws IOException {
+        ScraperMapping mapping = ProcedureScraper.loadMapping("gencat");
+        FieldExtractionRule requirements = mapping.fields.get("requirements");
+        assertNotNull(requirements);
+        assertTrue(requirements.multiple,
+                "'requirements' must use multiple=true to concatenate all elements");
+    }
+
+    @Test
+    void gencatMapping_skipCondition_includesPortalDeTramits() throws IOException {
+        ScraperMapping mapping = ProcedureScraper.loadMapping("gencat");
+        assertNotNull(mapping.skip);
+        assertTrue(mapping.skip.whenTitleEmptyOrEquals.stream()
+                .anyMatch(v -> v.equalsIgnoreCase("Tràmits per temes")),
+                "gencat mapping must skip pages titled 'Tràmits per temes'");
+    }
+
+    // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
 

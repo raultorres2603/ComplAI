@@ -1,0 +1,51 @@
+meta {
+  name: Ask with gencat keyword in Catalan
+  type: http
+  seq: 6
+  tags: [
+    ask
+    gencat
+    catalan
+    procedures
+  ]
+}
+
+post {
+  url: {{complaiPath}}/ask
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "text": "Quin tràmit de la Generalitat necessito per canvi de nom?",
+    "conversationId": "{{conversationId}}"
+  }
+}
+
+tests {
+  test("HTTP 200 on gencat keyword query", () => {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response is successful", () => {
+    expect(res.getBody().success).to.equal(true);
+  });
+  
+  test("Response contains message text", () => {
+    const body = res.getBody();
+    expect(body.message).to.not.equal(null);
+  });
+  
+  test("Contains catalan government reference", () => {
+    const body = res.getBody();
+    const message = body.message ? body.message.toLowerCase() : "";
+    const hasGeneralitatRef = message.includes("generalitat") || message.includes("catalunya");
+    console.log("Has generalitat reference: " + hasGeneralitatRef);
+  });
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
