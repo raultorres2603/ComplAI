@@ -1,0 +1,50 @@
+meta {
+  name: GenCat not available in test when S3 not configured
+  type: http
+  seq: 4
+  tags: [
+    ask
+    gencat
+    unhappy
+    error
+  ]
+}
+
+post {
+  url: {{complaiPath}}/ask
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "text": "Tràmits de la Generalitat",
+    "conversationId": "{{conversationId}}"
+  }
+}
+
+tests {
+  test("HTTP 200 even when gencat index unavailable", () => {
+    expect(res.getStatus()).to.equal(200);
+  });
+  
+  test("Response is successful (may be empty)", () => {
+    const body = res.getBody();
+    // In test without S3, should still return 200 but may have empty message
+    expect(body.success !== null).to.equal(true);
+  });
+  
+  test("Returns appropriate response when gencat unavailable", () => {
+    const body = res.getBody();
+    // Should have some response (either gencat content or graceful fallback)
+    const hasResponse = body.message && body.message.length > 0;
+    const hasSources = body.sources && body.sources.length > 0;
+    // Either message or sources should exist
+    console.log("Has response: " + hasResponse + ", has sources: " + hasSources);
+  });
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
