@@ -46,6 +46,9 @@ public class GencatProcedureScraper {
     private static final Logger logger = Logger.getLogger(GencatProcedureScraper.class.getName());
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String MAPPING_RESOURCE = "/scrapers/procedures-mapping-gencat.json";
+    private static final int CONNECT_TIMEOUT_MS = 60000; // 60 seconds for slow pages
+    private static final int READ_TIMEOUT_MS = 60000;
+    private static final int MAX_CATEGORY_PAGES = 50; // Limit crawling to prevent timeout
 
     public static void main(String[] args) throws IOException {
         String bucket = System.getenv("PROCEDURES_BUCKET");
@@ -92,6 +95,11 @@ public class GencatProcedureScraper {
         Set<String> detailUrls = new LinkedHashSet<>();
 
         pendingCategoryUrls.add(mapping.baseUrl);
+        
+        // Add seed URLs that directly show procedure lists (avoiding AJAX)
+        if (mapping.crawl.additionalSeeds != null) {
+            pendingCategoryUrls.addAll(mapping.crawl.additionalSeeds);
+        }
 
         while (!pendingCategoryUrls.isEmpty()) {
             String currentUrl = pendingCategoryUrls.iterator().next();
@@ -100,8 +108,16 @@ public class GencatProcedureScraper {
             if (!visitedCategoryUrls.add(currentUrl))
                 continue;
 
+            // Stop crawling if we've visited too many category pages
+            if (visitedCategoryUrls.size() > MAX_CATEGORY_PAGES) {
+                logger.warning("Reached max category pages limit (" + MAX_CATEGORY_PAGES + "), stopping crawl");
+                break;
+            }
+
             try {
-                Document doc = Jsoup.connect(currentUrl).get();
+                Document doc = Jsoup.connect(currentUrl)
+                        .timeout(CONNECT_TIMEOUT_MS)
+                        .get();
 
                 if (mapping.crawl.categoryLinkSelector != null && !mapping.crawl.categoryLinkSelector.isBlank()) {
                     var categoryLinks = doc.select(mapping.crawl.categoryLinkSelector);
@@ -156,7 +172,9 @@ public class GencatProcedureScraper {
 
     private static Optional<Map<String, Object>> scrapeProcedure(String url, ScraperMapping mapping)
             throws IOException {
-        Document doc = Jsoup.connect(url).get();
+        Document doc = Jsoup.connect(url)
+                .timeout(CONNECT_TIMEOUT_MS)
+                .get();
 
         Map<String, Object> procedure = new LinkedHashMap<>();
         procedure.put("procedureId", UUID.nameUUIDFromBytes(url.getBytes(StandardCharsets.UTF_8)).toString());
@@ -257,6 +275,7 @@ public class GencatProcedureScraper {
         public String categoryLinkSelector;
         public String detailLinkSelector;
         public String detailLinkExcludePattern;
+        public List<String> additionalSeeds = new ArrayList<>();
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
