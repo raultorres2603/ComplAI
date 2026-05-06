@@ -1,5 +1,6 @@
 package cat.complai.services.stadistics.models;
 
+import java.time.Instant;
 import java.util.ArrayList;
 
 import io.micronaut.core.annotation.Introspected;
@@ -239,5 +240,45 @@ public class StadisticsModel {
             return "N/A";
         }
         return String.format("%.2f", value);
+    }
+
+    /**
+     * Returns a human-readable label for the current week period.
+     * Uses the last 7 days from now.
+     */
+    public String getCurrentWeekLabel() {
+        Instant end   = Instant.now();
+        Instant start  = end.minusSeconds(7 * 24 * 60 * 60);
+        return formatDateRange(start, end);
+    }
+
+    /**
+     * Returns a human-readable label for the previous week period
+     * (days 8-14 ago).
+     */
+    public String getPreviousWeekLabel() {
+        Instant end   = Instant.now().minusSeconds(7 * 24 * 60 * 60);
+        Instant start  = end.minusSeconds(7 * 24 * 60 * 60);
+        return formatDateRange(start, end);
+    }
+
+    private String formatDateRange(Instant from, Instant to) {
+        java.time.ZoneId zone = java.time.ZoneId.of("Europe/Madrid");
+        java.time.format.DateTimeFormatter fmt =
+                java.time.format.DateTimeFormatter.ofPattern("d MMM")
+                        .withZone(zone);
+        return fmt.format(from) + " – " + fmt.format(to);
+    }
+
+    /**
+     * Renders this model as a polished HTML email body using the given renderer.
+     *
+     * @param renderer        the HTML renderer (injected as a CDI bean)
+     * @param reportGeneratedAt when the report was generated
+     * @return complete HTML string ready for SES
+     */
+    public String renderHtml(cat.complai.services.stadistics.StadisticsHtmlRenderer renderer,
+                             Instant reportGeneratedAt) {
+        return renderer.render(this, reportGeneratedAt);
     }
 }

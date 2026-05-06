@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 
 import cat.complai.config.ISesSenderConfig;
 import cat.complai.exceptions.ses.CloudWatchLogsException;
+import cat.complai.services.stadistics.StadisticsHtmlRenderer;
 import cat.complai.services.stadistics.StadisticsService;
 import cat.complai.services.stadistics.models.StadisticsModel;
 import io.micronaut.context.annotation.Bean;
@@ -16,6 +17,8 @@ import software.amazon.awssdk.services.ses.model.MailFromDomainNotVerifiedExcept
 import software.amazon.awssdk.services.ses.model.MessageRejectedException;
 import software.amazon.awssdk.services.ses.model.SendEmailRequest;
 import software.amazon.awssdk.services.ses.model.SendEmailResponse;
+
+import java.time.Instant;
 
 /**
  * Email service for sending notifications via Amazon SES (Simple Email
@@ -42,6 +45,9 @@ public class EmailService implements IEmailService {
 
     @Inject
     private StadisticsService stadisticsService;
+
+    @Inject
+    private StadisticsHtmlRenderer htmlRenderer;
 
     /**
      * Constructs the EmailService with SES sender configuration.
@@ -100,15 +106,17 @@ public class EmailService implements IEmailService {
             throw new IllegalArgumentException("Email subject cannot be empty");
         }
 
-        // Build the email body from the StadisticsModel
+        // Generate statistics report and render as polished HTML
+        Instant now = Instant.now();
         StadisticsModel body = stadisticsService.generateStadisticsReport();
+        String htmlBody = body.renderHtml(htmlRenderer, now);
 
         // Construct the SES email request
         logger.info("Preparing to send statistics report to: {}", maskEmail(to));
         SendEmailRequest emailRequest = SendEmailRequest.builder()
                 .destination(d -> d.toAddresses(to))
                 .message(m -> m.subject(s -> s.data(subject))
-                        .body(b -> b.html(h -> h.data(body.toString()))))
+                        .body(b -> b.html(h -> h.data(htmlBody))))
                 .source(fromEmail)
                 .build();
 
