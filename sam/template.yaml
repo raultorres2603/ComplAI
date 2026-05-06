@@ -401,6 +401,23 @@ Resources:
               - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/ComplAILambda-${Environment}:*
               - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/ComplAIRedactorLambda-${Environment}:*
               - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/ComplAIFeedbackWorkerLambda-${Environment}:*
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:ListBucket
+            Resource:
+              - !Sub arn:aws:s3:::complai-procedures-${Environment}
+              - !Sub arn:aws:s3:::complai-procedures-${Environment}/*
+              - !Sub arn:aws:s3:::complai-events-${Environment}
+              - !Sub arn:aws:s3:::complai-events-${Environment}/*
+              - !Sub arn:aws:s3:::complai-news-${Environment}
+              - !Sub arn:aws:s3:::complai-news-${Environment}/*
+              - !Sub arn:aws:s3:::complai-cityinfo-${Environment}
+              - !Sub arn:aws:s3:::complai-cityinfo-${Environment}/*
+              - !Sub arn:aws:s3:::complai-complaints-${Environment}
+              - !Sub arn:aws:s3:::complai-complaints-${Environment}/*
+              - !Sub arn:aws:s3:::complai-feedback-${Environment}
+              - !Sub arn:aws:s3:::complai-feedback-${Environment}/*
 
   ComplAIScheduledReportFunction:
     Type: AWS::Serverless::Function

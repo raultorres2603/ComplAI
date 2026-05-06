@@ -546,11 +546,14 @@ export class LambdaStack extends cdk.Stack {
         ],
       }),
     );
-    // Read from procedures, events, news, cityinfo buckets (StadisticsService reads these)
+    // Read from procedures, events, news, cityinfo, complaints, feedback buckets
+    // (StadisticsService lists complaint and feedback files from S3 for the report)
     proceduresBucket.grantRead(scheduledReportRole);
     eventsBucket.grantRead(scheduledReportRole);
     newsBucket.grantRead(scheduledReportRole);
     cityInfoBucket.grantRead(scheduledReportRole);
+    complaintsBucket.grantRead(scheduledReportRole);
+    feedbackBucket.grantRead(scheduledReportRole);
     // Allow SES send email from the verified sender address
     if (sesFromEmail) {
       scheduledReportRole.addToPrincipalPolicy(
