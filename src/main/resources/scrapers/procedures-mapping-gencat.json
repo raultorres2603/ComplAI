@@ -1,0 +1,47 @@
+{
+  "cityId": "gencat",
+  "cityName": "Generalitat de Catalunya",
+  "officialSources": [
+    "https://tramits.gencat.cat/",
+    "https://web.gencat.cat/"
+  ],
+  "baseUrl": "https://tramits.gencat.cat/ca/tramits/tramits-temes",
+  "s3Region": "eu-west-1",
+  "crawl": {
+    "categoryLinkSelector": "ul#navTemResp a[href*='?tema='], ul#navTemResp a[href*='?mostraFulls']",
+    "detailLinkSelector": "li.list-group-item a[href*='/tramits-temes/'], li.llista-titol + li a[href*='/tramits-temes/']",
+    "detailLinkExcludePattern": "Tramitar=True"
+  },
+  "fields": {
+    "title": {
+      "selector": "div.fpca-tramit h1.menu-tramits-xl__title, h1.title",
+      "multiple": false
+    },
+    "description": {
+      "selector": "meta[name='description'], section#que-es p, div.contingut-tramit p",
+      "multiple": false
+    },
+    "requirements": {
+      "selector": "section#requisits ul li, section#documentacio ul li",
+      "multiple": true
+    },
+    "steps": {
+      "selector": "div.steps-content ol li, section#steps ol li",
+      "multiple": true
+    },
+    "targetAudience": {
+      "selector": "div.banner-tramits-xl__info dl:first-child dd a, dl dt + dd",
+      "multiple": false
+    },
+    "howTo": {
+      "selector": "div.steps-content ol li",
+      "multiple": true
+    }
+  },
+  "skip": {
+    "whenTitleEmptyOrEquals": [
+      "Tràmits per temes",
+      "Portal de Tràmits"
+    ]
+  }
+}
