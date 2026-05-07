@@ -51,19 +51,27 @@ public class StadisticsHtmlRenderer {
                 "  <meta charset=\"UTF-8\">\n" +
                 "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n" +
                 "  <title>ComplAI — Weekly Statistics Report</title>\n" +
+                "  <style>\n" +
+                "    @media only screen and (max-width:520px) {\n" +
+                "      .mobile-stack { display:block !important; width:100% !important; max-width:100% !important; }\n" +
+                "      .mobile-full  { width:100% !important; max-width:100% !important; }\n" +
+                "      .mobile-hide { display:none !important; }\n" +
+                "    }\n" +
+                "  </style>\n" +
                 "</head>\n" +
                 "<body style=\"margin:0;padding:0;background-color:#EFF1F5;font-family:Arial,Helvetica,sans-serif;\">\n" +
                 "\n" +
-                "  <!-- Full-width outer wrapper — no max-width, stretches to email viewport -->\n" +
+                "  <!-- Outer wrapper: centered, max 600px on desktop, full width on mobile -->\n" +
                 "  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#EFF1F5;\">\n" +
                 "    <tr>\n" +
-                "      <td>\n" +
+                "      <td align=\"center\">\n" +
                 "\n" +
-                "        <!-- Header — blue bar, full width -->\n" +
-                "        <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"\n" +
-                "               style=\"background-color:" + ACCENT_BLUE + ";\">\n" +
+                "        <table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"\n" +
+                "               class=\"mobile-full\" style=\"max-width:600px;\">\n" +
+                "\n" +
+                "          <!-- Header -->\n" +
                 "          <tr>\n" +
-                "            <td style=\"padding:28px 32px 24px;\">\n" +
+                "            <td style=\"padding:28px 24px 24px;background-color:" + ACCENT_BLUE + ";\">\n" +
                 "              <table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\">\n" +
                 "                <tr>\n" +
                 "                  <td>\n" +
@@ -71,7 +79,7 @@ public class StadisticsHtmlRenderer {
                 "                    <h1 style=\"margin:6px 0 0;font-size:22px;font-weight:700;color:#FFFFFF;line-height:1.2;\">Weekly Statistics Report</h1>\n" +
                 "                    <p style=\"margin:8px 0 0;font-size:13px;color:rgba(255,255,255,0.85);\">Comparativa setmanal &mdash; aquesta setmana vs. l&rsquo;anterior</p>\n" +
                 "                  </td>\n" +
-                "                  <td align=\"right\" valign=\"middle\">\n" +
+                "                  <td align=\"right\" valign=\"middle\" class=\"mobile-hide\">\n" +
                 "                    <div style=\"background-color:rgba(255,255,255,0.15);border-radius:8px;padding:10px 14px;display:inline-block;\">\n" +
                 "                      <p style=\"margin:0;font-size:11px;color:rgba(255,255,255,0.7);\">Generat</p>\n" +
                 "                      <p style=\"margin:2px 0 0;font-size:13px;font-weight:600;color:#FFFFFF;\">" + DATE_FMT.format(reportGeneratedAt) + "</p>\n" +
@@ -81,13 +89,10 @@ public class StadisticsHtmlRenderer {
                 "              </table>\n" +
                 "            </td>\n" +
                 "          </tr>\n" +
-                "        </table>\n" +
                 "\n" +
-                "        <!-- KPI row -->\n" +
-                "        <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"\n" +
-                "               style=\"background-color:#FFFFFF;\">\n" +
+                "          <!-- KPI row -->\n" +
                 "          <tr>\n" +
-                "            <td style=\"padding:20px 32px 0;\">\n" +
+                "            <td style=\"padding:20px 24px 0;background-color:#FFFFFF;\">\n" +
                 "              <table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\">\n" +
                 "                <tr>\n" +
                 kpiRow + "\n" +
@@ -95,22 +100,19 @@ public class StadisticsHtmlRenderer {
                 "              </table>\n" +
                 "            </td>\n" +
                 "          </tr>\n" +
-                "        </table>\n" +
                 "\n" +
-                "        <!-- Charts section -->\n" +
-                "        <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"\n" +
-                "               style=\"background-color:#F9FAFB;\">\n" +
+                "          <!-- Charts section: two columns, stacked on mobile -->\n" +
                 "          <tr>\n" +
-                "            <td style=\"padding:20px 32px;\">\n" +
+                "            <td style=\"padding:20px 24px;background-color:#F9FAFB;\">\n" +
                 "              <table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\">\n" +
                 "                <tr>\n" +
-                "                  <td width=\"58%\" valign=\"top\" style=\"padding-right:12px;\">\n" +
+                "                  <td class=\"mobile-stack\" width=\"58%\" valign=\"top\" style=\"padding-right:12px;\">\n" +
                 "                    <div style=\"background-color:#FFFFFF;border:1px solid #E5E7EB;border-radius:12px;padding:20px;\">\n" +
                 "                      <p style=\"margin:0 0 16px;font-size:14px;font-weight:700;color:#1F2937;\">Weekly Comparison</p>\n" +
                 barChart + "\n" +
                 "                    </div>\n" +
                 "                  </td>\n" +
-                "                  <td width=\"42%\" valign=\"top\">\n" +
+                "                  <td class=\"mobile-stack\" width=\"42%\" valign=\"top\" style=\"padding-left:12px;\">\n" +
                 "                    <div style=\"background-color:#FFFFFF;border:1px solid #E5E7EB;border-radius:12px;padding:20px;\">\n" +
                 "                      <p style=\"margin:0 0 4px;font-size:14px;font-weight:700;color:#1F2937;\">Interaction Mix</p>\n" +
                 "                      <p style=\"margin:0 0 12px;font-size:12px;color:#6B7280;\">Repartiment setmana actual</p>\n" +
@@ -121,29 +123,39 @@ public class StadisticsHtmlRenderer {
                 "              </table>\n" +
                 "            </td>\n" +
                 "          </tr>\n" +
-                "        </table>\n" +
                 "\n" +
-                "        <!-- File section -->\n" +
-                "        <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"\n" +
-                "               style=\"background-color:#FFFFFF;\">\n" +
+                "          <!-- File section: two columns, stacked on mobile -->\n" +
                 "          <tr>\n" +
-                "            <td style=\"padding:20px 32px 0;\">\n" +
-                fileSection + "\n" +
+                "            <td style=\"padding:20px 24px 0;background-color:#FFFFFF;\">\n" +
+                "              <table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\">\n" +
+                "                <tr>\n" +
+                "                  <td class=\"mobile-stack\" width=\"50%\" valign=\"top\" style=\"padding-right:8px;\">\n" +
+                "                    <div style=\"background-color:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;padding:16px;\">\n" +
+                "                      <p style=\"margin:0 0 10px;font-size:13px;font-weight:700;color:#1F2937;\">&#128203; Reclamacions generades</p>\n" +
+                buildComplaintList(model) + "\n" +
+                "                    </div>\n" +
+                "                  </td>\n" +
+                "                  <td class=\"mobile-stack\" width=\"50%\" valign=\"top\" style=\"padding-left:8px;\">\n" +
+                "                    <div style=\"background-color:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;padding:16px;\">\n" +
+                "                      <p style=\"margin:0 0 10px;font-size:13px;font-weight:700;color:#1F2937;\">&#128172; Valoracions rebudes</p>\n" +
+                buildFeedbackList(model) + "\n" +
+                "                    </div>\n" +
+                "                  </td>\n" +
+                "                </tr>\n" +
+                "              </table>\n" +
                 "            </td>\n" +
                 "          </tr>\n" +
-                "        </table>\n" +
                 "\n" +
-                "        <!-- Footer -->\n" +
-                "        <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"\n" +
-                "               style=\"background-color:#F3F4F6;\">\n" +
+                "          <!-- Footer -->\n" +
                 "          <tr>\n" +
-                "            <td style=\"padding:24px 32px;\">\n" +
+                "            <td style=\"padding:24px 24px;background-color:#F3F4F6;\">\n" +
                 "              <p style=\"margin:0;font-size:11px;color:#9CA3AF;text-align:center;\">\n" +
                 "                Informe automatitzat generat per ComplAI &middot; El Prat de Llobregat.<br>\n" +
                 "                No respongueu a aquest correu.\n" +
                 "              </p>\n" +
                 "            </td>\n" +
                 "          </tr>\n" +
+                "\n" +
                 "        </table>\n" +
                 "\n" +
                 "      </td>\n" +
@@ -413,6 +425,16 @@ public class StadisticsHtmlRenderer {
             sb.append("</div>");
         }
         return sb.toString();
+    }
+
+    private String buildComplaintList(StadisticsModel m) {
+        var complaints = m.getCurrentWeek() != null ? m.getCurrentWeek().getComplaintFiles() : null;
+        return buildFileList(complaints, "No hi ha reclamacions esta setmana.");
+    }
+
+    private String buildFeedbackList(StadisticsModel m) {
+        var feedbacks = m.getCurrentWeek() != null ? m.getCurrentWeek().getFeedbackFiles() : null;
+        return buildFileList(feedbacks, "No hi ha valoracions aquesta setmana.");
     }
 
     // ─── Helpers ────────────────────────────────────────────────────────────────
