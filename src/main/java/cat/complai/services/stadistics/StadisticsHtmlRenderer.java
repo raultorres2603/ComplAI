@@ -240,19 +240,18 @@ public class StadisticsHtmlRenderer {
             "<line x1=\"%d\" y1=\"%d\" x2=\"%d\" y2=\"%d\" stroke=\"#E5E7EB\" stroke-width=\"1\"/>",
             chartLeft, chartBot, chartRight, chartBot));
 
-        // Bar geometry: 32px wide, 4px gap, centered in group
-        int barW = 32;
-        int barGap = 4;
+        // Bar geometry: 36px wide, 6px gap, centered in group (78px total per pair)
+        int barW = 36;
+        int barGap = 6;
 
         for (int i = 0; i < 3; i++) {
-            double curLog = Math.log10(curr[i] + 1);
-            double preLog = Math.log10(prev[i] + 1);
-            double curH = (curLog / maxLog) * chartH;
-            double preH = (preLog / maxLog) * chartH;
+            double curH = (Math.log10(curr[i] + 1) / maxLog) * chartH;
+            double preH = (Math.log10(prev[i] + 1) / maxLog) * chartH;
 
             int groupCenterX = chartLeft + i * groupW + groupW / 2;
-            int curBarX = groupCenterX - barGap - barW;
-            int preBarX = groupCenterX + barGap;
+            int pairLeftX = groupCenterX - (2 * barW + barGap) / 2; // center the pair
+            int curBarX = pairLeftX;
+            int preBarX = pairLeftX + barW + barGap;
 
             // Previous week bar (lighter, drawn first so it's behind)
             if (preH > 0) {
