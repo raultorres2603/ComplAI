@@ -589,8 +589,7 @@ export class LambdaStack extends cdk.Stack {
       timeout: cdk.Duration.seconds(60),
       environment: {
         AWS_SES_FROM_EMAIL: process.env.SES_FROM_EMAIL || '',
-        AWS_SES_TO_EMAIL: process.env.SES_TO_EMAIL || '',
-        AWS_SES_TO_EMAIL_ELPRAT: process.env.SES_TO_EMAIL || '',
+        AWS_SES_TO_EMAIL_ELPRAT: process.env.SES_TO_EMAIL_ELPRAT || '',
         AWS_SES_REGION: process.env.AWS_SES_REGION || 'eu-west-1',
         ENVIRONMENT: environment,
         PROCEDURES_BUCKET: proceduresBucket.bucketName,

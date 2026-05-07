@@ -23,29 +23,39 @@ body:json {
   }
 }
 
-tests {
-  test("HTTP 200 on gencat keyword query", () => {
-    expect(res.getStatus()).to.equal(200);
-  });
-  
-  test("Response is successful", () => {
-    expect(res.getBody().success).to.equal(true);
-  });
-  
-  test("Response contains message text", () => {
-    const body = res.getBody();
-    expect(body.message).to.not.equal(null);
-  });
-  
-  test("Contains catalan government reference", () => {
-    const body = res.getBody();
-    const message = body.message ? body.message.toLowerCase() : "";
-    const hasGeneralitatRef = message.includes("generalitat") || message.includes("catalunya");
-    console.log("Has generalitat reference: " + hasGeneralitatRef);
-  });
+script:post-response {
+  const rawBody = typeof res.body === 'string' ? res.body : JSON.stringify(res.body);
+  const parsed = parseSse(rawBody);
+  bru.setVar("parsedResponse", parsed);
+  console.log("gencat ask parsed — message length:", parsed.message.length, "success:", parsed.success);
 }
 
 settings {
   encodeUrl: true
   timeout: 0
+  stream: true
+}
+
+tests {
+  test("HTTP 200 on gencat keyword query", () => {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response is successful", () => {
+    const parsed = bru.getVar("parsedResponse");
+    expect(parsed.success).to.equal(true);
+  });
+
+  test("Response contains message text", () => {
+    const parsed = bru.getVar("parsedResponse");
+    expect(parsed.message).to.not.be.empty;
+  });
+
+  test("Contains catalan government reference", () => {
+    const parsed = bru.getVar("parsedResponse");
+    const hasGeneralitatRef =
+      parsed.message.includes("generalitat") ||
+      parsed.message.includes("catalunya");
+    console.log("Has generalitat reference: " + hasGeneralitatRef);
+  });
 }

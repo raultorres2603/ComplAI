@@ -20,19 +20,30 @@ body:json {
   }
 }
 
-tests {
-  test("Success prop == true", () => {
-    expect(res.getBody().success).to.equal(false);
-  });
-  test("Message != empty", () => {
-    expect(res.getBody().message).to.not.be.empty;
-  });
-  test("Error code == 0", () => {
-    expect(res.getBody().errorCode).to.not.equal(0);
-  });
+script:post-response {
+  const rawBody = typeof res.body === 'string' ? res.body : JSON.stringify(res.body);
+  const parsed = parseSse(rawBody);
+  bru.setVar("parsedResponse", parsed);
+  console.log("Common question parsed — message length:", parsed.message.length, "success:", parsed.success, "errorCode:", parsed.errorCode);
 }
 
 settings {
   encodeUrl: true
   timeout: 0
+  stream: true
+}
+
+tests {
+  test("Success prop == false", () => {
+    const parsed = bru.getVar("parsedResponse");
+    expect(parsed.success).to.equal(false);
+  });
+  test("Message != empty", () => {
+    const parsed = bru.getVar("parsedResponse");
+    expect(parsed.message).to.not.be.empty;
+  });
+  test("Error code != 0", () => {
+    const parsed = bru.getVar("parsedResponse");
+    expect(parsed.errorCode).to.not.equal(0);
+  });
 }

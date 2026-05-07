@@ -21,26 +21,35 @@ body:json {
   }
 }
 
-tests {
-  test("HTTP status is successful", () => {
-    expect(res.getStatus()).to.be.lessThan(500);
-  });
-  
-  test("SSE output includes sources event", () => {
-    const rawBody = res.getBody();
-    const bodyText = (typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody)).toLowerCase();
-    expect(bodyText.includes('"type":"sources"')).to.equal(true);
-  });
-  
-  test("SSE sources include source URLs", () => {
-    const rawBody = res.getBody();
-    const bodyText = (typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody)).toLowerCase();
-    const hasHttpSource = bodyText.includes("http://") || bodyText.includes("https://");
-    expect(hasHttpSource).to.equal(true);
-  });
+script:post-response {
+  const rawBody = typeof res.body === 'string' ? res.body : JSON.stringify(res.body);
+  const parsed = parseSse(rawBody);
+  bru.setVar("parsedResponse", parsed);
+  console.log("Sources ask parsed — message length:", parsed.message.length,
+    "sources count:", parsed.sources.length, "success:", parsed.success);
 }
 
 settings {
   encodeUrl: true
   timeout: 0
+  stream: true
+}
+
+tests {
+  test("HTTP status is successful", () => {
+    expect(res.getStatus()).to.be.lessThan(500);
+  });
+
+  test("SSE output includes sources event", () => {
+    const parsed = bru.getVar("parsedResponse");
+    expect(parsed.sources.length).to.be.greaterThan(0);
+  });
+
+  test("SSE sources include source URLs", () => {
+    const parsed = bru.getVar("parsedResponse");
+    const hasHttpSource = parsed.sources.some(s =>
+      s.url && (s.url.startsWith("http://") || s.url.startsWith("https://"))
+    );
+    expect(hasHttpSource).to.equal(true);
+  });
 }

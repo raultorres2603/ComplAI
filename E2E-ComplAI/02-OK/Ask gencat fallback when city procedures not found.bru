@@ -23,33 +23,42 @@ body:json {
   }
 }
 
-tests {
-  test("HTTP 200 when city procedures return empty", () => {
-    expect(res.getStatus()).to.equal(200);
-  });
-  
-  test("Response is successful", () => {
-    expect(res.getBody().success).to.equal(true);
-  });
-  
-  test("Response contains message text", () => {
-    const body = res.getBody();
-    expect(body.message).to.not.equal(null);
-  });
-  
-  test("Should return gencat procedures as fallback", () => {
-    const body = res.getBody();
-    // Either has a message or should have gencat source
-    if (body.sources && body.sources.length > 0) {
-      const hasGencatSource = body.sources.some(s => 
-        s.url && s.url.includes("tramits.gencat.cat")
-      );
-      console.log("Fallback to gencat source: " + hasGencatSource);
-    }
-  });
+script:post-response {
+  const rawBody = typeof res.body === 'string' ? res.body : JSON.stringify(res.body);
+  const parsed = parseSse(rawBody);
+  bru.setVar("parsedResponse", parsed);
+  console.log("Fallback ask parsed — message length:", parsed.message.length, "success:", parsed.success);
 }
 
 settings {
   encodeUrl: true
   timeout: 0
+  stream: true
+}
+
+tests {
+  test("HTTP 200 when city procedures return empty", () => {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response is successful", () => {
+    const parsed = bru.getVar("parsedResponse");
+    expect(parsed.success).to.equal(true);
+  });
+
+  test("Response contains message text", () => {
+    const parsed = bru.getVar("parsedResponse");
+    expect(parsed.message).to.not.be.empty;
+  });
+
+  test("Should return gencat procedures as fallback", () => {
+    const parsed = bru.getVar("parsedResponse");
+    // Either has a message or should have gencat source
+    if (parsed.sources && parsed.sources.length > 0) {
+      const hasGencatSource = parsed.sources.some(s =>
+        s.url && s.url.includes("tramits.gencat.cat")
+      );
+      console.log("Fallback to gencat source: " + hasGencatSource);
+    }
+  });
 }
