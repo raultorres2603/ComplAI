@@ -199,6 +199,13 @@ public class StadisticsHtmlRenderer {
 
     private int diff(int curr, int prev) { return curr - prev; }
 
+    private String formatNumber(int n) {
+        if (n >= 1000) {
+            return String.format("%.1fk", n / 1000.0).replace(",", ".").replace(".0k", "k");
+        }
+        return String.valueOf(n);
+    }
+
     // ─── Bar chart (weekly comparison) ─────────────────────────────────────────
 
     private String buildWeeklyBarChart(StadisticsModel m) {
@@ -213,10 +220,7 @@ public class StadisticsHtmlRenderer {
             val(m.getPreviousWeek(), w -> w.getRedactInteractions())
         };
 
-        int max = Math.max(1, Math.max(Math.max(curr[0], curr[1]), curr[2]));
-        max = Math.max(max, Math.max(Math.max(prev[0], prev[1]), prev[2]));
-
-        // SVG: 340 wide, 150 tall.  Chart area: x=30..330, y=10..110 (100px)
+        // SVG: 340 wide, 155 tall.  Chart area: x=30..330, y=10..110 (100px)
         int svgW = 340, svgH = 155;
         int chartLeft = 35, chartRight = 335, chartTop = 10, chartBot = 110;
         int chartW = chartRight - chartLeft;
@@ -226,19 +230,29 @@ public class StadisticsHtmlRenderer {
         String[] labels = {"Consultes", "Reclam.", "Valoracions"};
         int groupW = chartW / 3; // ~100px per group
 
+        // Use logarithmic scale so bars with vastly different values remain visible.
+        // log(value + 1) avoids log(0) and compresses large values.
+        double maxLog = Math.log10(Math.max(1, Math.max(
+            Math.max(curr[0], curr[1]), curr[2])) + 1);
+
         // X-axis baseline
         bars.append(String.format(
             "<line x1=\"%d\" y1=\"%d\" x2=\"%d\" y2=\"%d\" stroke=\"#E5E7EB\" stroke-width=\"1\"/>",
             chartLeft, chartBot, chartRight, chartBot));
 
+        // Bar geometry: 32px wide, 4px gap, centered in group
+        int barW = 32;
+        int barGap = 4;
+
         for (int i = 0; i < 3; i++) {
-            double curH = (curr[i] / (double) max) * chartH;
-            double preH = (prev[i] / (double) max) * chartH;
-            // Bar: 24px wide, 6px gap, centered in group
-            int barW = 24;
+            double curLog = Math.log10(curr[i] + 1);
+            double preLog = Math.log10(prev[i] + 1);
+            double curH = (curLog / maxLog) * chartH;
+            double preH = (preLog / maxLog) * chartH;
+
             int groupCenterX = chartLeft + i * groupW + groupW / 2;
-            int curBarX = groupCenterX - barW - 3;
-            int preBarX = groupCenterX + 3;
+            int curBarX = groupCenterX - barGap - barW;
+            int preBarX = groupCenterX + barGap;
 
             // Previous week bar (lighter, drawn first so it's behind)
             if (preH > 0) {
@@ -253,11 +267,11 @@ public class StadisticsHtmlRenderer {
                     curBarX, (int) (chartBot - curH), barW, curH, ACCENT_BLUE));
             }
 
-            // Value label — always placed BELOW the bar, well inside the chart height
-            int labelY = chartBot + 18;
+            // Value label — placed below the bars, with space for a 1-line label
+            int labelY = chartBot + 16;
             bars.append(String.format(
-                "<text x=\"%d\" y=\"%d\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"700\" fill=\"#1F2937\">%d</text>",
-                groupCenterX, labelY, curr[i]));
+                "<text x=\"%d\" y=\"%d\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"700\" fill=\"#1F2937\">%s</text>",
+                groupCenterX, labelY, formatNumber(curr[i])));
             // Category label below value
             bars.append(String.format(
                 "<text x=\"%d\" y=\"%d\" text-anchor=\"middle\" font-size=\"10\" fill=\"#6B7280\">%s</text>",
