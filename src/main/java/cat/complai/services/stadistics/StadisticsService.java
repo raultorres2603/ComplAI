@@ -193,7 +193,19 @@ public class StadisticsService implements IStadisticsService {
 
     @Override
     public StadisticsModel generateStadisticsReport() throws CloudWatchLogsException {
-        logger.info("Generating statistics report with weekly comparison...");
+        // Delegate to city-specific method with null (all cities)
+        return generateStadisticsReport(null);
+    }
+
+    /**
+     * Generates a city-specific statistics report (stub implementation).
+     *
+     * @param cityId the city identifier (e.g., "elprat"), or null for all cities
+     * @return the statistics model
+     * @throws CloudWatchLogsException if CloudWatch is unavailable
+     */
+    public StadisticsModel generateStadisticsReport(String cityId) throws CloudWatchLogsException {
+        logger.info("Generating statistics report with weekly comparison (cityId={})...", cityId);
 
         // Calculate date ranges
         Instant now = Instant.now();

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <!--
+                Pattern includes cityId from MDC when available.
+                Format: timestamp [thread] level cityId logger - message
+                Example: 2026-05-07T10:30:00.123+0000 [main] INFO city=elprat cat.complai.services.OpenRouterServices - Request processed
+                When cityId is not set (e.g., startup, health checks), it shows "city=-"
+            -->
+            <pattern>%d{yyyy-MM-dd'T'HH:mm:ss.SSSZ} [%thread] %level %X{cityId:- -} %logger - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!--
+        Route java.util.logging to SLF4J (JUL-to-SLF4J bridge).
+        This ensures that existing java.util.logging calls also get cityId via SLF4J MDC.
+    -->
+    <contextListener class="ch.qos.logback.classic.jul.LevelChangePropagator">
+        <resetJUL>true</resetJUL>
+    </contextListener>
+
+    <logger name="cat.complai" level="INFO"/>
+    <logger name="io.micronaut" level="INFO"/>
+    <logger name="software.amazon.awssdk" level="WARN"/>
+
+    <root level="INFO">
+        <appender-ref ref="STDOUT"/>
+    </root>
+</configuration>
