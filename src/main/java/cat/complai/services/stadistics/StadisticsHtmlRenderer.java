@@ -4,13 +4,9 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.List;
-
 import cat.complai.services.stadistics.models.ComplaintFile;
 import cat.complai.services.stadistics.models.FeedbackFile;
 import cat.complai.services.stadistics.models.StadisticsModel;
-import cat.complai.services.stadistics.models.StadisticsModel.WeeklyData;
-import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 /**
