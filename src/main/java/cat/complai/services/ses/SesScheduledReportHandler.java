@@ -11,7 +11,7 @@ import jakarta.inject.Inject;
  *
  * <p>Runs every Monday at 03:00 (server time) via an EventBridge rule in production
  * and a CloudWatch Events rule in SAM. This thin handler delegates all business logic
- * to {@link SesScheduledReportService}, which is also unit-tested independently.
+ * to {@link MultiCitySesService}, which discovers configured cities and sends per-city reports.
  *
  * <p>Lambda configuration:
  * <ul>
@@ -29,13 +29,13 @@ public class SesScheduledReportHandler extends MicronautRequestHandler<Scheduled
     private static final Logger logger = Logger.getLogger(SesScheduledReportHandler.class.getName());
 
     @Inject
-    private SesScheduledReportService service;
+    private MultiCitySesService multiCityService;
 
     @Override
     public String execute(ScheduledEvent event) {
         logger.info("SesScheduledReportHandler — scheduled invocation received");
         logger.info(() -> "Event source: " + event.getSource()
                 + " | detail-type: " + event.getDetailType());
-        return service.run();
+        return multiCityService.runReportsForAllCities();
     }
 }

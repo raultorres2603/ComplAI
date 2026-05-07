@@ -26,10 +26,12 @@ Parameters:
     Type: String
     Default: ''
     Description: Sender email for SES (passed from CI or manually)
-  SesRecipientEmail:
+  # Per-city SES recipient emails. Format: AWS_SES_TO_EMAIL_<CITYID>
+  # Both API_KEY_<CITYID> AND AWS_SES_TO_EMAIL_<CITYID> must be set for a city to receive reports.
+  SesToEmailElprat:
     Type: String
     Default: ''
-    Description: Recipient email for SES statistics reports
+    Description: Recipient email for city 'elprat' (e.g., elprat@example.com). Set both this and ApiKeyElprat.
   SesRegion:
     Type: String
     Default: eu-west-1
@@ -53,7 +55,7 @@ Globals:
         COMPLAINTS_REGION: !Ref LambdaRegion
         AWS_SES_REGION: !Ref SesRegion
         AWS_SES_FROM_EMAIL: !Ref SesFromEmail
-        AWS_SES_RECIPIENT_EMAIL: !Ref SesRecipientEmail
+        AWS_SES_TO_EMAIL_ELPRAT: !Ref SesToEmailElprat
 
 Resources:
   ComplAILambdaRole:
