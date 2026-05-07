@@ -244,13 +244,13 @@ public class StadisticsHtmlRenderer {
             if (preH > 0) {
                 bars.append(String.format(
                     "<rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%.0f\" fill=\"#BFDBFE\" rx=\"4\"/>",
-                    preBarX, chartBot - preH, barW, preH));
+                    preBarX, (int) (chartBot - preH), barW, preH));
             }
             // Current week bar (solid blue, drawn on top)
             if (curH > 0) {
                 bars.append(String.format(
                     "<rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%.0f\" fill=\"%s\" rx=\"4\"/>",
-                    curBarX, chartBot - curH, barW, curH, ACCENT_BLUE));
+                    curBarX, (int) (chartBot - curH), barW, curH, ACCENT_BLUE));
             }
 
             // Value label — always placed BELOW the bar, well inside the chart height
