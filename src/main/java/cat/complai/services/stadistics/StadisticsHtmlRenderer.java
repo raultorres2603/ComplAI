@@ -52,28 +52,28 @@ public class StadisticsHtmlRenderer {
                 "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n" +
                 "  <title>ComplAI — Weekly Statistics Report</title>\n" +
                 "</head>\n" +
-                "<body style=\"margin:0;padding:0;background-color:#F3F4F6;font-family:Arial,Helvetica,sans-serif;\">\n" +
+                "<body style=\"margin:0;padding:0;background-color:#EFF1F5;font-family:Arial,Helvetica,sans-serif;\">\n" +
                 "\n" +
-                "  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#F3F4F6;padding:20px;\">\n" +
+                "  <!-- Full-width outer wrapper — no max-width, stretches to email viewport -->\n" +
+                "  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#EFF1F5;\">\n" +
                 "    <tr>\n" +
-                "      <td align=\"center\">\n" +
+                "      <td>\n" +
                 "\n" +
-                "        <table width=\"640\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"\n" +
-                "               style=\"background-color:#FFFFFF;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);\">\n" +
-                "\n" +
-                "          <!-- Header -->\n" +
+                "        <!-- Header — blue bar, full width -->\n" +
+                "        <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"\n" +
+                "               style=\"background-color:" + ACCENT_BLUE + ";\">\n" +
                 "          <tr>\n" +
-                "            <td style=\"background-color:" + ACCENT_BLUE + ";padding:28px 32px;\">\n" +
+                "            <td style=\"padding:28px 32px 24px;\">\n" +
                 "              <table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\">\n" +
                 "                <tr>\n" +
                 "                  <td>\n" +
                 "                    <p style=\"margin:0;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.7);\">ComplAI &middot; El Prat de Llobregat</p>\n" +
-                "                    <h1 style=\"margin:6px 0 0;font-size:24px;font-weight:700;color:#FFFFFF;line-height:1.2;\">Weekly Statistics Report</h1>\n" +
+                "                    <h1 style=\"margin:6px 0 0;font-size:22px;font-weight:700;color:#FFFFFF;line-height:1.2;\">Weekly Statistics Report</h1>\n" +
                 "                    <p style=\"margin:8px 0 0;font-size:13px;color:rgba(255,255,255,0.85);\">Comparativa setmanal &mdash; aquesta setmana vs. l&rsquo;anterior</p>\n" +
                 "                  </td>\n" +
-                "                  <td align=\"right\" valign=\"top\">\n" +
+                "                  <td align=\"right\" valign=\"middle\">\n" +
                 "                    <div style=\"background-color:rgba(255,255,255,0.15);border-radius:8px;padding:10px 14px;display:inline-block;\">\n" +
-                "                      <p style=\"margin:0;font-size:11px;color:rgba(255,255,255,0.7);\">Generated</p>\n" +
+                "                      <p style=\"margin:0;font-size:11px;color:rgba(255,255,255,0.7);\">Generat</p>\n" +
                 "                      <p style=\"margin:2px 0 0;font-size:13px;font-weight:600;color:#FFFFFF;\">" + DATE_FMT.format(reportGeneratedAt) + "</p>\n" +
                 "                    </div>\n" +
                 "                  </td>\n" +
@@ -81,34 +81,39 @@ public class StadisticsHtmlRenderer {
                 "              </table>\n" +
                 "            </td>\n" +
                 "          </tr>\n" +
+                "        </table>\n" +
                 "\n" +
-                "          <!-- KPI row -->\n" +
+                "        <!-- KPI row -->\n" +
+                "        <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"\n" +
+                "               style=\"background-color:#FFFFFF;\">\n" +
                 "          <tr>\n" +
                 "            <td style=\"padding:20px 32px 0;\">\n" +
                 "              <table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\">\n" +
                 "                <tr>\n" +
-                kpiRow +
+                kpiRow + "\n" +
                 "                </tr>\n" +
                 "              </table>\n" +
                 "            </td>\n" +
                 "          </tr>\n" +
+                "        </table>\n" +
                 "\n" +
-                "          <!-- Charts: bar + donut side by side -->\n" +
+                "        <!-- Charts section -->\n" +
+                "        <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"\n" +
+                "               style=\"background-color:#F9FAFB;\">\n" +
                 "          <tr>\n" +
-                "            <td style=\"padding:20px 32px 0;\">\n" +
+                "            <td style=\"padding:20px 32px;\">\n" +
                 "              <table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\">\n" +
                 "                <tr>\n" +
-                "                  <td width=\"58%\" valign=\"top\">\n" +
-                "                    <div style=\"background-color:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;padding:16px;\">\n" +
-                "                      <p style=\"margin:0 0 12px;font-size:13px;font-weight:700;color:#1F2937;\">Weekly Comparison</p>\n" +
+                "                  <td width=\"58%\" valign=\"top\" style=\"padding-right:12px;\">\n" +
+                "                    <div style=\"background-color:#FFFFFF;border:1px solid #E5E7EB;border-radius:12px;padding:20px;\">\n" +
+                "                      <p style=\"margin:0 0 16px;font-size:14px;font-weight:700;color:#1F2937;\">Weekly Comparison</p>\n" +
                 barChart + "\n" +
                 "                    </div>\n" +
                 "                  </td>\n" +
-                "                  <td width=\"8%\"><!-- spacer --></td>\n" +
-                "                  <td width=\"34%\" valign=\"top\">\n" +
-                "                    <div style=\"background-color:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;padding:16px;\">\n" +
-                "                      <p style=\"margin:0 0 12px;font-size:13px;font-weight:700;color:#1F2937;\">Interaction Mix</p>\n" +
-                "                      <p style=\"margin:0 0 8px;font-size:12px;color:#6B7280;\">Current week breakdown</p>\n" +
+                "                  <td width=\"42%\" valign=\"top\">\n" +
+                "                    <div style=\"background-color:#FFFFFF;border:1px solid #E5E7EB;border-radius:12px;padding:20px;\">\n" +
+                "                      <p style=\"margin:0 0 4px;font-size:14px;font-weight:700;color:#1F2937;\">Interaction Mix</p>\n" +
+                "                      <p style=\"margin:0 0 12px;font-size:12px;color:#6B7280;\">Repartiment setmana actual</p>\n" +
                 donutChart + "\n" +
                 "                    </div>\n" +
                 "                  </td>\n" +
@@ -116,24 +121,29 @@ public class StadisticsHtmlRenderer {
                 "              </table>\n" +
                 "            </td>\n" +
                 "          </tr>\n" +
+                "        </table>\n" +
                 "\n" +
-                "          <!-- File section -->\n" +
+                "        <!-- File section -->\n" +
+                "        <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"\n" +
+                "               style=\"background-color:#FFFFFF;\">\n" +
                 "          <tr>\n" +
                 "            <td style=\"padding:20px 32px 0;\">\n" +
                 fileSection + "\n" +
                 "            </td>\n" +
                 "          </tr>\n" +
+                "        </table>\n" +
                 "\n" +
-                "          <!-- Footer -->\n" +
+                "        <!-- Footer -->\n" +
+                "        <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"\n" +
+                "               style=\"background-color:#F3F4F6;\">\n" +
                 "          <tr>\n" +
-                "            <td style=\"padding:24px 32px;background-color:#F9FAFB;border-top:1px solid #E5E7EB;\">\n" +
+                "            <td style=\"padding:24px 32px;\">\n" +
                 "              <p style=\"margin:0;font-size:11px;color:#9CA3AF;text-align:center;\">\n" +
-                "                This is an automated report generated by ComplAI &middot; El Prat de Llobregat.<br>\n" +
-                "                Do not reply to this email.\n" +
+                "                Informe automatitzat generat per ComplAI &middot; El Prat de Llobregat.<br>\n" +
+                "                No respongueu a aquest correu.\n" +
                 "              </p>\n" +
                 "            </td>\n" +
                 "          </tr>\n" +
-                "\n" +
                 "        </table>\n" +
                 "\n" +
                 "      </td>\n" +
@@ -200,52 +210,74 @@ public class StadisticsHtmlRenderer {
         int[] prev = {
             val(m.getPreviousWeek(), w -> w.getAskInteractions()),
             val(m.getPreviousWeek(), w -> w.getRedactInteractions()),
-            val(m.getPreviousWeek(), w -> w.getFeedbackCount())
+            val(m.getPreviousWeek(), w -> w.getRedactInteractions())
         };
 
         int max = Math.max(1, Math.max(Math.max(curr[0], curr[1]), curr[2]));
         max = Math.max(max, Math.max(Math.max(prev[0], prev[1]), prev[2]));
 
-        int width = 300, height = 140;
-        double chartH = height - 40;
+        // SVG: 340 wide, 150 tall.  Chart area: x=30..330, y=10..110 (100px)
+        int svgW = 340, svgH = 155;
+        int chartLeft = 35, chartRight = 335, chartTop = 10, chartBot = 110;
+        int chartW = chartRight - chartLeft;
+        int chartH = chartBot - chartTop;
 
         StringBuilder bars = new StringBuilder();
         String[] labels = {"Consultes", "Reclam.", "Valoracions"};
+        int groupW = chartW / 3; // ~100px per group
+
+        // X-axis baseline
+        bars.append(String.format(
+            "<line x1=\"%d\" y1=\"%d\" x2=\"%d\" y2=\"%d\" stroke=\"#E5E7EB\" stroke-width=\"1\"/>",
+            chartLeft, chartBot, chartRight, chartBot));
 
         for (int i = 0; i < 3; i++) {
             double curH = (curr[i] / (double) max) * chartH;
             double preH = (prev[i] / (double) max) * chartH;
-            int x = 20 + i * 90;
+            // Bar: 24px wide, 6px gap, centered in group
+            int barW = 24;
+            int groupCenterX = chartLeft + i * groupW + groupW / 2;
+            int curBarX = groupCenterX - barW - 3;
+            int preBarX = groupCenterX + 3;
 
-            if (curH > 0) {
-                bars.append(String.format(
-                    "<rect x=\"%d\" y=\"%.0f\" width=\"28\" height=\"%.0f\" fill=\"%s\" rx=\"3\"/>",
-                    x, chartH - curH, curH, ACCENT_BLUE));
-            }
+            // Previous week bar (lighter, drawn first so it's behind)
             if (preH > 0) {
                 bars.append(String.format(
-                    "<rect x=\"%d\" y=\"%.0f\" width=\"28\" height=\"%.0f\" fill=\"%s\" rx=\"3\"/>",
-                    x + 32, chartH - preH, preH, "#93C5FD"));
+                    "<rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%.0f\" fill=\"#BFDBFE\" rx=\"4\"/>",
+                    preBarX, chartBot - preH, barW, preH));
+            }
+            // Current week bar (solid blue, drawn on top)
+            if (curH > 0) {
+                bars.append(String.format(
+                    "<rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%.0f\" fill=\"%s\" rx=\"4\"/>",
+                    curBarX, chartBot - curH, barW, curH, ACCENT_BLUE));
             }
 
-            int labelY = (int) (chartH - Math.max(curH, preH)) - 5;
+            // Value label — always placed BELOW the bar, well inside the chart height
+            int labelY = chartBot + 18;
             bars.append(String.format(
-                "<text x=\"%d\" y=\"%d\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"700\" fill=\"#1F2937\">%d</text>",
-                x + 14, labelY, curr[i]));
+                "<text x=\"%d\" y=\"%d\" text-anchor=\"middle\" font-size=\"12\" font-weight=\"700\" fill=\"#1F2937\">%d</text>",
+                groupCenterX, labelY, curr[i]));
+            // Category label below value
             bars.append(String.format(
                 "<text x=\"%d\" y=\"%d\" text-anchor=\"middle\" font-size=\"10\" fill=\"#6B7280\">%s</text>",
-                x + 14, height - 4, labels[i]));
+                groupCenterX, labelY + 14, labels[i]));
         }
 
-        String legend = String.format(
-            "<rect x=\"20\" y=\"8\" width=\"10\" height=\"10\" fill=\"%s\" rx=\"2\"/>" +
-            "<text x=\"34\" y=\"17\" font-size=\"10\" fill=\"%s\">Aquesta setmana</text>" +
-            "<rect x=\"130\" y=\"8\" width=\"10\" height=\"10\" fill=\"#93C5FD\" rx=\"2\"/>" +
-            "<text x=\"144\" y=\"17\" font-size=\"10\" fill=\"%s\">Set. anterior</text>",
-            ACCENT_BLUE, GREY_DARK, GREY_DARK);
+        // Legend row — placed above the chart area so it doesn't push content down
+        bars.append(String.format(
+            "<rect x=\"%d\" y=\"%d\" width=\"12\" height=\"12\" fill=\"%s\" rx=\"3\"/>" +
+            "<text x=\"%d\" y=\"%d\" font-size=\"10\" fill=\"%s\">Aquesta setmana</text>" +
+            "<rect x=\"%d\" y=\"%d\" width=\"12\" height=\"12\" fill=\"#BFDBFE\" rx=\"3\"/>" +
+            "<text x=\"%d\" y=\"%d\" font-size=\"10\" fill=\"%s\">Set. anterior</text>",
+            chartLeft, chartTop - 4, ACCENT_BLUE,
+            chartLeft + 16, chartTop + 6, GREY_DARK,
+            chartLeft + 110, chartTop - 4,
+            chartLeft + 126, chartTop + 6, GREY_DARK));
 
-        return "<svg viewBox=\"0 0 " + width + " " + height + "\" width=\"100%\" xmlns=\"http://www.w3.org/2000/svg\" style=\"display:block;\">" +
-               legend + bars +
+        return "<svg viewBox=\"0 0 " + svgW + " " + svgH + "\" width=\"100%\" "
+             + "style=\"display:block;overflow:visible;\" xmlns=\"http://www.w3.org/2000/svg\">" +
+               bars.toString() +
                "</svg>";
     }
 
