@@ -590,6 +590,7 @@ export class LambdaStack extends cdk.Stack {
       environment: {
         AWS_SES_FROM_EMAIL: process.env.SES_FROM_EMAIL || '',
         AWS_SES_TO_EMAIL: process.env.SES_TO_EMAIL || '',
+        AWS_SES_TO_EMAIL_ELPRAT: process.env.SES_TO_EMAIL || '',
         AWS_SES_REGION: process.env.AWS_SES_REGION || 'eu-west-1',
         ENVIRONMENT: environment,
         PROCEDURES_BUCKET: proceduresBucket.bucketName,
@@ -603,6 +604,8 @@ export class LambdaStack extends cdk.Stack {
         COMPLAINTS_BUCKET: complaintsBucket.bucketName,
         COMPLAINTS_REGION: this.region,
         FEEDBACK_BUCKET_NAME: feedbackBucket.bucketName,
+        // Per-city API keys for MultiCitySesService discovery (city must have BOTH API_KEY_* and AWS_SES_TO_EMAIL_*)
+        API_KEY_ELPRAT: process.env.API_KEY_ELPRAT || '',
         // Allow LocalStack endpoint for local development
         ...(process.env.AWS_ENDPOINT_URL ? { AWS_ENDPOINT_URL: process.env.AWS_ENDPOINT_URL } : {}),
       },
