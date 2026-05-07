@@ -43,8 +43,6 @@ public class StadisticsHtmlRenderer {
         String kpiRow    = buildKpiRow(model);
         String barChart  = buildWeeklyBarChart(model);
         String donutChart = buildInteractionDonut(model);
-        String fileSection = buildFileSection(model);
-
         return "<!DOCTYPE html>\n" +
                 "<html lang=\"ca\">\n" +
                 "<head>\n" +
