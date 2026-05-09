@@ -307,9 +307,9 @@ public class StadisticsHtmlRenderer {
             "<text x=\"%d\" y=\"%d\" font-size=\"9\" fill=\"%s\">Valorac.</text>",
             chartLeft, chartTop - 4, ACCENT_BLUE,
             chartLeft + 14, chartTop + 4, GREY_DARK,
-            chartLeft + 80, chartTop - 4,
+            chartLeft + 80, chartTop - 4, ACCENT_PURPLE,
             chartLeft + 94, chartTop + 4, GREY_DARK,
-            chartLeft + 140, chartTop - 4,
+            chartLeft + 140, chartTop - 4, ACCENT_AMBER,
             chartLeft + 154, chartTop + 4, GREY_DARK));
 
         return "<svg viewBox=\"0 0 " + svgW + " " + svgH + "\" width=\"100%\" "
