@@ -224,7 +224,7 @@ public class StadisticsService implements IStadisticsService {
         for (int month = 1; month <= currentMonthValue; month++) {
             YearMonth ym = YearMonth.of(currentYear, month);
             String monthLabel = ym.atDay(1).format(
-                java.time.format.DateTimeFormatter.ofPattern("MMMM yyyy", new java.util.Locale("ca", "ES"))
+                java.time.format.DateTimeFormatter.ofPattern("LLLL yyyy", new java.util.Locale("ca", "ES"))
             );
             monthLabel = monthLabel.substring(0, 1).toUpperCase() + monthLabel.substring(1);
 
