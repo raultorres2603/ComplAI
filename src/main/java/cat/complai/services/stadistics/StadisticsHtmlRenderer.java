@@ -80,7 +80,7 @@ public class StadisticsHtmlRenderer {
                 "                  <td>\n" +
                 "                    <p style=\"margin:0;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.7);\">ComplAI &middot; El Prat de Llobregat</p>\n" +
                 "                    <h1 style=\"margin:6px 0 0;font-size:22px;font-weight:700;color:#FFFFFF;line-height:1.2;\">Monthly Statistics Report</h1>\n" +
-                "                    <p style=\"margin:8px 0 0;font-size:13px;color:rgba(255,255,255,0.85);\">Any " + year + " &mdash; any vs. mes anterior</p>\n" +
+                "                    <p style=\"margin:8px 0 0;font-size:13px;color:rgba(255,255,255,0.85);\">Resum mensual any " + year + " &mdash; acumulat gener a " + getCurrentMonthLabel(model) + "</p>\n" +
                 "                  </td>\n" +
                 "                  <td align=\"right\" valign=\"middle\" class=\"mobile-hide\">\n" +
                 "                    <div style=\"background-color:rgba(255,255,255,0.15);border-radius:8px;padding:10px 14px;display:inline-block;\">\n" +
@@ -127,9 +127,19 @@ public class StadisticsHtmlRenderer {
                 "            </td>\n" +
                 "          </tr>\n" +
                 "\n" +
+                "          <!-- Monthly breakdown table -->\n" +
+                "          <tr>\n" +
+                "            <td style=\"padding:20px 24px;background-color:#FFFFFF;\">\n" +
+                "              <div style=\"border:1px solid #E5E7EB;border-radius:12px;padding:20px;\">\n" +
+                "                <p style=\"margin:0 0 16px;font-size:14px;font-weight:700;color:#1F2937;\">Desglossament mensual ( + year + )</p>\n" +
+                buildMonthlyTable(model) + "\n" +
+                "              </div>\n" +
+                "            </td>\n" +
+                "          </tr>\n" +
+                "\n" +
                 "          <!-- File section: two columns, stacked on mobile -->\n" +
                 "          <tr>\n" +
-                "            <td style=\"padding:20px 24px 0;background-color:#FFFFFF;\">\n" +
+                "            <td style=\"padding:0 24px 20px;background-color:#FFFFFF;\">\n" +
                 "              <table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\">\n" +
                 "                <tr>\n" +
                 "                  <td class=\"mobile-stack\" width=\"50%\" valign=\"top\" style=\"padding-right:8px;\">\n" +
@@ -172,10 +182,16 @@ public class StadisticsHtmlRenderer {
     // ─── KPI cards ─────────────────────────────────────────────────────────────
 
     private String buildKpiRow(StadisticsModel m) {
-        MonthlyData curr = m.getCurrentMonth();
-        int ask    = curr != null ? curr.getAskInteractions() : 0;
-        int redact = curr != null ? curr.getRedactInteractions() : 0;
-        int fb     = curr != null ? curr.getFeedbackCount() : 0;
+        // Year-to-date totals from all monthly data
+        ArrayList<MonthlyData> yearly = m.getYearlyData();
+        int ask = 0, redact = 0, fb = 0;
+        if (yearly != null) {
+            for (MonthlyData md : yearly) {
+                ask    += md.getAskInteractions();
+                redact += md.getRedactInteractions();
+                fb     += md.getFeedbackCount();
+            }
+        }
         int diff   = totalDiff(m);
         String arrow = diff >= 0 ? "&#9650;" : "&#9660;";
         String diffColor = diff >= 0 ? ACCENT_GREEN : ACCENT_RED;
@@ -233,28 +249,26 @@ public class StadisticsHtmlRenderer {
         }
 
         int numMonths = yearly.size();
-        // Take last 6 months max for display
-        int displayStart = Math.max(0, numMonths - 6);
-        ArrayList<MonthlyData> displayMonths = new ArrayList<>();
-        for (int i = displayStart; i < numMonths; i++) {
-            displayMonths.add(yearly.get(i));
-        }
 
-        // SVG dimensions
-        int svgW = 340, svgH = 155;
-        int chartLeft = 35, chartRight = 335, chartTop = 10, chartBot = 110;
+        // SVG dimensions: scale width to fit all months
+        int svgW = Math.max(340, 60 + numMonths * 52);
+        int svgH = 155;
+        int chartLeft = 35, chartRight = svgW - 5, chartTop = 10, chartBot = 110;
         int chartW = chartRight - chartLeft;
         int chartH = chartBot - chartTop;
 
-        int numBars = displayMonths.size();
-        int barW = Math.min(32, (chartW - 20) / (numBars * 2));
-        int barGap = 4;
+        // Calculate bar width so all month groups fit in the available width
+        int availableWidth = chartW - 20;
+        int groupStep = availableWidth / numMonths;
+        int barW = Math.max(4, Math.min(22, (groupStep - 8) / 3));
+        int barGap = Math.max(2, (groupStep - 3 * barW) / 2);
+        int groupWidth = 3 * barW + 2 * barGap; // actual width per month group
 
         StringBuilder bars = new StringBuilder();
 
         // Find max for scaling
         int maxVal = 0;
-        for (MonthlyData md : displayMonths) {
+        for (MonthlyData md : yearly) {
             maxVal = Math.max(maxVal, md.getAskInteractions());
             maxVal = Math.max(maxVal, md.getRedactInteractions());
             maxVal = Math.max(maxVal, md.getFeedbackCount());
@@ -267,34 +281,42 @@ public class StadisticsHtmlRenderer {
             chartLeft, chartBot, chartRight, chartBot));
 
         // Draw bars for each month
-        for (int i = 0; i < numBars; i++) {
-            MonthlyData md = displayMonths.get(i);
-            int groupX = chartLeft + i * (barW * 3 + barGap * 2) + 10;
+        int startX = chartLeft + (availableWidth - numMonths * groupStep) / 2 + 10;
+        for (int i = 0; i < numMonths; i++) {
+            MonthlyData md = yearly.get(i);
+            int groupX = startX + i * groupStep;
 
             // Ask bar (blue)
             double askH = ((double) md.getAskInteractions() / maxVal) * chartH;
-            bars.append(String.format(
-                "<rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%.0f\" fill=\"%s\" rx=\"3\"/>",
-                groupX, (int) (chartBot - askH), barW, askH, ACCENT_BLUE));
+            if (md.getAskInteractions() > 0) {
+                bars.append(String.format(
+                    "<rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%.0f\" fill=\"%s\" rx=\"2\"/>",
+                    groupX, (int) (chartBot - askH), barW, askH, ACCENT_BLUE));
+            }
 
             // Redact bar (purple)
             double redactH = ((double) md.getRedactInteractions() / maxVal) * chartH;
-            bars.append(String.format(
-                "<rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%.0f\" fill=\"%s\" rx=\"3\"/>",
-                groupX + barW + barGap, (int) (chartBot - redactH), barW, redactH, ACCENT_PURPLE));
+            if (md.getRedactInteractions() > 0) {
+                bars.append(String.format(
+                    "<rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%.0f\" fill=\"%s\" rx=\"2\"/>",
+                    groupX + barW + barGap, (int) (chartBot - redactH), barW, redactH, ACCENT_PURPLE));
+            }
 
             // Feedback bar (amber)
             double fbH = ((double) md.getFeedbackCount() / maxVal) * chartH;
-            bars.append(String.format(
-                "<rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%.0f\" fill=\"%s\" rx=\"3\"/>",
-                groupX + 2 * (barW + barGap), (int) (chartBot - fbH), barW, fbH, ACCENT_AMBER));
+            if (md.getFeedbackCount() > 0) {
+                bars.append(String.format(
+                    "<rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%.0f\" fill=\"%s\" rx=\"2\"/>",
+                    groupX + 2 * (barW + barGap), (int) (chartBot - fbH), barW, fbH, ACCENT_AMBER));
+            }
 
             // Month label
             String monthLabel = getShortMonthLabel(md.getMonthLabel());
-            int labelX = groupX + (barW * 3 + barGap * 2) / 2;
+            int labelX = groupX + groupWidth / 2;
+            int fontSize = Math.max(7, Math.min(9, groupStep / 5));
             bars.append(String.format(
-                "<text x=\"%d\" y=\"%d\" text-anchor=\"middle\" font-size=\"9\" fill=\"#6B7280\">%s</text>",
-                labelX, chartBot + 12, monthLabel));
+                "<text x=\"%d\" y=\"%d\" text-anchor=\"middle\" font-size=\"%d\" fill=\"#6B7280\">%s</text>",
+                labelX, chartBot + 12, fontSize, monthLabel));
         }
 
         // Legend
@@ -428,6 +450,62 @@ public class StadisticsHtmlRenderer {
             }
             sb.append("</div>");
         }
+        return sb.toString();
+    }
+
+    // ─── Monthly breakdown table ────────────────────────────────────────────────
+
+    private String buildMonthlyTable(StadisticsModel m) {
+        ArrayList<MonthlyData> yearly = m.getYearlyData();
+        if (yearly == null || yearly.isEmpty()) {
+            return "";
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("<table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\" style=\"border-collapse:collapse;\">");
+
+        // Header row
+        sb.append("<tr style=\"background-color:#F9FAFB;\">");
+        sb.append("<th style=\"padding:10px 12px;font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.5px;text-align:left;border-bottom:2px solid #E5E7EB;\">Mes</th>");
+        sb.append("<th style=\"padding:10px 12px;font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.5px;text-align:center;border-bottom:2px solid #E5E7EB;\">Consultes</th>");
+        sb.append("<th style=\"padding:10px 12px;font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.5px;text-align:center;border-bottom:2px solid #E5E7EB;\">Reclam.</th>");
+        sb.append("<th style=\"padding:10px 12px;font-size:11px;font-weight:700;color:#6B7280;text-transform:uppercase;letter-spacing:0.5px;text-align:center;border-bottom:2px solid #E5E7EB;\">Valorac.</th>");
+        sb.append("</tr>");
+
+        // Data rows
+        for (int i = 0; i < yearly.size(); i++) {
+            MonthlyData md = yearly.get(i);
+            String bgColor = (i % 2 == 0) ? "#FFFFFF" : "#F9FAFB";
+            sb.append("<tr style=\"background-color:").append(bgColor).append(";\">");
+            sb.append("<td style=\"padding:8px 12px;font-size:13px;font-weight:600;color:#1F2937;border-bottom:1px solid #E5E7EB;\">")
+              .append(escHtml(md.getMonthLabel())).append("</td>");
+            sb.append("<td style=\"padding:8px 12px;font-size:13px;color:#374151;text-align:center;border-bottom:1px solid #E5E7EB;\">")
+              .append(md.getAskInteractions()).append("</td>");
+            sb.append("<td style=\"padding:8px 12px;font-size:13px;color:#374151;text-align:center;border-bottom:1px solid #E5E7EB;\">")
+              .append(md.getRedactInteractions()).append("</td>");
+            sb.append("<td style=\"padding:8px 12px;font-size:13px;color:#374151;text-align:center;border-bottom:1px solid #E5E7EB;\">")
+              .append(md.getFeedbackCount()).append("</td>");
+            sb.append("</tr>");
+        }
+
+        // Totals row
+        int totalAsk = 0, totalRedact = 0, totalFb = 0;
+        for (MonthlyData md : yearly) {
+            totalAsk += md.getAskInteractions();
+            totalRedact += md.getRedactInteractions();
+            totalFb += md.getFeedbackCount();
+        }
+        sb.append("<tr style=\"background-color:#EFF6FF;\">");
+        sb.append("<td style=\"padding:10px 12px;font-size:13px;font-weight:700;color:#1F2937;border-bottom:none;\">Total</td>");
+        sb.append("<td style=\"padding:10px 12px;font-size:13px;font-weight:700;color:#2563EB;text-align:center;border-bottom:none;\">")
+          .append(totalAsk).append("</td>");
+        sb.append("<td style=\"padding:10px 12px;font-size:13px;font-weight:700;color:#7C3AED;text-align:center;border-bottom:none;\">")
+          .append(totalRedact).append("</td>");
+        sb.append("<td style=\"padding:10px 12px;font-size:13px;font-weight:700;color:#D97706;text-align:center;border-bottom:none;\">")
+          .append(totalFb).append("</td>");
+        sb.append("</tr>");
+
+        sb.append("</table>");
         return sb.toString();
     }
 

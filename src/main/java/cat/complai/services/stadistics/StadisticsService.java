@@ -1,7 +1,6 @@
 package cat.complai.services.stadistics;
 
 import java.time.Instant;
-import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
@@ -15,7 +14,6 @@ import cat.complai.services.stadistics.models.ComplaintFile;
 import cat.complai.services.stadistics.models.FeedbackFile;
 import cat.complai.services.stadistics.models.StadisticsModel;
 import cat.complai.services.stadistics.models.StadisticsModel.ComparisonData;
-import cat.complai.services.stadistics.models.StadisticsModel;
 import cat.complai.utilities.s3.S3ComplaintLister;
 import cat.complai.utilities.s3.S3FeedbackLister;
 import jakarta.inject.Inject;
