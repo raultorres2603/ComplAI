@@ -204,16 +204,36 @@ ComplAI uses Amazon SES for sending complaint statistics reports and notificatio
 
 **Configuration Bean**: `cat.complai.config.SesConfiguration` (`@ConfigurationProperties("aws.ses")`)
 
-**Required GitHub Actions Secrets**:
-| Secret | Description | Example |
+#### Multi-City SES (New)
+
+ComplAI supports per-city statistics reports. Each city receives its own customized report via SES.
+
+**Requirement**: Both `API_KEY_<CITYID>` AND `AWS_SES_TO_EMAIL_<CITYID>` must be set for a city to receive reports.
+
+| Environment Variable | Example Value | Required For |
 |---|---|---|
-| `AWS_SES_FROM_EMAIL` | Verified sender email in AWS SES | `noreply@elprathq.cat` |
-| `AWS_SES_REGION` | AWS region for SES (optional) | `eu-west-1` |
+| `API_KEY_ELPRAT` | `sk-test-...` | Authentication |
+| `AWS_SES_TO_EMAIL_ELPRAT` | `elprat@example.com` | Report delivery |
+| `AWS_SES_FROM_EMAIL` | `noreply@elprathq.cat` | Always (sender) |
+| `AWS_SES_REGION` | `eu-west-1` | Optional |
+
+**Adding a New City** (e.g., "Barcelona"):
+```bash
+API_KEY_BARCELONA=sk-test-bcn-456
+AWS_SES_TO_EMAIL_BARCELONA=barcelona@example.com
+```
+
+The `MultiCitySesService` automatically discovers configured cities at Lambda startup.
+
+#### Legacy Configuration
+
+The old single-recipient pattern (`AWS_SES_RECIPIENT_EMAIL`) is deprecated and ignored.
 
 **Environment Variable Mapping** (application.properties):
 ```properties
 aws.ses.from-email=${AWS_SES_FROM_EMAIL:}
 aws.ses.region=${AWS_SES_REGION:eu-west-1}
+aws.ses.to-email.elprat=${AWS_SES_TO_EMAIL_ELPRAT:}
 ```
 
 **Pre-deployment Requirements**:
@@ -235,6 +255,124 @@ aws.ses.region=${AWS_SES_REGION:eu-west-1}
 - Email validation performed at application startup via `@Email` annotation
 - Invalid or missing sender email causes immediate startup failure (fail-fast)
 - SES SDK errors are logged with context for troubleshooting
+
+---
+
+## Main E2E Flows
+
+### 1. Ask Flow (Chat with AI)
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant C as API Gateway
+    participant F as ApiKeyAuthFilter
+    participant S as OpenRouterService
+    participant R as RAG (BM25)
+    participant O as OpenRouter AI
+
+    U->>C: POST /complai/ask<br/>X-Api-Key: test-integration-key-elprat
+    C->>F: Validate API key
+    F->>S: Extract city=elprat, pass request
+    S->>R: Detect intent & retrieve context
+    R-->>S: Procedures/Events/Gencat docs
+    S->>O: Build prompt + context
+    O-->>S: AI response
+    S-->>U: SSE stream response
+```
+
+**Key Points:**
+- City extracted from `X-Api-Key` header (e.g., `API_KEY_ELPRAT` → `elprat`)
+- Intent detection: procedure, event, or gencat query
+- RAG uses in-memory BM25 index (no external database)
+- Response via Server-Sent Events (SSE)
+
+---
+
+### 2. Redact Flow (PDF Complaint)
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant C as API Gateway
+    participant P as SqsComplaintPublisher
+    participant Q as SQS Queue
+    participant W as Redactor Worker Lambda
+    participant O as OpenRouter AI
+    participant B as S3 (PDF)
+
+    U->>C: POST /complai/redact<br/>identity: {name, NIF}
+    C->>P: Queue request
+    P->>Q: Send SQS message
+    Q-->>U: 202 Accepted (async)
+    Q->>W: Trigger Lambda
+    W->>O: Request redaction
+    O-->>W: Redacted text
+    W->>B: Generate PDF + upload
+    B-->>W: Return signed URL
+    W-->>U: (via callback or polling)
+```
+
+**Key Points:**
+- Identity validated via OIDC (for OIDC-enabled cities)
+- Async via SQS - user gets immediate 202 response
+- Worker Lambda generates PDF with PDFBox
+- Signed S3 URL returned for download
+
+---
+
+### 3. Feedback Flow
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant C as API Gateway
+    participant P as SqsFeedbackPublisher
+    participant Q as SQS Queue
+    participant W as Feedback Worker Lambda
+
+    U->>C: POST /complai/feedback<br/>idUser, idProcedure, rating
+    C->>P: Queue request
+    P->>Q: Send SQS message
+    Q-->>U: 202 Accepted
+    Q->>W: Trigger Lambda
+    W->>W: Process & store feedback
+```
+
+---
+
+### 4. SES Statistics Report Flow (Scheduled)
+
+```mermaid
+sequenceDiagram
+    participant E as EventBridge/CW Events
+    participant H as SesScheduledReportHandler
+    participant M as MultiCitySesService
+    participant S as StadisticsService
+    participant L as CloudWatch Logs
+    participant A as S3
+    participant Y as SES
+
+    E->>H: Cron: Monday 03:00
+    H->>M: runReportsForAllCities()
+    M->>M: discoverConfiguredCities()<br/>Scan env vars
+    M->>M: For each city with<br/>API_KEY + SES_TO_EMAIL
+    M->>S: generateStadisticsReport(cityId)
+    S->>L: Query API calls/errors/latency
+    S->>A: Query procedures/events/news
+    L-->>S: Metrics data
+    A-->>S: Metrics data
+    S-->>M: Report data
+    M->>Y: sendStadistics(recipient, cityId)
+    Y-->>M: Email sent
+    M-->>E: Summary: X succeeded, Y failed
+```
+
+**Key Points:**
+- Scheduled via EventBridge (production) or CloudWatch (SAM local)
+- `MultiCitySesService` discovers cities from environment variables
+- Only cities with BOTH `API_KEY_<CITYID>` AND `AWS_SES_TO_EMAIL_<CITYID>` receive reports
+- Each city gets its own customized report email
 
 ## Performance Optimizations
 - Conversation cache with TTL and turn cap.

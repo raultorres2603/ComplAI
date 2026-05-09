@@ -11,6 +11,8 @@ import cat.complai.exceptions.ses.CloudWatchLogsException;
 import cat.complai.services.stadistics.models.ComplaintFile;
 import cat.complai.services.stadistics.models.FeedbackFile;
 import cat.complai.services.stadistics.models.StadisticsModel;
+import cat.complai.services.stadistics.models.StadisticsModel.ComparisonData;
+import cat.complai.services.stadistics.models.StadisticsModel.WeeklyData;
 import cat.complai.utilities.s3.S3ComplaintLister;
 import cat.complai.utilities.s3.S3FeedbackLister;
 import jakarta.inject.Inject;
@@ -38,25 +40,25 @@ public class StadisticsService implements IStadisticsService {
         this.s3FeedbackLister = s3FeedbackLister;
     }
 
-    private int totalRedactInteractions() {
-        logger.info("Fetching total redact interactions from CloudWatch Logs for log group: {}", logGroupRedact);
-        // get the total redact interactions from cloudwatch logs
+    // ======================
+    // CloudWatch Logs Methods (with date range support)
+    // ======================
+
+    private int totalRedactInteractions(Instant from, Instant to) {
+        logger.info("Fetching total redact interactions from CloudWatch Logs for log group: {} from={} to={}", logGroupRedact, from, to);
         try (CloudWatchLogsClient logsClient = CloudWatchLogsClient.builder()
-                .region(Region.EU_WEST_1) // Change to your region
+                .region(Region.EU_WEST_1)
                 .build()) {
 
-            // Define the time range (e.g., the last 1 hour)
-            long startTime = Instant.now().minus(7, ChronoUnit.DAYS).toEpochMilli();
-            long endTime = Instant.now().toEpochMilli();
+            long startTime = from.toEpochMilli();
+            long endTime = to.toEpochMilli();
 
-            // Build the request
             FilterLogEventsRequest request = FilterLogEventsRequest.builder()
                     .logGroupName(logGroupRedact)
                     .startTime(startTime)
                     .endTime(endTime)
                     .build();
 
-            // Fetch the logs
             try {
                 FilterLogEventsResponse response = logsClient.filterLogEvents(request);
                 int totalInteractions = response.events().size();
@@ -75,25 +77,21 @@ public class StadisticsService implements IStadisticsService {
         }
     }
 
-    private int totalFeedbacks() {
-        logger.info("Fetching total feedback interactions from CloudWatch Logs for log group: {}", logGroupFeedback);
-        // get the total feedback interactions from cloudwatch logs
+    private int totalFeedbacks(Instant from, Instant to) {
+        logger.info("Fetching total feedback interactions from CloudWatch Logs for log group: {} from={} to={}", logGroupFeedback, from, to);
         try (CloudWatchLogsClient logsClient = CloudWatchLogsClient.builder()
-                .region(Region.EU_WEST_1) // Change to your region
+                .region(Region.EU_WEST_1)
                 .build()) {
 
-            // Define the time range (e.g., the last 1 hour)
-            long startTime = Instant.now().minus(7, ChronoUnit.DAYS).toEpochMilli();
-            long endTime = Instant.now().toEpochMilli();
+            long startTime = from.toEpochMilli();
+            long endTime = to.toEpochMilli();
 
-            // Build the request
             FilterLogEventsRequest request = FilterLogEventsRequest.builder()
                     .logGroupName(logGroupFeedback)
                     .startTime(startTime)
                     .endTime(endTime)
                     .build();
 
-            // Fetch the logs
             try {
                 FilterLogEventsResponse response = logsClient.filterLogEvents(request);
                 int totalInteractions = response.events().size();
@@ -112,25 +110,21 @@ public class StadisticsService implements IStadisticsService {
         }
     }
 
-    private int totalAskInteractions() {
-        logger.info("Fetching total ask interactions from CloudWatch Logs for log group: {}", logGroupAsk);
-        // get the total ask interactions from cloudwatch logs
+    private int totalAskInteractions(Instant from, Instant to) {
+        logger.info("Fetching total ask interactions from CloudWatch Logs for log group: {} from={} to={}", logGroupAsk, from, to);
         try (CloudWatchLogsClient logsClient = CloudWatchLogsClient.builder()
-                .region(Region.EU_WEST_1) // Change to your region
+                .region(Region.EU_WEST_1)
                 .build()) {
 
-            // Define the time range (e.g., the last 1 hour)
-            long startTime = Instant.now().minus(7, ChronoUnit.DAYS).toEpochMilli();
-            long endTime = Instant.now().toEpochMilli();
+            long startTime = from.toEpochMilli();
+            long endTime = to.toEpochMilli();
 
-            // Build the request
             FilterLogEventsRequest request = FilterLogEventsRequest.builder()
                     .logGroupName(logGroupAsk)
                     .startTime(startTime)
                     .endTime(endTime)
                     .build();
 
-            // Fetch the logs
             try {
                 FilterLogEventsResponse response = logsClient.filterLogEvents(request);
                 int totalInteractions = response.events().size();
@@ -149,31 +143,18 @@ public class StadisticsService implements IStadisticsService {
         }
     }
 
-    @Override
-    public StadisticsModel generateStadisticsReport() throws CloudWatchLogsException {
-        logger.info("Generating statistics report...");
-        int totalAsk = totalAskInteractions();
-        int totalRedact = totalRedactInteractions();
-        int totalFeedback = totalFeedbacks();
+    // ======================
+    // S3 File Methods (with date range support)
+    // ======================
 
-        // Get complaint and feedback files from S3
-        ArrayList<ComplaintFile> complaintFiles = getComplaintFiles();
-        ArrayList<FeedbackFile> feedbackFiles = getFeedbackFiles();
-
-        StadisticsModel report = new StadisticsModel(totalAsk, totalRedact, totalFeedback, complaintFiles, feedbackFiles);
-        logger.info("Statistics report generated: {}", report);
-        return report;
-    }
-
-    private ArrayList<ComplaintFile> getComplaintFiles() {
-        logger.info("Fetching complaint files from S3...");
+    private ArrayList<ComplaintFile> getComplaintFiles(Instant from, Instant to) {
+        logger.info("Fetching complaint files from S3 from={} to={}", from, to);
 
         try {
             ArrayList<ComplaintFile> files = new ArrayList<>();
-            var entries = s3ComplaintLister.listComplaintFiles();
+            var entries = s3ComplaintLister.listComplaintFiles(from, to);
 
             for (S3ComplaintLister.ComplaintFileEntry entry : entries) {
-                // Convert String URL to java.net.URL
                 java.net.URL url = new java.net.URL(entry.getUrl());
                 files.add(new ComplaintFile(entry.getFileName(), url));
             }
@@ -186,15 +167,14 @@ public class StadisticsService implements IStadisticsService {
         }
     }
 
-    private ArrayList<FeedbackFile> getFeedbackFiles() {
-        logger.info("Fetching feedback files from S3...");
+    private ArrayList<FeedbackFile> getFeedbackFiles(Instant from, Instant to) {
+        logger.info("Fetching feedback files from S3 from={} to={}", from, to);
 
         try {
             ArrayList<FeedbackFile> files = new ArrayList<>();
-            var entries = s3FeedbackLister.listAllFeedbackFiles();
+            var entries = s3FeedbackLister.listAllFeedbackFiles(from, to);
 
             for (S3FeedbackLister.FeedbackFileEntry entry : entries) {
-                // Convert String URL to java.net.URL
                 java.net.URL url = new java.net.URL(entry.getUrl());
                 files.add(new FeedbackFile(entry.getFileName(), url));
             }
@@ -205,6 +185,106 @@ public class StadisticsService implements IStadisticsService {
             logger.error("Error fetching feedback files from S3: {}", e.getMessage());
             throw new RuntimeException("Failed to fetch feedback files: " + e.getMessage(), e);
         }
+    }
+
+    // ======================
+    // Main Report Generation
+    // ======================
+
+    @Override
+    public StadisticsModel generateStadisticsReport() throws CloudWatchLogsException {
+        // Delegate to city-specific method with null (all cities)
+        return generateStadisticsReport(null);
+    }
+
+    /**
+     * Generates a city-specific statistics report (stub implementation).
+     *
+     * @param cityId the city identifier (e.g., "elprat"), or null for all cities
+     * @return the statistics model
+     * @throws CloudWatchLogsException if CloudWatch is unavailable
+     */
+    public StadisticsModel generateStadisticsReport(String cityId) throws CloudWatchLogsException {
+        logger.info("Generating statistics report with weekly comparison (cityId={})...", cityId);
+
+        // Calculate date ranges
+        Instant now = Instant.now();
+        Instant currentWeekStart = now.minus(7, ChronoUnit.DAYS);  // Last 7 days
+        Instant previousWeekStart = now.minus(14, ChronoUnit.DAYS); // Days 8-14 ago
+        Instant previousWeekEnd = now.minus(7, ChronoUnit.DAYS);    // End of previous week
+
+        // Fetch current week data (last 7 days)
+        int currentAsk = totalAskInteractions(currentWeekStart, now);
+        int currentRedact = totalRedactInteractions(currentWeekStart, now);
+        int currentFeedback = totalFeedbacks(currentWeekStart, now);
+        ArrayList<ComplaintFile> currentComplaintFiles = getComplaintFiles(currentWeekStart, now);
+        ArrayList<FeedbackFile> currentFeedbackFiles = getFeedbackFiles(currentWeekStart, now);
+
+        WeeklyData currentWeek = new WeeklyData(
+            currentAsk, currentRedact, currentFeedback,
+            currentComplaintFiles, currentFeedbackFiles
+        );
+
+        // Fetch previous week data (days 8-14)
+        int previousAsk = totalAskInteractions(previousWeekStart, previousWeekEnd);
+        int previousRedact = totalRedactInteractions(previousWeekStart, previousWeekEnd);
+        int previousFeedback = totalFeedbacks(previousWeekStart, previousWeekEnd);
+        ArrayList<ComplaintFile> previousComplaintFiles = getComplaintFiles(previousWeekStart, previousWeekEnd);
+        ArrayList<FeedbackFile> previousFeedbackFiles = getFeedbackFiles(previousWeekStart, previousWeekEnd);
+
+        WeeklyData previousWeek = new WeeklyData(
+            previousAsk, previousRedact, previousFeedback,
+            previousComplaintFiles, previousFeedbackFiles
+        );
+
+        // Calculate comparisons
+        ComparisonData askComparison = calculateComparison(previousAsk, currentAsk);
+        ComparisonData redactComparison = calculateComparison(previousRedact, currentRedact);
+        ComparisonData feedbackComparison = calculateComparison(previousFeedback, currentFeedback);
+
+        // Build legacy single-week data for backward compatibility
+        // Use current week as the "total" for backward compatibility
+        ArrayList<ComplaintFile> allComplaintFiles = new ArrayList<>(currentComplaintFiles);
+        allComplaintFiles.addAll(previousComplaintFiles);
+        ArrayList<FeedbackFile> allFeedbackFiles = new ArrayList<>(currentFeedbackFiles);
+        allFeedbackFiles.addAll(previousFeedbackFiles);
+
+        StadisticsModel report = new StadisticsModel(currentAsk, currentRedact, currentFeedback, allComplaintFiles, allFeedbackFiles);
+
+        // Set weekly comparison data
+        report.setCurrentWeek(currentWeek);
+        report.setPreviousWeek(previousWeek);
+        report.setAskComparison(askComparison);
+        report.setRedactComparison(redactComparison);
+        report.setFeedbackComparison(feedbackComparison);
+
+        logger.info("Statistics report generated with weekly comparison: {}", report);
+        return report;
+    }
+
+    // ======================
+    // Helper Methods
+    // ======================
+
+    /**
+     * Calculates comparison between previous and current values.
+     * @param previousValue the previous week's value
+     * @param currentValue the current week's value
+     * @return ComparisonData with absolute difference and percentage change
+     */
+    private ComparisonData calculateComparison(int previousValue, int currentValue) {
+        int absoluteDifference = currentValue - previousValue;
+        double percentageChange = 0.0;
+
+        if (previousValue != 0) {
+            percentageChange = ((double) absoluteDifference / previousValue) * 100.0;
+        } else if (currentValue != 0) {
+            // If previous was 0 and current is not, consider it as 100% increase
+            percentageChange = 100.0;
+        }
+        // If both are 0, percentage change is 0
+
+        return new ComparisonData(absoluteDifference, percentageChange);
     }
 
 }

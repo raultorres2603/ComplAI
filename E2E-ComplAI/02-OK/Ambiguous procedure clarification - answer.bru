@@ -21,36 +21,44 @@ body:json {
   }
 }
 
-tests {
-  test("HTTP 200 on clarification answer", () => {
-    expect(res.getStatus()).to.equal(200);
-  });
-  
-  test("Response is successful", () => {
-    expect(res.getBody().success).to.equal(true);
-  });
-  
-  test("Turn 2 response is not a clarification (no <ol>)", () => {
-    const rawBody = res.getBody();
-    const bodyText = typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody);
-    expect(bodyText.includes("<ol>")).to.equal(false);
-  });
-  
-  test("SSE output includes sources event", () => {
-    const rawBody = res.getBody();
-    const bodyText = typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody);
-    expect(bodyText.includes('"type":"sources"')).to.equal(true);
-  });
-  
-  test("Sources event contains at least one entry", () => {
-    const rawBody = res.getBody();
-    const bodyText = typeof rawBody === 'string' ? rawBody : JSON.stringify(rawBody);
-    const hasHttpSource = bodyText.includes("http://") || bodyText.includes("https://");
-    expect(hasHttpSource).to.equal(true);
-  });
+script:post-response {
+  const rawBody = typeof res.body === 'string' ? res.body : JSON.stringify(res.body);
+  const parsed = parseSse(rawBody);
+  bru.setVar("parsedResponse", parsed);
+  console.log("Clarification answer parsed — message length:", parsed.message.length, "success:", parsed.success);
 }
 
 settings {
   encodeUrl: true
   timeout: 0
+  stream: true
+}
+
+tests {
+  test("HTTP 200 on clarification answer", () => {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Response is successful", () => {
+    const parsed = bru.getVar("parsedResponse");
+    expect(parsed.success).to.equal(true);
+  });
+
+  test("Turn 2 response is not a clarification (no <ol>)", () => {
+    const parsed = bru.getVar("parsedResponse");
+    expect(parsed.message.includes("<ol>")).to.equal(false);
+  });
+
+  test("SSE output includes sources event", () => {
+    const parsed = bru.getVar("parsedResponse");
+    expect(parsed.sources.length).to.be.greaterThan(0);
+  });
+
+  test("Sources event contains at least one entry", () => {
+    const parsed = bru.getVar("parsedResponse");
+    const hasHttpSource = parsed.sources.some(s =>
+      s.url && (s.url.startsWith("http://") || s.url.startsWith("https://"))
+    );
+    expect(hasHttpSource).to.equal(true);
+  });
 }

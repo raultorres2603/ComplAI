@@ -18,11 +18,16 @@ script:post-response {
       return v.toString(16);
     });
   }
-  
+
   let conversationId = uuidv4();
   console.log("Created conversationId: " + conversationId);
   bru.setEnvVar("conversationId", conversationId);
-  
+
+  // Parse SSE stream into a structured object for downstream tests
+  const rawBody = typeof res.body === 'string' ? res.body : JSON.stringify(res.body);
+  const parsed = parseSse(rawBody);
+  bru.setVar("parsedResponse", parsed);
+  console.log("Parsed SSE response:", JSON.stringify(parsed));
 }
 
 settings {

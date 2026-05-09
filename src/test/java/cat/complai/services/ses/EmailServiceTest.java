@@ -23,7 +23,7 @@ import org.mockito.MockitoAnnotations;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import cat.complai.config.SesConfiguration;
-import cat.complai.exceptions.ses.SesEmailException;
+import cat.complai.services.stadistics.StadisticsHtmlRenderer;
 import cat.complai.services.stadistics.StadisticsService;
 import cat.complai.services.stadistics.models.StadisticsModel;
 import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
@@ -62,6 +62,9 @@ class EmailServiceTest {
     @Mock
     private StadisticsService stadisticsService;
 
+    @Mock
+    private StadisticsHtmlRenderer htmlRenderer;
+
     private EmailService emailService;
 
     /**
@@ -82,6 +85,7 @@ class EmailServiceTest {
         // Inject mocked dependencies using reflection since they are private fields
         injectField(emailService, "sesClient", sesClient);
         injectField(emailService, "stadisticsService", stadisticsService);
+        injectField(emailService, "htmlRenderer", htmlRenderer);
     }
 
     /**
@@ -300,7 +304,7 @@ class EmailServiceTest {
                 .thenThrow(exception);
 
         // Act & Assert
-        SesEmailException thrownException = assertThrows(SesEmailException.class, () -> {
+        RuntimeException thrownException = assertThrows(RuntimeException.class, () -> {
             emailService.sendStadistics(TEST_TO_EMAIL, TEST_SUBJECT);
         });
 
@@ -326,7 +330,7 @@ class EmailServiceTest {
                 .thenThrow(exception);
 
         // Act & Assert
-        SesEmailException thrownException = assertThrows(SesEmailException.class, () -> {
+        RuntimeException thrownException = assertThrows(RuntimeException.class, () -> {
             emailService.sendStadistics(TEST_TO_EMAIL, TEST_SUBJECT);
         });
 
@@ -349,7 +353,7 @@ class EmailServiceTest {
                 .thenThrow(genericException);
 
         // Act & Assert
-        SesEmailException thrownException = assertThrows(SesEmailException.class, () -> {
+        RuntimeException thrownException = assertThrows(RuntimeException.class, () -> {
             emailService.sendStadistics(TEST_TO_EMAIL, TEST_SUBJECT);
         });
 
@@ -394,9 +398,28 @@ class EmailServiceTest {
 
         StadisticsModel mockStadistics = new StadisticsModel(10, 5, 3);
 
-        // Mock the stadisticsService to return our mock with the expected content
+        // Mock the stadisticsService to return our mock model
         when(stadisticsService.generateStadisticsReport())
                 .thenReturn(mockStadistics);
+
+        // Mock the renderer to return a predictable HTML string with SVG chart markers
+        String renderedHtml = """
+                <!DOCTYPE html>
+                <html>
+                <body>
+                  <h1>Weekly Statistics Report</h1>
+                  <svg viewBox="0 0 300 140" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="20" y="50" width="28" height="50" fill="#2563EB" rx="3"/>
+                  </svg>
+                  <p>Consultes AI: 10</p>
+                  <p>Reclamacions: 5</p>
+                  <p>Valoracions: 3</p>
+                </body>
+                </html>
+                """;
+        when(htmlRenderer.render(org.mockito.ArgumentMatchers.any(StadisticsModel.class),
+                org.mockito.ArgumentMatchers.any(java.time.Instant.class)))
+                .thenReturn(renderedHtml);
 
         ArgumentCaptor<SendEmailRequest> requestCaptor = ArgumentCaptor.forClass(SendEmailRequest.class);
 
@@ -410,15 +433,18 @@ class EmailServiceTest {
         assertNotNull(capturedRequest.message().body(), "Email body must not be null");
         assertNotNull(capturedRequest.message().body().html(), "Email HTML body must not be null");
 
-        // Verify the statistics report is included in the email body (HTML format)
         String emailBodyContent = capturedRequest.message().body().html().data();
-        assertTrue(emailBodyContent.contains("Stadistics Report"),
-                "Email body must contain 'Stadistics Report'");
-        assertTrue(emailBodyContent.contains("<p><strong>Total Ask logs:</strong> 10</p>"),
-                "Email body must contain total ask logs in HTML format");
-        assertTrue(emailBodyContent.contains("<p><strong>Total Feedback logs:</strong> 3</p>"),
-                "Email body must contain total feedback logs in HTML format");
-        assertTrue(emailBodyContent.contains("<p><strong>Total Redact logs:</strong> 5</p>"),
-                "Email body must contain total redact logs in HTML format");
+
+        // Verify the HTML-rendered statistics report is in the email body
+        assertTrue(emailBodyContent.contains("Weekly Statistics Report"),
+                "Email body must contain rendered report title");
+        assertTrue(emailBodyContent.contains("<svg"),
+                "Email body must contain an SVG chart");
+        assertTrue(emailBodyContent.contains("Consultes"),
+                "Email body must contain interaction counts");
+        assertTrue(emailBodyContent.contains("Reclamacions"),
+                "Email body must contain redact counts");
+        assertTrue(emailBodyContent.contains("Valoracions"),
+                "Email body must contain feedback counts");
     }
 }

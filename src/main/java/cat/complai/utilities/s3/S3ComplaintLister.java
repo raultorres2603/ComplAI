@@ -77,9 +77,20 @@ public class S3ComplaintLister {
      * @return list of complaint file entries with pre-signed URLs, or empty list if none found
      */
     public List<ComplaintFileEntry> listComplaintFiles() {
-        logger.info(() -> "Listing complaint files from S3 bucket: " + bucketName);
-
         Instant sevenDaysAgo = Instant.now().minus(7, ChronoUnit.DAYS);
+        return listComplaintFiles(sevenDaysAgo, Instant.now());
+    }
+
+    /**
+     * Lists complaint files from a specific date range and generates pre-signed URLs.
+     *
+     * @param from start of date range (inclusive)
+     * @param to end of date range (inclusive)
+     * @return list of complaint file entries with pre-signed URLs, or empty list if none found
+     */
+    public List<ComplaintFileEntry> listComplaintFiles(Instant from, Instant to) {
+        logger.info(() -> "Listing complaint files from S3 bucket: " + bucketName + " from=" + from + " to=" + to);
+
         List<ComplaintFileEntry> files = new ArrayList<>();
 
         try {
@@ -98,10 +109,10 @@ public class S3ComplaintLister {
             }
 
             for (S3Object s3Object : response.contents()) {
-                // Filter by last modified date (last 7 days)
+                // Filter by last modified date within the specified range
                 Instant lastModified = s3Object.lastModified();
-                // Include only files modified within the last 7 days (i.e., after sevenDaysAgo)
-                if (lastModified.isAfter(sevenDaysAgo)) {
+                // Include only files modified within the date range (from inclusive, to inclusive)
+                if (!lastModified.isBefore(from) && !lastModified.isAfter(to)) {
                     String key = s3Object.key();
                     String fileName = extractFileName(key);
                     String presignedUrl = generatePresignedUrl(key);

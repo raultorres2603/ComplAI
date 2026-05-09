@@ -20,22 +20,34 @@ body:json {
   }
 }
 
-tests {
-  test("HTTP status != 500", () => {
-    expect(res.getStatus()).to.be.lessThan(500);
-  });
-  test("Success prop == true", () => {
-    expect(res.getBody().success).to.equal(true);
-  });
-  test("Message != empty", () => {
-    expect(res.getBody().message).to.not.be.empty;
-  });
-  test("Error code == 0", () => {
-    expect(res.getBody().errorCode).to.equal(0);
-  });
+script:post-response {
+  // Parse SSE stream into a structured object for assertions
+  const rawBody = typeof res.body === 'string' ? res.body : JSON.stringify(res.body);
+  const parsed = parseSse(rawBody);
+  bru.setVar("parsedResponse", parsed);
+  console.log("Ask SSE parsed — message length:", parsed.message.length, "success:", parsed.success);
 }
 
 settings {
   encodeUrl: true
   timeout: 0
+  stream: true
+}
+
+tests {
+  test("HTTP status != 500", () => {
+    expect(res.getStatus()).to.be.lessThan(500);
+  });
+  test("Success prop == true", () => {
+    const parsed = bru.getVar("parsedResponse");
+    expect(parsed.success).to.equal(true);
+  });
+  test("Message != empty", () => {
+    const parsed = bru.getVar("parsedResponse");
+    expect(parsed.message).to.not.be.empty;
+  });
+  test("Error code == 0", () => {
+    const parsed = bru.getVar("parsedResponse");
+    expect(parsed.errorCode).to.equal(0);
+  });
 }

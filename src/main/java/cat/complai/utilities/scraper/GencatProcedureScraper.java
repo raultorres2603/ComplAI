@@ -47,7 +47,6 @@ public class GencatProcedureScraper {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String MAPPING_RESOURCE = "/scrapers/procedures-mapping-gencat.json";
     private static final int CONNECT_TIMEOUT_MS = 60000; // 60 seconds for slow pages
-    private static final int READ_TIMEOUT_MS = 60000;
     private static final int MAX_CATEGORY_PAGES = 50; // Limit crawling to prevent timeout
 
     public static void main(String[] args) throws IOException {

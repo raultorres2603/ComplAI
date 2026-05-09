@@ -18,11 +18,75 @@ script:post-response {
       return v.toString(16);
     });
   }
-  
+
   let conversationId = uuidv4();
   console.log("Created conversationId: " + conversationId);
   bru.setEnvVar("conversationId", conversationId);
-  
+
+  // Parse SSE stream into a structured object for downstream tests
+  const rawBody = typeof res.body === 'string' ? res.body : JSON.stringify(res.body);
+  const parsed = parseSse(rawBody);
+  bru.setVar("parsedResponse", parsed);
+  console.log("Parsed SSE response:", JSON.stringify(parsed));
+}
+
+/**
+ * Parse SSE stream lines (e.g. "data: {...}\n") into a structured object.
+ * Extracts all chunk contents into message, collects type events, etc.
+ */
+function parseSse(sse) {
+  const lines = sse.split('\n');
+  const eventTypes = {};
+  let message = '';
+  let fullResponse = '';
+  let sources = [];
+  let done = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || !trimmed.startsWith('data: ')) continue;
+
+    let dataStr = trimmed.substring('data: '.length);
+
+    // SSE format may have trailing newline after the JSON object
+    if (dataStr.endsWith('\n')) dataStr = dataStr.slice(0, -1);
+    if (dataStr.endsWith('\r')) dataStr = dataStr.slice(0, -1);
+
+    let data;
+    try {
+      data = JSON.parse(dataStr);
+    } catch (e) {
+      console.warn('Failed to parse SSE data line:', dataStr);
+      continue;
+    }
+
+    const type = data.type || '';
+    const content = data.content || '';
+
+    fullResponse += content;
+
+    if (type === 'chunk') {
+      message += content;
+    } else if (type === 'sources') {
+      sources = data.sources || [];
+    } else if (type === 'done') {
+      done = true;
+    }
+
+    // Store named event data (e.g., { type: 'error', code: 0 })
+    if (type) {
+      eventTypes[type] = data;
+    }
+  }
+
+  return {
+    fullResponse,
+    message,
+    sources,
+    done,
+    errorCode: (eventTypes.error && eventTypes.error.code !== undefined) ? eventTypes.error.code : 0,
+    success: (eventTypes.done && !eventTypes.error) || (!eventTypes.error && message.length > 0),
+  };
 }
 
 settings {

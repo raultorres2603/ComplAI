@@ -5,7 +5,7 @@ import org.slf4j.LoggerFactory;
 
 import cat.complai.config.ISesSenderConfig;
 import cat.complai.exceptions.ses.CloudWatchLogsException;
-import cat.complai.exceptions.ses.SesEmailException;
+import cat.complai.services.stadistics.StadisticsHtmlRenderer;
 import cat.complai.services.stadistics.StadisticsService;
 import cat.complai.services.stadistics.models.StadisticsModel;
 import io.micronaut.context.annotation.Bean;
@@ -17,6 +17,8 @@ import software.amazon.awssdk.services.ses.model.MailFromDomainNotVerifiedExcept
 import software.amazon.awssdk.services.ses.model.MessageRejectedException;
 import software.amazon.awssdk.services.ses.model.SendEmailRequest;
 import software.amazon.awssdk.services.ses.model.SendEmailResponse;
+
+import java.time.Instant;
 
 /**
  * Email service for sending notifications via Amazon SES (Simple Email
@@ -43,6 +45,9 @@ public class EmailService implements IEmailService {
 
     @Inject
     private StadisticsService stadisticsService;
+
+    @Inject
+    private StadisticsHtmlRenderer htmlRenderer;
 
     /**
      * Constructs the EmailService with SES sender configuration.
@@ -90,7 +95,7 @@ public class EmailService implements IEmailService {
      * @throws IllegalArgumentException if to or subject is invalid
      */
     @Override
-    public void sendStadistics(String to, String subject) throws SesEmailException, CloudWatchLogsException {
+    public void sendStadistics(String to, String subject) throws CloudWatchLogsException {
         if (to == null || to.isBlank()) {
             logger.error("Recipient email address is required");
             throw new IllegalArgumentException("Recipient email address cannot be empty");
@@ -101,15 +106,17 @@ public class EmailService implements IEmailService {
             throw new IllegalArgumentException("Email subject cannot be empty");
         }
 
-        // Build the email body from the StadisticsModel
+        // Generate statistics report and render as polished HTML
+        Instant now = Instant.now();
         StadisticsModel body = stadisticsService.generateStadisticsReport();
+        String htmlBody = body.renderHtml(htmlRenderer, now);
 
         // Construct the SES email request
         logger.info("Preparing to send statistics report to: {}", maskEmail(to));
         SendEmailRequest emailRequest = SendEmailRequest.builder()
                 .destination(d -> d.toAddresses(to))
                 .message(m -> m.subject(s -> s.data(subject))
-                        .body(b -> b.html(h -> h.data(body.toString()))))
+                        .body(b -> b.html(h -> h.data(htmlBody))))
                 .source(fromEmail)
                 .build();
 
@@ -120,14 +127,14 @@ public class EmailService implements IEmailService {
         } catch (MessageRejectedException e) {
             logger.error("Email rejected by SES (address not verified or blacklisted): {}",
                     e.awsErrorDetails().errorMessage());
-            throw new SesEmailException(
+            throw new RuntimeException(
                     "SES rejected the email: " + e.awsErrorDetails().errorMessage(), e);
         } catch (MailFromDomainNotVerifiedException e) {
             logger.error("Sender domain is not verified in SES: {}", e.getMessage());
-            throw new SesEmailException("Sender domain is not verified in SES", e);
+            throw new RuntimeException("Sender domain is not verified in SES", e);
         } catch (Exception e) {
             logger.error("Failed to send statistics report email: {}", e.getMessage(), e);
-            throw new SesEmailException("Error sending email via SES: " + e.getMessage(), e);
+            throw new RuntimeException("Error sending email via SES: " + e.getMessage(), e);
         }
     }
 

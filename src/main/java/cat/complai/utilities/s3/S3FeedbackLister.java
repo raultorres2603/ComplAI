@@ -77,9 +77,20 @@ public class S3FeedbackLister {
      * @return list of feedback file entries with pre-signed URLs, or empty list if none found
      */
     public List<FeedbackFileEntry> listAllFeedbackFiles() {
-        logger.info(() -> "Listing all feedback files from S3 bucket: " + bucketName);
-
         Instant sevenDaysAgo = Instant.now().minus(7, ChronoUnit.DAYS);
+        return listAllFeedbackFiles(sevenDaysAgo, Instant.now());
+    }
+
+    /**
+     * Lists all feedback files from all cities from a specific date range and generates pre-signed URLs.
+     *
+     * @param from start of date range (inclusive)
+     * @param to end of date range (inclusive)
+     * @return list of feedback file entries with pre-signed URLs, or empty list if none found
+     */
+    public List<FeedbackFileEntry> listAllFeedbackFiles(Instant from, Instant to) {
+        logger.info(() -> "Listing all feedback files from S3 bucket: " + bucketName + " from=" + from + " to=" + to);
+
         List<FeedbackFileEntry> files = new ArrayList<>();
 
         try {
@@ -98,10 +109,10 @@ public class S3FeedbackLister {
             }
 
             for (S3Object s3Object : response.contents()) {
-                // Filter by last modified date (last 7 days)
+                // Filter by last modified date within the specified range
                 Instant lastModified = s3Object.lastModified();
-                // Include only files modified within the last 7 days (i.e., after sevenDaysAgo)
-                if (lastModified.isAfter(sevenDaysAgo)) {
+                // Include only files modified within the date range (from inclusive, to inclusive)
+                if (!lastModified.isBefore(from) && !lastModified.isAfter(to)) {
                     String key = s3Object.key();
                     String fileName = extractFileName(key);
                     String presignedUrl = generatePresignedUrl(key);
@@ -127,9 +138,21 @@ public class S3FeedbackLister {
      * @return list of feedback file entries with pre-signed URLs, or empty list if none found
      */
     public List<FeedbackFileEntry> listFeedbackFiles(String cityId) {
-        logger.info(() -> "Listing feedback files from S3 bucket: " + bucketName + " city=" + cityId);
-
         Instant sevenDaysAgo = Instant.now().minus(7, ChronoUnit.DAYS);
+        return listFeedbackFiles(cityId, sevenDaysAgo, Instant.now());
+    }
+
+    /**
+     * Lists feedback files for a specific city from a specific date range and generates pre-signed URLs.
+     *
+     * @param cityId the city identifier (e.g., "elprat", "barcelona")
+     * @param from start of date range (inclusive)
+     * @param to end of date range (inclusive)
+     * @return list of feedback file entries with pre-signed URLs, or empty list if none found
+     */
+    public List<FeedbackFileEntry> listFeedbackFiles(String cityId, Instant from, Instant to) {
+        logger.info(() -> "Listing feedback files from S3 bucket: " + bucketName + " city=" + cityId + " from=" + from + " to=" + to);
+
         List<FeedbackFileEntry> files = new ArrayList<>();
 
         try {
@@ -151,10 +174,10 @@ public class S3FeedbackLister {
             }
 
             for (S3Object s3Object : response.contents()) {
-                // Filter by last modified date (last 7 days)
+                // Filter by last modified date within the specified range
                 Instant lastModified = s3Object.lastModified();
-                // Include only files modified within the last 7 days (i.e., after sevenDaysAgo)
-                if (lastModified.isAfter(sevenDaysAgo)) {
+                // Include only files modified within the date range (from inclusive, to inclusive)
+                if (!lastModified.isBefore(from) && !lastModified.isAfter(to)) {
                     String key = s3Object.key();
                     String fileName = extractFileName(key);
                     String presignedUrl = generatePresignedUrl(key);
