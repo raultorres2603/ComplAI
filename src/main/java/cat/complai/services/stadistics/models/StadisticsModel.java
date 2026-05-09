@@ -1,6 +1,8 @@
 package cat.complai.services.stadistics.models;
 
 import java.time.Instant;
+import java.time.YearMonth;
+import java.time.ZoneId;
 import java.util.ArrayList;
 
 import io.micronaut.core.annotation.Introspected;
@@ -14,28 +16,33 @@ public class StadisticsModel {
     private ArrayList<ComplaintFile> complaintFile;
     private ArrayList<FeedbackFile> feedbackFile;
 
-    // Weekly comparison fields
-    private WeeklyData currentWeek;
-    private WeeklyData previousWeek;
+    // Monthly comparison fields (current month vs previous month)
+    private MonthlyData currentMonth;
+    private MonthlyData previousMonth;
     private ComparisonData askComparison;
     private ComparisonData redactComparison;
     private ComparisonData feedbackComparison;
 
+    // Year-to-date monthly data (all months from Jan to current month)
+    private ArrayList<MonthlyData> yearlyData;
+
     /**
-     * Inner class to hold data for a single week period.
+     * Inner class to hold data for a single month period.
      */
     @Introspected
-    public static class WeeklyData {
+    public static class MonthlyData {
+        private String monthLabel;  // e.g., "January 2026", "February 2026"
         private int askInteractions;
         private int redactInteractions;
         private int feedbackCount;
         private ArrayList<ComplaintFile> complaintFiles;
         private ArrayList<FeedbackFile> feedbackFiles;
 
-        public WeeklyData() {}
+        public MonthlyData() {}
 
-        public WeeklyData(int askInteractions, int redactInteractions, int feedbackCount,
+        public MonthlyData(String monthLabel, int askInteractions, int redactInteractions, int feedbackCount,
                 ArrayList<ComplaintFile> complaintFiles, ArrayList<FeedbackFile> feedbackFiles) {
+            this.monthLabel = monthLabel;
             this.askInteractions = askInteractions;
             this.redactInteractions = redactInteractions;
             this.feedbackCount = feedbackCount;
@@ -43,6 +50,8 @@ public class StadisticsModel {
             this.feedbackFiles = feedbackFiles;
         }
 
+        public String getMonthLabel() { return monthLabel; }
+        public void setMonthLabel(String monthLabel) { this.monthLabel = monthLabel; }
         public int getAskInteractions() { return askInteractions; }
         public void setAskInteractions(int askInteractions) { this.askInteractions = askInteractions; }
         public int getRedactInteractions() { return redactInteractions; }
@@ -53,6 +62,18 @@ public class StadisticsModel {
         public void setComplaintFiles(ArrayList<ComplaintFile> complaintFiles) { this.complaintFiles = complaintFiles; }
         public ArrayList<FeedbackFile> getFeedbackFiles() { return feedbackFiles; }
         public void setFeedbackFiles(ArrayList<FeedbackFile> feedbackFiles) { this.feedbackFiles = feedbackFiles; }
+
+        /**
+         * Creates a MonthlyData from a YearMonth.
+         */
+        public static MonthlyData fromYearMonth(YearMonth yearMonth) {
+            String label = yearMonth.atDay(1).format(
+                java.time.format.DateTimeFormatter.ofPattern("MMMM yyyy", new java.util.Locale("ca", "ES"))
+            );
+            // Capitalize first letter
+            label = label.substring(0, 1).toUpperCase() + label.substring(1);
+            return new MonthlyData(label, 0, 0, 0, new ArrayList<>(), new ArrayList<>());
+        }
     }
 
     /**
@@ -133,17 +154,19 @@ public class StadisticsModel {
         this.totalRedactInteractions = totalRedactInteractions;
     }
 
-    // Getters and setters for weekly comparison fields
-    public WeeklyData getCurrentWeek() { return currentWeek; }
-    public void setCurrentWeek(WeeklyData currentWeek) { this.currentWeek = currentWeek; }
-    public WeeklyData getPreviousWeek() { return previousWeek; }
-    public void setPreviousWeek(WeeklyData previousWeek) { this.previousWeek = previousWeek; }
+    // Getters and setters for monthly comparison fields
+    public MonthlyData getCurrentMonth() { return currentMonth; }
+    public void setCurrentMonth(MonthlyData currentMonth) { this.currentMonth = currentMonth; }
+    public MonthlyData getPreviousMonth() { return previousMonth; }
+    public void setPreviousMonth(MonthlyData previousMonth) { this.previousMonth = previousMonth; }
     public ComparisonData getAskComparison() { return askComparison; }
     public void setAskComparison(ComparisonData askComparison) { this.askComparison = askComparison; }
     public ComparisonData getRedactComparison() { return redactComparison; }
     public void setRedactComparison(ComparisonData redactComparison) { this.redactComparison = redactComparison; }
     public ComparisonData getFeedbackComparison() { return feedbackComparison; }
     public void setFeedbackComparison(ComparisonData feedbackComparison) { this.feedbackComparison = feedbackComparison; }
+    public ArrayList<MonthlyData> getYearlyData() { return yearlyData; }
+    public void setYearlyData(ArrayList<MonthlyData> yearlyData) { this.yearlyData = yearlyData; }
 
     @Override
     public String toString() {
@@ -176,98 +199,82 @@ public class StadisticsModel {
             sb.append("</ul>\n");
         }
 
-        // Weekly comparison data
-        if (currentWeek != null || previousWeek != null) {
-            sb.append("<p><strong>--- Weekly Comparison ---</strong></p>\n");
+        // Year-to-date monthly data
+        if (yearlyData != null && !yearlyData.isEmpty()) {
+            // Determine year from current month label
+            int currentYear = java.time.YearMonth.now(java.time.ZoneId.of("Europe/Madrid")).getYear();
 
-            // Current week
-            if (currentWeek != null) {
-                sb.append("<p><strong>Current Week (Last 7 days):</strong></p>\n");
+            sb.append("<p><strong>--- Year-to-Date Monthly Data (").append(currentYear).append(") ---</strong></p>\n");
+
+            // Table header
+            sb.append("<table border='1' cellpadding='5' cellspacing='0' style='border-collapse: collapse;'>\n");
+            sb.append("<tr><th>Month</th><th>Ask</th><th>Redact</th><th>Feedback</th></tr>\n");
+
+            for (MonthlyData monthData : yearlyData) {
+                sb.append("<tr>");
+                sb.append("<td><strong>").append(monthData.getMonthLabel()).append("</strong></td>");
+                sb.append("<td>").append(monthData.getAskInteractions()).append("</td>");
+                sb.append("<td>").append(monthData.getRedactInteractions()).append("</td>");
+                sb.append("<td>").append(monthData.getFeedbackCount()).append("</td>");
+                sb.append("</tr>\n");
+            }
+            sb.append("</table>\n");
+
+            // Current month vs Previous month comparison
+            if (currentMonth != null) {
+                sb.append("<p><strong>Current Month (").append(currentMonth.getMonthLabel()).append("):</strong></p>\n");
                 sb.append("<ul>\n");
-                sb.append("  <li>Ask interactions: ").append(currentWeek.getAskInteractions()).append("</li>\n");
-                sb.append("  <li>Redact interactions: ").append(currentWeek.getRedactInteractions()).append("</li>\n");
-                sb.append("  <li>Feedback count: ").append(currentWeek.getFeedbackCount()).append("</li>\n");
-                sb.append("  <li>Complaint files: ").append(currentWeek.getComplaintFiles() != null ? currentWeek.getComplaintFiles().size() : 0).append("</li>\n");
-                sb.append("  <li>Feedback files: ").append(currentWeek.getFeedbackFiles() != null ? currentWeek.getFeedbackFiles().size() : 0).append("</li>\n");
+                sb.append("  <li>Ask interactions: ").append(currentMonth.getAskInteractions()).append("</li>\n");
+                sb.append("  <li>Redact interactions: ").append(currentMonth.getRedactInteractions()).append("</li>\n");
+                sb.append("  <li>Feedback count: ").append(currentMonth.getFeedbackCount()).append("</li>\n");
                 sb.append("</ul>\n");
             }
 
-            // Previous week
-            if (previousWeek != null) {
-                sb.append("<p><strong>Previous Week (Days 8-14):</strong></p>\n");
+            if (previousMonth != null) {
+                sb.append("<p><strong>Previous Month (").append(previousMonth.getMonthLabel()).append("):</strong></p>\n");
                 sb.append("<ul>\n");
-                sb.append("  <li>Ask interactions: ").append(previousWeek.getAskInteractions()).append("</li>\n");
-                sb.append("  <li>Redact interactions: ").append(previousWeek.getRedactInteractions()).append("</li>\n");
-                sb.append("  <li>Feedback count: ").append(previousWeek.getFeedbackCount()).append("</li>\n");
-                sb.append("  <li>Complaint files: ").append(previousWeek.getComplaintFiles() != null ? previousWeek.getComplaintFiles().size() : 0).append("</li>\n");
-                sb.append("  <li>Feedback files: ").append(previousWeek.getFeedbackFiles() != null ? previousWeek.getFeedbackFiles().size() : 0).append("</li>\n");
+                sb.append("  <li>Ask interactions: ").append(previousMonth.getAskInteractions()).append("</li>\n");
+                sb.append("  <li>Redact interactions: ").append(previousMonth.getRedactInteractions()).append("</li>\n");
+                sb.append("  <li>Feedback count: ").append(previousMonth.getFeedbackCount()).append("</li>\n");
                 sb.append("</ul>\n");
             }
 
-            // Comparisons
-            sb.append("<p><strong>Comparisons (Current vs Previous):</strong></p>\n");
-            if (askComparison != null) {
-                sb.append("<ul>\n");
-                sb.append("  <li>Ask: ").append(askComparison.getAbsoluteDifference() >= 0 ? "+" : "")
-                   .append(askComparison.getAbsoluteDifference())
-                   .append(" (").append(formatPercentage(askComparison.getPercentageChange())).append("%)</li>\n");
-                sb.append("</ul>\n");
-            }
-            if (redactComparison != null) {
-                sb.append("<ul>\n");
-                sb.append("  <li>Redact: ").append(redactComparison.getAbsoluteDifference() >= 0 ? "+" : "")
-                   .append(redactComparison.getAbsoluteDifference())
-                   .append(" (").append(formatPercentage(redactComparison.getPercentageChange())).append("%)</li>\n");
-                sb.append("</ul>\n");
-            }
-            if (feedbackComparison != null) {
-                sb.append("<ul>\n");
-                sb.append("  <li>Feedback: ").append(feedbackComparison.getAbsoluteDifference() >= 0 ? "+" : "")
-                   .append(feedbackComparison.getAbsoluteDifference())
-                   .append(" (").append(formatPercentage(feedbackComparison.getPercentageChange())).append("%)</li>\n");
-                sb.append("</ul>\n");
+            // Comparison (current vs previous)
+            if (askComparison != null || redactComparison != null || feedbackComparison != null) {
+                sb.append("<p><strong>Comparison (");
+
+                if (currentMonth != null && previousMonth != null) {
+                    sb.append(previousMonth.getMonthLabel()).append(" → ").append(currentMonth.getMonthLabel());
+                } else {
+                    sb.append("Current vs Previous");
+                }
+                sb.append("):</strong></p>\n");
+
+                if (askComparison != null) {
+                    sb.append("<ul>\n");
+                    sb.append("  <li>Ask: ").append(askComparison.getAbsoluteDifference() >= 0 ? "+" : "")
+                       .append(askComparison.getAbsoluteDifference())
+                       .append(" (").append(formatPercentage(askComparison.getPercentageChange())).append("%)</li>\n");
+                    sb.append("</ul>\n");
+                }
+                if (redactComparison != null) {
+                    sb.append("<ul>\n");
+                    sb.append("  <li>Redact: ").append(redactComparison.getAbsoluteDifference() >= 0 ? "+" : "")
+                       .append(redactComparison.getAbsoluteDifference())
+                       .append(" (").append(formatPercentage(redactComparison.getPercentageChange())).append("%)</li>\n");
+                    sb.append("</ul>\n");
+                }
+                if (feedbackComparison != null) {
+                    sb.append("<ul>\n");
+                    sb.append("  <li>Feedback: ").append(feedbackComparison.getAbsoluteDifference() >= 0 ? "+" : "")
+                       .append(feedbackComparison.getAbsoluteDifference())
+                       .append(" (").append(formatPercentage(feedbackComparison.getPercentageChange())).append("%)</li>\n");
+                    sb.append("</ul>\n");
+                }
             }
         }
 
         return sb.toString();
-    }
-
-    /**
-     * Helper to format percentage for display.
-     */
-    private String formatPercentage(double value) {
-        if (Double.isNaN(value) || Double.isInfinite(value)) {
-            return "N/A";
-        }
-        return String.format("%.2f", value);
-    }
-
-    /**
-     * Returns a human-readable label for the current week period.
-     * Uses the last 7 days from now.
-     */
-    public String getCurrentWeekLabel() {
-        Instant end   = Instant.now();
-        Instant start  = end.minusSeconds(7 * 24 * 60 * 60);
-        return formatDateRange(start, end);
-    }
-
-    /**
-     * Returns a human-readable label for the previous week period
-     * (days 8-14 ago).
-     */
-    public String getPreviousWeekLabel() {
-        Instant end   = Instant.now().minusSeconds(7 * 24 * 60 * 60);
-        Instant start  = end.minusSeconds(7 * 24 * 60 * 60);
-        return formatDateRange(start, end);
-    }
-
-    private String formatDateRange(Instant from, Instant to) {
-        java.time.ZoneId zone = java.time.ZoneId.of("Europe/Madrid");
-        java.time.format.DateTimeFormatter fmt =
-                java.time.format.DateTimeFormatter.ofPattern("d MMM")
-                        .withZone(zone);
-        return fmt.format(from) + " – " + fmt.format(to);
     }
 
     /**
@@ -280,5 +287,15 @@ public class StadisticsModel {
     public String renderHtml(cat.complai.services.stadistics.StadisticsHtmlRenderer renderer,
                              Instant reportGeneratedAt) {
         return renderer.render(this, reportGeneratedAt);
+    }
+
+    /**
+     * Helper to format percentage for display.
+     */
+    private String formatPercentage(double value) {
+        if (Double.isNaN(value) || Double.isInfinite(value)) {
+            return "N/A";
+        }
+        return String.format("%.2f", value);
     }
 }
