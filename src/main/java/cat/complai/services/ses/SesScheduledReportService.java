@@ -11,10 +11,11 @@ import jakarta.inject.Singleton;
 /**
  * Business logic for sending the scheduled statistics report via SES.
  *
- * <p>Extracted from {@link SesScheduledReportHandler} so it can be unit-tested
+ * <p>
+ * Extracted from {@link SesScheduledReportHandler} so it can be unit-tested
  * without starting a Micronaut application context (which would attempt to bind
  * an HTTP port and collide with any embedded server already running in the test
- * JVM).  The handler delegates to this class in production; tests instantiate it
+ * JVM). The handler delegates to this class in production; tests instantiate it
  * directly with mock / fake dependencies.
  *
  * @see SesScheduledReportHandler
@@ -41,7 +42,8 @@ public class SesScheduledReportService {
      *
      * @return a result string beginning with {@code "OK:"} on success or
      *         {@code "ERROR:"} when the recipient address is not configured
-     * @throws CloudWatchLogsException if CloudWatch is unavailable (triggers Lambda retry)
+     * @throws CloudWatchLogsException if CloudWatch is unavailable (triggers Lambda
+     *                                 retry)
      * @throws RuntimeException        wrapping any other failure
      */
     public String run() {
@@ -54,13 +56,14 @@ public class SesScheduledReportService {
         }
 
         try {
-            emailService.sendStadistics(recipient, "ComplAI — Weekly Usage Statistics Report");
+            emailService.sendStadistics(recipient, "ComplAI — Monthly Usage Statistics Report");
             logger.info("Statistics report sent successfully");
             return "OK: Statistics report sent to " + maskEmail(recipient);
         } catch (CloudWatchLogsException e) {
             logger.log(Level.SEVERE,
                     "CloudWatch Logs unavailable — could not generate statistics: "
-                            + e.getMessage(), e);
+                            + e.getMessage(),
+                    e);
             throw e; // let Lambda surface as a handled error, triggering retry
         } catch (Exception e) {
             logger.log(Level.SEVERE, "Failed to send statistics report: " + e.getMessage(), e);

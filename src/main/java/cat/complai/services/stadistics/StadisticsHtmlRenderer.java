@@ -43,7 +43,6 @@ public class StadisticsHtmlRenderer {
      */
     public String render(StadisticsModel model, Instant reportGeneratedAt) {
         String kpiRow    = buildKpiRow(model);
-        String barChart  = buildMonthlyBarChart(model);
         String donutChart = buildInteractionDonut(model);
         YearMonth currentYm = YearMonth.now(ZoneId.of("Europe/Madrid"));
         int year = currentYm.getYear();
@@ -109,13 +108,7 @@ public class StadisticsHtmlRenderer {
                 "            <td style=\"padding:20px 24px;background-color:#F9FAFB;\">\n" +
                 "              <table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\">\n" +
                 "                <tr>\n" +
-                "                  <td class=\"mobile-stack\" width=\"58%\" valign=\"top\" style=\"padding-right:12px;\">\n" +
-                "                    <div style=\"background-color:#FFFFFF;border:1px solid #E5E7EB;border-radius:12px;padding:20px;\">\n" +
-                "                      <p style=\"margin:0 0 16px;font-size:14px;font-weight:700;color:#1F2937;\">Monthly Comparison (" + year + ")</p>\n" +
-                barChart + "\n" +
-                "                    </div>\n" +
-                "                  </td>\n" +
-                "                  <td class=\"mobile-stack\" width=\"42%\" valign=\"top\" style=\"padding-left:12px;\">\n" +
+                "                  <td class=\"mobile-stack\" width=\"100%\" valign=\"top\">\n" +
                 "                    <div style=\"background-color:#FFFFFF;border:1px solid #E5E7EB;border-radius:12px;padding:20px;\">\n" +
                 "                      <p style=\"margin:0 0 4px;font-size:14px;font-weight:700;color:#1F2937;\">Interaction Mix</p>\n" +
                 "                      <p style=\"margin:0 0 12px;font-size:12px;color:#6B7280;\">" + getCurrentMonthLabel(model) + "</p>\n" +
@@ -238,106 +231,6 @@ public class StadisticsHtmlRenderer {
             return String.format("%.1fk", n / 1000.0).replace(",", ".").replace(".0k", "k");
         }
         return String.valueOf(n);
-    }
-
-    // ─── Bar chart (monthly comparison) ─────────────────────────────────────────
-
-    private String buildMonthlyBarChart(StadisticsModel m) {
-        ArrayList<MonthlyData> yearly = m.getYearlyData();
-        if (yearly == null || yearly.isEmpty()) {
-            return "<p style=\"margin:0;font-size:12px;color:#9CA3AF;\">No hi ha dades disponibles.</p>";
-        }
-
-        int numMonths = yearly.size();
-
-        // SVG dimensions: scale width to fit all months
-        int svgW = Math.max(340, 60 + numMonths * 52);
-        int svgH = 155;
-        int chartLeft = 35, chartRight = svgW - 5, chartTop = 10, chartBot = 110;
-        int chartW = chartRight - chartLeft;
-        int chartH = chartBot - chartTop;
-
-        // Calculate bar width so all month groups fit in the available width
-        int availableWidth = chartW - 20;
-        int groupStep = availableWidth / numMonths;
-        int barW = Math.max(4, Math.min(22, (groupStep - 8) / 3));
-        int barGap = Math.max(2, (groupStep - 3 * barW) / 2);
-        int groupWidth = 3 * barW + 2 * barGap; // actual width per month group
-
-        StringBuilder bars = new StringBuilder();
-
-        // Find max for scaling
-        int maxVal = 0;
-        for (MonthlyData md : yearly) {
-            maxVal = Math.max(maxVal, md.getAskInteractions());
-            maxVal = Math.max(maxVal, md.getRedactInteractions());
-            maxVal = Math.max(maxVal, md.getFeedbackCount());
-        }
-        if (maxVal == 0) maxVal = 1;
-
-        // X-axis baseline
-        bars.append(String.format(
-            "<line x1=\"%d\" y1=\"%d\" x2=\"%d\" y2=\"%d\" stroke=\"#E5E7EB\" stroke-width=\"1\"/>",
-            chartLeft, chartBot, chartRight, chartBot));
-
-        // Draw bars for each month
-        int startX = chartLeft + (availableWidth - numMonths * groupStep) / 2 + 10;
-        for (int i = 0; i < numMonths; i++) {
-            MonthlyData md = yearly.get(i);
-            int groupX = startX + i * groupStep;
-
-            // Ask bar (blue)
-            double askH = ((double) md.getAskInteractions() / maxVal) * chartH;
-            if (md.getAskInteractions() > 0) {
-                bars.append(String.format(
-                    "<rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%.0f\" fill=\"%s\" rx=\"2\"/>",
-                    groupX, (int) (chartBot - askH), barW, askH, ACCENT_BLUE));
-            }
-
-            // Redact bar (purple)
-            double redactH = ((double) md.getRedactInteractions() / maxVal) * chartH;
-            if (md.getRedactInteractions() > 0) {
-                bars.append(String.format(
-                    "<rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%.0f\" fill=\"%s\" rx=\"2\"/>",
-                    groupX + barW + barGap, (int) (chartBot - redactH), barW, redactH, ACCENT_PURPLE));
-            }
-
-            // Feedback bar (amber)
-            double fbH = ((double) md.getFeedbackCount() / maxVal) * chartH;
-            if (md.getFeedbackCount() > 0) {
-                bars.append(String.format(
-                    "<rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%.0f\" fill=\"%s\" rx=\"2\"/>",
-                    groupX + 2 * (barW + barGap), (int) (chartBot - fbH), barW, fbH, ACCENT_AMBER));
-            }
-
-            // Month label
-            String monthLabel = getShortMonthLabel(md.getMonthLabel());
-            int labelX = groupX + groupWidth / 2;
-            int fontSize = Math.max(7, Math.min(9, groupStep / 5));
-            bars.append(String.format(
-                "<text x=\"%d\" y=\"%d\" text-anchor=\"middle\" font-size=\"%d\" fill=\"#6B7280\">%s</text>",
-                labelX, chartBot + 12, fontSize, monthLabel));
-        }
-
-        // Legend
-        bars.append(String.format(
-            "<rect x=\"%d\" y=\"%d\" width=\"10\" height=\"10\" fill=\"%s\" rx=\"2\"/>" +
-            "<text x=\"%d\" y=\"%d\" font-size=\"9\" fill=\"%s\">Consultes</text>" +
-            "<rect x=\"%d\" y=\"%d\" width=\"10\" height=\"10\" fill=\"%s\" rx=\"2\"/>" +
-            "<text x=\"%d\" y=\"%d\" font-size=\"9\" fill=\"%s\">Reclam.</text>" +
-            "<rect x=\"%d\" y=\"%d\" width=\"10\" height=\"10\" fill=\"%s\" rx=\"2\"/>" +
-            "<text x=\"%d\" y=\"%d\" font-size=\"9\" fill=\"%s\">Valorac.</text>",
-            chartLeft, chartTop - 4, ACCENT_BLUE,
-            chartLeft + 14, chartTop + 4, GREY_DARK,
-            chartLeft + 80, chartTop - 4, ACCENT_PURPLE,
-            chartLeft + 94, chartTop + 4, GREY_DARK,
-            chartLeft + 140, chartTop - 4, ACCENT_AMBER,
-            chartLeft + 154, chartTop + 4, GREY_DARK));
-
-        return "<svg viewBox=\"0 0 " + svgW + " " + svgH + "\" width=\"100%\" "
-             + "style=\"display:block;overflow:visible;\" xmlns=\"http://www.w3.org/2000/svg\">" +
-               bars.toString() +
-               "</svg>";
     }
 
     // ─── Donut chart (interaction mix) ───────────────────────────────────────────
