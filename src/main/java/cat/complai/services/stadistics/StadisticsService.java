@@ -5,14 +5,19 @@ import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import cat.complai.dto.openrouter.OpenRouterResponseDto;
 import cat.complai.exceptions.ses.CloudWatchLogsException;
+import cat.complai.services.openrouter.IOpenRouterService;
 import cat.complai.services.stadistics.models.ComplaintFile;
 import cat.complai.services.stadistics.models.FeedbackFile;
 import cat.complai.services.stadistics.models.StadisticsModel;
+import cat.complai.services.stadistics.models.StadisticsModel.MonthlyData;
 import cat.complai.services.stadistics.models.StadisticsModel.ComparisonData;
 import cat.complai.utilities.s3.S3ComplaintLister;
 import cat.complai.utilities.s3.S3FeedbackLister;
@@ -34,11 +39,14 @@ public class StadisticsService implements IStadisticsService {
 
     private final S3ComplaintLister s3ComplaintLister;
     private final S3FeedbackLister s3FeedbackLister;
+    private final IOpenRouterService openRouterService;
 
     @Inject
-    public StadisticsService(S3ComplaintLister s3ComplaintLister, S3FeedbackLister s3FeedbackLister) {
+    public StadisticsService(S3ComplaintLister s3ComplaintLister, S3FeedbackLister s3FeedbackLister,
+            IOpenRouterService openRouterService) {
         this.s3ComplaintLister = s3ComplaintLister;
         this.s3FeedbackLister = s3FeedbackLister;
+        this.openRouterService = openRouterService;
     }
 
     // ======================
@@ -314,5 +322,95 @@ public class StadisticsService implements IStadisticsService {
 
         return new ComparisonData(absoluteDifference, percentageChange);
     }
+
+    // ======================
+    // Prediction Methods
+    // ======================
+
+    /**
+     * Generates an AI prediction based on yearly statistics data.
+     * Calls OpenRouter to get insights and predictions for the next month.
+     *
+     * @param model the statistics model with yearly data
+     * @param cityId the city identifier
+     * @return prediction text from AI, or fallback message on failure
+     */
+    public String generatePrediction(StadisticsModel model, String cityId) {
+        logger.info("Generating AI prediction for city: {}", cityId);
+
+        try {
+            ArrayList<MonthlyData> yearlyData = model.getYearlyData();
+            if (yearlyData == null || yearlyData.isEmpty()) {
+                logger.warn("No yearly data available for prediction");
+                return FALLBACK_PREDICTION;
+            }
+
+            // Build the prompt with yearly data
+            String prompt = buildPredictionPrompt(yearlyData, cityId);
+
+            // Call OpenRouter
+            List<Map<String, Object>> messages = List.of(
+                Map.of("role", "system", "content", "Ets un assistent d'anàlisi de dades municipals. Analitzes dades d'interacció ciutadana i fas prediccions."),
+                Map.of("role", "user", "content", prompt)
+            );
+
+            OpenRouterResponseDto response = openRouterService.ask(prompt, null, cityId);
+
+            if (response.isSuccess() && response.getMessage() != null && !response.getMessage().isBlank()) {
+                logger.info("AI prediction generated successfully for city: {}", cityId);
+                return response.getMessage();
+            } else {
+                logger.warn("AI prediction call returned empty or failed for city: {}", cityId);
+                return FALLBACK_PREDICTION;
+            }
+        } catch (Exception e) {
+            logger.error("Failed to generate AI prediction for city {}: {}", cityId, e.getMessage());
+            return FALLBACK_PREDICTION;
+        }
+    }
+
+    private String buildPredictionPrompt(ArrayList<MonthlyData> yearlyData, String cityId) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Analitza les següents dades estadístiques any ").append(YearMonth.now(ZoneId.of("Europe/Madrid")).getYear()).append(" per a la ciutat ").append(cityId).append(":\n\n");
+
+        sb.append("| Mes | Consultes | Reclamacions | Valoracions | Arxius Reclam. | Arxius Valoracions |\n");
+        sb.append("|---|---|---|---|---|---|\n");
+
+        int totalAsk = 0, totalRedact = 0, totalFeedback = 0, totalComplaintFiles = 0, totalFeedbackFiles = 0;
+
+        for (MonthlyData md : yearlyData) {
+            int complaintFiles = md.getComplaintFiles() != null ? md.getComplaintFiles().size() : 0;
+            int feedbackFiles = md.getFeedbackFiles() != null ? md.getFeedbackFiles().size() : 0;
+
+            sb.append("| ").append(md.getMonthLabel()).append(" | ")
+              .append(md.getAskInteractions()).append(" | ")
+              .append(md.getRedactInteractions()).append(" | ")
+              .append(md.getFeedbackCount()).append(" | ")
+              .append(complaintFiles).append(" | ")
+              .append(feedbackFiles).append(" |\n");
+
+            totalAsk += md.getAskInteractions();
+            totalRedact += md.getRedactInteractions();
+            totalFeedback += md.getFeedbackCount();
+            totalComplaintFiles += complaintFiles;
+            totalFeedbackFiles += feedbackFiles;
+        }
+
+        sb.append("\n**Total anual:** ").append(totalAsk).append(" consultes, ")
+          .append(totalRedact).append(" reclamacions, ")
+          .append(totalFeedback).append(" valoracions.\n");
+        sb.append("**Arxius generats:** ").append(totalComplaintFiles).append(" reclamacions, ")
+          .append(totalFeedbackFiles).append(" valoracions.\n\n");
+
+        sb.append("Basant-te en aquestes dades, proporciona:");
+        sb.append("\n1. Una breu anàlisi de les tendències (quin tipus d'interacció creix, quin disminueix)");
+        sb.append("\n2. Una predicció per al proper mes (quines xifres esperes)");
+        sb.append("\n3. Recomanacions per millorar el servei ciutadà");
+        sb.append("\n\nRespon en català i en format HTML senzill (paràgrafs i llistes).");
+
+        return sb.toString();
+    }
+
+    private static final String FALLBACK_PREDICTION = "<p style=\"margin:0;font-size:12px;color:#9CA3AF;font-style:italic;\">No s'ha pogut generar la predicció basada en les dades actuals.</p>";
 
 }

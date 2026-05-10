@@ -2,7 +2,6 @@ package cat.complai.services.stadistics.models;
 
 import java.time.Instant;
 import java.time.YearMonth;
-import java.time.ZoneId;
 import java.util.ArrayList;
 
 import io.micronaut.core.annotation.Introspected;
@@ -25,6 +24,9 @@ public class StadisticsModel {
 
     // Year-to-date monthly data (all months from Jan to current month)
     private ArrayList<MonthlyData> yearlyData;
+
+    // AI-generated prediction based on yearly data
+    private String prediction;
 
     /**
      * Inner class to hold data for a single month period.
@@ -167,6 +169,8 @@ public class StadisticsModel {
     public void setFeedbackComparison(ComparisonData feedbackComparison) { this.feedbackComparison = feedbackComparison; }
     public ArrayList<MonthlyData> getYearlyData() { return yearlyData; }
     public void setYearlyData(ArrayList<MonthlyData> yearlyData) { this.yearlyData = yearlyData; }
+    public String getPrediction() { return prediction; }
+    public void setPrediction(String prediction) { this.prediction = prediction; }
 
     @Override
     public String toString() {
@@ -282,11 +286,12 @@ public class StadisticsModel {
      *
      * @param renderer        the HTML renderer (injected as a CDI bean)
      * @param reportGeneratedAt when the report was generated
+     * @param prediction       AI-generated prediction HTML (or fallback message)
      * @return complete HTML string ready for SES
      */
     public String renderHtml(cat.complai.services.stadistics.StadisticsHtmlRenderer renderer,
-                             Instant reportGeneratedAt) {
-        return renderer.render(this, reportGeneratedAt);
+                             Instant reportGeneratedAt, String prediction) {
+        return renderer.render(this, reportGeneratedAt, prediction);
     }
 
     /**

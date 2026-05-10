@@ -45,9 +45,10 @@ public class StadisticsHtmlRenderer {
      *
      * @param model              the statistics model (must not be null)
      * @param reportGeneratedAt when the report was generated (used in the header)
+     * @param prediction         AI-generated prediction HTML (or fallback message)
      * @return complete HTML string ready for SES email body
      */
-    public String render(StadisticsModel model, Instant reportGeneratedAt) {
+    public String render(StadisticsModel model, Instant reportGeneratedAt, String prediction) {
         int year = YearMonth.now(ZoneId.of("Europe/Madrid")).getYear();
         String currentMonthLabel = getCurrentMonthLabel(model);
 
@@ -66,18 +67,19 @@ public class StadisticsHtmlRenderer {
             %s
             </body>
             </html>
-            """.formatted(CSS_STYLES, buildOuterWrapper(model, reportGeneratedAt, year, currentMonthLabel));
+            """.formatted(CSS_STYLES, buildOuterWrapper(model, reportGeneratedAt, year, currentMonthLabel, prediction));
     }
 
     // ─── HTML structure builders ─────────────────────────────────────────────────
 
-    private String buildOuterWrapper(StadisticsModel model, Instant reportGeneratedAt, int year, String currentMonthLabel) {
+    private String buildOuterWrapper(StadisticsModel model, Instant reportGeneratedAt, int year, String currentMonthLabel, String prediction) {
         return """
             <table width="100%%" cellpadding="0" cellspacing="0" border="0" style="background-color:#EFF1F5;">
               <tr>
                 <td align="center">
                   <table width="600" cellpadding="0" cellspacing="0" border="0"
                          class="mobile-full" style="max-width:600px;">
+                    %s
                     %s
                     %s
                     %s
@@ -92,6 +94,7 @@ public class StadisticsHtmlRenderer {
                 buildHeader(model, reportGeneratedAt, year, currentMonthLabel),
                 buildKpiRowSection(model),
                 buildChartsSection(model, currentMonthLabel),
+                buildPredictionSection(prediction),
                 buildMonthlyBreakdownSection(model, year),
                 buildFilesSection(model),
                 buildFooter()
@@ -154,6 +157,22 @@ public class StadisticsHtmlRenderer {
               </td>
             </tr>
             """.formatted(currentMonthLabel, buildInteractionDonut(model));
+    }
+
+    private String buildPredictionSection(String prediction) {
+        if (prediction == null || prediction.isBlank()) {
+            return "";
+        }
+        return """
+            <tr>
+              <td style="padding:20px 24px;background-color:#F9FAFB;">
+                <div style="background-color:#FFFFFF;border:1px solid #E5E7EB;border-radius:12px;padding:20px;">
+                  <p style="margin:0 0 12px;font-size:14px;font-weight:700;color:#1F2937;">Predicció i Anàlisi</p>
+                  %s
+                </div>
+              </td>
+            </tr>
+            """.formatted(prediction);
     }
 
     private String buildMonthlyBreakdownSection(StadisticsModel model, int year) {
