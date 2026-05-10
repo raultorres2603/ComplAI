@@ -13,11 +13,11 @@ import jakarta.inject.Singleton;
 
 /**
  * Renders a {@link StadisticsModel} as a polished HTML email body with
- * inline SVG charts (bar chart for monthly comparison, donut for interaction
- * distribution).  No external requests are made — all charts are pure SVG
- * embedded directly in the HTML, making them reliable in all email clients.
+ * inline SVG charts (donut for interaction distribution).  No external requests
+ * are made — all charts are pure SVG embedded directly in the HTML, making them
+ * reliable in all email clients.
  *
- * <p>Layout: header → summary KPIs → two-column charts section → file lists
+ * <p>Layout: header → summary KPIs → donut chart → monthly table → file lists
  * (complaints + feedback with download links).
  */
 @Singleton
@@ -28,11 +28,17 @@ public class StadisticsHtmlRenderer {
     private static final String ACCENT_RED    = "#DC2626";
     private static final String ACCENT_AMBER  = "#D97706";
     private static final String ACCENT_PURPLE = "#7C3AED";
-    private static final String GREY_DARK     = "#1F2937";
-
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter
             .ofPattern("d MMM yyyy")
             .withZone(ZoneId.of("Europe/Madrid"));
+
+    private static final String CSS_STYLES = """
+        @media only screen and (max-width:520px) {
+          .mobile-stack { display:block !important; width:100% !important; max-width:100% !important; }
+          .mobile-full  { width:100% !important; max-width:100% !important; }
+          .mobile-hide { display:none !important; }
+        }
+        """;
 
     /**
      * Renders the full HTML email for the given statistics model.
@@ -42,140 +48,168 @@ public class StadisticsHtmlRenderer {
      * @return complete HTML string ready for SES email body
      */
     public String render(StadisticsModel model, Instant reportGeneratedAt) {
-        String kpiRow    = buildKpiRow(model);
-        String donutChart = buildInteractionDonut(model);
-        YearMonth currentYm = YearMonth.now(ZoneId.of("Europe/Madrid"));
-        int year = currentYm.getYear();
+        int year = YearMonth.now(ZoneId.of("Europe/Madrid")).getYear();
+        String currentMonthLabel = getCurrentMonthLabel(model);
 
-        return "<!DOCTYPE html>\n" +
-                "<html lang=\"ca\">\n" +
-                "<head>\n" +
-                "  <meta charset=\"UTF-8\">\n" +
-                "  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n" +
-                "  <title>ComplAI — Monthly Statistics Report</title>\n" +
-                "  <style>\n" +
-                "    @media only screen and (max-width:520px) {\n" +
-                "      .mobile-stack { display:block !important; width:100% !important; max-width:100% !important; }\n" +
-                "      .mobile-full  { width:100% !important; max-width:100% !important; }\n" +
-                "      .mobile-hide { display:none !important; }\n" +
-                "    }\n" +
-                "  </style>\n" +
-                "</head>\n" +
-                "<body style=\"margin:0;padding:0;background-color:#EFF1F5;font-family:Arial,Helvetica,sans-serif;\">\n" +
-                "\n" +
-                "  <!-- Outer wrapper: centered, max 600px on desktop, full width on mobile -->\n" +
-                "  <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\" style=\"background-color:#EFF1F5;\">\n" +
-                "    <tr>\n" +
-                "      <td align=\"center\">\n" +
-                "\n" +
-                "        <table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"\n" +
-                "               class=\"mobile-full\" style=\"max-width:600px;\">\n" +
-                "\n" +
-                "          <!-- Header -->\n" +
-                "          <tr>\n" +
-                "            <td style=\"padding:28px 24px 24px;background-color:" + ACCENT_BLUE + ";\">\n" +
-                "              <table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\">\n" +
-                "                <tr>\n" +
-                "                  <td>\n" +
-                "                    <p style=\"margin:0;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.7);\">ComplAI &middot; El Prat de Llobregat</p>\n" +
-                "                    <h1 style=\"margin:6px 0 0;font-size:22px;font-weight:700;color:#FFFFFF;line-height:1.2;\">Monthly Statistics Report</h1>\n" +
-                "                    <p style=\"margin:8px 0 0;font-size:13px;color:rgba(255,255,255,0.85);\">Resum mensual any " + year + " &mdash; acumulat gener a " + getCurrentMonthLabel(model) + "</p>\n" +
-                "                  </td>\n" +
-                "                  <td align=\"right\" valign=\"middle\" class=\"mobile-hide\">\n" +
-                "                    <div style=\"background-color:rgba(255,255,255,0.15);border-radius:8px;padding:10px 14px;display:inline-block;\">\n" +
-                "                      <p style=\"margin:0;font-size:11px;color:rgba(255,255,255,0.7);\">Generat</p>\n" +
-                "                      <p style=\"margin:2px 0 0;font-size:13px;font-weight:600;color:#FFFFFF;\">" + DATE_FMT.format(reportGeneratedAt) + "</p>\n" +
-                "                    </div>\n" +
-                "                  </td>\n" +
-                "                </tr>\n" +
-                "              </table>\n" +
-                "            </td>\n" +
-                "          </tr>\n" +
-                "\n" +
-                "          <!-- KPI row -->\n" +
-                "          <tr>\n" +
-                "            <td style=\"padding:20px 24px 0;background-color:#FFFFFF;\">\n" +
-                "              <table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\">\n" +
-                "                <tr>\n" +
-                kpiRow + "\n" +
-                "                </tr>\n" +
-                "              </table>\n" +
-                "            </td>\n" +
-                "          </tr>\n" +
-                "\n" +
-                "          <!-- Charts section: two columns, stacked on mobile -->\n" +
-                "          <tr>\n" +
-                "            <td style=\"padding:20px 24px;background-color:#F9FAFB;\">\n" +
-                "              <table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\">\n" +
-                "                <tr>\n" +
-                "                  <td class=\"mobile-stack\" width=\"100%\" valign=\"top\">\n" +
-                "                    <div style=\"background-color:#FFFFFF;border:1px solid #E5E7EB;border-radius:12px;padding:20px;\">\n" +
-                "                      <p style=\"margin:0 0 4px;font-size:14px;font-weight:700;color:#1F2937;\">Interaction Mix</p>\n" +
-                "                      <p style=\"margin:0 0 12px;font-size:12px;color:#6B7280;\">" + getCurrentMonthLabel(model) + "</p>\n" +
-                donutChart + "\n" +
-                "                    </div>\n" +
-                "                  </td>\n" +
-                "                </tr>\n" +
-                "              </table>\n" +
-                "            </td>\n" +
-                "          </tr>\n" +
-                "\n" +
-                "          <!-- Monthly breakdown table -->\n" +
-                "          <tr>\n" +
-                "            <td style=\"padding:20px 24px;background-color:#FFFFFF;\">\n" +
-                "              <div style=\"border:1px solid #E5E7EB;border-radius:12px;padding:20px;\">\n" +
-                "                <p style=\"margin:0 0 16px;font-size:14px;font-weight:700;color:#1F2937;\">Desglossament mensual ( + year + )</p>\n" +
-                buildMonthlyTable(model) + "\n" +
-                "              </div>\n" +
-                "            </td>\n" +
-                "          </tr>\n" +
-                "\n" +
-                "          <!-- File section: two columns, stacked on mobile -->\n" +
-                "          <tr>\n" +
-                "            <td style=\"padding:0 24px 20px;background-color:#FFFFFF;\">\n" +
-                "              <table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\">\n" +
-                "                <tr>\n" +
-                "                  <td class=\"mobile-stack\" width=\"50%\" valign=\"top\" style=\"padding-right:8px;\">\n" +
-                "                    <div style=\"background-color:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;padding:16px;\">\n" +
-                "                      <p style=\"margin:0 0 10px;font-size:13px;font-weight:700;color:#1F2937;\">&#128203; Reclamacions generades</p>\n" +
-                buildComplaintList(model) + "\n" +
-                "                    </div>\n" +
-                "                  </td>\n" +
-                "                  <td class=\"mobile-stack\" width=\"50%\" valign=\"top\" style=\"padding-left:8px;\">\n" +
-                "                    <div style=\"background-color:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;padding:16px;\">\n" +
-                "                      <p style=\"margin:0 0 10px;font-size:13px;font-weight:700;color:#1F2937;\">&#128172; Valoracions rebudes</p>\n" +
-                buildFeedbackList(model) + "\n" +
-                "                    </div>\n" +
-                "                  </td>\n" +
-                "                </tr>\n" +
-                "              </table>\n" +
-                "            </td>\n" +
-                "          </tr>\n" +
-                "\n" +
-                "          <!-- Footer -->\n" +
-                "          <tr>\n" +
-                "            <td style=\"padding:24px 24px;background-color:#F3F4F6;\">\n" +
-                "              <p style=\"margin:0;font-size:11px;color:#9CA3AF;text-align:center;\">\n" +
-                "                Informe automatitzat generat per ComplAI &middot; El Prat de Llobregat.<br>\n" +
-                "                No respongueu a aquest correu.\n" +
-                "              </p>\n" +
-                "            </td>\n" +
-                "          </tr>\n" +
-                "\n" +
-                "        </table>\n" +
-                "\n" +
-                "      </td>\n" +
-                "    </tr>\n" +
-                "  </table>\n" +
-                "\n" +
-                "</body>\n" +
-                "</html>\n";
+        return """
+            <!DOCTYPE html>
+            <html lang="ca">
+            <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>ComplAI — Monthly Statistics Report</title>
+              <style>
+                %s
+              </style>
+            </head>
+            <body style="margin:0;padding:0;background-color:#EFF1F5;font-family:Arial,Helvetica,sans-serif;">
+            %s
+            </body>
+            </html>
+            """.formatted(CSS_STYLES, buildOuterWrapper(model, reportGeneratedAt, year, currentMonthLabel));
+    }
+
+    // ─── HTML structure builders ─────────────────────────────────────────────────
+
+    private String buildOuterWrapper(StadisticsModel model, Instant reportGeneratedAt, int year, String currentMonthLabel) {
+        return """
+            <table width="100%%" cellpadding="0" cellspacing="0" border="0" style="background-color:#EFF1F5;">
+              <tr>
+                <td align="center">
+                  <table width="600" cellpadding="0" cellspacing="0" border="0"
+                         class="mobile-full" style="max-width:600px;">
+                    %s
+                    %s
+                    %s
+                    %s
+                    %s
+                    %s
+                  </table>
+                </td>
+              </tr>
+            </table>
+            """.formatted(
+                buildHeader(model, reportGeneratedAt, year, currentMonthLabel),
+                buildKpiRowSection(model),
+                buildChartsSection(model, currentMonthLabel),
+                buildMonthlyBreakdownSection(model, year),
+                buildFilesSection(model),
+                buildFooter()
+            );
+    }
+
+    private String buildHeader(StadisticsModel model, Instant reportGeneratedAt, int year, String currentMonthLabel) {
+        return """
+            <tr>
+              <td style="padding:28px 24px 24px;background-color:%s;">
+                <table cellpadding="0" cellspacing="0" border="0" width="100%%">
+                  <tr>
+                    <td>
+                      <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.7);">ComplAI &middot; El Prat de Llobregat</p>
+                      <h1 style="margin:6px 0 0;font-size:22px;font-weight:700;color:#FFFFFF;line-height:1.2;">Monthly Statistics Report</h1>
+                      <p style="margin:8px 0 0;font-size:13px;color:rgba(255,255,255,0.85);">Resum mensual any %d &mdash; acumulat gener a %s</p>
+                    </td>
+                    <td align="right" valign="middle" class="mobile-hide">
+                      <div style="background-color:rgba(255,255,255,0.15);border-radius:8px;padding:10px 14px;display:inline-block;">
+                        <p style="margin:0;font-size:11px;color:rgba(255,255,255,0.7);">Generat</p>
+                        <p style="margin:2px 0 0;font-size:13px;font-weight:600;color:#FFFFFF;">%s</p>
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            """.formatted(ACCENT_BLUE, year, currentMonthLabel, DATE_FMT.format(reportGeneratedAt));
+    }
+
+    private String buildKpiRowSection(StadisticsModel model) {
+        return """
+            <tr>
+              <td style="padding:20px 24px 0;background-color:#FFFFFF;">
+                <table cellpadding="0" cellspacing="0" border="0" width="100%%">
+                  <tr>
+                    %s
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            """.formatted(buildKpiRow(model));
+    }
+
+    private String buildChartsSection(StadisticsModel model, String currentMonthLabel) {
+        return """
+            <tr>
+              <td style="padding:20px 24px;background-color:#F9FAFB;">
+                <table cellpadding="0" cellspacing="0" border="0" width="100%%">
+                  <tr>
+                    <td class="mobile-stack" width="100%%" valign="top">
+                      <div style="background-color:#FFFFFF;border:1px solid #E5E7EB;border-radius:12px;padding:20px;">
+                        <p style="margin:0 0 4px;font-size:14px;font-weight:700;color:#1F2937;">Interaction Mix</p>
+                        <p style="margin:0 0 12px;font-size:12px;color:#6B7280;">%s</p>
+                        %s
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            """.formatted(currentMonthLabel, buildInteractionDonut(model));
+    }
+
+    private String buildMonthlyBreakdownSection(StadisticsModel model, int year) {
+        return """
+            <tr>
+              <td style="padding:20px 24px;background-color:#FFFFFF;">
+                <div style="border:1px solid #E5E7EB;border-radius:12px;padding:20px;">
+                  <p style="margin:0 0 16px;font-size:14px;font-weight:700;color:#1F2937;">Desglossament mensual (%d)</p>
+                  %s
+                </div>
+              </td>
+            </tr>
+            """.formatted(year, buildMonthlyTable(model));
+    }
+
+    private String buildFilesSection(StadisticsModel model) {
+        return """
+            <tr>
+              <td style="padding:0 24px 20px;background-color:#FFFFFF;">
+                <table cellpadding="0" cellspacing="0" border="0" width="100%%">
+                  <tr>
+                    <td class="mobile-stack" width="50%%" valign="top" style="padding-right:8px;">
+                      <div style="background-color:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;padding:16px;">
+                        <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#1F2937;">&#128203; Reclamacions generades</p>
+                        %s
+                      </div>
+                    </td>
+                    <td class="mobile-stack" width="50%%" valign="top" style="padding-left:8px;">
+                      <div style="background-color:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;padding:16px;">
+                        <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#1F2937;">&#128172; Valoracions rebudes</p>
+                        %s
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            """.formatted(buildComplaintList(model), buildFeedbackList(model));
+    }
+
+    private String buildFooter() {
+        return """
+            <tr>
+              <td style="padding:24px 24px;background-color:#F3F4F6;">
+                <p style="margin:0;font-size:11px;color:#9CA3AF;text-align:center;">
+                  Informe automatitzat generat per ComplAI &middot; El Prat de Llobregat.<br>
+                  No respongueu a aquest correu.
+                </p>
+              </td>
+            </tr>
+            """;
     }
 
     // ─── KPI cards ─────────────────────────────────────────────────────────────
 
     private String buildKpiRow(StadisticsModel m) {
-        // Year-to-date totals from all monthly data
         ArrayList<MonthlyData> yearly = m.getYearlyData();
         int ask = 0, redact = 0, fb = 0;
         if (yearly != null) {
@@ -197,22 +231,26 @@ public class StadisticsHtmlRenderer {
     }
 
     private String kpiCard(String label, String value, String color) {
-        return "<td width=\"22%\" style=\"padding:0 4px;\">" +
-               "  <div style=\"background-color:" + color + ";border-radius:10px;padding:14px 16px;text-align:center;\">" +
-               "    <p style=\"margin:0 0 6px;font-size:11px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:rgba(255,255,255,0.75);\">" + label + "</p>" +
-               "    <p style=\"margin:0;font-size:28px;font-weight:700;color:#FFFFFF;line-height:1;\">" + value + "</p>" +
-               "  </div>" +
-               "</td>";
+        return """
+            <td width="22%%" style="padding:0 4px;">
+              <div style="background-color:%s;border-radius:10px;padding:14px 16px;text-align:center;">
+                <p style="margin:0 0 6px;font-size:11px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:rgba(255,255,255,0.75);">%s</p>
+                <p style="margin:0;font-size:28px;font-weight:700;color:#FFFFFF;line-height:1;">%s</p>
+              </div>
+            </td>
+            """.formatted(color, label, value);
     }
 
     private String changeCell(int diff, String arrow, String color, String sign) {
-        return "<td width=\"12%\" style=\"padding:0 4px;\">" +
-               "  <div style=\"background-color:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;padding:14px 12px;text-align:center;\">" +
-               "    <p style=\"margin:0 0 4px;font-size:11px;color:#6B7280;\">vs. mes anterior</p>" +
-               "    <p style=\"margin:0;font-size:22px;font-weight:700;color:" + color + ";\">" + arrow + " " + sign + diff + "</p>" +
-               "    <p style=\"margin:4px 0 0;font-size:11px;color:#9CA3AF;\">total interaccions</p>" +
-               "  </div>" +
-               "</td>";
+        return """
+            <td width="12%%" style="padding:0 4px;">
+              <div style="background-color:#F9FAFB;border:1px solid #E5E7EB;border-radius:10px;padding:14px 12px;text-align:center;">
+                <p style="margin:0 0 4px;font-size:11px;color:#6B7280;">vs. mes anterior</p>
+                <p style="margin:0;font-size:22px;font-weight:700;color:%s;">%s %s%d</p>
+                <p style="margin:4px 0 0;font-size:11px;color:#9CA3AF;">total interaccions</p>
+              </div>
+            </td>
+            """.formatted(color, arrow, sign, diff);
     }
 
     private int totalDiff(StadisticsModel m) {
@@ -276,21 +314,30 @@ public class StadisticsHtmlRenderer {
             cursor = end;
         }
 
-        return "<table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\">" +
-               "  <tr>" +
-               "    <td width=\"120\" align=\"center\">" +
-               "      <svg viewBox=\"0 0 130 130\" width=\"120\" height=\"120\" xmlns=\"http://www.w3.org/2000/svg\">" +
-               slices.toString() +
-               "        <circle cx=\"" + fmtDbl(cx) + "\" cy=\"" + fmtDbl(cy) + "\" r=\"35\" fill=\"#FFFFFF\"/>" +
-               "        <text x=\"" + fmtDbl(cx) + "\" y=\"" + fmtDbl(cy - 5) + "\" text-anchor=\"middle\" dominant-baseline=\"middle\" font-size=\"16\" font-weight=\"700\" fill=\"#1F2937\">" + total + "</text>" +
-               "        <text x=\"" + fmtDbl(cx) + "\" y=\"" + fmtDbl(cy + 11) + "\" text-anchor=\"middle\" font-size=\"9\" fill=\"#9CA3AF\">total</text>" +
-               "      </svg>" +
-               "    </td>" +
-               "    <td valign=\"middle\" style=\"padding-left:4px;\">" +
-               legends.toString() +
-               "    </td>" +
-               "  </tr>" +
-               "</table>";
+        return """
+            <table cellpadding="0" cellspacing="0" border="0" width="100%%">
+              <tr>
+                <td width="120" align="center">
+                  <svg viewBox="0 0 130 130" width="120" height="120" xmlns="http://www.w3.org/2000/svg">
+                    %s
+                    <circle cx="%s" cy="%s" r="35" fill="#FFFFFF"/>
+                    <text x="%s" y="%s" text-anchor="middle" dominant-baseline="middle" font-size="16" font-weight="700" fill="#1F2937">%d</text>
+                    <text x="%s" y="%s" text-anchor="middle" font-size="9" fill="#9CA3AF">total</text>
+                  </svg>
+                </td>
+                <td valign="middle" style="padding-left:4px;">
+                  %s
+                </td>
+              </tr>
+            </table>
+            """.formatted(
+                slices.toString(),
+                fmtDbl(cx), fmtDbl(cy),
+                fmtDbl(cx), fmtDbl(cy - 5),
+                total,
+                fmtDbl(cx), fmtDbl(cy + 11),
+                legends.toString()
+            );
     }
 
     // ─── File section ────────────────────────────────────────────────────────────
@@ -355,7 +402,7 @@ public class StadisticsHtmlRenderer {
         }
 
         StringBuilder sb = new StringBuilder();
-        sb.append("<table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%\" style=\"border-collapse:collapse;\">");
+        sb.append("<table cellpadding=\"0\" cellspacing=\"0\" border=\"0\" width=\"100%%\" style=\"border-collapse:collapse;\">");
 
         // Header row
         sb.append("<tr style=\"background-color:#F9FAFB;\">");
@@ -422,7 +469,6 @@ public class StadisticsHtmlRenderer {
     }
 
     private String getShortMonthLabel(String fullLabel) {
-        // Converts "Maig 2026" to "Mai" or just first 3 chars
         if (fullLabel == null || fullLabel.length() < 3) return fullLabel;
         return fullLabel.substring(0, 3);
     }
