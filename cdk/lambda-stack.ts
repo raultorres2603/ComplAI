@@ -578,6 +578,11 @@ export class LambdaStack extends cdk.Stack {
       memorySize: 512,
       timeout: cdk.Duration.seconds(60),
       environment: {
+        // OpenRouter API key for AI predictions in statistics reports
+        OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '',
+        OPENROUTER_REQUEST_TIMEOUT_SECONDS: process.env.OPENROUTER_REQUEST_TIMEOUT_SECONDS || '60',
+        OPENROUTER_OVERALL_TIMEOUT_SECONDS: process.env.OPENROUTER_OVERALL_TIMEOUT_SECONDS || '60',
+        OPENROUTER_MAX_RETRIES: process.env.OPENROUTER_MAX_RETRIES || '3',
         AWS_SES_FROM_EMAIL: process.env.SES_FROM_EMAIL || '',
         AWS_SES_TO_EMAIL_ELPRAT: process.env.SES_TO_EMAIL_ELPRAT || '',
         AWS_SES_REGION: process.env.AWS_SES_REGION || 'eu-west-1',
