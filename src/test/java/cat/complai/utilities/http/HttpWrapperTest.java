@@ -17,12 +17,10 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -72,15 +70,31 @@ public class HttpWrapperTest {
     }
 
     @Test
-    public void postToOpenRouterAsync_shouldReturnErrorOnNon2xx() throws Exception {
-        String body = "{\"error\":\"server failure\"}";
+    public void postToOpenRouterAsync_shouldRetryOn5xxAndSucceed() throws Exception {
+        // Server returns 500 on first call, 200 on retry - tests Micronaut's @Retryable behavior
+        String errorBody = "{\"error\":\"server failure\"}";
+        String successBody = "{\"choices\":[{\"message\":{\"content\":\"success\"}}]}";
+        AtomicInteger callCount = new AtomicInteger(0);
+
         HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
         server.createContext("/api/v1/chat/completions", exchange -> {
-            byte[] bytes = body.getBytes();
-            exchange.getResponseHeaders().add("Content-Type", "application/json");
-            exchange.sendResponseHeaders(500, bytes.length);
-            try (OutputStream os = exchange.getResponseBody()) {
-                os.write(bytes);
+            int count = callCount.incrementAndGet();
+            if (count == 1) {
+                // First call returns 500 - triggers retry
+                byte[] bytes = errorBody.getBytes();
+                exchange.getResponseHeaders().add("Content-Type", "application/json");
+                exchange.sendResponseHeaders(500, bytes.length);
+                try (OutputStream os = exchange.getResponseBody()) {
+                    os.write(bytes);
+                }
+            } else {
+                // Subsequent calls return 200 - success after retry
+                byte[] bytes = successBody.getBytes();
+                exchange.getResponseHeaders().add("Content-Type", "application/json");
+                exchange.sendResponseHeaders(200, bytes.length);
+                try (OutputStream os = exchange.getResponseBody()) {
+                    os.write(bytes);
+                }
             }
         });
         server.start();
@@ -95,13 +109,13 @@ public class HttpWrapperTest {
             HttpWrapper wrapper = ctx.getBean(HttpWrapper.class);
 
             var future = wrapper.postToOpenRouterAsync("prompt");
-            HttpDto dto = future.get(5, TimeUnit.SECONDS);
+            HttpDto dto = future.get(10, TimeUnit.SECONDS);
 
+            // After retry, should succeed
             assertNotNull(dto);
-            assertEquals(500, dto.statusCode());
-            assertNotNull(dto.error());
-            assertTrue(dto.error().contains("OpenRouter non-2xx response"));
-            assertEquals(body, dto.message());
+            assertEquals(200, dto.statusCode());
+            assertNotNull(dto.message());
+            assertTrue(dto.message().contains("success"));
         } finally {
             server.stop(0);
         }
@@ -337,39 +351,5 @@ public class HttpWrapperTest {
         }
     }
 
-    @Test
-    public void postToOpenRouterAsync_retryUsesDelayedExecutorWithoutBlockingSleep() throws Exception {
-        class ImmediateRetryWrapper extends HttpWrapper {
-            private final List<HttpDto> responses = new ArrayList<>(List.of(
-                    new HttpDto(null, 429, "POST", "OpenRouter non-2xx response: 429"),
-                    new HttpDto("retried-ok", 200, "POST", null)));
-            private final List<Long> recordedDelays = new ArrayList<>();
-
-            @Override
-            protected String resolveAuthHeader() {
-                return "Bearer test-key";
-            }
-
-            @Override
-            protected CompletableFuture<HttpDto> executeRequestAsync(Map<String, Object> payload, String authValue,
-                    int attemptNumber) {
-                return CompletableFuture.completedFuture(responses.remove(0));
-            }
-
-            @Override
-            protected Executor retryDelayExecutor(long delayMs) {
-                recordedDelays.add(delayMs);
-                return Runnable::run;
-            }
-        }
-
-        ImmediateRetryWrapper wrapper = new ImmediateRetryWrapper();
-        HttpDto dto = wrapper.postToOpenRouterAsync(List.of(Map.of("role", "user", "content", "prompt")))
-                .get(1, TimeUnit.SECONDS);
-
-        assertEquals(200, dto.statusCode());
-        assertEquals("retried-ok", dto.message());
-        assertEquals(1, wrapper.recordedDelays.size());
-        assertTrue(wrapper.recordedDelays.get(0) > 0);
-    }
+    // Test removed - old custom retry logic replaced with Micronaut's built-in @Retryable
 }
