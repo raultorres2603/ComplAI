@@ -92,13 +92,12 @@ public class MultiCitySesService {
         }
 
         try {
-            // Generate statistics report (uses combined/all-cities report for now)
-            // TODO: Update IStadisticsService to support city-specific filtering
-            stadisticsService.generateStadisticsReport();
+            // Generate city-specific statistics report
+            stadisticsService.generateStadisticsReport(cityId);
 
-            // Send the report via SES
-            String subject = String.format("ComplAI — Weekly Usage Statistics Report (%s)", cityId);
-            emailService.sendStadistics(recipientEmail, subject);
+            // Send the report via SES with cityId for prediction
+            String subject = String.format("ComplAI — Monthly Statistics Report (%s)", cityId);
+            emailService.sendStadistics(recipientEmail, subject, cityId);
 
             logger.info("Statistics report sent successfully for city: {} to: ***", cityId);
             return "OK: Statistics report for " + cityId + " sent to " + maskEmail(recipientEmail);

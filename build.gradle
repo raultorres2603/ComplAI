@@ -3,7 +3,7 @@ plugins {
     id("com.gradleup.shadow") version "8.3.9"
 }
 
-version = "0.9.8"
+version = "0.9.9"
 group = "cat.complai"
 
 repositories {
@@ -20,6 +20,8 @@ dependencies {
     implementation("io.micronaut.email:micronaut-email-amazon-ses")
     // Reactor support for SSE streaming on @Client interfaces (Publisher<String> return type)
     implementation("io.micronaut.reactor:micronaut-reactor")
+    // Micronaut retry support for declarative retry with @Retryable annotation
+    implementation("io.micronaut:micronaut-retry")
     // Micronaut JSON support via Jackson - provides JsonMapper bean
     implementation("io.micronaut:micronaut-jackson-databind")
     // micronaut-function-aws-api-proxy contains APIGatewayV2HTTPEventFunction,

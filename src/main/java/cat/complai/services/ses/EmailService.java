@@ -96,6 +96,30 @@ public class EmailService implements IEmailService {
      */
     @Override
     public void sendStadistics(String to, String subject) throws CloudWatchLogsException {
+        sendStadisticsWithCityId(to, subject, null);
+    }
+
+    /**
+     * Sends a statistics report email to the specified recipient with city-specific prediction.
+     *
+     * @param to      The recipient email address
+     * @param subject The email subject line
+     * @param cityId  The city identifier for prediction (null for all cities)
+     * @throws IllegalArgumentException if to or subject is invalid
+     */
+    public void sendStadistics(String to, String subject, String cityId) throws CloudWatchLogsException {
+        sendStadisticsWithCityId(to, subject, cityId);
+    }
+
+    /**
+     * Internal method to generate and send statistics report.
+     *
+     * @param to      The recipient email address
+     * @param subject The email subject line
+     * @param cityId  The city identifier for prediction (null for all cities)
+     * @throws CloudWatchLogsException if CloudWatch is unavailable
+     */
+    private void sendStadisticsWithCityId(String to, String subject, String cityId) throws CloudWatchLogsException {
         if (to == null || to.isBlank()) {
             logger.error("Recipient email address is required");
             throw new IllegalArgumentException("Recipient email address cannot be empty");
@@ -108,8 +132,19 @@ public class EmailService implements IEmailService {
 
         // Generate statistics report and render as polished HTML
         Instant now = Instant.now();
-        StadisticsModel body = stadisticsService.generateStadisticsReport();
-        String htmlBody = body.renderHtml(htmlRenderer, now);
+        StadisticsModel body;
+
+        // Use no-param version for backward compatibility when cityId is null
+        if (cityId == null) {
+            body = stadisticsService.generateStadisticsReport();
+        } else {
+            body = stadisticsService.generateStadisticsReport(cityId);
+        }
+
+        // Generate AI prediction if cityId is provided
+        String prediction = cityId != null ? stadisticsService.generatePrediction(body, cityId) : "";
+
+        String htmlBody = body.renderHtml(htmlRenderer, now, prediction);
 
         // Construct the SES email request
         logger.info("Preparing to send statistics report to: {}", maskEmail(to));

@@ -7,6 +7,7 @@ import cat.complai.exceptions.OpenRouterStreamingException;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import io.micronaut.context.annotation.Value;
+import io.micronaut.retry.annotation.Retryable;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
@@ -21,11 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.stream.Stream;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -154,7 +151,7 @@ public class HttpWrapper {
 
             logger.fine(() -> "postToOpenRouterAsync — sending POST to " + openRouterUrl
                     + " timeoutSeconds=" + requestTimeoutSeconds + " maxRetries=" + maxRetries);
-            return sendWithRetryMicronaut(payload, authValue, maxRetries);
+            return sendWithMicronautRetry(payload, authValue);
 
         } catch (Exception e) {
             logger.log(Level.SEVERE, "Failed preparing request to OpenRouter", e);
@@ -182,7 +179,7 @@ public class HttpWrapper {
             logger.fine(() -> "postToOpenRouterAsync (multi-turn) — sending POST to " + openRouterUrl
                     + " payloadSize=" + requestBody.length()
                     + " timeoutSeconds=" + requestTimeoutSeconds + " maxRetries=" + maxRetries);
-            return sendWithRetryMicronaut(payload, authValue, maxRetries);
+            return sendWithMicronautRetry(payload, authValue);
 
         } catch (Exception e) {
             logger.log(Level.SEVERE, "Failed preparing request to OpenRouter (multi-turn)", e);
@@ -191,9 +188,8 @@ public class HttpWrapper {
     }
 
     /**
-     * Sends request using Micronaut HTTP client and retries on transient failures.
-     * This replaces the old HttpClient-based implementation with Micronaut's
-     * managed client.
+     * Sends request using Micronaut HTTP client with built-in retry support.
+     * Uses Micronaut's @Retryable annotation for retry logic.
      *
      * <p>
      * Retried statuses:
@@ -203,107 +199,62 @@ public class HttpWrapper {
      * <li>{@code 5xx} — server-side errors</li>
      * </ul>
      * 4xx responses other than 429 are definitive client errors and are returned
-     * immediately.
-     * Network exceptions are also not retried — they are unlikely to self-heal
-     * within the same
-     * request lifecycle.
+     * immediately without retry.
      * </p>
      */
-    private CompletableFuture<HttpDto> sendWithRetryMicronaut(Map<String, Object> payload, String authValue,
-            int attemptsLeft) {
-        int attemptNumber = maxRetries - attemptsLeft + 1;
+    @Retryable(
+            attempts = "${OPENROUTER_MAX_RETRIES:3}",
+            delay = "250ms",
+            multiplier = "2.0"
+    )
+    CompletableFuture<HttpDto> sendWithMicronautRetry(Map<String, Object> payload, String authValue) {
+        try {
+            String responseBody = openRouterClient.chatCompletions(
+                    payload,
+                    authValue,
+                    headers.getOrDefault("HTTP-Referer", "https://complai.cat"),
+                    headers.getOrDefault("X-Title", "Complai"));
 
-        return performAsyncRequest(payload, authValue, attemptNumber, attemptsLeft);
-    }
+            String extracted = extractTextFromOpenRouterResponse(responseBody, mapper);
+            return CompletableFuture.completedFuture(new HttpDto(extracted, 200, "POST", null));
 
-    private CompletableFuture<HttpDto> performAsyncRequest(Map<String, Object> payload, String authValue,
-            int attemptNumber, int attemptsLeft) {
-        return executeRequestAsync(payload, authValue, attemptNumber)
-                .thenCompose(dto -> handleRetryIfNeeded(dto, payload, authValue, attemptNumber, attemptsLeft));
-    }
+        } catch (HttpClientResponseException e) {
+            int status = e.getStatus().getCode();
 
-    protected CompletableFuture<HttpDto> executeRequestAsync(Map<String, Object> payload, String authValue,
-            int attemptNumber) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                String responseBody = openRouterClient.chatCompletions(
-                        payload,
-                        authValue,
-                        headers.getOrDefault("HTTP-Referer", "https://complai.cat"),
-                        headers.getOrDefault("X-Title", "Complai"));
-
-                int bodyLength = responseBody == null ? 0 : responseBody.length();
-                logger.fine(() -> "OpenRouter response — bodyLength=" + bodyLength
-                        + " attempt=" + attemptNumber + "/" + maxRetries
-                        + " url=" + openRouterUrl);
-
-                // For Micronaut client, we assume 200 status on successful response
-                // HttpClientResponseException will be thrown for error status codes
-                String extracted = extractTextFromOpenRouterResponse(responseBody, mapper);
-                logger.fine(() -> "OpenRouter success — extractedLength=" + (extracted == null ? 0 : extracted.length())
-                        + " attempt=" + attemptNumber + "/" + maxRetries);
-                return new HttpDto(extracted, 200, "POST", null);
-
-            } catch (HttpClientResponseException e) {
-                int status = e.getStatus().getCode();
+            // Throw custom exception for retryable status codes (429 and 5xx)
+            // so Micronaut's @Retryable can catch and retry them
+            if (status == 429 || status >= 500) {
                 String body = e.getResponse().getBody(String.class).orElse("");
-                int bodyLength = body == null ? 0 : body.length();
-                logger.fine(() -> "OpenRouter error response — httpStatus=" + status
-                        + " bodyLength=" + bodyLength
-                        + " attempt=" + attemptNumber + "/" + maxRetries
-                        + " url=" + openRouterUrl);
-
-                logger.warning(() -> "OpenRouter non-2xx response — httpStatus=" + status
-                        + " attempt=" + attemptNumber + "/" + maxRetries
-                        + " url=" + openRouterUrl);
-                return new HttpDto(body, status, "POST", String.format("OpenRouter non-2xx response: %d", status));
-
-            } catch (Exception e) {
-                logger.log(Level.SEVERE, "OpenRouter request failed — attempt=" + attemptNumber + "/" + maxRetries
-                        + " url=" + openRouterUrl + " error=" + e.getMessage(), e);
-                return new HttpDto(null, null, "POST", e.getMessage());
+                logger.warning(() -> "OpenRouter retryable error — httpStatus=" + status + " url=" + openRouterUrl);
+                throw new RetryableHttpException(status, body);
             }
-        }, requestExecutor());
-    }
 
-    private CompletableFuture<HttpDto> handleRetryIfNeeded(HttpDto dto, Map<String, Object> payload,
-            String authValue, int attemptNumber, int attemptsLeft) {
-        if (shouldRetry(dto, attemptsLeft)) {
-            int status = dto.statusCode();
-            String reason = status == 429 ? "rate-limited" : "server error";
-            long delayMs = computeRetryDelayMillis(attemptNumber);
-            logger.warning(() -> "OpenRouter " + reason + " — httpStatus=" + status
-                    + " retrying attempt=" + (attemptNumber + 1) + "/" + maxRetries
-                    + " backoffMs=" + delayMs
-                    + " url=" + openRouterUrl);
+            // For non-retryable 4xx errors, return without throwing (no retry)
+            String body = e.getResponse().getBody(String.class).orElse("");
+            logger.warning(() -> "OpenRouter non-2xx response — httpStatus=" + status + " url=" + openRouterUrl);
+            return CompletableFuture.completedFuture(new HttpDto(body, status, "POST", String.format("OpenRouter non-2xx response: %d", status)));
 
-            return CompletableFuture.runAsync(() -> {
-            }, retryDelayExecutor(delayMs))
-                    .thenCompose(ignored -> performAsyncRequest(payload, authValue, attemptNumber + 1, attemptsLeft - 1));
+        } catch (Exception e) {
+            logger.log(Level.SEVERE, "OpenRouter request failed — url=" + openRouterUrl + " error=" + e.getMessage(), e);
+            return CompletableFuture.completedFuture(new HttpDto(null, null, "POST", e.getMessage()));
         }
-        return CompletableFuture.completedFuture(dto);
     }
 
-    protected Executor requestExecutor() {
-        return ForkJoinPool.commonPool();
-    }
+    /**
+     * Custom exception for HTTP errors that should be retried (429 rate limit, 5xx server errors).
+     * This exception triggers Micronaut's @Retryable retry mechanism.
+     */
+    static class RetryableHttpException extends RuntimeException {
+        private final int statusCode;
 
-    protected Executor retryDelayExecutor(long delayMs) {
-        return CompletableFuture.delayedExecutor(delayMs, TimeUnit.MILLISECONDS);
-    }
+        public RetryableHttpException(int statusCode, String message) {
+            super(message);
+            this.statusCode = statusCode;
+        }
 
-    protected long computeRetryDelayMillis(int attemptNumber) {
-        long baseDelayMs = 250L;
-        long expDelayMs = baseDelayMs * (1L << Math.min(attemptNumber - 1, 3));
-        long jitterMs = ThreadLocalRandom.current().nextLong(0, 150);
-        return Math.min(2000L, expDelayMs + jitterMs);
-    }
-
-    private boolean shouldRetry(HttpDto dto, int attemptsLeft) {
-        return dto != null
-                && dto.statusCode() != null
-                && (dto.statusCode() == 429 || dto.statusCode() >= 500)
-                && attemptsLeft > 1;
+        public int getStatusCode() {
+            return statusCode;
+        }
     }
 
     /**

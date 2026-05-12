@@ -418,7 +418,8 @@ class EmailServiceTest {
                 </html>
                 """;
         when(htmlRenderer.render(org.mockito.ArgumentMatchers.any(StadisticsModel.class),
-                org.mockito.ArgumentMatchers.any(java.time.Instant.class)))
+                org.mockito.ArgumentMatchers.any(java.time.Instant.class),
+                org.mockito.ArgumentMatchers.nullable(String.class)))
                 .thenReturn(renderedHtml);
 
         ArgumentCaptor<SendEmailRequest> requestCaptor = ArgumentCaptor.forClass(SendEmailRequest.class);

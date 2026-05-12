@@ -23,4 +23,13 @@ public interface IStadisticsService {
      */
     StadisticsModel generateStadisticsReport(String cityId) throws CloudWatchLogsException;
 
+    /**
+     * Generates an AI prediction based on yearly statistics data.
+     *
+     * @param model the statistics model with yearly data
+     * @param cityId the city identifier
+     * @return prediction text from AI, or fallback message on failure
+     */
+    String generatePrediction(StadisticsModel model, String cityId);
+
 }

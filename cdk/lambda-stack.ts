@@ -183,10 +183,9 @@ export class LambdaStack extends cdk.Stack {
     // Explicit log group so we control retention and can attach metric filters.
     // Lambda would create a log group automatically, but that gives us no control
     // over retention or any ability to reference it in CFN outputs.
-    // Production keeps logs longer for audit/compliance; development is kept short.
-    const logRetention = environment === 'production'
-      ? logs.RetentionDays.THREE_MONTHS
-      : logs.RetentionDays.ONE_WEEK;
+    // Both environments keep logs 1 year for audit/compliance and statistics retention.
+    // This stays within the CloudWatch Logs Free Tier (5GB/month ingestion + 5GB/month storage).
+    const logRetention = logs.RetentionDays.ONE_YEAR;
 
     const logGroup = new logs.LogGroup(this, `ComplAILogGroup-${environment}`, {
       // The Lambda runtime writes to /aws/lambda/<functionName> by convention.
@@ -194,11 +193,8 @@ export class LambdaStack extends cdk.Stack {
       // invocation and our metric filters are in place from day one.
       logGroupName: `/aws/lambda/ComplAILambda-${environment}`,
       retention: logRetention,
-      // Destroy the log group when the stack is torn down (development).
-      // Production retains logs independently of the stack for compliance.
-      removalPolicy: environment === 'production'
-        ? cdk.RemovalPolicy.RETAIN
-        : cdk.RemovalPolicy.DESTROY,
+      // Retain log groups in both environments for audit compliance and statistics.
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
     const lambdaFn = new lambda.Function(this, `ComplAILambda-${environment}`, {
@@ -386,17 +382,13 @@ export class LambdaStack extends cdk.Stack {
     const workerLogGroup = new logs.LogGroup(this, `ComplAIWorkerLogGroup-${environment}`, {
       logGroupName: `/aws/lambda/ComplAIRedactorLambda-${environment}`,
       retention: logRetention,
-      removalPolicy: environment === 'production'
-        ? cdk.RemovalPolicy.RETAIN
-        : cdk.RemovalPolicy.DESTROY,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
     const feedbackWorkerLogGroup = new logs.LogGroup(this, `ComplAIFeedbackWorkerLogGroup-${environment}`, {
       logGroupName: `/aws/lambda/ComplAIFeedbackWorkerLambda-${environment}`,
       retention: logRetention,
-      removalPolicy: environment === 'production'
-        ? cdk.RemovalPolicy.RETAIN
-        : cdk.RemovalPolicy.DESTROY,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
     const workerFn = new lambda.Function(this, `ComplAIRedactorLambda-${environment}`, {
@@ -574,9 +566,7 @@ export class LambdaStack extends cdk.Stack {
     const scheduledReportLogGroup = new logs.LogGroup(this, `ComplAIScheduledReportLogGroup-${environment}`, {
       logGroupName: `/aws/lambda/ComplAIScheduledReportLambda-${environment}`,
       retention: logRetention,
-      removalPolicy: environment === 'production'
-        ? cdk.RemovalPolicy.RETAIN
-        : cdk.RemovalPolicy.DESTROY,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
     });
 
     const scheduledReportFn = new lambda.Function(this, `ComplAIScheduledReportLambda-${environment}`, {
@@ -588,6 +578,11 @@ export class LambdaStack extends cdk.Stack {
       memorySize: 512,
       timeout: cdk.Duration.seconds(60),
       environment: {
+        // OpenRouter API key for AI predictions in statistics reports
+        OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '',
+        OPENROUTER_REQUEST_TIMEOUT_SECONDS: process.env.OPENROUTER_REQUEST_TIMEOUT_SECONDS || '60',
+        OPENROUTER_OVERALL_TIMEOUT_SECONDS: process.env.OPENROUTER_OVERALL_TIMEOUT_SECONDS || '60',
+        OPENROUTER_MAX_RETRIES: process.env.OPENROUTER_MAX_RETRIES || '3',
         AWS_SES_FROM_EMAIL: process.env.SES_FROM_EMAIL || '',
         AWS_SES_TO_EMAIL_ELPRAT: process.env.SES_TO_EMAIL_ELPRAT || '',
         AWS_SES_REGION: process.env.AWS_SES_REGION || 'eu-west-1',
