@@ -67,7 +67,9 @@ class OpenRouterServicesStreamTest {
                                 procedureContextService,
                                 promptBuilder,
                                 httpWrapper,
-                                objectMapper);
+                                objectMapper,
+                                null,
+                                null);
         }
 
         private List<String> collectStream(AskStreamResult result) {

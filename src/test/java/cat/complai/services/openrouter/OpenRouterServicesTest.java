@@ -41,7 +41,7 @@ public class OpenRouterServicesTest {
                 new EventRagHelperRegistry(), new RedactPromptBuilder());
         com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
         return new OpenRouterServices(validationService, conversationService, aiResponseService,
-                procedureContextService, new RedactPromptBuilder(), wrapper, objectMapper);
+                procedureContextService, new RedactPromptBuilder(), wrapper, objectMapper, null, null);
     }
 
     // Flexible fake wrapper that simulates all test scenarios based on the last
@@ -249,7 +249,7 @@ public class OpenRouterServicesTest {
                 new EventRagHelperRegistry(), new RedactPromptBuilder());
         com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
         OpenRouterServices svc = new OpenRouterServices(validationService, conversationService, aiResponseService,
-                procedureContextService, new RedactPromptBuilder(), wrapper, objectMapper);
+                procedureContextService, new RedactPromptBuilder(), wrapper, objectMapper, null, null);
 
         OpenRouterResponseDto out = svc.redactComplaint("   ", OutputFormat.JSON, null, null, "testcity");
         assertFalse(out.isSuccess());

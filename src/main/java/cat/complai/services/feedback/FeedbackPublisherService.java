@@ -1,10 +1,13 @@
 package cat.complai.services.feedback;
 
+import cat.complai.config.CivicVocabularyConfig;
 import cat.complai.controllers.feedback.dto.FeedbackAcceptedDto;
 import cat.complai.controllers.feedback.dto.FeedbackRequest;
 import cat.complai.dto.feedback.FeedbackErrorCode;
 import cat.complai.dto.feedback.FeedbackResult;
 import cat.complai.dto.feedback.FeedbackSqsMessage;
+import cat.complai.helpers.openrouter.CivicVocabularyService;
+import cat.complai.helpers.openrouter.LanguageDetector;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.context.annotation.Value;
 import jakarta.inject.Inject;
@@ -43,6 +46,8 @@ public class FeedbackPublisherService {
     private final ObjectMapper mapper;
     private final int maxMessageLength;
     private final int maxUsernameLength;
+    private final CivicVocabularyService civicVocabularyService;
+    private final CivicVocabularyConfig civicVocabularyConfig;
 
     private final Logger logger = Logger.getLogger(FeedbackPublisherService.class.getName());
 
@@ -52,11 +57,15 @@ public class FeedbackPublisherService {
             @Value("${feedback.queue-region:eu-west-1}") String queueRegion,
             @Value("${AWS_ENDPOINT_URL:}") String endpointUrl,
             @Value("${feedback.max-message-length:5000}") int maxMessageLength,
-            @Value("${feedback.max-username-length:200}") int maxUsernameLength) {
+            @Value("${feedback.max-username-length:200}") int maxUsernameLength,
+            CivicVocabularyService civicVocabularyService,
+            CivicVocabularyConfig civicVocabularyConfig) {
         this.queueUrl = queueUrl;
         this.mapper = new ObjectMapper();
         this.maxMessageLength = maxMessageLength;
         this.maxUsernameLength = maxUsernameLength;
+        this.civicVocabularyService = civicVocabularyService;
+        this.civicVocabularyConfig = civicVocabularyConfig;
         SqsClientBuilder builder = SqsClient.builder().region(Region.of(queueRegion));
         if (endpointUrl != null && !endpointUrl.isBlank()) {
             builder.endpointOverride(URI.create(endpointUrl));
@@ -73,6 +82,8 @@ public class FeedbackPublisherService {
         this.mapper = new ObjectMapper();
         this.maxMessageLength = 5000;
         this.maxUsernameLength = 200;
+        this.civicVocabularyService = null;
+        this.civicVocabularyConfig = null;
     }
 
     /**
@@ -121,6 +132,24 @@ public class FeedbackPublisherService {
                 + " city=" + city + " userName=" + request.userName());
 
         try {
+            // Expand message with civic vocabulary for better processing
+            String expandedMessage = request.message();
+            if (civicVocabularyConfig != null && civicVocabularyService != null
+                    && civicVocabularyConfig.isEnabled() && request.message() != null) {
+                String detectedLang = LanguageDetector.detect(request.message());
+                if (!"CA".equalsIgnoreCase(detectedLang)) {
+                    String vocabLang = switch (detectedLang.toUpperCase()) {
+                        case "EN" -> "en";
+                        case "ES" -> "es";
+                        case "FR" -> "fr";
+                        default -> null;
+                    };
+                    if (vocabLang != null) {
+                        expandedMessage = civicVocabularyService.expandQuery(request.message(), vocabLang);
+                    }
+                }
+            }
+
             // Build and serialize the SQS message
             FeedbackSqsMessage sqsMessage = new FeedbackSqsMessage(
                     feedbackId,
@@ -128,7 +157,7 @@ public class FeedbackPublisherService {
                     city,
                     request.userName(),
                     request.idUser(),
-                    request.message());
+                    expandedMessage);
 
             String messageBody = mapper.writeValueAsString(sqsMessage);
 

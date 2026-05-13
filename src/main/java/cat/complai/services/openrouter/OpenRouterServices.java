@@ -2,6 +2,8 @@ package cat.complai.services.openrouter;
 
 import cat.complai.utilities.http.HttpWrapper;
 import cat.complai.dto.http.OpenRouterStreamStartResult;
+import cat.complai.config.CivicVocabularyConfig;
+import cat.complai.helpers.openrouter.CivicVocabularyService;
 import cat.complai.services.openrouter.validation.InputValidationService;
 import cat.complai.services.openrouter.conversation.ConversationManagementService;
 import cat.complai.services.openrouter.ai.AiResponseProcessingService;
@@ -72,6 +74,8 @@ public class OpenRouterServices implements IOpenRouterService {
     private final HttpWrapper httpWrapper;
     private final ObjectMapper objectMapper;
     private final ExecutorService ragExecutor;
+    private final CivicVocabularyService civicVocabularyService;
+    private final CivicVocabularyConfig civicVocabularyConfig;
 
     /**
      * Estimates token count for text using OpenAI's rule of thumb: ~1 token per 4
@@ -194,7 +198,9 @@ public class OpenRouterServices implements IOpenRouterService {
             ProcedureContextService procedureContextService,
             RedactPromptBuilder promptBuilder,
             HttpWrapper httpWrapper,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            CivicVocabularyService civicVocabularyService,
+            CivicVocabularyConfig civicVocabularyConfig) {
         this.validationService = validationService;
         this.conversationService = conversationService;
         this.aiResponseService = aiResponseService;
@@ -203,6 +209,8 @@ public class OpenRouterServices implements IOpenRouterService {
         this.httpWrapper = httpWrapper;
         this.objectMapper = objectMapper;
         this.ragExecutor = createRagExecutor();
+        this.civicVocabularyService = civicVocabularyService;
+        this.civicVocabularyConfig = civicVocabularyConfig;
     }
 
     @PreDestroy
@@ -455,6 +463,26 @@ public class OpenRouterServices implements IOpenRouterService {
             return validationError.get();
         }
 
+        // Expand complaint with civic vocabulary for better RAG retrieval
+        String expandedComplaint = complaint;
+        if (civicVocabularyConfig != null && civicVocabularyService != null
+                && civicVocabularyConfig.isEnabled() && complaint != null && !complaint.isBlank()) {
+            String detectedLang = LanguageDetector.detect(complaint);
+            if (!"CA".equalsIgnoreCase(detectedLang)) {
+                String vocabLang = switch (detectedLang.toUpperCase()) {
+                    case "EN" -> "en";
+                    case "ES" -> "es";
+                    case "FR" -> "fr";
+                    default -> null;
+                };
+                if (vocabLang != null) {
+                    expandedComplaint = civicVocabularyService.expandQuery(complaint, vocabLang);
+                    log.debug("redactComplaint() expanded complaint with civic vocabulary — originalLength={} expandedLength={}",
+                            complaint.length(), expandedComplaint.length());
+                }
+            }
+        }
+
         List<Map<String, Object>> messages = new ArrayList<>();
         messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage(cityId)));
 
@@ -463,7 +491,7 @@ public class OpenRouterServices implements IOpenRouterService {
         String contextBlock;
         boolean hasCompleteIdentity = identity != null && identity.isComplete();
         if (hasCompleteIdentity) {
-            contextBlock = promptBuilder.buildProcedureContextBlock(complaint, cityId);
+            contextBlock = promptBuilder.buildProcedureContextBlock(expandedComplaint, cityId);
             if (contextBlock != null) {
                 messages.add(Map.of("role", "system", "content", contextBlock));
             }
