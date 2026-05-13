@@ -54,7 +54,7 @@ public class S3FeedbackLister {
 
         if (endpointUrl != null && !endpointUrl.isBlank()) {
             URI endpoint = URI.create(endpointUrl);
-            clientBuilder.endpointOverride(endpoint);
+            clientBuilder.endpointOverride(endpoint).forcePathStyle(true);
             presignerBuilder.endpointOverride(endpoint);
         }
 

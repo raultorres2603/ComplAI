@@ -38,7 +38,7 @@ public class S3FeedbackUploader {
         this.bucketName = bucketName;
         S3ClientBuilder builder = S3Client.builder().region(Region.of(bucketRegion));
         if (endpointUrl != null && !endpointUrl.isBlank()) {
-            builder.endpointOverride(URI.create(endpointUrl));
+            builder.endpointOverride(URI.create(endpointUrl)).forcePathStyle(true);
         }
         this.s3Client = builder.build();
     }

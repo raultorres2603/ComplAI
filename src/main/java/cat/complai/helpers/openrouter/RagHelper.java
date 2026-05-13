@@ -530,7 +530,7 @@ public class RagHelper<T> {
                                             .build());
 
             if (endpointUrl != null && !endpointUrl.isBlank()) {
-                clientBuilder.endpointOverride(URI.create(endpointUrl));
+                clientBuilder.endpointOverride(URI.create(endpointUrl)).forcePathStyle(true);
             }
 
             try (software.amazon.awssdk.services.s3.S3Client s3 = clientBuilder.build()) {
