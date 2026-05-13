@@ -33,6 +33,9 @@ create_bucket() {
 create_bucket "complai-local"
 create_bucket "complai-complaints-local"
 create_bucket "complai-feedback-local"
+create_bucket "complai-news-local"
+create_bucket "complai-events-local"
+create_bucket "complai-cityinfo-local"
 
 # ---- SQS queues ----------------------------------------------------------------
 

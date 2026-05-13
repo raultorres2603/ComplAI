@@ -51,7 +51,7 @@ Globals:
     Environment:
       Variables:
         OPENROUTER_API_KEY: !Ref OpenRouterApiKey
-        AWS_ENDPOINT_URL: "http://localhost:4566"
+        AWS_ENDPOINT_URL: "http://host.docker.internal:4566"
         COMPLAINTS_REGION: !Ref LambdaRegion
         AWS_SES_REGION: !Ref SesRegion
         AWS_SES_FROM_EMAIL: !Ref SesFromEmail
@@ -187,6 +187,44 @@ Resources:
             ExpirationInDays: 365
       DeletionPolicy: Retain
 
+  EventsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub complai-events-${Environment}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Status: Enabled
+            ExpirationInDays: 365
+      DeletionPolicy: Retain
+
+  CityInfoBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub complai-cityinfo-${Environment}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Status: Enabled
+            ExpirationInDays: 365
+      DeletionPolicy: Retain
+
   ComplaintsBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -277,7 +315,7 @@ Resources:
           OPENROUTER_REQUEST_TIMEOUT_SECONDS: "60"
           OPENROUTER_OVERALL_TIMEOUT_SECONDS: "60"
           OPENROUTER_MAX_RETRIES: "3"
-          OPENROUTER_MODEL: google/gemma-3-12b-it:free
+          OPENROUTER_MODEL: openrouter/free
           API_KEY_ENABLED: 'true'
           API_KEY_ELPRAT: !Ref ApiKeyElprat
           REDACT_QUEUE_URL: !Ref RedactQueue
@@ -288,6 +326,12 @@ Resources:
           COMPLAI_DEFAULT_CITY_ID: elprat
           AWS_SES_REGION: !Ref LambdaRegion
           AWS_SES_FROM_EMAIL: !Ref SesFromEmail
+          EVENTS_BUCKET: !Ref EventsBucket
+          EVENTS_REGION: !Ref LambdaRegion
+          CITYINFO_BUCKET: !Ref CityInfoBucket
+          CITYINFO_REGION: !Ref LambdaRegion
+          FEEDBACK_BUCKET_NAME: !Ref FeedbackBucket
+          AWS_SES_TO_EMAIL_ELPRAT: !Ref SesToEmailElprat
 
       Events:
         ProxyRoot:
@@ -305,7 +349,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ../build/libs/complai-all.jar
-      Handler: cat.complai.worker.RedactWorkerHandler::handleRequest
+      Handler: cat.complai.services.worker.RedactWorkerHandler::handleRequest
       Runtime: java25
       Architectures: [x86_64]
       MemorySize: 1024
@@ -317,7 +361,7 @@ Resources:
           OPENROUTER_REQUEST_TIMEOUT_SECONDS: "60"
           OPENROUTER_OVERALL_TIMEOUT_SECONDS: "60"
           OPENROUTER_MAX_RETRIES: "3"
-          OPENROUTER_MODEL: google/gemma-3-12b-it:free
+          OPENROUTER_MODEL: openrouter/free
           COMPLAINTS_BUCKET: !Ref ComplaintsBucket
           COMPLAINTS_REGION: !Ref LambdaRegion
           PROCEDURES_BUCKET: !Ref ProceduresBucket
@@ -327,6 +371,10 @@ Resources:
           AWS_ENDPOINT_URL: "http://host.docker.internal:4566"
           AWS_SES_REGION: !Ref LambdaRegion
           AWS_SES_FROM_EMAIL: !Ref SesFromEmail
+          EVENTS_BUCKET: !Ref EventsBucket
+          EVENTS_REGION: !Ref LambdaRegion
+          CITYINFO_BUCKET: !Ref CityInfoBucket
+          CITYINFO_REGION: !Ref LambdaRegion
       Events:
         SQSTrigger:
           Type: SQS
@@ -340,7 +388,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ../build/libs/complai-all.jar
-      Handler: cat.complai.feedback.worker.FeedbackWorkerHandler::handleRequest
+      Handler: cat.complai.services.worker.FeedbackWorkerHandler::handleRequest
       Runtime: java25
       Architectures: [x86_64]
       MemorySize: 512
@@ -362,23 +410,6 @@ Resources:
             BatchSize: 1
             FunctionResponseTypes:
               - ReportBatchItemFailures
-
-  ComplAIScheduledReportFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: ../build/libs/complai-all.jar
-      Handler: cat.complai.services.ses.SesScheduledReportHandler::handleRequest
-      Runtime: java25
-      Architectures: [x86_64]
-      MemorySize: 512
-      Timeout: 60
-      Role: !GetAtt ComplAIScheduledReportRole.Arn
-      Environment:
-        Variables:
-          AWS_ENDPOINT_URL: "http://host.docker.internal:4566"
-          AWS_SES_REGION: !Ref LambdaRegion
-          AWS_SES_FROM_EMAIL: !Ref SesFromEmail
-          SES_REPORTING_ENABLED: !Ref SesReportingEnabled
 
   # IAM Policy for the scheduled report role — inline (SAM doesn't support managed policy for custom role)
   ComplAIScheduledReportPolicy:
@@ -440,6 +471,15 @@ Resources:
           EVENTS_BUCKET: !Ref EventsBucket
           COMPLAINTS_BUCKET: !Ref ComplaintsBucket
           FEEDBACK_BUCKET_NAME: !Ref FeedbackBucket
+          OPENROUTER_API_KEY: !Ref OpenRouterApiKey
+          ENVIRONMENT: !Ref Environment
+          API_KEY_ELPRAT: !Ref ApiKeyElprat
+          AWS_SES_TO_EMAIL_ELPRAT: !Ref SesToEmailElprat
+          NEWS_BUCKET: !Ref NewsBucket
+          NEWS_REGION: !Ref LambdaRegion
+          CITYINFO_BUCKET: !Ref CityInfoBucket
+          CITYINFO_REGION: !Ref LambdaRegion
+          EVENTS_REGION: !Ref LambdaRegion
       Events:
         ScheduledReport:
           Type: Schedule
