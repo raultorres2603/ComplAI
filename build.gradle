@@ -16,6 +16,7 @@ dependencies {
     testImplementation("org.mockito:mockito-junit-jupiter:5.2.0")
     implementation("com.amazonaws:aws-lambda-java-events")
     implementation("software.amazon.awssdk:cloudwatchlogs:2.25.x") // Use the latest 2.x version
+    implementation("software.amazon.awssdk:cloudwatch:2.25.x") // CloudWatch Metrics (putMetricData, getMetricStatistics)
     implementation("io.micronaut:micronaut-http-client")
     implementation("io.micronaut.email:micronaut-email-amazon-ses")
     // Reactor support for SSE streaming on @Client interfaces (Publisher<String> return type)

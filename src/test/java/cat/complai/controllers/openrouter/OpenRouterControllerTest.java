@@ -14,6 +14,7 @@ import cat.complai.services.openrouter.IOpenRouterService;
 import cat.complai.controllers.openrouter.dto.AskRequest;
 import cat.complai.controllers.openrouter.dto.RedactRequest;
 import cat.complai.dto.openrouter.OutputFormat;
+import cat.complai.utilities.metrics.InteractionMetricsPublisher;
 import cat.complai.utilities.s3.S3PdfUploader;
 import cat.complai.utilities.sqs.SqsComplaintPublisher;
 import cat.complai.dto.sqs.RedactSqsMessage;
@@ -206,6 +207,13 @@ public class OpenRouterControllerTest {
         }
     };
 
+    /** No-op metrics publisher — accepts calls silently. */
+    static final InteractionMetricsPublisher NOOP_METRICS = new InteractionMetricsPublisher() {
+        @Override
+        public void publishInteraction(String operation, String cityId, boolean success, long latencyMs) {
+            /* no-op */ }
+    };
+
     // -------------------------------------------------------------------------
     // ask() tests
     // -------------------------------------------------------------------------
@@ -213,7 +221,7 @@ public class OpenRouterControllerTest {
     @Test
     void ask_success_returns200() {
         OpenRouterController c = new OpenRouterController(new FakeServiceSuccess(), ASSERT_NOT_CALLED_PUBLISHER,
-                ASSERT_NOT_CALLED_UPLOADER, null);
+                ASSERT_NOT_CALLED_UPLOADER, NOOP_METRICS, null);
         HttpResponse<?> raw = c.ask(new AskRequest("Is there a recycling center?"), requestWithCity("testcity"));
         @SuppressWarnings("unchecked")
         org.reactivestreams.Publisher<Event<String>> publisher = (org.reactivestreams.Publisher<Event<String>>) raw
@@ -227,7 +235,7 @@ public class OpenRouterControllerTest {
     @Test
     void ask_refuse_returns422() {
         OpenRouterController c = new OpenRouterController(new FakeServiceRefuse(), ASSERT_NOT_CALLED_PUBLISHER,
-                ASSERT_NOT_CALLED_UPLOADER, null);
+                ASSERT_NOT_CALLED_UPLOADER, NOOP_METRICS, null);
         HttpResponse<?> raw = c.ask(new AskRequest("What's the capital of France?"), requestWithCity("testcity"));
         @SuppressWarnings("unchecked")
         org.reactivestreams.Publisher<Event<String>> publisher = (org.reactivestreams.Publisher<Event<String>>) raw
@@ -241,7 +249,7 @@ public class OpenRouterControllerTest {
     @Test
     void ask_upstream_returns502() {
         OpenRouterController c = new OpenRouterController(new FakeServiceUpstream(), ASSERT_NOT_CALLED_PUBLISHER,
-                ASSERT_NOT_CALLED_UPLOADER, null);
+                ASSERT_NOT_CALLED_UPLOADER, NOOP_METRICS, null);
         HttpResponse<?> raw = c.ask(new AskRequest("Is there a recycling center?"), requestWithCity("testcity"));
         assertEquals(502, raw.getStatus().getCode());
         Object body = raw.getBody().orElseThrow();
@@ -260,7 +268,7 @@ public class OpenRouterControllerTest {
     void redact_success_returns200() {
         // No identity → sync path → SQS/S3 must not be called.
         OpenRouterController c = new OpenRouterController(new FakeServiceSuccess(), ASSERT_NOT_CALLED_PUBLISHER,
-                ASSERT_NOT_CALLED_UPLOADER, null);
+                ASSERT_NOT_CALLED_UPLOADER, NOOP_METRICS, null);
         HttpResponse<?> raw = c.redact(new RedactRequest("Noise from the airport"), requestWithCity("testcity"));
         assertEquals(200, raw.getStatus().getCode());
         OpenRouterPublicDto body = (OpenRouterPublicDto) raw.getBody().get();
@@ -272,7 +280,7 @@ public class OpenRouterControllerTest {
     @Test
     void redact_refuse_returns422() {
         OpenRouterController c = new OpenRouterController(new FakeServiceRefuse(), ASSERT_NOT_CALLED_PUBLISHER,
-                ASSERT_NOT_CALLED_UPLOADER, null);
+                ASSERT_NOT_CALLED_UPLOADER, NOOP_METRICS, null);
         HttpResponse<?> raw = c.redact(new RedactRequest("How to cook paella?"), requestWithCity("testcity"));
         assertEquals(422, raw.getStatus().getCode());
     }
@@ -280,7 +288,7 @@ public class OpenRouterControllerTest {
     @Test
     void redact_upstream_returns502() {
         OpenRouterController c = new OpenRouterController(new FakeServiceUpstream(), ASSERT_NOT_CALLED_PUBLISHER,
-                ASSERT_NOT_CALLED_UPLOADER, null);
+                ASSERT_NOT_CALLED_UPLOADER, NOOP_METRICS, null);
         HttpResponse<?> raw = c.redact(new RedactRequest("Noise from the airport"), requestWithCity("testcity"));
         assertEquals(502, raw.getStatus().getCode());
     }
@@ -288,7 +296,7 @@ public class OpenRouterControllerTest {
     @Test
     void redact_unsupportedFormat_returns400WithClearMessage() {
         OpenRouterController c = new OpenRouterController(new FakeServiceSuccess(), ASSERT_NOT_CALLED_PUBLISHER,
-                ASSERT_NOT_CALLED_UPLOADER, null);
+                ASSERT_NOT_CALLED_UPLOADER, NOOP_METRICS, null);
         HttpResponse<?> raw = c.redact(new RedactRequest("Noise from the airport", null), requestWithCity("testcity"));
         assertEquals(400, raw.getStatus().getCode());
         OpenRouterPublicDto body = (OpenRouterPublicDto) raw.getBody().get();
@@ -301,7 +309,7 @@ public class OpenRouterControllerTest {
     @Test
     void redact_anonymousRequest_returns400() {
         OpenRouterController c = new OpenRouterController(new FakeServiceRejectAnonymous(), ASSERT_NOT_CALLED_PUBLISHER,
-                ASSERT_NOT_CALLED_UPLOADER, null);
+                ASSERT_NOT_CALLED_UPLOADER, NOOP_METRICS, null);
         HttpResponse<?> raw = c.redact(new RedactRequest("Noise from the airport. I want to be anonymous."),
                 requestWithCity("testcity"));
         assertEquals(400, raw.getStatus().getCode());
@@ -314,7 +322,7 @@ public class OpenRouterControllerTest {
     @Test
     void redact_missingIdentity_returns200WithQuestion() {
         OpenRouterController c = new OpenRouterController(new FakeServiceRequestsIdentity(),
-                ASSERT_NOT_CALLED_PUBLISHER, ASSERT_NOT_CALLED_UPLOADER, null);
+                ASSERT_NOT_CALLED_PUBLISHER, ASSERT_NOT_CALLED_UPLOADER, NOOP_METRICS, null);
         HttpResponse<?> raw = c.redact(new RedactRequest("Noise from the airport"), requestWithCity("testcity"));
         assertEquals(200, raw.getStatus().getCode());
         OpenRouterPublicDto body = (OpenRouterPublicDto) raw.getBody().get();
@@ -330,7 +338,7 @@ public class OpenRouterControllerTest {
     @Test
     void redact_completeIdentityAndPdfFormat_returns202WithPdfUrl() {
         OpenRouterController c = new OpenRouterController(new FakeServiceSuccess(), NOOP_PUBLISHER, FIXED_URL_UPLOADER,
-                null);
+                NOOP_METRICS, null);
         RedactRequest req = RedactRequest.fromJson("Noise from the airport", "pdf", null, "Joan", "Garcia",
                 "12345678A");
         HttpResponse<?> raw = c.redact(req, requestWithCity("testcity"));
@@ -346,7 +354,7 @@ public class OpenRouterControllerTest {
     @Test
     void redact_asyncPath_sqsPublishFailure_returns500() {
         OpenRouterController c = new OpenRouterController(new FakeServiceSuccess(), FAILING_PUBLISHER,
-                FIXED_URL_UPLOADER, null);
+                FIXED_URL_UPLOADER, NOOP_METRICS, null);
         RedactRequest req = RedactRequest.fromJson("Noise from the airport", "pdf", null, "Joan", "Garcia",
                 "12345678A");
         HttpResponse<?> raw = c.redact(req, requestWithCity("testcity"));
@@ -361,7 +369,7 @@ public class OpenRouterControllerTest {
     void redact_asyncPath_validationFailure_returns400() {
         // Anonymity check is run before SQS publish; result must be 400, not 202.
         OpenRouterController c = new OpenRouterController(new FakeServiceRejectAnonymous(), ASSERT_NOT_CALLED_PUBLISHER,
-                FIXED_URL_UPLOADER, null);
+                FIXED_URL_UPLOADER, NOOP_METRICS, null);
         // Complete identity BUT anonymous request — validation must short-circuit.
         RedactRequest req = RedactRequest.fromJson("I want to be anonymous.", "pdf", null, "Joan", "Garcia",
                 "12345678A");
@@ -376,7 +384,7 @@ public class OpenRouterControllerTest {
     @Test
     void redact_jsonFormat_returns400() {
         OpenRouterController c = new OpenRouterController(new FakeServiceSuccess(), ASSERT_NOT_CALLED_PUBLISHER,
-                ASSERT_NOT_CALLED_UPLOADER, null);
+                ASSERT_NOT_CALLED_UPLOADER, NOOP_METRICS, null);
         RedactRequest req = RedactRequest.fromJson("Noise from the airport", "json", null, null, null, null);
         HttpResponse<?> raw = c.redact(req, requestWithCity("testcity"));
         assertEquals(400, raw.getStatus().getCode());
@@ -389,7 +397,7 @@ public class OpenRouterControllerTest {
     @Test
     void redact_autoFormat_returns400() {
         OpenRouterController c = new OpenRouterController(new FakeServiceSuccess(), ASSERT_NOT_CALLED_PUBLISHER,
-                ASSERT_NOT_CALLED_UPLOADER, null);
+                ASSERT_NOT_CALLED_UPLOADER, NOOP_METRICS, null);
         RedactRequest req = RedactRequest.fromJson("Noise from the airport", "auto", null, null, null, null);
         HttpResponse<?> raw = c.redact(req, requestWithCity("testcity"));
         assertEquals(400, raw.getStatus().getCode());
@@ -402,7 +410,7 @@ public class OpenRouterControllerTest {
     @Test
     void redact_nullFormat_defaultsToPdfAndRoutes202() {
         OpenRouterController c = new OpenRouterController(new FakeServiceSuccess(), NOOP_PUBLISHER, FIXED_URL_UPLOADER,
-                null);
+                NOOP_METRICS, null);
         RedactRequest req = RedactRequest.fromJson("Noise from the airport", null, null, "Joan", "Garcia", "12345678A");
         HttpResponse<?> raw = c.redact(req, requestWithCity("testcity"));
         assertEquals(202, raw.getStatus().getCode());
@@ -452,7 +460,7 @@ public class OpenRouterControllerTest {
         OidcIdentityTokenValidator validator = validatorThatReturns(idpIdentity);
 
         OpenRouterController c = new OpenRouterController(
-                new FakeServiceSuccess(), NOOP_PUBLISHER, FIXED_URL_UPLOADER, validator);
+                new FakeServiceSuccess(), NOOP_PUBLISHER, FIXED_URL_UPLOADER, NOOP_METRICS, validator);
 
         // No identity in the body — the token fills it in.
         HttpRequest<?> req = requestWithCityAndIdentityToken("testcity", "valid.token.here");
@@ -473,7 +481,7 @@ public class OpenRouterControllerTest {
         OidcIdentityTokenValidator validator = validatorThatThrows("Identity token has expired");
 
         OpenRouterController c = new OpenRouterController(
-                new FakeServiceSuccess(), ASSERT_NOT_CALLED_PUBLISHER, ASSERT_NOT_CALLED_UPLOADER, validator);
+                new FakeServiceSuccess(), ASSERT_NOT_CALLED_PUBLISHER, ASSERT_NOT_CALLED_UPLOADER, NOOP_METRICS, validator);
 
         HttpRequest<?> req = requestWithCityAndIdentityToken("testcity", "expired.token.here");
         HttpResponse<?> raw = c.redact(new RedactRequest("Noise from the airport"), req);
@@ -493,7 +501,7 @@ public class OpenRouterControllerTest {
         // The request has no body identity fields either → sync path (AI asks for
         // identity).
         OpenRouterController c = new OpenRouterController(
-                new FakeServiceRequestsIdentity(), ASSERT_NOT_CALLED_PUBLISHER, ASSERT_NOT_CALLED_UPLOADER, null);
+                new FakeServiceRequestsIdentity(), ASSERT_NOT_CALLED_PUBLISHER, ASSERT_NOT_CALLED_UPLOADER, NOOP_METRICS, null);
 
         HttpRequest<?> req = requestWithCityAndIdentityToken("testcity", "some.token.here");
         HttpResponse<?> raw = c.redact(new RedactRequest("Noise from the airport"), req);
@@ -514,7 +522,7 @@ public class OpenRouterControllerTest {
         OidcIdentityTokenValidator validator = validatorThatReturns(idpIdentity);
 
         OpenRouterController c = new OpenRouterController(
-                new FakeServiceSuccess(), ASSERT_NOT_CALLED_PUBLISHER, ASSERT_NOT_CALLED_UPLOADER, validator);
+                new FakeServiceSuccess(), ASSERT_NOT_CALLED_PUBLISHER, ASSERT_NOT_CALLED_UPLOADER, NOOP_METRICS, validator);
 
         // Body has complete identity, no X-Identity-Token header
         RedactRequest bodyReq = RedactRequest.fromJson("Noise", "pdf", null, "Maria", "Garcia", "87654321B");
@@ -538,7 +546,7 @@ public class OpenRouterControllerTest {
         OidcIdentityTokenValidator validator = validatorThatReturns(idpIdentity);
 
         OpenRouterController c = new OpenRouterController(
-                new FakeServiceSuccess(), ASSERT_NOT_CALLED_PUBLISHER, ASSERT_NOT_CALLED_UPLOADER, validator);
+                new FakeServiceSuccess(), ASSERT_NOT_CALLED_PUBLISHER, ASSERT_NOT_CALLED_UPLOADER, NOOP_METRICS, validator);
 
         // Use requestWithCity (no header) to simulate absent/blank token — Netty
         // does not allow setting an empty header value, but the controller sees null
@@ -572,7 +580,7 @@ public class OpenRouterControllerTest {
         };
 
         OpenRouterController c = new OpenRouterController(
-                new FakeServiceSuccess(), capturingPublisher, FIXED_URL_UPLOADER, validator);
+                new FakeServiceSuccess(), capturingPublisher, FIXED_URL_UPLOADER, NOOP_METRICS, validator);
 
         // Body has conflicting identity fields
         RedactRequest bodyReq = RedactRequest.fromJson("Noise", "pdf", null, "FAKE", "IMPOSTOR", "00000000X");
