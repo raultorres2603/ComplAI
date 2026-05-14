@@ -403,7 +403,7 @@ public class HttpWrapperTest {
             var dto2 = wrapper.postToOpenRouterAsync("prompt").get(5, TimeUnit.SECONDS);
             assertNull(dto2.statusCode());
             assertEquals(OpenRouterErrorCode.CIRCUIT_OPEN, dto2.errorCode());
-            assertTrue(dto2.message().contains("no està disponible"));
+            assertTrue(dto2.error().contains("no està disponible"));
             // No additional HTTP calls
             assertEquals(1, openRouterCallCount.get());
         } finally {

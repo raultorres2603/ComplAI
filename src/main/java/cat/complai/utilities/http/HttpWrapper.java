@@ -100,7 +100,7 @@ public class HttpWrapper {
     @Inject
     public HttpWrapper(OpenRouterClient openRouterClient,
             @Client("${openrouter.url:https://openrouter.ai}") StreamingHttpClient streamingClient,
-            @Value("${openrouter.url:${OPENROUTER_URL:https://openrouter.ai}}") String openRouterUrl,
+            @Value("${openrouter.url:}") String openRouterUrl,
             @Value("${OPENROUTER_API_KEY:}") String openRouterApiKey,
             @Value("${OPENROUTER_REQUEST_TIMEOUT_SECONDS:60}") int requestTimeoutSeconds,
             @Value("${OPENROUTER_MODEL:openrouter/free}") String openRouterModel,
@@ -109,7 +109,14 @@ public class HttpWrapper {
             @Value("${circuit-breaker.window-size:10}") int cbWindowSize,
             @Value("${circuit-breaker.cooldown-seconds:30}") int cbCooldownSeconds) {
         this.openRouterClient = openRouterClient;
-        this.openRouterUrl = normalizeOpenRouterBaseUrl(openRouterUrl);
+        // If openRouterUrl is empty, fall back to environment variable or default
+        String resolvedUrl = (openRouterUrl != null && !openRouterUrl.isBlank())
+                ? openRouterUrl
+                : System.getenv("OPENROUTER_URL");
+        if (resolvedUrl == null || resolvedUrl.isBlank()) {
+            resolvedUrl = DEFAULT_OPENROUTER_URL;
+        }
+        this.openRouterUrl = normalizeOpenRouterBaseUrl(resolvedUrl);
         this.requestTimeoutSeconds = (requestTimeoutSeconds > 0) ? requestTimeoutSeconds : 20; // fallback to 20s if
                                                                                                    // invalid
         this.rawStreamingHttpClient = HttpClient.newBuilder()
@@ -208,9 +215,9 @@ public class HttpWrapper {
         }
     }
 
-    /**
-     * Sends request using Micronaut HTTP client with built-in retry support.
-     * Uses Micronaut's @Retryable annotation for retry logic.
+/**
+     * Sends request with manual retry logic.
+     * Note: @Retryable doesn't work for internal method calls, so we implement retry manually.
      *
      * <p>
      * Retried statuses:
@@ -223,11 +230,6 @@ public class HttpWrapper {
      * immediately without retry.
      * </p>
      */
-    @Retryable(
-            attempts = "${OPENROUTER_MAX_RETRIES:3}",
-            delay = "250ms",
-            multiplier = "2.0"
-    )
     CompletableFuture<HttpDto> sendWithMicronautRetry(Map<String, Object> payload, String authValue) {
         // --- Circuit breaker guard: fail fast when circuit is OPEN ---
         if (!circuitBreaker.isCallPermitted()) {
@@ -238,62 +240,72 @@ public class HttpWrapper {
                             OpenRouterErrorCode.CIRCUIT_OPEN));
         }
 
-        try {
-            String responseBody = openRouterClient.chatCompletions(
-                    payload,
-                    authValue,
-                    headers.getOrDefault("HTTP-Referer", "https://complai.cat"),
-                    headers.getOrDefault("X-Title", "Complai"));
+        HttpDto finalResult = null;
+        int lastStatus = 0;
 
-            String extracted = extractTextFromOpenRouterResponse(responseBody, mapper);
-            circuitBreaker.recordSuccess();
-            return CompletableFuture.completedFuture(new HttpDto(extracted, 200, "POST", null));
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                String responseBody = openRouterClient.chatCompletions(
+                        payload,
+                        authValue,
+                        headers.getOrDefault("HTTP-Referer", "https://complai.cat"),
+                        headers.getOrDefault("X-Title", "Complai"));
 
-        } catch (HttpClientResponseException e) {
-            int status = e.getStatus().getCode();
+                String extracted = extractTextFromOpenRouterResponse(responseBody, mapper);
+                circuitBreaker.recordSuccess();
+                return CompletableFuture.completedFuture(new HttpDto(extracted, 200, "POST", null));
 
-            // Throw custom exception for retryable status codes (429 and 5xx)
-            // so Micronaut's @Retryable can catch and retry them
-            if (status == 429 || status >= 500) {
+            } catch (HttpClientResponseException e) {
+                lastStatus = e.getStatus().getCode();
                 String body = e.getResponse().getBody(String.class).orElse("");
-                logger.warning(() -> "OpenRouter retryable error — httpStatus=" + status + " url=" + openRouterUrl);
-                circuitBreaker.recordFailure();
-                throw new RetryableHttpException(status, body);
+
+                // Retryable error (429 or 5xx) - retry if we have attempts left
+                if (lastStatus == 429 || lastStatus >= 500) {
+                    logger.warning("OpenRouter retryable error — httpStatus=" + lastStatus + " url=" + openRouterUrl + " attempt=" + attempt + "/" + maxRetries);
+                    if (attempt < maxRetries) {
+                        try {
+                            Thread.sleep(250L * (long) Math.pow(2, attempt - 1)); // Exponential backoff
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
+                        continue; // Retry
+                    }
+                    // No more retries - fall through to return error
+                }
+
+                // Non-retryable error or retries exhausted
+                logger.warning("OpenRouter non-2xx response — httpStatus=" + lastStatus + " url=" + openRouterUrl);
+                finalResult = new HttpDto(body, lastStatus, "POST", String.format("OpenRouter error: %d", lastStatus));
+                break; // Don't retry
+
+            } catch (Exception e) {
+                logger.log(Level.SEVERE, "OpenRouter request failed — url=" + openRouterUrl + " error=" + e.getMessage(), e);
+                lastStatus = 0;
+                finalResult = new HttpDto(null, null, "POST", e.getMessage());
+                break; // Don't retry
             }
-
-            // For non-retryable 4xx errors, return without throwing (no retry)
-            String body = e.getResponse().getBody(String.class).orElse("");
-            logger.warning(() -> "OpenRouter non-2xx response — httpStatus=" + status + " url=" + openRouterUrl);
-            circuitBreaker.recordFailure();
-            return CompletableFuture.completedFuture(new HttpDto(body, status, "POST", String.format("OpenRouter non-2xx response: %d", status)));
-
-        } catch (Exception e) {
-            logger.log(Level.SEVERE, "OpenRouter request failed — url=" + openRouterUrl + " error=" + e.getMessage(), e);
-            circuitBreaker.recordFailure();
-            return CompletableFuture.completedFuture(new HttpDto(null, null, "POST", e.getMessage()));
         }
+
+        // After all attempts exhausted (or non-retryable error), record failure
+        if (finalResult == null && lastStatus > 0) {
+            // Retries exhausted case
+            logger.warning("OpenRouter retries exhausted — recording failure for circuit breaker");
+            circuitBreaker.recordFailure();
+            finalResult = new HttpDto(null, lastStatus, "POST", String.format("OpenRouter error after %d attempts", maxRetries));
+        } else if (finalResult != null && finalResult.statusCode() != null && finalResult.statusCode() >= 500) {
+            // Non-retryable server error
+            circuitBreaker.recordFailure();
+        } else if (finalResult != null && finalResult.statusCode() != null && finalResult.statusCode() >= 400 && finalResult.statusCode() != 429) {
+            // Non-retryable client error
+            circuitBreaker.recordFailure();
+        }
+
+return CompletableFuture.completedFuture(finalResult);
     }
 
     /**
-     * Custom exception for HTTP errors that should be retried (429 rate limit, 5xx server errors).
-     * This exception triggers Micronaut's @Retryable retry mechanism.
-     */
-    static class RetryableHttpException extends RuntimeException {
-        private final int statusCode;
-
-        public RetryableHttpException(int statusCode, String message) {
-            super(message);
-            this.statusCode = statusCode;
-        }
-
-        public int getStatusCode() {
-            return statusCode;
-        }
-    }
-
-    /**
-     * Resolves the Bearer token from the pre-configured headers, falling back to
-     * the
+     * Resolves the Bearer token from the pre-configured headers, falling back to the
      * {@code OPENROUTER_API_KEY} environment variable if absent.
      *
      * @return the full "Bearer …" auth value, or {@code null} if no key is
