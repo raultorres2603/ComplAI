@@ -1,0 +1,11 @@
+{
+  "procedures": [
+    {
+      "procedureId": "test-id-1",
+      "title": "Ajuts per a la rehabilitació",
+      "description": "Descripció del tràmit",
+      "requirements": "Requisit 1\nRequisit 2",
+      "url": "https://tramits.gencat.cat/ca/tramits/tramits-temes/exemple-procedure"
+    }
+  ]
+}

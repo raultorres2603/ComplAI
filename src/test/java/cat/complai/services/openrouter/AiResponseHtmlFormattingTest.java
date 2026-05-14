@@ -41,7 +41,7 @@ public class AiResponseHtmlFormattingTest {
                 new EventRagHelperRegistry(), new RedactPromptBuilder());
         com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
         return new OpenRouterServices(validationService, conversationService, aiResponseService,
-                procedureContextService, new RedactPromptBuilder(), wrapper, objectMapper);
+                procedureContextService, new RedactPromptBuilder(), wrapper, objectMapper, null, null);
     }
 
     /**

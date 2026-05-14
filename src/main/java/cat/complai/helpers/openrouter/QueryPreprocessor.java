@@ -1,5 +1,6 @@
 package cat.complai.helpers.openrouter;
 
+import cat.complai.config.CivicVocabularyConfig;
 import cat.complai.helpers.openrouter.rag.TokenNormalizer;
 
 import java.util.*;
@@ -223,5 +224,74 @@ public class QueryPreprocessor {
         String result = String.join(" ", filtered).trim();
         // Fallback to original if all words were stop words
         return result.isEmpty() ? query : result;
+    }
+
+    /**
+     * Preprocesses the query with civic vocabulary expansion enabled.
+     *
+     * <p>
+     * This method calls {@link #preprocess(String, String)} first, then expands
+     * the query with Catalan civic synonyms if civic vocabulary expansion is enabled
+     * and the language is supported (EN, ES, FR).
+     *
+     * @param query              the raw search query (may be null or blank)
+     * @param language          explicit language code ("CA", "ES", "EN", "FR"), or null to
+     *                           auto-detect
+     * @param civicVocabularySvc the CivicVocabularyService to use for expansion (may be null)
+     * @param config            the CivicVocabularyConfig to check if expansion is enabled
+     *                           (may be null)
+     * @return {@code QueryContext} with language detected, tokens processed, and civic
+     *         vocabulary expanded (in the originalQuery field)
+     */
+    public static QueryContext preprocessWithCivicVocabulary(
+            String query,
+            String language,
+            CivicVocabularyService civicVocabularySvc,
+            CivicVocabularyConfig config) {
+
+        // First do standard preprocessing
+        QueryContext context = preprocess(query, language);
+
+        if (query == null || query.isBlank()) {
+            return context;
+        }
+
+        // Check if expansion is enabled
+        if (config == null || !config.isEnabled()) {
+            logger.fine(() -> "QueryPreprocessor: civic vocabulary expansion disabled");
+            return context;
+        }
+
+        if (civicVocabularySvc == null) {
+            logger.fine(() -> "QueryPreprocessor: CivicVocabularyService not available");
+            return context;
+        }
+
+        // Expand with civic vocabulary (only for non-Catalan languages)
+        String detectedLang = context.detectedLanguage();
+        if ("CA".equalsIgnoreCase(detectedLang)) {
+            logger.fine(() -> "QueryPreprocessor: skipping civic vocab for Catalan query");
+            return context;
+        }
+
+        // Map to ISO code that CivicVocabularyService understands
+        String vocabLang = switch (detectedLang.toUpperCase()) {
+            case "EN" -> "en";
+            case "ES" -> "es";
+            case "FR" -> "fr";
+            default -> null;
+        };
+
+        if (vocabLang == null) {
+            logger.fine(() -> "QueryPreprocessor: unsupported language for civic vocab expansion");
+            return context;
+        }
+
+        // Expand the query
+        String expandedQuery = civicVocabularySvc.expandQuery(query, vocabLang);
+        logger.fine(() -> "QueryPreprocessor: civic vocab expanded '" + query + "' -> '" + expandedQuery + "'");
+
+        // Return new context with expanded query
+        return new QueryContext(expandedQuery, context.detectedLanguage(), context.tokens());
     }
 }

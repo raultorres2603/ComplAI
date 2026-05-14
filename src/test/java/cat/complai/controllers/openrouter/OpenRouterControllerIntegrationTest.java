@@ -1069,7 +1069,7 @@ public class OpenRouterControllerIntegrationTest {
                     new RedactPromptBuilder());
             return new OpenRouterServices(validationService, conversationService, aiResponseService,
                     procedureContextService, new RedactPromptBuilder(), httpWrapper,
-                    objectMapper);
+                    objectMapper, null, null);
         }
 
         @Singleton

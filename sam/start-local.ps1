@@ -6,7 +6,7 @@
 # Prerequisites (must already be installed and on PATH):
 #   - Docker (with the Compose plugin)
 #   - AWS SAM CLI
-#   - Java 17 + Gradle wrapper in the project root
+#   - Java 25 + Gradle wrapper in the project root
 #
 # Usage:
 #   cd sam\

@@ -1,5 +1,6 @@
 package cat.complai.helpers.openrouter;
 
+import cat.complai.config.CivicVocabularyConfig;
 import cat.complai.helpers.openrouter.rag.DeterministicQueryExpansion;
 import cat.complai.helpers.openrouter.rag.InMemoryLexicalIndex;
 import cat.complai.helpers.openrouter.rag.RagJavaCalibration;
@@ -290,6 +291,27 @@ public class RagHelper<T> {
     private final RagDomainConfig<T> config;
 
     // =========================================================================
+    // Static civic vocabulary services (set by registries at startup)
+    // =========================================================================
+
+    private static CivicVocabularyService civicVocabularyService;
+    private static CivicVocabularyConfig civicVocabularyConfig;
+
+    /**
+     * Sets the civic vocabulary service and config for all RagHelper instances.
+     * Called by registries during initialization.
+     *
+     * @param service the CivicVocabularyService instance
+     * @param config  the configuration with enabled flag
+     */
+    public static void setCivicVocabularyServices(CivicVocabularyService service, CivicVocabularyConfig config) {
+        RagHelper.civicVocabularyService = service;
+        RagHelper.civicVocabularyConfig = config;
+        logger.info(() -> "RagHelper: civic vocabulary services configured (enabled=" +
+                (config != null && config.isEnabled()) + ")");
+    }
+
+    // =========================================================================
     // Constructor
     // =========================================================================
 
@@ -439,7 +461,8 @@ public class RagHelper<T> {
             return Collections.emptyList();
         }
 
-        QueryContext context = QueryPreprocessor.preprocess(query);
+        QueryContext context = QueryPreprocessor.preprocessWithCivicVocabulary(
+                query, null, civicVocabularyService, civicVocabularyConfig);
         if (context.tokens().isEmpty()) {
             return Collections.emptyList();
         }
@@ -478,7 +501,8 @@ public class RagHelper<T> {
                     config.calibration().absoluteFloor(), config.calibration().relativeFloor());
         }
 
-        QueryContext context = QueryPreprocessor.preprocess(query);
+        QueryContext context = QueryPreprocessor.preprocessWithCivicVocabulary(
+                query, null, civicVocabularyService, civicVocabularyConfig);
         if (context.tokens().isEmpty()) {
             return InMemoryLexicalIndex.SearchResponse.empty(
                     config.calibration().absoluteFloor(), config.calibration().relativeFloor());
@@ -506,7 +530,7 @@ public class RagHelper<T> {
                                             .build());
 
             if (endpointUrl != null && !endpointUrl.isBlank()) {
-                clientBuilder.endpointOverride(URI.create(endpointUrl));
+                clientBuilder.endpointOverride(URI.create(endpointUrl)).forcePathStyle(true);
             }
 
             try (software.amazon.awssdk.services.s3.S3Client s3 = clientBuilder.build()) {

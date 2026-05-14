@@ -64,7 +64,9 @@ class OpenRouterServicesOrchestrationTest {
                                 procedureContextService,
                                 promptBuilder,
                                 httpWrapper,
-                                new ObjectMapper());
+                                new ObjectMapper(),
+                                null,
+                                null);
 
                 when(validationService.validateQuestion(anyString())).thenReturn(Optional.empty());
                 when(procedureContextService.requiresEventDateWindowClarification(anyString(), eq("elprat")))

@@ -9,7 +9,7 @@
 # Prerequisites (must already be installed and on PATH):
 #   - Docker (with the Compose plugin or standalone docker-compose)
 #   - AWS SAM CLI  (https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/install-sam-cli.html)
-#   - Java 17 + Gradle wrapper in the project root
+#   - Java 25 + Gradle wrapper in the project root
 #   - Python 3 with venv module
 #
 # Usage (Linux / macOS / WSL):

@@ -33,6 +33,9 @@ dependencies {
     runtimeOnly("ch.qos.logback:logback-classic")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 
+    // Jackson Joda module — required for ScheduledEvent deserialization (time field uses org.joda.time.DateTime)
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-joda:2.17.2")
+
     // PDF generation
     implementation("org.apache.pdfbox:pdfbox:2.0.29")
 
