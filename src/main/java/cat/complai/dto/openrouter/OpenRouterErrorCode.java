@@ -24,7 +24,11 @@ public enum OpenRouterErrorCode {
     // short-circuits the request.
     UNAUTHORIZED(6),
     // Emitted by RateLimitFilter when a user exceeds the per-minute request cap.
-    RATE_LIMITED(7);
+    RATE_LIMITED(7),
+    // Emitted when the circuit breaker protecting OpenRouter calls is open.
+    // The upstream provider is degraded and the request was rejected without
+    // attempting the HTTP call.
+    CIRCUIT_OPEN(8);
 
     private final int code;
 

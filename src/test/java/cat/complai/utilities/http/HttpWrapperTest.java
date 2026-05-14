@@ -352,4 +352,218 @@ public class HttpWrapperTest {
     }
 
     // Test removed - old custom retry logic replaced with Micronaut's built-in @Retryable
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Circuit breaker integration tests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Verifies that while the circuit breaker is OPEN, HttpWrapper returns a
+     * fallback response immediately without making any HTTP call to OpenRouter.
+     */
+    @Test
+    public void circuitBreaker_shouldNotCallOpenRouterWhenCircuitIsOpen() throws Exception {
+        AtomicInteger openRouterCallCount = new AtomicInteger(0);
+        HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext("/api/v1/chat/completions", exchange -> {
+            openRouterCallCount.incrementAndGet();
+            byte[] bytes = "{\"choices\":[{\"message\":{\"content\":\"ok\"}}]}".getBytes();
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, bytes.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(bytes);
+            }
+        });
+        server.start();
+
+        // Default CircuitBreaker config (failureThreshold=5, windowSize=10, cooldown=30)
+        Map<String, Object> props = Map.of(
+                "openrouter.url", "http://localhost:" + server.getAddress().getPort(),
+                "OPENROUTER_API_KEY", "test-key",
+                "micronaut.application.name", "complai-test");
+        try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST)
+                .build()) {
+            ctx.registerSingleton(new ObjectMapper());
+            ctx.start();
+            HttpWrapper wrapper = ctx.getBean(HttpWrapper.class);
+            CircuitBreaker cb = wrapper.getCircuitBreaker();
+
+            // First call: succeed normally
+            var dto1 = wrapper.postToOpenRouterAsync("prompt").get(5, TimeUnit.SECONDS);
+            assertEquals(200, dto1.statusCode());
+            assertEquals(1, openRouterCallCount.get());
+
+            // Trip the circuit: 5 failures in default window of 10 = 50%+ → OPEN
+            for (int i = 0; i < 5; i++) {
+                cb.recordFailure();
+            }
+            assertEquals(CircuitBreaker.State.OPEN, cb.getState());
+
+            // Second call: should be rejected immediately — NO HTTP call made
+            var dto2 = wrapper.postToOpenRouterAsync("prompt").get(5, TimeUnit.SECONDS);
+            assertNull(dto2.statusCode());
+            assertEquals(OpenRouterErrorCode.CIRCUIT_OPEN, dto2.errorCode());
+            assertTrue(dto2.message().contains("no està disponible"));
+            // No additional HTTP calls
+            assertEquals(1, openRouterCallCount.get());
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    /**
+     * Verifies that after cooldown expires, a probe call in HALF_OPEN succeeds
+     * and the circuit transitions back to CLOSED.
+     */
+    @Test
+    public void circuitBreaker_shouldRecordSuccessAndClose() throws Exception {
+        String resp = "{\"choices\":[{\"message\":{\"content\":\"recovered\"}}]}";
+        AtomicInteger callCount = new AtomicInteger(0);
+        HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext("/api/v1/chat/completions", exchange -> {
+            callCount.incrementAndGet();
+            byte[] bytes = resp.getBytes();
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, bytes.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(bytes);
+            }
+        });
+        server.start();
+
+        // Short cooldown (1 second) so test runs fast
+        Map<String, Object> props = Map.of(
+                "openrouter.url", "http://localhost:" + server.getAddress().getPort(),
+                "OPENROUTER_API_KEY", "test-key",
+                "circuit-breaker.failure-threshold", "1",
+                "circuit-breaker.window-size", "1",
+                "circuit-breaker.cooldown-seconds", "1",
+                "micronaut.application.name", "complai-test");
+        try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST)
+                .build()) {
+            ctx.registerSingleton(new ObjectMapper());
+            ctx.start();
+            HttpWrapper wrapper = ctx.getBean(HttpWrapper.class);
+            CircuitBreaker cb = wrapper.getCircuitBreaker();
+
+            // Trip the circuit
+            cb.recordFailure();
+            assertEquals(CircuitBreaker.State.OPEN, cb.getState());
+
+            // Wait for cooldown
+            Thread.sleep(1_200);
+
+            // Probe call — should succeed and transition to CLOSED
+            var dto = wrapper.postToOpenRouterAsync("prompt").get(5, TimeUnit.SECONDS);
+            assertEquals(200, dto.statusCode());
+            assertEquals(1, callCount.get());
+            assertEquals(CircuitBreaker.State.CLOSED, cb.getState());
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    /**
+     * Verifies that when the probe call in HALF_OPEN fails, the circuit
+     * transitions back to OPEN.
+     */
+    @Test
+    public void circuitBreaker_shouldRecordFailureAndReopen() throws Exception {
+        AtomicInteger callCount = new AtomicInteger(0);
+        HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext("/api/v1/chat/completions", exchange -> {
+            callCount.incrementAndGet();
+            byte[] bytes = "{\"error\":\"server error\"}".getBytes();
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(500, bytes.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(bytes);
+            }
+        });
+        server.start();
+
+        Map<String, Object> props = Map.of(
+                "openrouter.url", "http://localhost:" + server.getAddress().getPort(),
+                "OPENROUTER_API_KEY", "test-key",
+                "circuit-breaker.failure-threshold", "1",
+                "circuit-breaker.window-size", "1",
+                "circuit-breaker.cooldown-seconds", "1",
+                "OPENROUTER_MAX_RETRIES", "1", // 1 retry only to speed up test
+                "micronaut.application.name", "complai-test");
+        try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST)
+                .build()) {
+            ctx.registerSingleton(new ObjectMapper());
+            ctx.start();
+            HttpWrapper wrapper = ctx.getBean(HttpWrapper.class);
+            CircuitBreaker cb = wrapper.getCircuitBreaker();
+
+            // Trip the circuit
+            cb.recordFailure();
+            assertEquals(CircuitBreaker.State.OPEN, cb.getState());
+
+            // Wait for cooldown
+            Thread.sleep(1_200);
+
+            // Probe call fails (500 response) — should transition to OPEN again
+            var dto = wrapper.postToOpenRouterAsync("prompt").get(5, TimeUnit.SECONDS);
+            assertNotNull(dto.statusCode());
+            assertEquals(500, dto.statusCode());
+            // After retries are exhausted, the call is recorded as failure → OPEN again
+            assertEquals(CircuitBreaker.State.OPEN, cb.getState());
+            assertEquals(1, callCount.get()); // Only the probe was made
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    /**
+     * Verifies that streamFromOpenRouter returns a circuit-open error when the
+     * circuit is OPEN, without making any HTTP call.
+     */
+    @Test
+    public void streamFromOpenRouter_shouldReturnCircuitOpenErrorWhenCircuitIsOpen() throws Exception {
+        AtomicInteger openRouterCallCount = new AtomicInteger(0);
+        HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+        server.createContext("/api/v1/chat/completions", exchange -> {
+            openRouterCallCount.incrementAndGet();
+            byte[] bytes = "data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"}}]}\n\ndata: [DONE]\n\n"
+                    .getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "text/event-stream");
+            exchange.sendResponseHeaders(200, 0);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(bytes);
+            }
+        });
+        server.start();
+
+        Map<String, Object> props = Map.of(
+                "openrouter.url", "http://localhost:" + server.getAddress().getPort(),
+                "OPENROUTER_API_KEY", "test-key",
+                "circuit-breaker.failure-threshold", "1",
+                "circuit-breaker.window-size", "1",
+                "circuit-breaker.cooldown-seconds", "30",
+                "micronaut.application.name", "complai-test");
+        try (ApplicationContext ctx = ApplicationContext.builder().properties(props).environments(Environment.TEST)
+                .build()) {
+            ctx.registerSingleton(new ObjectMapper());
+            ctx.start();
+            HttpWrapper wrapper = ctx.getBean(HttpWrapper.class);
+            CircuitBreaker cb = wrapper.getCircuitBreaker();
+
+            // Trip the circuit
+            cb.recordFailure();
+            assertEquals(CircuitBreaker.State.OPEN, cb.getState());
+
+            // Streaming call should be rejected immediately
+            OpenRouterStreamStartResult result = wrapper.streamFromOpenRouter(
+                    List.of(Map.of("role", "user", "content", "test")));
+
+            assertInstanceOf(OpenRouterStreamStartResult.Error.class, result);
+            OpenRouterStreamingException failure = ((OpenRouterStreamStartResult.Error) result).failure();
+            assertEquals(OpenRouterErrorCode.CIRCUIT_OPEN, failure.getErrorCode());
+            assertEquals(0, openRouterCallCount.get()); // No HTTP call made
+        } finally {
+            server.stop(0);
+        }
+    }
 }
