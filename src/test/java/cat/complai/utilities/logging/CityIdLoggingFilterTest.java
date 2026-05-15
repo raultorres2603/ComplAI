@@ -2,7 +2,6 @@ package cat.complai.utilities.logging;
 
 import cat.complai.utilities.auth.ApiKeyAuthFilter;
 import io.micronaut.http.MutableHttpRequest;
-import io.micronaut.http.MutableHttpResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

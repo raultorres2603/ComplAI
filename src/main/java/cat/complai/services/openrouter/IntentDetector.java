@@ -4,8 +4,6 @@ import cat.complai.helpers.openrouter.CityInfoRagHelperRegistry;
 import cat.complai.helpers.openrouter.EventRagHelperRegistry;
 import cat.complai.helpers.openrouter.NewsRagHelperRegistry;
 import cat.complai.helpers.openrouter.ProcedureRagHelperRegistry;
-import cat.complai.helpers.openrouter.RagHelper;
-import cat.complai.helpers.openrouter.rag.TokenNormalizer;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import java.util.ArrayList;

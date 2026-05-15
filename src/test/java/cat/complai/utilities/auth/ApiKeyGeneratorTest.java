@@ -3,8 +3,6 @@ package cat.complai.utilities.auth;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
 import java.security.SecureRandom;
 import java.util.Base64;
 

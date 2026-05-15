@@ -212,8 +212,7 @@ public class StadisticsService implements IStadisticsService {
         for (int month = 1; month <= currentMonthValue; month++) {
             YearMonth ym = YearMonth.of(currentYear, month);
             String monthLabel = ym.atDay(1).format(
-                java.time.format.DateTimeFormatter.ofPattern("LLLL yyyy", new java.util.Locale("ca", "ES"))
-            );
+                    java.time.format.DateTimeFormatter.ofPattern("LLLL yyyy", new java.util.Locale("ca", "ES")));
             monthLabel = monthLabel.substring(0, 1).toUpperCase() + monthLabel.substring(1);
 
             Instant monthStart = ym.atDay(1).atStartOfDay(zone).toInstant();
@@ -233,7 +232,8 @@ public class StadisticsService implements IStadisticsService {
             ArrayList<ComplaintFile> complaintFiles = getComplaintFiles(monthStart, monthEnd);
             ArrayList<FeedbackFile> feedbackFiles = getFeedbackFiles(monthStart, monthEnd);
 
-            yearlyData.add(new StadisticsModel.MonthlyData(monthLabel, ask, redact, feedback, complaintFiles, feedbackFiles));
+            yearlyData.add(
+                    new StadisticsModel.MonthlyData(monthLabel, ask, redact, feedback, complaintFiles, feedbackFiles));
 
             // Accumulate for legacy total
             allComplaintFiles.addAll(complaintFiles);
@@ -249,24 +249,22 @@ public class StadisticsService implements IStadisticsService {
 
         // Calculate comparisons (current month vs previous month)
         ComparisonData askComparison = calculateComparison(
-            previousMonthData != null ? previousMonthData.getAskInteractions() : 0,
-            currentMonthData.getAskInteractions()
-        );
+                previousMonthData != null ? previousMonthData.getAskInteractions() : 0,
+                currentMonthData.getAskInteractions());
         ComparisonData redactComparison = calculateComparison(
-            previousMonthData != null ? previousMonthData.getRedactInteractions() : 0,
-            currentMonthData.getRedactInteractions()
-        );
+                previousMonthData != null ? previousMonthData.getRedactInteractions() : 0,
+                currentMonthData.getRedactInteractions());
         ComparisonData feedbackComparison = calculateComparison(
-            previousMonthData != null ? previousMonthData.getFeedbackCount() : 0,
-            currentMonthData.getFeedbackCount()
-        );
+                previousMonthData != null ? previousMonthData.getFeedbackCount() : 0,
+                currentMonthData.getFeedbackCount());
 
         // Legacy totals (current month only for backward compatibility)
         int totalAsk = currentMonthData.getAskInteractions();
         int totalRedact = currentMonthData.getRedactInteractions();
         int totalFeedback = currentMonthData.getFeedbackCount();
 
-        StadisticsModel report = new StadisticsModel(totalAsk, totalRedact, totalFeedback, allComplaintFiles, allFeedbackFiles);
+        StadisticsModel report = new StadisticsModel(totalAsk, totalRedact, totalFeedback, allComplaintFiles,
+                allFeedbackFiles);
 
         // Set monthly comparison data
         report.setCurrentMonth(currentMonthData);
@@ -286,8 +284,9 @@ public class StadisticsService implements IStadisticsService {
 
     /**
      * Calculates comparison between previous and current values.
+     * 
      * @param previousValue the previous week's value
-     * @param currentValue the current week's value
+     * @param currentValue  the current week's value
      * @return ComparisonData with absolute difference and percentage change
      */
     private ComparisonData calculateComparison(int previousValue, int currentValue) {
@@ -313,7 +312,7 @@ public class StadisticsService implements IStadisticsService {
      * Generates an AI prediction based on yearly statistics data.
      * Calls OpenRouter to get insights and predictions for the next month.
      *
-     * @param model the statistics model with yearly data
+     * @param model  the statistics model with yearly data
      * @param cityId the city identifier
      * @return prediction text from AI, or fallback message on failure
      */
@@ -329,12 +328,6 @@ public class StadisticsService implements IStadisticsService {
 
             // Build the prompt with yearly data
             String prompt = buildPredictionPrompt(yearlyData, cityId);
-
-            // Call OpenRouter
-            List<Map<String, Object>> messages = List.of(
-                Map.of("role", "system", "content", "Ets un assistent d'anàlisi de dades municipals. Analitzes dades d'interacció ciutadana i fas prediccions."),
-                Map.of("role", "user", "content", prompt)
-            );
 
             OpenRouterResponseDto response = openRouterService.ask(prompt, null, cityId);
 
@@ -353,7 +346,9 @@ public class StadisticsService implements IStadisticsService {
 
     private String buildPredictionPrompt(ArrayList<MonthlyData> yearlyData, String cityId) {
         StringBuilder sb = new StringBuilder();
-        sb.append("Analitza les següents dades estadístiques any ").append(YearMonth.now(ZoneId.of("Europe/Madrid")).getYear()).append(" per a la ciutat ").append(cityId).append(":\n\n");
+        sb.append("Analitza les següents dades estadístiques any ")
+                .append(YearMonth.now(ZoneId.of("Europe/Madrid")).getYear()).append(" per a la ciutat ").append(cityId)
+                .append(":\n\n");
 
         sb.append("| Mes | Consultes | Reclamacions | Valoracions | Arxius Reclam. | Arxius Valoracions |\n");
         sb.append("|---|---|---|---|---|---|\n");
@@ -365,11 +360,11 @@ public class StadisticsService implements IStadisticsService {
             int feedbackFiles = md.getFeedbackFiles() != null ? md.getFeedbackFiles().size() : 0;
 
             sb.append("| ").append(md.getMonthLabel()).append(" | ")
-              .append(md.getAskInteractions()).append(" | ")
-              .append(md.getRedactInteractions()).append(" | ")
-              .append(md.getFeedbackCount()).append(" | ")
-              .append(complaintFiles).append(" | ")
-              .append(feedbackFiles).append(" |\n");
+                    .append(md.getAskInteractions()).append(" | ")
+                    .append(md.getRedactInteractions()).append(" | ")
+                    .append(md.getFeedbackCount()).append(" | ")
+                    .append(complaintFiles).append(" | ")
+                    .append(feedbackFiles).append(" |\n");
 
             totalAsk += md.getAskInteractions();
             totalRedact += md.getRedactInteractions();
@@ -379,10 +374,10 @@ public class StadisticsService implements IStadisticsService {
         }
 
         sb.append("\n**Total anual:** ").append(totalAsk).append(" consultes, ")
-          .append(totalRedact).append(" reclamacions, ")
-          .append(totalFeedback).append(" valoracions.\n");
+                .append(totalRedact).append(" reclamacions, ")
+                .append(totalFeedback).append(" valoracions.\n");
         sb.append("**Arxius generats:** ").append(totalComplaintFiles).append(" reclamacions, ")
-          .append(totalFeedbackFiles).append(" valoracions.\n\n");
+                .append(totalFeedbackFiles).append(" valoracions.\n\n");
 
         sb.append("Basant-te en aquestes dades, proporciona:");
         sb.append("\n1. Una breu anàlisi de les tendències (quin tipus d'interacció creix, quin disminueix)");

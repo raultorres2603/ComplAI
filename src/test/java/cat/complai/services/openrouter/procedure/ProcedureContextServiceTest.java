@@ -6,7 +6,6 @@ import cat.complai.helpers.openrouter.EventRagHelperRegistry;
 import cat.complai.helpers.openrouter.NewsRagHelperRegistry;
 import cat.complai.helpers.openrouter.ProcedureRagHelperRegistry;
 import cat.complai.helpers.openrouter.RagHelper;
-import cat.complai.helpers.openrouter.RedactPromptBuilder;
 import cat.complai.services.openrouter.IntentDetector;
 import cat.complai.services.openrouter.NewsContextResult;
 import cat.complai.services.openrouter.ProcedureContextResult;

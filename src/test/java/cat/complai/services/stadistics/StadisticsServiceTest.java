@@ -8,12 +8,9 @@ import static org.mockito.Mockito.when;
 
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.List;
-
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -26,7 +23,6 @@ import cat.complai.services.stadistics.models.FeedbackFile;
 import cat.complai.services.stadistics.models.StadisticsModel;
 import cat.complai.services.stadistics.models.StadisticsModel.MonthlyData;
 import cat.complai.services.stadistics.models.StadisticsModel.ComparisonData;
-import cat.complai.exceptions.ses.CloudWatchLogsException;
 import cat.complai.services.openrouter.IOpenRouterService;
 import cat.complai.utilities.metrics.InteractionMetricsPublisher;
 import cat.complai.utilities.s3.S3ComplaintLister;

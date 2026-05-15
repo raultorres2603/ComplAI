@@ -23,11 +23,6 @@ import cat.complai.dto.openrouter.OutputFormat;
 import cat.complai.services.openrouter.cache.ResponseCacheService;
 import cat.complai.helpers.openrouter.CivicVocabularyService;
 import cat.complai.config.CivicVocabularyConfig;
-import cat.complai.services.openrouter.IntentDetector;
-import cat.complai.services.openrouter.RagContextBuilder;
-import cat.complai.services.openrouter.ClarificationService;
-import cat.complai.services.openrouter.StreamingOrchestrator;
-import cat.complai.services.openrouter.RedactOrchestrator;
 import cat.complai.helpers.openrouter.NewsRagHelperRegistry;
 import cat.complai.helpers.openrouter.CityInfoRagHelperRegistry;
 

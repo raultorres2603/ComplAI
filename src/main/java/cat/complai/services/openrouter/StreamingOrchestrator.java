@@ -15,7 +15,6 @@ import cat.complai.helpers.openrouter.AskStreamErrorMapper;
 import cat.complai.helpers.openrouter.LanguageDetector;
 import cat.complai.helpers.openrouter.RedactPromptBuilder;
 import cat.complai.helpers.openrouter.SseChunkParser;
-import cat.complai.services.openrouter.ai.AiResponseProcessingService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.inject.Singleton;
 import jakarta.inject.Inject;
