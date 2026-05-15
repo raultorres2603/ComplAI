@@ -213,9 +213,6 @@ export class LambdaStack extends cdk.Stack {
       // 1536 MB provides better CPU proportionality (more vCPU) for these workloads
       // vs. the default 1024 MB. Verified with AWS Lambda Power Tuning.
       memorySize: 1536,
-      // 30 concurrent executions handle ~10 req/s at 3s average AI latency.
-      // Higher values risk exceeding the account's unreserved concurrency floor.
-      reservedConcurrentExecutions: 30,
       timeout: cdk.Duration.seconds(60),
       // Wire the OpenRouter API key (from CFN parameter) into the Lambda environment.
       // Be aware that environment variables are visible in the Lambda console; using
@@ -409,10 +406,6 @@ export class LambdaStack extends cdk.Stack {
       // verified with AWS Lambda Power Tuning — lower values cause GC thrashing
       // during PDF generation, higher values offer no measurable improvement.
       memorySize: 1024,
-      // SQS-driven with batchSize=1; messages queue harmlessly during bursts.
-      // 5 concurrent executions = ~10 PDFs/min at 30s each — sufficient for a
-      // municipal complaint system.
-      reservedConcurrentExecutions: 5,
       // Must be ≤ SQS visibility timeout (90s). Lambda extends visibility automatically
       // while running, so using the same duration is the safest choice here.
       timeout: cdk.Duration.seconds(60),
@@ -480,9 +473,6 @@ export class LambdaStack extends cdk.Stack {
       // 256 MB is sufficient and reduces cost by ~50% vs. 512 MB for this
       // lightweight workload. Verified with AWS Lambda Power Tuning.
       memorySize: 256,
-      // Very lightweight worker (~1s per invocation). 3 concurrent executions
-      // handle ~180 feedback submissions/min — far beyond municipal needs.
-      reservedConcurrentExecutions: 3,
       timeout: cdk.Duration.seconds(60),
       // Feedback worker environment
       environment: {
@@ -599,7 +589,6 @@ export class LambdaStack extends cdk.Stack {
       // wall-clock time and risk of timeout during busy months with many log events.
       // Verified with AWS Lambda Power Tuning.
       memorySize: 1024,
-      reservedConcurrentExecutions: 1,
       timeout: cdk.Duration.seconds(60),
       environment: {
         // OpenRouter API key for AI predictions in statistics reports
