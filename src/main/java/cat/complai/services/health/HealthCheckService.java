@@ -2,19 +2,13 @@ package cat.complai.services.health;
 
 import cat.complai.config.SesConfiguration;
 import cat.complai.helpers.openrouter.ProcedureRagHelperRegistry;
-import io.micronaut.context.annotation.Value;
 import jakarta.annotation.PreDestroy;
-import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
-import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.S3ClientBuilder;
 import software.amazon.awssdk.services.s3.model.HeadBucketRequest;
 import software.amazon.awssdk.services.sqs.SqsClient;
-import software.amazon.awssdk.services.sqs.SqsClientBuilder;
 import software.amazon.awssdk.services.sqs.model.GetQueueAttributesRequest;
 
-import java.net.URI;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -52,49 +46,6 @@ public class HealthCheckService {
     private final String defaultCityId;
     private final ProcedureRagHelperRegistry procedureRegistry;
     private final String openRouterApiKey;
-
-    /**
-     * Constructs the health check service with all necessary configuration and
-     * AWS SDK clients.
-     *
-     * @param complaintsBucket  the S3 bucket used for complaint PDFs
-     * @param region            the AWS region for S3 and SQS clients
-     * @param endpointUrl       optional LocalStack endpoint override
-     * @param redactQueueUrl    the SQS queue URL for redact requests
-     * @param defaultCityId     the default city for RAG index verification
-     * @param sesConfig         SES configuration (from-email, region)
-     * @param procedureRegistry the procedure RAG helper registry
-     */
-    @Inject
-    public HealthCheckService(
-            @Value("${COMPLAINTS_BUCKET:complai-complaints-development}") String complaintsBucket,
-            @Value("${COMPLAINTS_REGION:eu-west-1}") String region,
-            @Value("${AWS_ENDPOINT_URL:}") String endpointUrl,
-            @Value("${REDACT_QUEUE_URL:}") String redactQueueUrl,
-            @Value("${complai.default-city-id:elprat}") String defaultCityId,
-            SesConfiguration sesConfig,
-            ProcedureRagHelperRegistry procedureRegistry) {
-        this.complaintsBucket = complaintsBucket;
-        this.redactQueueUrl = redactQueueUrl;
-        this.defaultCityId = defaultCityId;
-        this.sesConfig = sesConfig;
-        this.procedureRegistry = procedureRegistry;
-        this.openRouterApiKey = System.getenv("OPENROUTER_API_KEY");
-
-        Region awsRegion = Region.of(region);
-
-        S3ClientBuilder s3Builder = S3Client.builder().region(awsRegion);
-        if (endpointUrl != null && !endpointUrl.isBlank()) {
-            s3Builder.endpointOverride(URI.create(endpointUrl)).forcePathStyle(true);
-        }
-        this.s3Client = s3Builder.build();
-
-        SqsClientBuilder sqsBuilder = SqsClient.builder().region(awsRegion);
-        if (endpointUrl != null && !endpointUrl.isBlank()) {
-            sqsBuilder.endpointOverride(URI.create(endpointUrl));
-        }
-        this.sqsClient = sqsBuilder.build();
-    }
 
     /**
      * Protected no-arg constructor for test subclassing.

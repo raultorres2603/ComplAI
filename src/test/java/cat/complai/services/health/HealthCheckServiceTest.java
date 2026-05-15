@@ -118,7 +118,7 @@ class HealthCheckServiceTest {
     @Test
     void checkRAG_returnsResult_withItemCount() {
         TestableHealthCheckService service = new TestableHealthCheckService(
-                null, null, null, ragLoadedResult(42), null);
+                null, null, null, ragLoadedResult(), null);
 
         Map<String, Object> result = service.checkRAG();
         assertStatus(result, true);
@@ -217,11 +217,11 @@ class HealthCheckServiceTest {
         return result;
     }
 
-    private static Map<String, Object> ragLoadedResult(int items) {
+    private static Map<String, Object> ragLoadedResult() {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("status", true);
-        result.put("message", "RAG loaded with " + items + " items");
-        result.put("items", items);
+        result.put("message", "RAG loaded with " + 42 + " items");
+        result.put("items", 42);
         return result;
     }
 

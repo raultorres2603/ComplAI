@@ -79,8 +79,7 @@ class HealthService {
      * @return a {@link HealthDto} with status "UP" and diagnostic checks
      */
     public HealthDto getHealth() {
-        Map<String, Object> checks = new LinkedHashMap<>();
-        checks.putAll(healthCheckService.checkAll());
+        Map<String, Object> checks = new LinkedHashMap<>(healthCheckService.checkAll());
         return new HealthDto("UP", "1.0", checks);
     }
 

@@ -1,11 +1,9 @@
 package cat.complai.controllers.home;
 
 import cat.complai.dto.home.HealthDto;
-import cat.complai.services.health.HealthCheckService;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.annotation.Client;
-import io.micronaut.test.annotation.MockBean;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
@@ -13,8 +11,6 @@ import org.junit.jupiter.api.Test;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 @MicronautTest
 class HealthControllerIntegrationTest {
@@ -67,21 +63,4 @@ class HealthControllerIntegrationTest {
         assertEquals("UP", response.getBody().get().getStatus());
     }
 
-    /**
-     * Replaces the real {@link HealthCheckService} with a mock that returns
-     * predictable values for all dependency checks, so the integration test
-     * does not require real AWS infrastructure.
-     */
-    @MockBean(HealthCheckService.class)
-    HealthCheckService healthCheckService() {
-        HealthCheckService mock = mock(HealthCheckService.class);
-        when(mock.checkAll()).thenReturn(Map.of(
-                "s3", Map.of("status", false, "message", "S3 check (mocked)"),
-                "sqs", Map.of("status", false, "message", "SQS check (mocked)"),
-                "ses", Map.of("status", true, "message", "SES check (mocked)"),
-                "ragIndexes", Map.of("status", true, "message", "RAG check (mocked)", "items", 10),
-                "openRouterApiKeyConfigured", Map.of("status", true, "message", "OpenRouter check (mocked)")
-        ));
-        return mock;
-    }
 }
