@@ -7,7 +7,6 @@ import cat.complai.dto.openrouter.Source;
 import cat.complai.helpers.openrouter.RedactPromptBuilder;
 import cat.complai.services.openrouter.ai.AiResponseProcessingService;
 import cat.complai.services.openrouter.conversation.ConversationManagementService;
-import cat.complai.services.openrouter.procedure.ProcedureContextService;
 import cat.complai.services.openrouter.validation.InputValidationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,6 +27,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -46,7 +46,19 @@ class OpenRouterServicesOrchestrationTest {
         private AiResponseProcessingService aiResponseService;
 
         @Mock
-        private ProcedureContextService procedureContextService;
+        private IntentDetector intentDetector;
+
+        @Mock
+        private RagContextBuilder ragContextBuilder;
+
+        @Mock
+        private ClarificationService clarificationService;
+
+        @Mock
+        private StreamingOrchestrator streamingOrchestrator;
+
+        @Mock
+        private RedactOrchestrator redactOrchestrator;
 
         @Mock
         private RedactPromptBuilder promptBuilder;
@@ -61,20 +73,28 @@ class OpenRouterServicesOrchestrationTest {
                                 validationService,
                                 conversationService,
                                 aiResponseService,
-                                procedureContextService,
-                                promptBuilder,
-                                httpWrapper,
-                                new ObjectMapper(),
-                                null,
-                                null);
+                                intentDetector,
+                                ragContextBuilder,
+                                clarificationService,
+                                streamingOrchestrator,
+                                redactOrchestrator,
+                                promptBuilder);
 
                 when(validationService.validateQuestion(anyString())).thenReturn(Optional.empty());
-                when(procedureContextService.requiresEventDateWindowClarification(anyString(), eq("elprat")))
+                when(intentDetector.requiresEventDateWindowClarification(anyString(), eq("elprat")))
                                 .thenReturn(false);
-                when(procedureContextService.detectProcedureAmbiguity(anyString(), anyString()))
+                when(clarificationService.detectProcedureAmbiguity(anyString(), anyString()))
                                 .thenReturn(Optional.empty());
-                when(procedureContextService.deDuplicateAndOrderSources(anyList()))
+                when(ragContextBuilder.deDuplicateAndOrderSources(anyList()))
                                 .thenAnswer(invocation -> invocation.getArgument(0));
+                doAnswer(invocation -> {
+                        List<Source> merged = invocation.getArgument(0);
+                        List<Source> contextSources = invocation.getArgument(1);
+                        if (contextSources != null) {
+                                merged.addAll(contextSources);
+                        }
+                        return null;
+                }).when(ragContextBuilder).validateAndAddSources(anyList(), anyList(), anyString());
                 when(promptBuilder.getSystemMessage(eq("elprat"), anyString())).thenReturn("system");
                 when(conversationService.getConversationHistory(any())).thenReturn(List.of());
                 when(aiResponseService.callOpenRouterAndExtract(anyList(), eq("elprat"), any(Long.class),
@@ -84,29 +104,29 @@ class OpenRouterServicesOrchestrationTest {
 
         @Test
         void ask_noContextNeeded_skipsAllRagBuilders() {
-                when(procedureContextService.detectContextRequirements(anyString(), eq("elprat")))
-                                .thenReturn(ProcedureContextService.ContextRequirements.none());
+                when(intentDetector.detectContextRequirements(anyString(), eq("elprat")))
+                                .thenReturn(ContextRequirements.none());
 
                 OpenRouterResponseDto response = service.ask("hello", null, "elprat");
 
                 assertTrue(response.isSuccess());
-                verify(procedureContextService, never()).buildProcedureContextResult(anyString(), anyString());
-                verify(procedureContextService, never()).buildEventContextResult(anyString(), anyString());
-                verify(procedureContextService, never()).buildProcedureContextResultAsync(anyString(), anyString(),
+                verify(ragContextBuilder, never()).buildProcedureContextResult(anyString(), anyString());
+                verify(ragContextBuilder, never()).buildEventContextResult(anyString(), anyString());
+                verify(ragContextBuilder, never()).buildProcedureContextResultAsync(anyString(), anyString(),
                                 any(Executor.class));
-                verify(procedureContextService, never()).buildEventContextResultAsync(anyString(), anyString(),
+                verify(ragContextBuilder, never()).buildEventContextResultAsync(anyString(), anyString(),
                                 any(Executor.class));
                 verify(aiResponseService).callOpenRouterAndExtract(anyList(), eq("elprat"), eq(0L), eq(0L));
         }
 
         @Test
         void ask_procedureOnly_usesSynchronousProcedurePath() {
-                ProcedureContextService.ProcedureContextResult procedureContext = new ProcedureContextService.ProcedureContextResult(
+                ProcedureContextResult procedureContext = new ProcedureContextResult(
                                 "procedure-context",
                                 List.of(new Source("https://example.com/procedure", "Procedure")));
-                when(procedureContextService.detectContextRequirements(anyString(), eq("elprat")))
-                                .thenReturn(new ProcedureContextService.ContextRequirements(true, false, false, false));
-                when(procedureContextService.buildProcedureContextResult(anyString(), eq("elprat")))
+                when(intentDetector.detectContextRequirements(anyString(), eq("elprat")))
+                                .thenReturn(new ContextRequirements(true, false, false, false));
+                when(ragContextBuilder.buildProcedureContextResult(anyString(), eq("elprat")))
                                 .thenReturn(procedureContext);
 
                 OpenRouterResponseDto response = service.ask("procedure question", null, "elprat");
@@ -114,23 +134,23 @@ class OpenRouterServicesOrchestrationTest {
                 assertTrue(response.isSuccess());
                 assertFalse(response.getSources().isEmpty());
                 assertEquals("https://example.com/procedure", response.getSources().getFirst().getUrl());
-                verify(procedureContextService).buildProcedureContextResult(anyString(), eq("elprat"));
-                verify(procedureContextService, never()).buildEventContextResult(anyString(), anyString());
-                verify(procedureContextService, never()).buildProcedureContextResultAsync(anyString(), anyString(),
+                verify(ragContextBuilder).buildProcedureContextResult(anyString(), eq("elprat"));
+                verify(ragContextBuilder, never()).buildEventContextResult(anyString(), anyString());
+                verify(ragContextBuilder, never()).buildProcedureContextResultAsync(anyString(), anyString(),
                                 any(Executor.class));
                 verify(aiResponseService).callOpenRouterAndExtract(anyList(), eq("elprat"), any(Long.class), eq(0L));
         }
 
         @Test
         void ask_eventOnly_usesSynchronousEventPath() {
-                ProcedureContextService.EventContextResult eventContext = new ProcedureContextService.EventContextResult(
+                EventContextResult eventContext = new EventContextResult(
                                 "event-context",
                                 List.of(new Source("https://example.com/event", "Event")));
-                when(procedureContextService.requiresEventDateWindowClarification(anyString(), eq("elprat")))
+                when(intentDetector.requiresEventDateWindowClarification(anyString(), eq("elprat")))
                                 .thenReturn(false);
-                when(procedureContextService.detectContextRequirements(anyString(), eq("elprat")))
-                                .thenReturn(new ProcedureContextService.ContextRequirements(false, true, false, false));
-                when(procedureContextService.buildEventContextResult(anyString(), eq("elprat")))
+                when(intentDetector.detectContextRequirements(anyString(), eq("elprat")))
+                                .thenReturn(new ContextRequirements(false, true, false, false));
+                when(ragContextBuilder.buildEventContextResult(anyString(), eq("elprat")))
                                 .thenReturn(eventContext);
 
                 OpenRouterResponseDto response = service.ask("event question", null, "elprat");
@@ -138,16 +158,16 @@ class OpenRouterServicesOrchestrationTest {
                 assertTrue(response.isSuccess());
                 assertFalse(response.getSources().isEmpty());
                 assertEquals("https://example.com/event", response.getSources().getFirst().getUrl());
-                verify(procedureContextService).buildEventContextResult(anyString(), eq("elprat"));
-                verify(procedureContextService, never()).buildProcedureContextResult(anyString(), anyString());
-                verify(procedureContextService, never()).buildEventContextResultAsync(anyString(), anyString(),
+                verify(ragContextBuilder).buildEventContextResult(anyString(), eq("elprat"));
+                verify(ragContextBuilder, never()).buildProcedureContextResult(anyString(), anyString());
+                verify(ragContextBuilder, never()).buildEventContextResultAsync(anyString(), anyString(),
                                 any(Executor.class));
                 verify(aiResponseService).callOpenRouterAndExtract(anyList(), eq("elprat"), eq(0L), any(Long.class));
         }
 
         @Test
         void ask_eventIntentWithoutDateWindow_returnsClarificationAndSkipsRetrieval() {
-                when(procedureContextService.requiresEventDateWindowClarification(anyString(), eq("elprat")))
+                when(intentDetector.requiresEventDateWindowClarification(anyString(), eq("elprat")))
                                 .thenReturn(true);
 
                 OpenRouterResponseDto response = service.ask("What events are happening?", "conv-1", "elprat");
@@ -156,52 +176,52 @@ class OpenRouterServicesOrchestrationTest {
                 assertTrue(response.getMessage().contains("date window")
                                 || response.getMessage().contains("rango de fechas")
                                 || response.getMessage().contains("interval de dates"));
-                verify(procedureContextService, never()).detectContextRequirements(anyString(), anyString());
-                verify(procedureContextService, never()).buildEventContextResult(anyString(), anyString());
+                verify(intentDetector, never()).detectContextRequirements(anyString(), anyString());
+                verify(ragContextBuilder, never()).buildEventContextResult(anyString(), anyString());
                 verify(aiResponseService, never()).callOpenRouterAndExtract(anyList(), anyString(), anyLong(),
                                 anyLong());
         }
 
         @Test
         void ask_bothContexts_usesBoundedParallelAsyncPath() {
-                ProcedureContextService.ProcedureContextResult procedureContext = new ProcedureContextService.ProcedureContextResult(
+                ProcedureContextResult procedureContext = new ProcedureContextResult(
                                 "procedure-context",
                                 List.of(new Source("https://example.com/procedure", "Procedure")));
-                ProcedureContextService.EventContextResult eventContext = new ProcedureContextService.EventContextResult(
+                EventContextResult eventContext = new EventContextResult(
                                 "event-context",
                                 List.of(new Source("https://example.com/event", "Event")));
-                when(procedureContextService.detectContextRequirements(anyString(), eq("elprat")))
-                                .thenReturn(new ProcedureContextService.ContextRequirements(true, true, false, false));
-                when(procedureContextService.buildProcedureContextResultAsync(anyString(), eq("elprat"),
+                when(intentDetector.detectContextRequirements(anyString(), eq("elprat")))
+                                .thenReturn(new ContextRequirements(true, true, false, false));
+                when(ragContextBuilder.buildProcedureContextResultAsync(anyString(), eq("elprat"),
                                 any(Executor.class)))
                                 .thenReturn(CompletableFuture.completedFuture(procedureContext));
-                when(procedureContextService.buildEventContextResultAsync(anyString(), eq("elprat"),
+                when(ragContextBuilder.buildEventContextResultAsync(anyString(), eq("elprat"),
                                 any(Executor.class)))
                                 .thenReturn(CompletableFuture.completedFuture(eventContext));
 
                 OpenRouterResponseDto response = service.ask("combined question", null, "elprat");
 
                 assertTrue(response.isSuccess());
-                verify(procedureContextService).buildProcedureContextResultAsync(anyString(), eq("elprat"),
+                verify(ragContextBuilder).buildProcedureContextResultAsync(anyString(), eq("elprat"),
                                 any(Executor.class));
-                verify(procedureContextService).buildEventContextResultAsync(anyString(), eq("elprat"),
+                verify(ragContextBuilder).buildEventContextResultAsync(anyString(), eq("elprat"),
                                 any(Executor.class));
-                verify(procedureContextService, never()).buildProcedureContextResult(anyString(), anyString());
-                verify(procedureContextService, never()).buildEventContextResult(anyString(), anyString());
+                verify(ragContextBuilder, never()).buildProcedureContextResult(anyString(), anyString());
+                verify(ragContextBuilder, never()).buildEventContextResult(anyString(), anyString());
         }
 
         @Test
         void ask_contextBuilderFailure_keepsPartialContextInsteadOfFailingRequest() {
-                ProcedureContextService.EventContextResult eventContext = new ProcedureContextService.EventContextResult(
+                EventContextResult eventContext = new EventContextResult(
                                 "event-context",
                                 List.of(new Source("https://example.com/event", "Event")));
-                when(procedureContextService.detectContextRequirements(anyString(), eq("elprat")))
-                                .thenReturn(new ProcedureContextService.ContextRequirements(true, true, false, false));
-                when(procedureContextService.buildProcedureContextResultAsync(anyString(), eq("elprat"),
+                when(intentDetector.detectContextRequirements(anyString(), eq("elprat")))
+                                .thenReturn(new ContextRequirements(true, true, false, false));
+                when(ragContextBuilder.buildProcedureContextResultAsync(anyString(), eq("elprat"),
                                 any(Executor.class)))
                                 .thenReturn(CompletableFuture
                                                 .failedFuture(new IllegalStateException("procedure failed")));
-                when(procedureContextService.buildEventContextResultAsync(anyString(), eq("elprat"),
+                when(ragContextBuilder.buildEventContextResultAsync(anyString(), eq("elprat"),
                                 any(Executor.class)))
                                 .thenReturn(CompletableFuture.completedFuture(eventContext));
 
@@ -213,10 +233,10 @@ class OpenRouterServicesOrchestrationTest {
 
         @Test
         void ask_newsIntentWithoutMatches_returnsDeterministicFallbackWithoutCallingAi() {
-                when(procedureContextService.detectContextRequirements(anyString(), eq("elprat")))
-                                .thenReturn(new ProcedureContextService.ContextRequirements(false, false, true, false));
-                when(procedureContextService.buildNewsContextResult(anyString(), eq("elprat")))
-                                .thenReturn(new ProcedureContextService.NewsContextResult(null, List.of()));
+                when(intentDetector.detectContextRequirements(anyString(), eq("elprat")))
+                                .thenReturn(new ContextRequirements(false, false, true, false));
+                when(ragContextBuilder.buildNewsContextResult(anyString(), eq("elprat")))
+                                .thenReturn(new NewsContextResult(null, List.of()));
 
                 OpenRouterResponseDto response = service.ask("Any recent news about Martian taxes?", null, "elprat");
 
@@ -228,12 +248,12 @@ class OpenRouterServicesOrchestrationTest {
 
         @Test
         void ask_newsIntentWithMatches_callsAiWithNewsContextHash() {
-                ProcedureContextService.NewsContextResult newsContext = new ProcedureContextService.NewsContextResult(
+                NewsContextResult newsContext = new NewsContextResult(
                                 "news-context",
                                 List.of(new Source("https://example.com/news", "News")));
-                when(procedureContextService.detectContextRequirements(anyString(), eq("elprat")))
-                                .thenReturn(new ProcedureContextService.ContextRequirements(false, false, true, false));
-                when(procedureContextService.buildNewsContextResult(anyString(), eq("elprat")))
+                when(intentDetector.detectContextRequirements(anyString(), eq("elprat")))
+                                .thenReturn(new ContextRequirements(false, false, true, false));
+                when(ragContextBuilder.buildNewsContextResult(anyString(), eq("elprat")))
                                 .thenReturn(newsContext);
 
                 OpenRouterResponseDto response = service.ask("Latest news about recycling", null, "elprat");
@@ -246,12 +266,12 @@ class OpenRouterServicesOrchestrationTest {
 
         @Test
         void ask_cityInfoOnly_loadsCityInfoContextAndSources() {
-                ProcedureContextService.CityInfoContextResult cityInfoContext = new ProcedureContextService.CityInfoContextResult(
+                CityInfoContextResult cityInfoContext = new CityInfoContextResult(
                                 "cityinfo-context",
                                 List.of(new Source("https://example.com/cityinfo", "City Info")));
-                when(procedureContextService.detectContextRequirements(anyString(), eq("elprat")))
-                                .thenReturn(new ProcedureContextService.ContextRequirements(false, false, false, true));
-                when(procedureContextService.buildCityInfoContextResult(anyString(), eq("elprat")))
+                when(intentDetector.detectContextRequirements(anyString(), eq("elprat")))
+                                .thenReturn(new ContextRequirements(false, false, false, true));
+                when(ragContextBuilder.buildCityInfoContextResult(anyString(), eq("elprat")))
                                 .thenReturn(cityInfoContext);
 
                 OpenRouterResponseDto response = service.ask("municipal information", null, "elprat");
@@ -259,7 +279,7 @@ class OpenRouterServicesOrchestrationTest {
                 assertTrue(response.isSuccess());
                 assertFalse(response.getSources().isEmpty());
                 assertEquals("https://example.com/cityinfo", response.getSources().getFirst().getUrl());
-                verify(procedureContextService).buildCityInfoContextResult(anyString(), eq("elprat"));
+                verify(ragContextBuilder).buildCityInfoContextResult(anyString(), eq("elprat"));
                 verify(aiResponseService).callOpenRouterAndExtract(anyList(), eq("elprat"), eq(0L), anyLong());
         }
 }

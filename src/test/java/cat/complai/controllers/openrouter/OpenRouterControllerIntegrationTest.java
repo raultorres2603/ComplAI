@@ -13,9 +13,13 @@ import cat.complai.services.openrouter.IOpenRouterService;
 import cat.complai.controllers.openrouter.dto.AskRequest;
 import cat.complai.controllers.openrouter.dto.RedactRequest;
 import cat.complai.services.openrouter.OpenRouterServices;
+import cat.complai.services.openrouter.IntentDetector;
+import cat.complai.services.openrouter.RagContextBuilder;
+import cat.complai.services.openrouter.ClarificationService;
+import cat.complai.services.openrouter.StreamingOrchestrator;
+import cat.complai.services.openrouter.RedactOrchestrator;
 import cat.complai.services.openrouter.ai.AiResponseProcessingService;
 import cat.complai.services.openrouter.conversation.ConversationManagementService;
-import cat.complai.services.openrouter.procedure.ProcedureContextService;
 import cat.complai.services.openrouter.cache.ResponseCacheService;
 import cat.complai.services.openrouter.validation.InputValidationService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -38,7 +42,9 @@ import cat.complai.dto.openrouter.RedactAcceptedDto;
 import cat.complai.dto.sqs.RedactSqsMessage;
 import cat.complai.utilities.s3.S3PdfUploader;
 import cat.complai.utilities.sqs.SqsComplaintPublisher;
+import cat.complai.helpers.openrouter.CityInfoRagHelperRegistry;
 import cat.complai.helpers.openrouter.EventRagHelperRegistry;
+import cat.complai.helpers.openrouter.NewsRagHelperRegistry;
 import cat.complai.helpers.openrouter.ProcedureRagHelperRegistry;
 import cat.complai.helpers.openrouter.RedactPromptBuilder;
 
@@ -1060,16 +1066,26 @@ public class OpenRouterControllerIntegrationTest {
                 ObjectMapper objectMapper) {
             InputValidationService validationService = new InputValidationService(5000);
             ConversationManagementService conversationService = new ConversationManagementService(5);
-            // ResponseCacheService is injected from ApplicationContext
             AiResponseProcessingService aiResponseService = new AiResponseProcessingService(httpWrapper, cacheService,
                     30);
-            ProcedureContextService procedureContextService = new ProcedureContextService(
-                    new ProcedureRagHelperRegistry(),
-                    new EventRagHelperRegistry(),
-                    new RedactPromptBuilder());
+            ProcedureRagHelperRegistry procedureRegistry = new ProcedureRagHelperRegistry();
+            EventRagHelperRegistry eventRegistry = new EventRagHelperRegistry();
+            NewsRagHelperRegistry newsRegistry = new NewsRagHelperRegistry();
+            CityInfoRagHelperRegistry cityInfoRegistry = new CityInfoRagHelperRegistry();
+            RedactPromptBuilder redactPromptBuilder = new RedactPromptBuilder();
+            IntentDetector intentDetector = new IntentDetector(procedureRegistry, eventRegistry, newsRegistry,
+                    cityInfoRegistry);
+            RagContextBuilder ragContextBuilder = new RagContextBuilder(procedureRegistry, eventRegistry, newsRegistry,
+                    cityInfoRegistry, redactPromptBuilder);
+            ClarificationService clarificationService = new ClarificationService(procedureRegistry, intentDetector);
+            RedactOrchestrator redactOrchestrator = new RedactOrchestrator(validationService, conversationService,
+                    aiResponseService, redactPromptBuilder, null, null);
+            StreamingOrchestrator streamingOrchestrator = new StreamingOrchestrator(validationService,
+                    conversationService, ragContextBuilder, clarificationService, intentDetector,
+                    redactPromptBuilder, httpWrapper, objectMapper);
             return new OpenRouterServices(validationService, conversationService, aiResponseService,
-                    procedureContextService, new RedactPromptBuilder(), httpWrapper,
-                    objectMapper, null, null);
+                    intentDetector, ragContextBuilder, clarificationService,
+                    streamingOrchestrator, redactOrchestrator, redactPromptBuilder);
         }
 
         @Singleton

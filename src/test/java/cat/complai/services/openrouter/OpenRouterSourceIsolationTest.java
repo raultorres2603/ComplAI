@@ -11,8 +11,16 @@ import cat.complai.helpers.openrouter.RedactPromptBuilder;
 import cat.complai.services.openrouter.ai.AiResponseProcessingService;
 import cat.complai.services.openrouter.cache.ResponseCacheService;
 import cat.complai.services.openrouter.conversation.ConversationManagementService;
-import cat.complai.services.openrouter.procedure.ProcedureContextService;
 import cat.complai.services.openrouter.validation.InputValidationService;
+import cat.complai.services.openrouter.IntentDetector;
+import cat.complai.services.openrouter.RagContextBuilder;
+import cat.complai.services.openrouter.ClarificationService;
+import cat.complai.services.openrouter.StreamingOrchestrator;
+import cat.complai.services.openrouter.RedactOrchestrator;
+import cat.complai.helpers.openrouter.CivicVocabularyService;
+import cat.complai.config.CivicVocabularyConfig;
+import cat.complai.helpers.openrouter.NewsRagHelperRegistry;
+import cat.complai.helpers.openrouter.CityInfoRagHelperRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -50,11 +58,22 @@ public class OpenRouterSourceIsolationTest {
         ConversationManagementService conversationService = new ConversationManagementService(5);
         ResponseCacheService cacheService = new ResponseCacheService(true, 10, 500);
         AiResponseProcessingService aiResponseService = new AiResponseProcessingService(wrapper, cacheService, 30);
-        ProcedureContextService procedureContextService = new ProcedureContextService(wrapper.ragRegistry,
-                new EventRagHelperRegistry(), new RedactPromptBuilder());
+        RedactPromptBuilder promptBuilder = new RedactPromptBuilder();
+        IntentDetector intentDetector = new IntentDetector(wrapper.ragRegistry, new EventRagHelperRegistry(),
+                new NewsRagHelperRegistry(), new CityInfoRagHelperRegistry());
+        RagContextBuilder ragContextBuilder = new RagContextBuilder(wrapper.ragRegistry, new EventRagHelperRegistry(),
+                new NewsRagHelperRegistry(), new CityInfoRagHelperRegistry(), promptBuilder);
+        ClarificationService clarificationService = new ClarificationService(wrapper.ragRegistry, intentDetector);
         com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        StreamingOrchestrator streamingOrchestrator = new StreamingOrchestrator(validationService,
+                conversationService, ragContextBuilder, clarificationService, intentDetector,
+                promptBuilder, wrapper, objectMapper);
+        RedactOrchestrator redactOrchestrator = new RedactOrchestrator(validationService,
+                conversationService, aiResponseService, promptBuilder,
+                new CivicVocabularyService(), new CivicVocabularyConfig());
         return new OpenRouterServices(validationService, conversationService, aiResponseService,
-                procedureContextService, new RedactPromptBuilder(), wrapper, objectMapper, null, null);
+                intentDetector, ragContextBuilder, clarificationService,
+                streamingOrchestrator, redactOrchestrator, promptBuilder);
     }
 
     /**
