@@ -6,7 +6,12 @@ import cat.complai.helpers.openrouter.EventRagHelperRegistry;
 import cat.complai.helpers.openrouter.NewsRagHelperRegistry;
 import cat.complai.helpers.openrouter.ProcedureRagHelperRegistry;
 import cat.complai.helpers.openrouter.RagHelper;
-import cat.complai.helpers.openrouter.RedactPromptBuilder;
+import cat.complai.services.openrouter.IntentDetector;
+import cat.complai.services.openrouter.NewsContextResult;
+import cat.complai.services.openrouter.ProcedureContextResult;
+import cat.complai.services.openrouter.EventContextResult;
+import cat.complai.services.openrouter.RagContextBuilder;
+import cat.complai.services.openrouter.ContextRequirements;
 
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
@@ -26,11 +31,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ProcedureContextServiceTest {
 
         @Inject
-        ProcedureContextService procedureContextService;
+        RagContextBuilder ragContextBuilder;
+
+        @Inject
+        IntentDetector intentDetector;
 
         @Test
         void buildProcedureContextResult_returnsMaxThreeMatches() {
-                ProcedureContextService.ProcedureContextResult result = procedureContextService
+                ProcedureContextResult result = ragContextBuilder
                                 .buildProcedureContextResult("recycling waste", "testcity");
 
                 assertNotNull(result);
@@ -40,7 +48,7 @@ class ProcedureContextServiceTest {
 
         @Test
         void buildEventContextResult_returnsMaxThreeMatches() {
-                ProcedureContextService.EventContextResult result = procedureContextService
+                EventContextResult result = ragContextBuilder
                                 .buildEventContextResult("festival concert", "testcity");
 
                 assertNotNull(result);
@@ -50,7 +58,7 @@ class ProcedureContextServiceTest {
 
         @Test
         void buildProcedureContextResult_emptyQuery_returnsEmpty() {
-                ProcedureContextService.ProcedureContextResult result = procedureContextService
+                ProcedureContextResult result = ragContextBuilder
                                 .buildProcedureContextResult("", "testcity");
 
                 assertNotNull(result);
@@ -59,7 +67,7 @@ class ProcedureContextServiceTest {
 
         @Test
         void buildEventContextResult_emptyQuery_returnsEmpty() {
-                ProcedureContextService.EventContextResult result = procedureContextService
+                EventContextResult result = ragContextBuilder
                                 .buildEventContextResult("", "testcity");
 
                 assertNotNull(result);
@@ -75,7 +83,7 @@ class ProcedureContextServiceTest {
                 sourcesWithDuplicates.add(new Source("https://example.com/proc3", "Procedure 3"));
                 sourcesWithDuplicates.add(new Source("https://example.com/proc2", "Procedure 2"));
 
-                List<Source> deduped = procedureContextService.deDuplicateAndOrderSources(sourcesWithDuplicates);
+                List<Source> deduped = ragContextBuilder.deDuplicateAndOrderSources(sourcesWithDuplicates);
 
                 assertEquals(3, deduped.size());
                 assertEquals("https://example.com/proc1", deduped.get(0).getUrl());
@@ -85,54 +93,54 @@ class ProcedureContextServiceTest {
 
         @Test
         void questionNeedsProcedureContext_detects_keywords() {
-                assertTrue(procedureContextService.questionNeedsProcedureContext("How do I apply for a permit?",
+                assertTrue(intentDetector.questionNeedsProcedureContext("How do I apply for a permit?",
                                 "testcity"));
-                assertTrue(procedureContextService.questionNeedsProcedureContext("What are the requirements?",
+                assertTrue(intentDetector.questionNeedsProcedureContext("What are the requirements?",
                                 "testcity"));
-                assertFalse(procedureContextService.questionNeedsProcedureContext("What is the weather today?",
+                assertFalse(intentDetector.questionNeedsProcedureContext("What is the weather today?",
                                 "testcity"));
         }
 
         @Test
         void questionNeedsEventContext_detects_keywords() {
-                assertTrue(procedureContextService.questionNeedsEventContext("What events are happening?", "testcity"));
-                assertTrue(procedureContextService.questionNeedsEventContext("What's on this weekend?", "testcity"));
-                assertFalse(procedureContextService.questionNeedsEventContext("Tell me a joke", "testcity"));
+                assertTrue(intentDetector.questionNeedsEventContext("What events are happening?", "testcity"));
+                assertTrue(intentDetector.questionNeedsEventContext("What's on this weekend?", "testcity"));
+                assertFalse(intentDetector.questionNeedsEventContext("Tell me a joke", "testcity"));
         }
 
         @Test
         void requiresEventDateWindowClarification_returnsTrue_whenEventIntentHasNoDateWindow() {
-                assertTrue(procedureContextService.requiresEventDateWindowClarification(
+                assertTrue(intentDetector.requiresEventDateWindowClarification(
                                 "Quins esdeveniments hi ha?", "testcity"));
-                assertTrue(procedureContextService.requiresEventDateWindowClarification(
+                assertTrue(intentDetector.requiresEventDateWindowClarification(
                                 "What events are happening?", "testcity"));
-                assertTrue(procedureContextService.requiresEventDateWindowClarification(
+                assertTrue(intentDetector.requiresEventDateWindowClarification(
                                 "Que eventos hay en la ciudad?", "testcity"));
         }
 
         @Test
         void requiresEventDateWindowClarification_returnsFalse_whenDateWindowExists() {
-                assertFalse(procedureContextService.requiresEventDateWindowClarification(
+                assertFalse(intentDetector.requiresEventDateWindowClarification(
                                 "What events are happening this week?", "testcity"));
-                assertFalse(procedureContextService.requiresEventDateWindowClarification(
+                assertFalse(intentDetector.requiresEventDateWindowClarification(
                                 "Quins esdeveniments hi ha a l'abril?", "testcity"));
-                assertFalse(procedureContextService.requiresEventDateWindowClarification(
+                assertFalse(intentDetector.requiresEventDateWindowClarification(
                                 "Que eventos hay del 10/04 al 15/04?", "testcity"));
         }
 
         @Test
         void questionNeedsNewsContext_detects_keywords() {
-                assertTrue(procedureContextService.questionNeedsNewsContext("Any latest news in the city?",
+                assertTrue(intentDetector.questionNeedsNewsContext("Any latest news in the city?",
                                 "testcity"));
-                assertTrue(procedureContextService.questionNeedsNewsContext("Que diu l'actualitat municipal?",
+                assertTrue(intentDetector.questionNeedsNewsContext("Que diu l'actualitat municipal?",
                                 "testcity"));
-                assertFalse(procedureContextService.questionNeedsNewsContext("How do I apply for a permit?",
+                assertFalse(intentDetector.questionNeedsNewsContext("How do I apply for a permit?",
                                 "testcity"));
         }
 
         @Test
         void buildNewsContextResult_returnsEmpty_whenNoMatches() {
-                ProcedureContextService.NewsContextResult result = procedureContextService
+                NewsContextResult result = ragContextBuilder
                                 .buildNewsContextResult("martian taxation", "testcity");
 
                 assertNotNull(result);
@@ -145,12 +153,11 @@ class ProcedureContextServiceTest {
                                 List.of(new RagHelper.Procedure("p1", "Resident Parking Badge Renewal", "", "",
                                                 "",
                                                 "https://example.com/procedure")));
-                ProcedureContextService service = new ProcedureContextService(
+                IntentDetector service = new IntentDetector(
                                 new TestProcedureRegistry(Map.of("city-a", procedureHelper)),
                                 new TestEventRegistry(Map.of("city-a", new CountingEventRagHelper(List.of()))),
                                 new TestNewsRegistry(Map.of("city-a", new CountingNewsRagHelper(List.of()))),
-                                new TestCityInfoRegistry(Map.of("city-a", new CountingCityInfoRagHelper(List.of()))),
-                                new RedactPromptBuilder());
+                                new TestCityInfoRegistry(Map.of("city-a", new CountingCityInfoRagHelper(List.of()))));
 
                 assertTrue(service.questionNeedsProcedureContext("Need resident parking badge renewal today",
                                 "city-a"));
@@ -165,12 +172,11 @@ class ProcedureContextServiceTest {
                                 List.of(new RagHelper.Event("e1", "Neighborhood Meetup", "", "", "", "", "", "",
                                                 "",
                                                 "https://example.com/event")));
-                ProcedureContextService service = new ProcedureContextService(
+                IntentDetector service = new IntentDetector(
                                 new TestProcedureRegistry(Map.of("city-a", new CountingProcedureRagHelper(List.of()))),
                                 new TestEventRegistry(Map.of("city-a", eventHelper)),
                                 new TestNewsRegistry(Map.of("city-a", new CountingNewsRagHelper(List.of()))),
-                                new TestCityInfoRegistry(Map.of("city-a", new CountingCityInfoRagHelper(List.of()))),
-                                new RedactPromptBuilder());
+                                new TestCityInfoRegistry(Map.of("city-a", new CountingCityInfoRagHelper(List.of()))));
 
                 assertTrue(service.questionNeedsEventContext("Can I join the neighborhood meetup tonight?", "city-a"));
                 assertTrue(service.questionNeedsEventContext("Can I join the neighborhood meetup tonight?", "city-a"));
@@ -186,16 +192,15 @@ class ProcedureContextServiceTest {
                 CountingEventRagHelper eventHelper = new CountingEventRagHelper(
                                 List.of(new RagHelper.Event("e1", "Moonlight Concert", "", "", "", "", "", "", "",
                                                 "https://example.com/event")));
-                ProcedureContextService service = new ProcedureContextService(
+                IntentDetector service = new IntentDetector(
                                 new TestProcedureRegistry(Map.of("city-a", procedureHelper)),
                                 new TestEventRegistry(Map.of("city-a", eventHelper)),
                                 new TestNewsRegistry(Map.of("city-a", new CountingNewsRagHelper(List.of()))),
-                                new TestCityInfoRegistry(Map.of("city-a", new CountingCityInfoRagHelper(List.of()))),
-                                new RedactPromptBuilder());
+                                new TestCityInfoRegistry(Map.of("city-a", new CountingCityInfoRagHelper(List.of()))));
 
-                ProcedureContextService.ContextRequirements keywordRequirements = service
+                ContextRequirements keywordRequirements = service
                                 .detectContextRequirements("How do I apply for a permit?", "city-a");
-                ProcedureContextService.ContextRequirements conversationalRequirements = service
+                ContextRequirements conversationalRequirements = service
                                 .detectContextRequirements("Tell me a joke", "city-a");
 
                 assertTrue(keywordRequirements.needsProcedureContext());
@@ -218,7 +223,7 @@ class ProcedureContextServiceTest {
                                 List.of(new RagHelper.Procedure("p2", "Beach Access Permit", "", "", "",
                                                 "https://example.com/b")));
 
-                ProcedureContextService service = new ProcedureContextService(
+                IntentDetector service = new IntentDetector(
                                 new TestProcedureRegistry(Map.of("city-a", cityAHelper, "city-b", cityBHelper)),
                                 new TestEventRegistry(Map.of(
                                                 "city-a", new CountingEventRagHelper(List.of()),
@@ -228,8 +233,7 @@ class ProcedureContextServiceTest {
                                                 "city-b", new CountingNewsRagHelper(List.of()))),
                                 new TestCityInfoRegistry(Map.of(
                                                 "city-a", new CountingCityInfoRagHelper(List.of()),
-                                                "city-b", new CountingCityInfoRagHelper(List.of()))),
-                                new RedactPromptBuilder());
+                                                "city-b", new CountingCityInfoRagHelper(List.of()))));
 
                 assertTrue(service.questionNeedsProcedureContext("Need resident parking badge renewal today",
                                 "city-a"));
@@ -247,16 +251,15 @@ class ProcedureContextServiceTest {
                 CountingEventRagHelper eventHelper = new CountingEventRagHelper(
                                 List.of(new RagHelper.Event("e1", "Moonlight Concert", "", "", "", "", "", "", "",
                                                 "https://example.com/event")));
-                ProcedureContextService service = new ProcedureContextService(
+                IntentDetector service = new IntentDetector(
                                 new TestProcedureRegistry(Map.of("city-a", procedureHelper)),
                                 new TestEventRegistry(Map.of("city-a", eventHelper)),
                                 new TestNewsRegistry(Map.of("city-a", new CountingNewsRagHelper(List.of()))),
-                                new TestCityInfoRegistry(Map.of("city-a", new CountingCityInfoRagHelper(List.of()))),
-                                new RedactPromptBuilder());
+                                new TestCityInfoRegistry(Map.of("city-a", new CountingCityInfoRagHelper(List.of()))));
 
-                ProcedureContextService.ContextRequirements procedureRequirements = service
+                ContextRequirements procedureRequirements = service
                                 .detectContextRequirements("Need resident parking badge renewal today", "city-a");
-                ProcedureContextService.ContextRequirements eventRequirements = service
+                ContextRequirements eventRequirements = service
                                 .detectContextRequirements("Can I join the moonlight concert tonight?", "city-a");
 
                 assertTrue(procedureRequirements.needsProcedureContext());
@@ -276,14 +279,13 @@ class ProcedureContextServiceTest {
                 CountingEventRagHelper eventHelper = new CountingEventRagHelper(
                                 List.of(new RagHelper.Event("e1", "Moonlight Concert", "", "", "", "", "", "", "",
                                                 "https://example.com/event")));
-                ProcedureContextService service = new ProcedureContextService(
+                IntentDetector service = new IntentDetector(
                                 new TestProcedureRegistry(Map.of("city-a", procedureHelper)),
                                 new TestEventRegistry(Map.of("city-a", eventHelper)),
                                 new TestNewsRegistry(Map.of("city-a", new CountingNewsRagHelper(List.of()))),
-                                new TestCityInfoRegistry(Map.of("city-a", new CountingCityInfoRagHelper(List.of()))),
-                                new RedactPromptBuilder());
+                                new TestCityInfoRegistry(Map.of("city-a", new CountingCityInfoRagHelper(List.of()))));
 
-                ProcedureContextService.ContextRequirements requirements = service
+                ContextRequirements requirements = service
                                 .detectContextRequirements("resident parking badge renewal", "city-a");
 
                 assertTrue(requirements.needsProcedureContext());
@@ -305,14 +307,13 @@ class ProcedureContextServiceTest {
                                 new RagHelper.News("n1", "Latest municipal recycling update", "", "", "", "", "",
                                                 "https://example.com/news")));
 
-                ProcedureContextService service = new ProcedureContextService(
+                IntentDetector service = new IntentDetector(
                                 new TestProcedureRegistry(Map.of("city-a", procedureHelper)),
                                 new TestEventRegistry(Map.of("city-a", eventHelper)),
                                 new TestNewsRegistry(Map.of("city-a", newsHelper)),
-                                new TestCityInfoRegistry(Map.of("city-a", new CountingCityInfoRagHelper(List.of()))),
-                                new RedactPromptBuilder());
+                                new TestCityInfoRegistry(Map.of("city-a", new CountingCityInfoRagHelper(List.of()))));
 
-                ProcedureContextService.ContextRequirements requirements = service
+                ContextRequirements requirements = service
                                 .detectContextRequirements("Any latest news in the city?", "city-a");
 
                 assertFalse(requirements.needsProcedureContext());
@@ -330,14 +331,13 @@ class ProcedureContextServiceTest {
                                 new RagHelper.CityInfo("c1", "Turisme", "Punts d'interès", "", "", "",
                                                 "https://example.com/cityinfo")));
 
-                ProcedureContextService service = new ProcedureContextService(
+                IntentDetector service = new IntentDetector(
                                 new TestProcedureRegistry(Map.of("city-a", new CountingProcedureRagHelper(List.of()))),
                                 new TestEventRegistry(Map.of("city-a", new CountingEventRagHelper(List.of()))),
                                 new TestNewsRegistry(Map.of("city-a", new CountingNewsRagHelper(List.of()))),
-                                new TestCityInfoRegistry(Map.of("city-a", cityInfoHelper)),
-                                new RedactPromptBuilder());
+                                new TestCityInfoRegistry(Map.of("city-a", cityInfoHelper)));
 
-                ProcedureContextService.ContextRequirements requirements = service
+                ContextRequirements requirements = service
                                 .detectContextRequirements("Punts d'interès local", "city-a");
 
                 assertFalse(requirements.needsProcedureContext());

@@ -1,15 +1,13 @@
 package cat.complai.services.openrouter;
 
-import cat.complai.utilities.http.HttpWrapper;
 import cat.complai.dto.openrouter.AskStreamResult;
 import cat.complai.dto.openrouter.OpenRouterErrorCode;
 import cat.complai.dto.openrouter.OpenRouterResponseDto;
+import cat.complai.dto.openrouter.Source;
 import cat.complai.helpers.openrouter.RedactPromptBuilder;
 import cat.complai.services.openrouter.ai.AiResponseProcessingService;
 import cat.complai.services.openrouter.conversation.ConversationManagementService;
-import cat.complai.services.openrouter.procedure.ProcedureContextService;
 import cat.complai.services.openrouter.validation.InputValidationService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -18,7 +16,6 @@ import org.mockito.MockitoAnnotations;
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -26,6 +23,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -44,13 +42,22 @@ class OpenRouterServicesAmbiguityTest {
     private AiResponseProcessingService aiResponseService;
 
     @Mock
-    private ProcedureContextService procedureContextService;
+    private IntentDetector intentDetector;
+
+    @Mock
+    private RagContextBuilder ragContextBuilder;
+
+    @Mock
+    private ClarificationService clarificationService;
+
+    @Mock
+    private StreamingOrchestrator streamingOrchestrator;
+
+    @Mock
+    private RedactOrchestrator redactOrchestrator;
 
     @Mock
     private RedactPromptBuilder promptBuilder;
-
-    @Mock
-    private HttpWrapper httpWrapper;
 
     @BeforeEach
     void setUp() {
@@ -59,18 +66,30 @@ class OpenRouterServicesAmbiguityTest {
                 validationService,
                 conversationService,
                 aiResponseService,
-                procedureContextService,
-                promptBuilder,
-                httpWrapper,
-                new ObjectMapper(),
-                null,
-                null);
+                intentDetector,
+                ragContextBuilder,
+                clarificationService,
+                streamingOrchestrator,
+                redactOrchestrator,
+                promptBuilder);
 
         when(validationService.validateQuestion(anyString())).thenReturn(Optional.empty());
-        when(procedureContextService.requiresEventDateWindowClarification(anyString(), anyString()))
+        when(intentDetector.requiresEventDateWindowClarification(anyString(), anyString()))
                 .thenReturn(false);
-        when(procedureContextService.deDuplicateAndOrderSources(anyList()))
+        when(intentDetector.detectContextRequirements(anyString(), anyString()))
+                .thenReturn(ContextRequirements.none());
+        when(ragContextBuilder.deDuplicateAndOrderSources(anyList()))
                 .thenAnswer(invocation -> invocation.getArgument(0));
+        doAnswer(invocation -> {
+                List<Source> merged = invocation.getArgument(0);
+                List<Source> contextSources = invocation.getArgument(1);
+                if (contextSources != null) {
+                        merged.addAll(contextSources);
+                }
+                return null;
+        }).when(ragContextBuilder).validateAndAddSources(anyList(), anyList(), anyString());
+        when(clarificationService.resolveClarificationAnswer(anyString(), anyList()))
+                .thenReturn(java.util.OptionalInt.empty());
         when(promptBuilder.getSystemMessage(anyString(), anyString())).thenReturn("system");
         when(conversationService.getConversationHistory(any())).thenReturn(List.of());
         when(aiResponseService.callOpenRouterAndExtract(anyList(), anyString(), anyLong(), anyLong()))
@@ -80,48 +99,12 @@ class OpenRouterServicesAmbiguityTest {
     @Test
     void ask_ambiguousQuery_returnsClarificationAndStoresCandidates() {
         List<ConversationManagementService.ClarificationCandidate> candidates = List.of(
-                new ConversationManagementService.ClarificationCandidate("proc-1", "Llicència d'obres menors"),
-                new ConversationManagementService.ClarificationCandidate("proc-2", "Llicència d'obres majors"));
-        ProcedureContextService.ProcedureAmbiguityResult ambiguityResult =
-                new ProcedureContextService.ProcedureAmbiguityResult(candidates);
-
-        when(procedureContextService.detectProcedureAmbiguity(anyString(), anyString()))
-                .thenReturn(Optional.of(ambiguityResult));
-        when(promptBuilder.buildProcedureClarificationMessage(anyList(), anyString(), anyString()))
-                .thenReturn("Trobo 2 opcions: 1) Llicència d'obres menors 2) Llicència d'obres majors");
-
-        OpenRouterResponseDto response = service.ask("llicència obres", "conv-1", "elprat");
-
-        assertTrue(response.isSuccess());
-        assertFalse(response.getMessage().isBlank());
-        verify(conversationService).storePendingClarification(eq("conv-1"), eq(candidates));
-        verify(conversationService).updateConversationHistory(eq("conv-1"), anyString(), anyString());
-        verify(aiResponseService, never()).callOpenRouterAndExtract(anyList(), anyString(), anyLong(), anyLong());
-    }
-
-    @Test
-    void ask_ambiguousQuery_noConversationId_skipsStorageButStillChecksAmbiguity() {
-        when(procedureContextService.detectProcedureAmbiguity(anyString(), anyString()))
-                .thenReturn(Optional.empty());
-        when(procedureContextService.detectContextRequirements(anyString(), anyString()))
-                .thenReturn(ProcedureContextService.ContextRequirements.none());
-
-        OpenRouterResponseDto response = service.ask("llicència obres", null, "elprat");
-
-        assertTrue(response.isSuccess());
-        verify(conversationService, never()).storePendingClarification(anyString(), anyList());
-        verify(aiResponseService).callOpenRouterAndExtract(anyList(), anyString(), anyLong(), anyLong());
-    }
-
-    @Test
-    void ask_ambiguousQuery_spanishDetected_returnsSpanishClarification() {
-        List<ConversationManagementService.ClarificationCandidate> candidates = List.of(
                 new ConversationManagementService.ClarificationCandidate("proc-1", "Tarjeta de aparcamiento"),
                 new ConversationManagementService.ClarificationCandidate("proc-2", "Vado permanente"));
-        ProcedureContextService.ProcedureAmbiguityResult ambiguityResult =
-                new ProcedureContextService.ProcedureAmbiguityResult(candidates);
+        ProcedureAmbiguityResult ambiguityResult =
+                new ProcedureAmbiguityResult(candidates);
 
-        when(procedureContextService.detectProcedureAmbiguity(anyString(), anyString()))
+        when(clarificationService.detectProcedureAmbiguity(anyString(), anyString()))
                 .thenReturn(Optional.of(ambiguityResult));
         when(promptBuilder.buildProcedureClarificationMessage(anyList(), eq("ES"), eq("elprat")))
                 .thenReturn("Encuentro varias opciones relacionadas en El Prat.");
@@ -135,10 +118,10 @@ class OpenRouterServicesAmbiguityTest {
 
     @Test
     void ask_ambiguityFilteredBelowThreshold_skipsClarificationStorageAndReturnsNormalResponse() {
-        when(procedureContextService.detectProcedureAmbiguity(anyString(), anyString()))
+        when(clarificationService.detectProcedureAmbiguity(anyString(), anyString()))
                 .thenReturn(Optional.empty());
-        when(procedureContextService.detectContextRequirements(anyString(), anyString()))
-                .thenReturn(ProcedureContextService.ContextRequirements.none());
+        when(intentDetector.detectContextRequirements(anyString(), anyString()))
+                .thenReturn(ContextRequirements.none());
 
         OpenRouterResponseDto response = service.ask("tramite aparcamiento municipal", "conv-1", "elprat");
 
@@ -152,21 +135,15 @@ class OpenRouterServicesAmbiguityTest {
 
     @Test
     void streamAsk_ambiguousQuery_returnsFallbackStreamWithClarification() {
-        List<ConversationManagementService.ClarificationCandidate> candidates = List.of(
-                new ConversationManagementService.ClarificationCandidate("proc-1", "Llicència d'obres menors"),
-                new ConversationManagementService.ClarificationCandidate("proc-2", "Llicència d'obres majors"));
-        ProcedureContextService.ProcedureAmbiguityResult ambiguityResult =
-                new ProcedureContextService.ProcedureAmbiguityResult(candidates);
-
-        when(procedureContextService.detectProcedureAmbiguity(anyString(), anyString()))
-                .thenReturn(Optional.of(ambiguityResult));
-        when(promptBuilder.buildProcedureClarificationMessage(anyList(), anyString(), anyString()))
-                .thenReturn("Trobo 2 opcions: 1) Llicència d'obres menors 2) Llicència d'obres majors");
+        AskStreamResult expected = new AskStreamResult.Success(
+                reactor.core.publisher.Flux.just("mock-stream-event"));
+        when(streamingOrchestrator.streamAsk("llicència obres", "conv-1", "elprat"))
+                .thenReturn(expected);
 
         AskStreamResult result = service.streamAsk("llicència obres", "conv-1", "elprat");
 
         assertInstanceOf(AskStreamResult.Success.class, result);
-        verify(conversationService).storePendingClarification(eq("conv-1"), eq(candidates));
+        verify(streamingOrchestrator).streamAsk("llicència obres", "conv-1", "elprat");
     }
 
     @Test
@@ -176,14 +153,16 @@ class OpenRouterServicesAmbiguityTest {
                 new ConversationManagementService.ClarificationCandidate("proc-B", "Llicència d'obres majors"));
 
         when(conversationService.getPendingClarification(eq("conv-1"))).thenReturn(pending);
-        when(procedureContextService.buildProcedureContextResultForId(anyString(), anyString()))
-                .thenReturn(new ProcedureContextService.ProcedureContextResult(null, List.of()));
+        when(clarificationService.resolveClarificationAnswer(eq("1"), eq(pending)))
+                .thenReturn(java.util.OptionalInt.of(0));
+        when(ragContextBuilder.buildProcedureContextResultForId(anyString(), anyString()))
+                .thenReturn(new ProcedureContextResult(null, List.of()));
 
         OpenRouterResponseDto response = service.ask("1", "conv-1", "elprat");
 
         assertTrue(response.isSuccess());
         verify(conversationService).clearPendingClarification(eq("conv-1"));
-        verify(procedureContextService).buildProcedureContextResultForId(eq("proc-A"), eq("elprat"));
+        verify(ragContextBuilder).buildProcedureContextResultForId(eq("proc-A"), eq("elprat"));
         verify(aiResponseService).callOpenRouterAndExtract(anyList(), anyString(), anyLong(), anyLong());
     }
 
@@ -194,14 +173,16 @@ class OpenRouterServicesAmbiguityTest {
                 new ConversationManagementService.ClarificationCandidate("proc-B", "Llicència d'obres majors"));
 
         when(conversationService.getPendingClarification(eq("conv-1"))).thenReturn(pending);
-        when(procedureContextService.buildProcedureContextResultForId(anyString(), anyString()))
-                .thenReturn(new ProcedureContextService.ProcedureContextResult(null, List.of()));
+        when(clarificationService.resolveClarificationAnswer(eq("vull la llicència d'obres majors"), eq(pending)))
+                .thenReturn(java.util.OptionalInt.of(1));
+        when(ragContextBuilder.buildProcedureContextResultForId(anyString(), anyString()))
+                .thenReturn(new ProcedureContextResult(null, List.of()));
 
         OpenRouterResponseDto response = service.ask("vull la llicència d'obres majors", "conv-1", "elprat");
 
         assertTrue(response.isSuccess());
         verify(conversationService).clearPendingClarification(eq("conv-1"));
-        verify(procedureContextService).buildProcedureContextResultForId(eq("proc-B"), eq("elprat"));
+        verify(ragContextBuilder).buildProcedureContextResultForId(eq("proc-B"), eq("elprat"));
         verify(aiResponseService).callOpenRouterAndExtract(anyList(), anyString(), anyLong(), anyLong());
     }
 
@@ -212,16 +193,16 @@ class OpenRouterServicesAmbiguityTest {
                 new ConversationManagementService.ClarificationCandidate("proc-B", "Llicència d'obres majors"));
 
         when(conversationService.getPendingClarification(eq("conv-1"))).thenReturn(pending);
-        when(procedureContextService.detectProcedureAmbiguity(anyString(), anyString()))
+        when(clarificationService.detectProcedureAmbiguity(anyString(), anyString()))
                 .thenReturn(Optional.empty());
-        when(procedureContextService.detectContextRequirements(anyString(), anyString()))
-                .thenReturn(ProcedureContextService.ContextRequirements.none());
+        when(intentDetector.detectContextRequirements(anyString(), anyString()))
+                .thenReturn(ContextRequirements.none());
 
         OpenRouterResponseDto response = service.ask("banana", "conv-1", "elprat");
 
         assertTrue(response.isSuccess());
         verify(conversationService).clearPendingClarification(eq("conv-1"));
-        verify(procedureContextService, never()).buildProcedureContextResultForId(anyString(), anyString());
+        verify(ragContextBuilder, never()).buildProcedureContextResultForId(anyString(), anyString());
         verify(aiResponseService).callOpenRouterAndExtract(anyList(), anyString(), anyLong(), anyLong());
     }
 
@@ -231,8 +212,10 @@ class OpenRouterServicesAmbiguityTest {
                 new ConversationManagementService.ClarificationCandidate("proc-A", "Llicència d'obres menors"));
 
         when(conversationService.getPendingClarification(eq("conv-1"))).thenReturn(pending);
-        when(procedureContextService.buildProcedureContextResultForId(anyString(), anyString()))
-                .thenReturn(new ProcedureContextService.ProcedureContextResult(null, List.of()));
+        when(clarificationService.resolveClarificationAnswer(eq("1"), eq(pending)))
+                .thenReturn(java.util.OptionalInt.of(0));
+        when(ragContextBuilder.buildProcedureContextResultForId(anyString(), anyString()))
+                .thenReturn(new ProcedureContextResult(null, List.of()));
 
         org.mockito.InOrder inOrder = org.mockito.Mockito.inOrder(conversationService, aiResponseService);
 

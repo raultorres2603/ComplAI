@@ -238,7 +238,8 @@ class GencatProcedureScraperTest {
 
         try (MockedStatic<Jsoup> jsoupStatic = mockStatic(Jsoup.class, CALLS_REAL_METHODS)) {
             jsoupStatic.when(() -> Jsoup.connect(baseUrl)).thenReturn(new FakeConnection(baseHtml, baseUrl));
-            jsoupStatic.when(() -> Jsoup.connect(categoryPageUrl)).thenReturn(new FakeConnection(categoryHtml, categoryPageUrl));
+            jsoupStatic.when(() -> Jsoup.connect(categoryPageUrl))
+                    .thenReturn(new FakeConnection(categoryHtml, categoryPageUrl));
 
             Set<String> detailUrls = invokeCrawlProcedureDetailUrls(mapping);
 
@@ -273,8 +274,6 @@ class GencatProcedureScraperTest {
 
     @Test
     void crawlProcedureDetailUrls_handlesFetchErrorGracefully() throws Exception {
-        String baseUrl = "https://tramits.gencat.cat/ca/tramits/tramits-temes";
-
         ScraperMapping mapping = minimalMapping();
         mapping.crawl.categoryLinkSelector = null;
         mapping.crawl.additionalSeeds = null;
@@ -397,7 +396,8 @@ class GencatProcedureScraperTest {
 
         mapping.fields = new LinkedHashMap<>();
         mapping.fields.put("title", singleRule("div.fpca-tramit h1.menu-tramits-xl__title, h1.title"));
-        mapping.fields.put("description", singleRule("meta[name='description'], section#que-es p, div.contingut-tramit p"));
+        mapping.fields.put("description",
+                singleRule("meta[name='description'], section#que-es p, div.contingut-tramit p"));
         mapping.fields.put("requirements", multipleRule("section#requisits ul li, section#documentacio ul li"));
         mapping.fields.put("steps", multipleRule("div.steps-content ol li, section#steps ol li"));
         mapping.fields.put("targetAudience", singleRule("div.banner-tramits-xl__info dl:first-child dd a, dl dt + dd"));

@@ -43,27 +43,28 @@ The backend is built with Micronaut and deployed on AWS Lambda.
 ## Tech Stack
 
 | Area | Current implementation |
-|---|---|
+|---|---|---|
 | Language / runtime | Java 25 |
 | Framework | Micronaut 4.10.7 |
 | Build tool | Gradle (Shadow JAR: complai-all.jar) |
-| IaC | AWS CDK (TypeScript, cdk/) |
-| Cloud services | AWS Lambda, API Gateway HTTP API, SQS, S3, CloudWatch, optional WAF (production) |
-| AI provider | OpenRouter |
+| IaC | AWS CDK (TypeScript, cdk/) — 5 stacks |
+| Cloud services | AWS Lambda, API Gateway HTTP API, SQS, S3, CloudWatch, CloudFront, WAF (production) |
+| AI provider | OpenRouter (with circuit breaker pattern) |
 | RAG | In-memory lexical retrieval (InMemoryLexicalIndex, no Lucene dependency) |
-| Caching | Caffeine (conversation and response caches) |
+| Caching | Caffeine (conversation and response caches), CloudFront CDN (GET/OPTIONS) |
 | PDF | Apache PDFBox |
 | Auth / identity | API key auth (X-Api-Key) and OIDC ID token validation (X-Identity-Token) with JJWT |
 | HTML parsing | Jsoup |
+| Health checks | Deep health: S3, SQS, SES, RAG index, OpenRouter |
 | Tests | JUnit 5, Mockito, Bruno E2E |
 
 ## Architecture Overview
 Layering present in code:
 - Controllers: HTTP boundary and status mapping.
-- Services: orchestration, validation, AI calls, RAG composition.
+- Services: orchestration, validation, AI calls, RAG composition, clarification, streaming, redact.
 - Helpers: prompt building, language detection, parsing, PDF rendering.
 - Infrastructure adapters: SQS publishers/handlers and S3 upload/signing.
-- Caches: conversation state and short-lived response cache.
+- Caches: conversation state, short-lived response cache, circuit breaker state.
 
 Current backend request and async-processing flow:
 
@@ -72,7 +73,7 @@ flowchart TD
 	C[Clients\nWeb and API consumers]
 
 	subgraph API[Micronaut API Lambda]
-		F[Filters and Middleware\nApiKeyAuthFilter\nRateLimitFilter\nCorsFilter]
+		F[Filters and Middleware\nApiKeyAuthFilter\nRateLimitFilter\nCorsFilter\nCityIdLoggingFilter]
 
 		subgraph CTRL[Controllers]
 			HC[HomeController and HealthController]
@@ -82,10 +83,14 @@ flowchart TD
 
 		subgraph SVC[Services]
 			ORS[OpenRouterServices]
+			ID[IntentDetector]
+			RCB[RagContextBuilder]
+			CS[ClarificationService]
+			SO[StreamingOrchestrator]
+			RO[RedactOrchestrator]
 			IVS[InputValidationService]
 			CMS[ConversationManagementService]
 			ARS[AiResponseProcessingService]
-			PCS[ProcedureContextService]
 			FPS[FeedbackPublisherService]
 		end
 
@@ -93,10 +98,17 @@ flowchart TD
 			RH[RAG helpers\nNewsRagHelper and others]
 			RGW[RagWarmupService]
 			PDFH[PdfGenerator]
+			HCH[HealthCheckService]
+		end
+
+		subgraph INF[Infrastructure]
+			CB[CircuitBreaker\n(multi-city)]
+			HW[HttpWrapper\nmanual retry + circuit breaker]
 		end
 
 		subgraph IDX[Cache and Index]
 			CC[Caffeine conversation cache]
+			RC[Response cache]
 			ILI[InMemoryLexicalIndex]
 		end
 	end
@@ -113,13 +125,23 @@ flowchart TD
 
 	ORC --> IVS
 	ORC --> ORS
+	ORS --> ID
+	ORS --> RCB
+	ORS --> CS
+	ORS --> SO
+	ORS --> RO
 	ORS --> ARS
 	ORS --> CMS
-	ORS --> PCS
-	ORS --> RH
-	ORS --> ILI
+	ID --> ILI
+	RCB --> RH
+	CS --> ID
+	SO --> ID
+	SO --> RCB
+	SO --> CS
 	CMS --> CC
-	ORS --> ORAPI
+	ARS --> RC
+	HW --> CB
+	HW --> ORAPI
 
 	ORC --> SQS
 	FBC --> FPS
@@ -170,23 +192,37 @@ cd sam
 ./start-local.sh
 ```
 
+Or use the VS Code task (Ctrl+Shift+B → "Local SAM") which runs the same script from the `sam/` directory automatically.
+
 ## Testing
 
+Always run a clean build before tests to catch stale artifacts:
+
 ```bash
-./gradlew test
-./gradlew ciTest
+# Standard test run
+./gradlew clean build -x test test
+
+# CI-style run with verbose failure output (use before pushing)
+./gradlew clean build -x test ciTest
 ```
 
-E2E tests are in E2E-ComplAI (Bruno collection).
+E2E tests are in `E2E-ComplAI/` (Bruno collection).
 
 ## Infrastructure (CDK)
 
 | Stack | Main resources |
 |---|---|
-| ComplAIStorageStack-<env> | S3 buckets |
-| ComplAIQueueStack-<env> | SQS queues and DLQs |
-| ComplAILambdaStack-<env> | API Lambda, worker Lambdas, HTTP API |
-| ComplAIWafStack-production | WAF for production API |
+| `ComplAIStorageStack-<env>` | S3 buckets (procedures, events, news, city-info, complaints, feedback, deployments) |
+| `ComplAIQueueStack-<env>` | SQS queues and DLQs (redact, feedback) |
+| `ComplAILambdaStack-<env>` | API Lambda, redact worker Lambda, feedback worker Lambda, scheduled report Lambda, HTTP API, metric filters, reserved concurrency |
+| `ComplAIEdgeStack-production` | CloudFront distribution with WAF, geo-restriction (Spain), rate limiting, custom cache policy (60s TTL) |
+| `ComplAIWafStack-production` | WAF web ACL for production API |
+
+**Key infrastructure decisions:**
+
+- **Reserved concurrency**: each Lambda function has a guaranteed pool (API: 50, redact worker: 20, feedback worker: 10, scheduled report: 1) to prevent traffic spikes from starving other functions.
+- **CloudFront caching**: GET `/`, `/health`, `/health/startup` and OPTIONS preflight responses are cached for 60 seconds. POST requests bypass cache (CloudFront never caches them). The origin read timeout is set to 60 seconds to support long-running SSE streams.
+- **Log retention**: all Lambda log groups retain logs for 1 year for audit compliance and statistics.
 
 ```bash
 cd cdk
@@ -375,10 +411,13 @@ sequenceDiagram
 - Each city gets its own customized report email
 
 ## Performance Optimizations
-- Conversation cache with TTL and turn cap.
-- Response cache with privacy-preserving hash keys.
-- In-memory lexical RAG index.
-- Async queue-based complaint and feedback processing.
+- **Conversation cache** with 30-minute TTL and configurable max turns (default 5).
+- **Response cache** with privacy-preserving hash keys (cache keys contain only `cityId` + procedure/event hashes + question category — never user queries).
+- **In-memory lexical RAG index** (BM25) — no external database dependency.
+- **Common response pre-population** — top ~20 most common municipal queries can be cached at startup via `common-ai-requests.json`.
+- **Async queue-based** complaint and feedback processing (SQS).
+- **CloudFront CDN caching** — GET/OPTIONS responses cached for 60 seconds in production.
+- **Circuit breaker** per-city/per-model to fail fast when OpenRouter error rate exceeds 50%, with automatic recovery after cooldown.
 
 ## Conversation History (Multi-turn)
 Conversation context is stored by conversationId with a 30-minute TTL and configurable max turns (default 5).

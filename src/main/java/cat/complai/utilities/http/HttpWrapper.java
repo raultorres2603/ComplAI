@@ -7,7 +7,6 @@ import cat.complai.exceptions.OpenRouterStreamingException;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import io.micronaut.context.annotation.Value;
-import io.micronaut.retry.annotation.Retryable;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;

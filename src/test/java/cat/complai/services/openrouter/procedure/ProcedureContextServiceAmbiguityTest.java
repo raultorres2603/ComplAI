@@ -8,6 +8,12 @@ import cat.complai.helpers.openrouter.RagHelper;
 import cat.complai.helpers.openrouter.RedactPromptBuilder;
 import cat.complai.helpers.openrouter.rag.InMemoryLexicalIndex;
 import cat.complai.helpers.openrouter.rag.SearchResult;
+import cat.complai.services.openrouter.ClarificationService;
+import cat.complai.services.openrouter.ContextRequirements;
+import cat.complai.services.openrouter.IntentDetector;
+import cat.complai.services.openrouter.ProcedureAmbiguityResult;
+import cat.complai.services.openrouter.ProcedureContextResult;
+import cat.complai.services.openrouter.RagContextBuilder;
 import cat.complai.services.openrouter.conversation.ConversationManagementService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
 class ProcedureContextServiceAmbiguityTest {
@@ -37,22 +44,33 @@ class ProcedureContextServiceAmbiguityTest {
     RedactPromptBuilder promptBuilder;
     @Mock
     RagHelper<RagHelper.Procedure> procedureRagHelper;
+    @Mock
+    IntentDetector intentDetector;
 
-    ProcedureContextService service;
+    ClarificationService clarificationService;
+    RagContextBuilder ragContextBuilder;
 
     private static final String CITY = "testcity";
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        service = new ProcedureContextService(ragRegistry, eventRagRegistry, newsRagRegistry,
+        // Stub intentDetector.detectContextRequirements to return procedure context needed
+        when(intentDetector.detectContextRequirements(anyString(), anyString()))
+                .thenReturn(new ContextRequirements(true, false, false, false));
+        clarificationService = new ClarificationService(ragRegistry, intentDetector);
+        ragContextBuilder = new RagContextBuilder(ragRegistry, eventRagRegistry, newsRagRegistry,
                 cityInfoRagRegistry, promptBuilder);
     }
 
     @Test
     void detectProcedureAmbiguity_returnsEmpty_whenQueryRequiresNoProcedureContext() {
-        Optional<ProcedureContextService.ProcedureAmbiguityResult> result =
-                service.detectProcedureAmbiguity("hello", CITY);
+        // Override the default stub to return no context needed
+        when(intentDetector.detectContextRequirements("hello", CITY))
+                .thenReturn(new ContextRequirements(false, false, false, false));
+
+        Optional<ProcedureAmbiguityResult> result =
+                clarificationService.detectProcedureAmbiguity("hello", CITY);
 
         assertTrue(result.isEmpty());
     }
@@ -71,8 +89,8 @@ class ProcedureContextServiceAmbiguityTest {
         when(ragRegistry.getForCity(CITY)).thenReturn(procedureRagHelper);
         when(procedureRagHelper.searchWithScores("apply for permit")).thenReturn(response);
 
-        Optional<ProcedureContextService.ProcedureAmbiguityResult> result =
-                service.detectProcedureAmbiguity("apply for permit", CITY);
+        Optional<ProcedureAmbiguityResult> result =
+                clarificationService.detectProcedureAmbiguity("apply for permit", CITY);
 
         assertTrue(result.isEmpty());
     }
@@ -97,8 +115,8 @@ class ProcedureContextServiceAmbiguityTest {
         when(ragRegistry.getForCity(CITY)).thenReturn(procedureRagHelper);
         when(procedureRagHelper.searchWithScores("apply for permit")).thenReturn(response);
 
-        Optional<ProcedureContextService.ProcedureAmbiguityResult> result =
-                service.detectProcedureAmbiguity("apply for permit", CITY);
+        Optional<ProcedureAmbiguityResult> result =
+                clarificationService.detectProcedureAmbiguity("apply for permit", CITY);
 
         assertTrue(result.isPresent());
         List<ConversationManagementService.ClarificationCandidate> candidates = result.get().candidates();
@@ -133,8 +151,8 @@ class ProcedureContextServiceAmbiguityTest {
         when(procedureRagHelper.searchWithScores("tramite aparcamiento municipal avenida verge montserrat"))
                 .thenReturn(response);
 
-        Optional<ProcedureContextService.ProcedureAmbiguityResult> result =
-                service.detectProcedureAmbiguity("tramite aparcamiento municipal avenida verge montserrat", CITY);
+        Optional<ProcedureAmbiguityResult> result =
+                clarificationService.detectProcedureAmbiguity("tramite aparcamiento municipal avenida verge montserrat", CITY);
 
         assertTrue(result.isPresent());
         List<ConversationManagementService.ClarificationCandidate> candidates = result.get().candidates();
@@ -163,8 +181,8 @@ class ProcedureContextServiceAmbiguityTest {
         when(procedureRagHelper.searchWithScores("tramite aparcamiento municipal"))
                 .thenReturn(response);
 
-        Optional<ProcedureContextService.ProcedureAmbiguityResult> result =
-                service.detectProcedureAmbiguity("tramite aparcamiento municipal", CITY);
+        Optional<ProcedureAmbiguityResult> result =
+                clarificationService.detectProcedureAmbiguity("tramite aparcamiento municipal", CITY);
 
         assertTrue(result.isEmpty());
     }
@@ -180,8 +198,8 @@ class ProcedureContextServiceAmbiguityTest {
         when(promptBuilder.buildProcedureContextBlockFromMatches(List.of(proc), CITY))
                 .thenReturn("CONTEXT BLOCK");
 
-        ProcedureContextService.ProcedureContextResult result =
-                service.buildProcedureContextResultForId("proc-1", CITY);
+        ProcedureContextResult result =
+                ragContextBuilder.buildProcedureContextResultForId("proc-1", CITY);
 
         assertNotNull(result);
         assertEquals("CONTEXT BLOCK", result.getContextBlock());
@@ -195,8 +213,8 @@ class ProcedureContextServiceAmbiguityTest {
         when(ragRegistry.getForCity(CITY)).thenReturn(procedureRagHelper);
         when(procedureRagHelper.getAll()).thenReturn(List.of());
 
-        ProcedureContextService.ProcedureContextResult result =
-                service.buildProcedureContextResultForId("proc-unknown", CITY);
+        ProcedureContextResult result =
+                ragContextBuilder.buildProcedureContextResultForId("proc-unknown", CITY);
 
         assertNotNull(result);
         assertNull(result.getContextBlock());
