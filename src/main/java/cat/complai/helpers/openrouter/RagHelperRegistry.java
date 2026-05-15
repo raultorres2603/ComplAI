@@ -49,6 +49,20 @@ public abstract class RagHelperRegistry<T> {
         return helpersByCity.computeIfAbsent(cityId, this::buildHelper);
     }
 
+    /**
+     * Checks whether a {@link RagHelper} has already been loaded for the given
+     * city, without triggering a lazy build.
+     *
+     * <p>Useful for health checks and monitoring where we want to report
+     * whether the index is warm without incurring the cost of building it.
+     *
+     * @param cityId the city identifier
+     * @return {@code true} if a helper is already cached for this city
+     */
+    public boolean isLoaded(String cityId) {
+        return helpersByCity.containsKey(cityId);
+    }
+
     private RagHelper<T> buildHelper(String cityId) {
         long startTime = System.currentTimeMillis();
         RagHelper<T> helper = factory.apply(cityId);
