@@ -210,6 +210,7 @@ export class LambdaStack extends cdk.Stack {
       handler: 'io.micronaut.function.aws.proxy.payload2.APIGatewayV2HTTPEventFunction::handleRequest',
       code,
       memorySize: 1024,
+      reservedConcurrentExecutions: 50,
       timeout: cdk.Duration.seconds(60),
       // Wire the OpenRouter API key (from CFN parameter) into the Lambda environment.
       // Be aware that environment variables are visible in the Lambda console; using
@@ -400,6 +401,7 @@ export class LambdaStack extends cdk.Stack {
       handler: 'cat.complai.services.worker.RedactWorkerHandler::handleRequest',
       code,
       memorySize: 1024,
+      reservedConcurrentExecutions: 20,
       // Must be ≤ SQS visibility timeout (90s). Lambda extends visibility automatically
       // while running, so using the same duration is the safest choice here.
       timeout: cdk.Duration.seconds(60),
@@ -464,6 +466,7 @@ export class LambdaStack extends cdk.Stack {
       handler: 'cat.complai.services.worker.FeedbackWorkerHandler::handleRequest',
       code,
       memorySize: 512,  // Feedback processing is lighter than AI redaction
+      reservedConcurrentExecutions: 10,
       timeout: cdk.Duration.seconds(60),
       // Feedback worker environment
       environment: {
@@ -576,6 +579,7 @@ export class LambdaStack extends cdk.Stack {
       handler: 'cat.complai.services.ses.SesScheduledReportHandler::handleRequest',
       code,
       memorySize: 512,
+      reservedConcurrentExecutions: 1,
       timeout: cdk.Duration.seconds(60),
       environment: {
         // OpenRouter API key for AI predictions in statistics reports
