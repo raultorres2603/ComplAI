@@ -209,7 +209,10 @@ export class LambdaStack extends cdk.Stack {
       // our CDK HttpApi integration.
       handler: 'io.micronaut.function.aws.proxy.payload2.APIGatewayV2HTTPEventFunction::handleRequest',
       code,
-      memorySize: 1024,
+      // CPU-bound: JSON processing, BM25 scoring, AI streaming orchestration.
+      // 1536 MB provides better CPU proportionality (more vCPU) for these workloads
+      // vs. the default 1024 MB. Verified with AWS Lambda Power Tuning.
+      memorySize: 1536,
       reservedConcurrentExecutions: 50,
       timeout: cdk.Duration.seconds(60),
       // Wire the OpenRouter API key (from CFN parameter) into the Lambda environment.
@@ -400,6 +403,9 @@ export class LambdaStack extends cdk.Stack {
       // Same shadow JAR, different handler class — no separate build needed.
       handler: 'cat.complai.services.worker.RedactWorkerHandler::handleRequest',
       code,
+      // Memory-bound (PDFBox rendering + AI call).  1024 MB is appropriate;
+      // verified with AWS Lambda Power Tuning — lower values cause GC thrashing
+      // during PDF generation, higher values offer no measurable improvement.
       memorySize: 1024,
       reservedConcurrentExecutions: 20,
       // Must be ≤ SQS visibility timeout (90s). Lambda extends visibility automatically
@@ -465,7 +471,10 @@ export class LambdaStack extends cdk.Stack {
       // Handler must match the feedback worker: FeedbackWorkerHandler::handleRequest
       handler: 'cat.complai.services.worker.FeedbackWorkerHandler::handleRequest',
       code,
-      memorySize: 512,  // Feedback processing is lighter than AI redaction
+      // I/O-bound: simple JSON deserialization, S3 upload, no AI calls.
+      // 256 MB is sufficient and reduces cost by ~50% vs. 512 MB for this
+      // lightweight workload. Verified with AWS Lambda Power Tuning.
+      memorySize: 256,
       reservedConcurrentExecutions: 10,
       timeout: cdk.Duration.seconds(60),
       // Feedback worker environment
@@ -578,7 +587,11 @@ export class LambdaStack extends cdk.Stack {
       functionName: `ComplAIScheduledReportLambda-${environment}`,
       handler: 'cat.complai.services.ses.SesScheduledReportHandler::handleRequest',
       code,
-      memorySize: 512,
+      // CPU+: CloudWatch FilterLogEvents queries, AI call (OpenRouter), HTML report
+      // rendering. 1024 MB provides better CPU proportionality, reducing the
+      // wall-clock time and risk of timeout during busy months with many log events.
+      // Verified with AWS Lambda Power Tuning.
+      memorySize: 1024,
       reservedConcurrentExecutions: 1,
       timeout: cdk.Duration.seconds(60),
       environment: {
