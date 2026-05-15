@@ -66,7 +66,39 @@ export class EdgeStack extends cdk.Stack {
 
     const origin = new origins.HttpOrigin(
       `${httpApiId}.execute-api.${httpApiRegion}.amazonaws.com`,
+      {
+        // The read timeout must match the Lambda timeout (60 s) so that long-running
+        // requests like SSE streaming on /complai/ask are not terminated by CloudFront.
+        readTimeout: cdk.Duration.seconds(60),
+      },
     );
+
+    // Custom cache policy: cache idempotent responses (GET, HEAD, OPTIONS) for 60 s.
+    // POST / PUT / DELETE / PATCH requests are never cached by CloudFront regardless
+    // of the cache policy — they always reach the origin.
+    //
+    // This means:
+    //   - GET /, GET /health, GET /health/startup → cached for 60 s
+    //   - POST /complai/ask, POST /complai/redact, POST /complai/feedback → NOT cached
+    //   - OPTIONS preflight responses → cached for 60 s (keyed on Origin + CORS headers)
+    const cachePolicy = new cloudfront.CachePolicy(this, `ComplAICachePolicy-${environment}`, {
+      cachePolicyName: `ComplAICachePolicy-${environment}`,
+      comment: `Caches GET/HEAD/OPTIONS for 60 s — ComplAI ${environment}`,
+      defaultTtl: cdk.Duration.seconds(60),
+      minTtl: cdk.Duration.seconds(0),
+      maxTtl: cdk.Duration.seconds(60),
+      cookieBehavior: cloudfront.CacheCookieBehavior.none(),
+      // Include CORS-related headers in the cache key so that OPTIONS preflight
+      // responses are cached correctly for each distinct CORS request.
+      headerBehavior: cloudfront.CacheHeaderBehavior.allowList(
+        'Origin',
+        'Access-Control-Request-Method',
+        'Access-Control-Request-Headers',
+      ),
+      queryStringBehavior: cloudfront.CacheQueryStringBehavior.all(),
+      enableAcceptEncodingGzip: true,
+      enableAcceptEncodingBrotli: true,
+    });
 
     const distribution = new cloudfront.Distribution(this, `ComplAIDistribution-${environment}`, {
       comment: `ComplAI CloudFront - ${environment}`,
@@ -74,7 +106,7 @@ export class EdgeStack extends cdk.Stack {
       defaultBehavior: {
         origin,
         allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
-        cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+        cachePolicy,
         originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
       },
     });

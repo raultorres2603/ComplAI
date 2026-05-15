@@ -7,18 +7,49 @@ compatibility: opencode
 
 # Run Tests Command
 
-This project uses Gradle for testing. Here are the available test commands:
+This project uses Gradle for testing.
+
+## Recommended Workflow
+
+Before running any tests, always perform these three steps in order to ensure a clean state:
+
+```bash
+# Step 1 — Clean build artifacts (removes stale class files and cached test results)
+./gradlew clean
+
+# Step 2 — Compile and build the project (catches compilation errors early)
+./gradlew build -x test
+
+# Step 3 — Run the tests
+./gradlew test        # standard test run
+# or
+./gradlew ciTest      # CI-style run with verbose failure output
+```
+
+All in one line:
+
+```bash
+./gradlew clean build -x test test
+```
+
+Or with CI-style verbose failures:
+
+```bash
+./gradlew clean build -x test ciTest
+```
+
+> **Note:** `clean` removes previous build outputs and cached test results, ensuring stale artifacts do not affect test outcomes. `build -x test` compiles main and test code *without* running tests yet, surfacing any compilation failures before the test execution phase.
 
 ## Run All Tests
 
 ```bash
-./gradlew test
+./gradlew clean build -x test test
 ```
 
 ## CI-Style Test Run (Verbose Failures)
 
 ```bash
-./gradlew ciTest
+./gradlew clean build -x test ciTest
 ```
 
 This runs tests with verbose output, showing detailed failure information. Use this before pushing code.
@@ -26,29 +57,29 @@ This runs tests with verbose output, showing detailed failure information. Use t
 ## Run a Single Test Class
 
 ```bash
-./gradlew test --tests 'cat.complai.SomeTest'
+./gradlew clean build -x test test --tests 'cat.complai.SomeTest'
 ```
 
 Example:
 ```bash
-./gradlew test --tests 'cat.complai.HomeControllerTest'
+./gradlew clean build -x test test --tests 'cat.complai.HomeControllerTest'
 ```
 
 ## Run a Single Test Method
 
 ```bash
-./gradlew test --tests 'cat.complai.SomeTest.testMethodName'
+./gradlew clean build -x test test --tests 'cat.complai.SomeTest.testMethodName'
 ```
 
 Example:
 ```bash
-./gradlew test --tests 'cat.complai.HomeControllerTest.testHome'
+./gradlew clean build -x test test --tests 'cat.complai.HomeControllerTest.testHome'
 ```
 
 ## Run Tests for a Nested Class
 
 ```bash
-./gradlew test --tests 'cat.complai.SomeTest$NestedClass'
+./gradlew clean build -x test test --tests 'cat.complai.SomeTest$NestedClass'
 ```
 
 ## Test Authentication
