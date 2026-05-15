@@ -1,5 +1,6 @@
 package cat.complai.services.stadistics;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneId;
@@ -19,27 +20,27 @@ import cat.complai.services.stadistics.models.FeedbackFile;
 import cat.complai.services.stadistics.models.StadisticsModel;
 import cat.complai.services.stadistics.models.StadisticsModel.MonthlyData;
 import cat.complai.services.stadistics.models.StadisticsModel.ComparisonData;
+import cat.complai.utilities.metrics.InteractionMetricsPublisher;
 import cat.complai.utilities.s3.S3ComplaintLister;
 import cat.complai.utilities.s3.S3FeedbackLister;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import software.amazon.awssdk.regions.Region;
-import software.amazon.awssdk.services.cloudwatchlogs.CloudWatchLogsClient;
-import software.amazon.awssdk.services.cloudwatchlogs.model.FilterLogEventsRequest;
-import software.amazon.awssdk.services.cloudwatchlogs.model.FilterLogEventsResponse;
-import software.amazon.awssdk.services.cloudwatchlogs.model.ServiceUnavailableException;
+import software.amazon.awssdk.services.cloudwatch.CloudWatchClient;
+import software.amazon.awssdk.services.cloudwatch.model.Dimension;
+import software.amazon.awssdk.services.cloudwatch.model.GetMetricStatisticsRequest;
+import software.amazon.awssdk.services.cloudwatch.model.GetMetricStatisticsResponse;
+import software.amazon.awssdk.services.cloudwatch.model.Statistic;
 
 @Singleton
 public class StadisticsService implements IStadisticsService {
 
     private final Logger logger = LoggerFactory.getLogger(StadisticsService.class.getName());
-    private final String logGroupAsk = "/aws/lambda/ComplAILambda-" + System.getenv("ENVIRONMENT");
-    private final String logGroupRedact = "/aws/lambda/ComplAIRedactorLambda-" + System.getenv("ENVIRONMENT");
-    private final String logGroupFeedback = "/aws/lambda/ComplAIFeedbackWorkerLambda-" + System.getenv("ENVIRONMENT");
 
     private final S3ComplaintLister s3ComplaintLister;
     private final S3FeedbackLister s3FeedbackLister;
     private final IOpenRouterService openRouterService;
+    private final CloudWatchClient cloudWatchClient;
 
     @Inject
     public StadisticsService(S3ComplaintLister s3ComplaintLister, S3FeedbackLister s3FeedbackLister,
@@ -47,108 +48,89 @@ public class StadisticsService implements IStadisticsService {
         this.s3ComplaintLister = s3ComplaintLister;
         this.s3FeedbackLister = s3FeedbackLister;
         this.openRouterService = openRouterService;
+        this.cloudWatchClient = CloudWatchClient.builder()
+                .region(Region.EU_WEST_1)
+                .build();
+    }
+
+    /**
+     * Protected constructor for testing — allows injecting a mock CloudWatchClient.
+     */
+    protected StadisticsService(S3ComplaintLister s3ComplaintLister, S3FeedbackLister s3FeedbackLister,
+            IOpenRouterService openRouterService, CloudWatchClient cloudWatchClient) {
+        this.s3ComplaintLister = s3ComplaintLister;
+        this.s3FeedbackLister = s3FeedbackLister;
+        this.openRouterService = openRouterService;
+        this.cloudWatchClient = cloudWatchClient;
     }
 
     // ======================
-    // CloudWatch Logs Methods (with date range support)
+    // CloudWatch Metrics Methods (replaces previous FilterLogEvents calls)
     // ======================
 
-    private int totalRedactInteractions(Instant from, Instant to) {
-        logger.info("Fetching total redact interactions from CloudWatch Logs for log group: {} from={} to={}", logGroupRedact, from, to);
-        try (CloudWatchLogsClient logsClient = CloudWatchLogsClient.builder()
-                .region(Region.EU_WEST_1)
-                .build()) {
+    /**
+     * Queries the SUM of Interaction metrics from CloudWatch Metrics for a specific
+     * operation and time range.
+     *
+     * @param operation the operation type: "ASK", "REDACT", or "FEEDBACK"
+     * @param cityId    the city identifier, or null for all cities
+     * @param from      the start of the time range (inclusive)
+     * @param to        the end of the time range (exclusive)
+     * @return the total count of interactions matching the criteria
+     * @throws CloudWatchLogsException if CloudWatch Metrics is unavailable
+     */
+    private int queryInteractionCount(String operation, String cityId, Instant from, Instant to) {
+        logger.info("Querying CloudWatch Metrics — operation={} cityId={} from={} to={}",
+                operation, cityId, from, to);
 
-            long startTime = from.toEpochMilli();
-            long endTime = to.toEpochMilli();
-
-            FilterLogEventsRequest request = FilterLogEventsRequest.builder()
-                    .logGroupName(logGroupRedact)
-                    .startTime(startTime)
-                    .endTime(endTime)
-                    .build();
-
-            try {
-                FilterLogEventsResponse response = logsClient.filterLogEvents(request);
-                int totalInteractions = response.events().size();
-                logger.info("Total redact interactions found: {}", totalInteractions);
-                return totalInteractions;
-            } catch (ServiceUnavailableException e) {
-                logger.error("CloudWatch Logs service is currently unavailable: {}", e.getMessage());
-                throw new CloudWatchLogsException("CloudWatch Logs service is currently unavailable", e);
-            } catch (Exception e) {
-                logger.error("Error filtering redact interactions from CloudWatch Logs: {}", e.getMessage());
-                throw new CloudWatchLogsException("Error filtering redact interactions from CloudWatch Logs", e);
+        try {
+            // Period must cover the entire range in seconds
+            long rangeSeconds = Duration.between(from, to).getSeconds();
+            if (rangeSeconds <= 0) {
+                rangeSeconds = 60; // minimum 1 minute
             }
-        } catch (Exception e) {
-            logger.error("Error building CloudWatch connection for redact interactions: {}", e.getMessage());
-            throw new CloudWatchLogsException("Error building CloudWatch connection", e);
-        }
-    }
 
-    private int totalFeedbacks(Instant from, Instant to) {
-        logger.info("Fetching total feedback interactions from CloudWatch Logs for log group: {} from={} to={}", logGroupFeedback, from, to);
-        try (CloudWatchLogsClient logsClient = CloudWatchLogsClient.builder()
-                .region(Region.EU_WEST_1)
-                .build()) {
+            GetMetricStatisticsRequest.Builder requestBuilder = GetMetricStatisticsRequest.builder()
+                    .namespace(InteractionMetricsPublisher.METRICS_NAMESPACE)
+                    .metricName(InteractionMetricsPublisher.INTERACTION_METRIC_NAME)
+                    .startTime(from)
+                    .endTime(to)
+                    .period((int) Math.min(rangeSeconds, Integer.MAX_VALUE))
+                    .statistics(Statistic.SUM);
 
-            long startTime = from.toEpochMilli();
-            long endTime = to.toEpochMilli();
+            // Always add Operation dimension
+            requestBuilder.dimensions(
+                    Dimension.builder().name("Operation").value(operation).build());
 
-            FilterLogEventsRequest request = FilterLogEventsRequest.builder()
-                    .logGroupName(logGroupFeedback)
-                    .startTime(startTime)
-                    .endTime(endTime)
-                    .build();
-
-            try {
-                FilterLogEventsResponse response = logsClient.filterLogEvents(request);
-                int totalInteractions = response.events().size();
-                logger.info("Total feedback interactions found: {}", totalInteractions);
-                return totalInteractions;
-            } catch (ServiceUnavailableException e) {
-                logger.error("CloudWatch Logs service is currently unavailable: {}", e.getMessage());
-                throw new CloudWatchLogsException("CloudWatch Logs service is currently unavailable", e);
-            } catch (Exception e) {
-                logger.error("Error filtering feedback interactions from CloudWatch Logs: {}", e.getMessage());
-                throw new CloudWatchLogsException("Error filtering feedback interactions from CloudWatch Logs", e);
+            // Add City dimension if filtering by city
+            if (cityId != null && !cityId.isBlank()) {
+                requestBuilder.dimensions(
+                        Dimension.builder().name("Operation").value(operation).build(),
+                        Dimension.builder().name("City").value(cityId).build());
             }
-        } catch (Exception e) {
-            logger.error("Error building CloudWatch connection for feedback interactions: {}", e.getMessage());
-            throw new CloudWatchLogsException("Error building CloudWatch connection", e);
-        }
-    }
 
-    private int totalAskInteractions(Instant from, Instant to) {
-        logger.info("Fetching total ask interactions from CloudWatch Logs for log group: {} from={} to={}", logGroupAsk, from, to);
-        try (CloudWatchLogsClient logsClient = CloudWatchLogsClient.builder()
-                .region(Region.EU_WEST_1)
-                .build()) {
+            GetMetricStatisticsResponse response = cloudWatchClient.getMetricStatistics(requestBuilder.build());
 
-            long startTime = from.toEpochMilli();
-            long endTime = to.toEpochMilli();
-
-            FilterLogEventsRequest request = FilterLogEventsRequest.builder()
-                    .logGroupName(logGroupAsk)
-                    .startTime(startTime)
-                    .endTime(endTime)
-                    .build();
-
-            try {
-                FilterLogEventsResponse response = logsClient.filterLogEvents(request);
-                int totalInteractions = response.events().size();
-                logger.info("Total ask interactions found: {}", totalInteractions);
-                return totalInteractions;
-            } catch (ServiceUnavailableException e) {
-                logger.error("CloudWatch Logs service is currently unavailable: {}", e.getMessage());
-                throw new CloudWatchLogsException("CloudWatch Logs service is currently unavailable", e);
-            } catch (Exception e) {
-                logger.error("Error filtering ask interactions from CloudWatch Logs: {}", e.getMessage());
-                throw new CloudWatchLogsException("Error filtering ask interactions from CloudWatch Logs", e);
+            if (response.datapoints() == null || response.datapoints().isEmpty()) {
+                logger.debug("No CloudWatch Metrics datapoints found — operation={} cityId={}", operation, cityId);
+                return 0;
             }
+
+            // Sum all datapoints (there should be only one with SUM + period=range)
+            double total = response.datapoints().stream()
+                    .mapToDouble(dp -> dp.sum() != null ? dp.sum() : 0.0)
+                    .sum();
+
+            int result = (int) Math.round(total);
+            logger.info("CloudWatch Metrics query result — operation={} cityId={} count={}",
+                    operation, cityId, result);
+            return result;
+
         } catch (Exception e) {
-            logger.error("Error building CloudWatch connection: {}", e.getMessage());
-            throw new CloudWatchLogsException("Error building CloudWatch connection", e);
+            logger.error("Failed to query CloudWatch Metrics — operation={} cityId={}: {}",
+                    operation, cityId, e.getMessage(), e);
+            throw new CloudWatchLogsException("Failed to query CloudWatch Metrics for operation="
+                    + operation + " cityId=" + cityId, e);
         }
     }
 
@@ -245,9 +227,9 @@ public class StadisticsService implements IStadisticsService {
                 monthEnd = ym.atEndOfMonth().atStartOfDay(zone).toInstant().plus(1, ChronoUnit.DAYS);
             }
 
-            int ask = totalAskInteractions(monthStart, monthEnd);
-            int redact = totalRedactInteractions(monthStart, monthEnd);
-            int feedback = totalFeedbacks(monthStart, monthEnd);
+            int ask = queryInteractionCount("ASK", cityId, monthStart, monthEnd);
+            int redact = queryInteractionCount("REDACT", cityId, monthStart, monthEnd);
+            int feedback = queryInteractionCount("FEEDBACK", cityId, monthStart, monthEnd);
             ArrayList<ComplaintFile> complaintFiles = getComplaintFiles(monthStart, monthEnd);
             ArrayList<FeedbackFile> feedbackFiles = getFeedbackFiles(monthStart, monthEnd);
 

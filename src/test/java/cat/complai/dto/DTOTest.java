@@ -553,7 +553,7 @@ class DTOTest {
         @Test
         @DisplayName("Should have expected enum constants")
         void shouldHaveExpectedConstants() {
-            assertEquals(8, OpenRouterErrorCode.values().length);
+            assertEquals(9, OpenRouterErrorCode.values().length);
         }
 
         @Test

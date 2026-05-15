@@ -13,6 +13,7 @@ import cat.complai.controllers.openrouter.dto.RedactRequest;
 import cat.complai.dto.openrouter.ComplainantIdentity;
 import cat.complai.dto.openrouter.OutputFormat;
 import cat.complai.helpers.openrouter.AuditLogger;
+import cat.complai.utilities.metrics.InteractionMetricsPublisher;
 import cat.complai.utilities.s3.S3PdfUploader;
 import cat.complai.utilities.sqs.SqsComplaintPublisher;
 import cat.complai.dto.sqs.RedactSqsMessage;
@@ -67,6 +68,7 @@ public class OpenRouterController {
         private final IOpenRouterService service;
         private final SqsComplaintPublisher sqsPublisher;
         private final S3PdfUploader s3PdfUploader;
+        private final InteractionMetricsPublisher metricsPublisher;
         // Null when jwt.secret is not configured (worker Lambda). When non-null,
         // individual
         // cities may still have verification disabled — check isEnabledForCity() before
@@ -78,10 +80,12 @@ public class OpenRouterController {
         public OpenRouterController(IOpenRouterService service,
                         SqsComplaintPublisher sqsPublisher,
                         S3PdfUploader s3PdfUploader,
+                        InteractionMetricsPublisher metricsPublisher,
                         @Nullable OidcIdentityTokenValidator identityTokenValidator) {
                 this.service = service;
                 this.sqsPublisher = sqsPublisher;
                 this.s3PdfUploader = s3PdfUploader;
+                this.metricsPublisher = metricsPublisher;
                 this.identityTokenValidator = identityTokenValidator;
         }
 
@@ -107,6 +111,8 @@ public class OpenRouterController {
                         AuditLogger.log("/complai/ask",
                                         AuditLogger.hashText(questionText),
                                         errorCode.getCode(), latency, null, null);
+                        metricsPublisher.publishInteraction("ASK", cityId,
+                                        false, latency);
                         if (errorCode == OpenRouterErrorCode.UPSTREAM || errorCode == OpenRouterErrorCode.TIMEOUT) {
                                 logger.warning(() -> "POST /complai/ask rejected before stream start — conversationId="
                                                 + conversationId + " errorCode=" + errorCode + " latencyMs=" + latency
@@ -128,6 +134,8 @@ public class OpenRouterController {
                                         AuditLogger.log("/complai/ask",
                                                         AuditLogger.hashText(questionText),
                                                         OpenRouterErrorCode.NONE.getCode(), latency, null, null);
+                                        metricsPublisher.publishInteraction("ASK", cityId,
+                                                        true, latency);
                                         logger.info(() -> "POST /complai/ask (stream) completed — conversationId="
                                                         + conversationId + " latencyMs=" + latency);
                                 })
@@ -137,6 +145,8 @@ public class OpenRouterController {
                                         AuditLogger.log("/complai/ask",
                                                         AuditLogger.hashText(questionText),
                                                         errorCode.getCode(), latency, null, null);
+                                        metricsPublisher.publishInteraction("ASK", cityId,
+                                                        false, latency);
                                         Level logLevel = errorCode == OpenRouterErrorCode.INTERNAL ? Level.SEVERE
                                                         : Level.WARNING;
                                         logger.log(logLevel, "POST /complai/ask (stream) error — conversationId="
@@ -168,6 +178,8 @@ public class OpenRouterController {
                                 AuditLogger.log("/complai/redact", AuditLogger.hashText(text),
                                                 OpenRouterErrorCode.VALIDATION.getCode(), latency,
                                                 format != null ? format.name() : null, null);
+                                metricsPublisher.publishInteraction("REDACT", cityId,
+                                                false, latency);
                                 logger.info(() -> "POST /complai/redact rejected — httpStatus=400 reason=unsupportedFormat"
                                                 + " format=" + format + " latencyMs=" + latency + " conversationId="
                                                 + conversationId);
@@ -191,6 +203,8 @@ public class OpenRouterController {
                                         AuditLogger.log("/complai/redact", AuditLogger.hashText(text),
                                                         OpenRouterErrorCode.UNAUTHORIZED.getCode(), latency,
                                                         format != null ? format.name() : null, null);
+                                        metricsPublisher.publishInteraction("REDACT", cityId,
+                                                        false, latency);
                                         logger.warning(() -> "POST /complai/redact rejected — httpStatus=401"
                                                         + " reason=missingIdentityToken"
                                                         + " conversationId=" + conversationId);
@@ -210,6 +224,8 @@ public class OpenRouterController {
                                         AuditLogger.log("/complai/redact", AuditLogger.hashText(text),
                                                         OpenRouterErrorCode.UNAUTHORIZED.getCode(), latency,
                                                         format != null ? format.name() : null, null);
+                                        metricsPublisher.publishInteraction("REDACT", cityId,
+                                                        false, latency);
                                         logger.warning(() -> "POST /complai/redact rejected — httpStatus=401"
                                                         + " reason=invalidIdentityToken: " + e.getMessage()
                                                         + " conversationId=" + conversationId);
@@ -234,6 +250,10 @@ public class OpenRouterController {
                                         dto != null ? dto.getErrorCode().getCode() : -1, latency,
                                         format != null ? format.name() : null, null);
 
+                        boolean success = dto != null && dto.isSuccess();
+                        metricsPublisher.publishInteraction("REDACT", cityId,
+                                        success, latency);
+
                         HttpResponse<?> response = errorToHttpResponse(dto, "redact");
                         logger.info(() -> "POST /complai/redact completed (sync) — httpStatus="
                                         + (response instanceof MutableHttpResponse<?> mr ? mr.status().getCode() : "?")
@@ -250,6 +270,8 @@ public class OpenRouterController {
                                         request != null && request.getFormat() != null ? request.getFormat().name()
                                                         : null,
                                         null);
+                        metricsPublisher.publishInteraction("REDACT", cityId,
+                                        false, latency);
                         logger.log(Level.SEVERE, "POST /complai/redact failed — httpStatus=500"
                                         + " latencyMs=" + latency + " conversationId=" + conversationId, e);
                         OpenRouterPublicDto err = new OpenRouterPublicDto(false, null,
@@ -279,6 +301,8 @@ public class OpenRouterController {
                         AuditLogger.log("/complai/redact", AuditLogger.hashText(text),
                                         err.getErrorCode().getCode(), latency, format != null ? format.name() : null,
                                         null);
+                        metricsPublisher.publishInteraction("REDACT", cityId,
+                                        false, latency);
                         return errorToHttpResponse(err, "redact").contentType(MediaType.APPLICATION_JSON);
                 }
 
@@ -287,8 +311,11 @@ public class OpenRouterController {
                 try {
                         pdfUrl = s3PdfUploader.generatePresignedGetUrl(s3Key);
                 } catch (Exception e) {
+                        long latency = System.currentTimeMillis() - requestStart;
                         logger.log(Level.SEVERE, "POST /complai/redact — httpStatus=500 reason=presignedUrlFailed"
                                         + " s3Key=" + s3Key + " conversationId=" + conversationId, e);
+                        metricsPublisher.publishInteraction("REDACT", cityId,
+                                        false, latency);
                         OpenRouterPublicDto err = new OpenRouterPublicDto(false, null,
                                         "Failed to prepare complaint storage URL.",
                                         OpenRouterErrorCode.INTERNAL.getCode(), List.of());
@@ -301,8 +328,11 @@ public class OpenRouterController {
                 try {
                         sqsPublisher.publish(sqsMessage);
                 } catch (Exception e) {
+                        long latency = System.currentTimeMillis() - requestStart;
                         logger.log(Level.SEVERE, "POST /complai/redact — httpStatus=500 reason=sqsPublishFailed"
                                         + " s3Key=" + s3Key + " conversationId=" + conversationId, e);
+                        metricsPublisher.publishInteraction("REDACT", cityId,
+                                        false, latency);
                         OpenRouterPublicDto err = new OpenRouterPublicDto(false, null,
                                         "Failed to queue complaint generation. Please try again.",
                                         OpenRouterErrorCode.INTERNAL.getCode(), List.of());
@@ -314,6 +344,8 @@ public class OpenRouterController {
                 AuditLogger.log("/complai/redact", AuditLogger.hashText(text),
                                 OpenRouterErrorCode.NONE.getCode(), latency, format != null ? format.name() : null,
                                 detectedLanguage);
+                metricsPublisher.publishInteraction("REDACT", cityId,
+                                true, latency);
 
                 logger.info(() -> "POST /complai/redact completed (async) — httpStatus=202"
                                 + " s3Key=" + s3Key + " latencyMs=" + latency

@@ -6,6 +6,7 @@ import cat.complai.dto.feedback.FeedbackErrorCode;
 import cat.complai.dto.feedback.FeedbackResult;
 import cat.complai.services.feedback.FeedbackPublisherService;
 import cat.complai.utilities.auth.ApiKeyAuthFilter;
+import cat.complai.utilities.metrics.InteractionMetricsPublisher;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -36,11 +37,14 @@ import java.util.logging.Logger;
 public class FeedbackController {
 
     private final FeedbackPublisherService publisherService;
+    private final InteractionMetricsPublisher metricsPublisher;
     private final Logger logger = Logger.getLogger(FeedbackController.class.getName());
 
     @Inject
-    public FeedbackController(FeedbackPublisherService publisherService) {
+    public FeedbackController(FeedbackPublisherService publisherService,
+                              InteractionMetricsPublisher metricsPublisher) {
         this.publisherService = publisherService;
+        this.metricsPublisher = metricsPublisher;
     }
 
     /**
@@ -86,6 +90,8 @@ public class FeedbackController {
                 case FeedbackResult.Success success -> {
                     long latency = System.currentTimeMillis() - startTime;
                     FeedbackAcceptedDto data = success.data();
+                    metricsPublisher.publishInteraction("FEEDBACK", city,
+                                    true, latency);
                     logger.info(() -> "POST /complai/feedback — httpStatus=202 feedbackId="
                             + data.feedbackId() + " latencyMs=" + latency + " city=" + city);
                     yield HttpResponse.status(HttpStatus.ACCEPTED).body(data).contentType(MediaType.APPLICATION_JSON);
@@ -94,6 +100,8 @@ public class FeedbackController {
                     long latency = System.currentTimeMillis() - startTime;
                     FeedbackErrorCode code = error.errorCode();
                     int httpStatus = code == FeedbackErrorCode.VALIDATION ? 400 : 500;
+                    metricsPublisher.publishInteraction("FEEDBACK", city,
+                                    false, latency);
                     logger.info(() -> "POST /complai/feedback — httpStatus=" + httpStatus
                             + " errorCode=" + code.getCode() + " latencyMs=" + latency + " city=" + city);
 
@@ -114,6 +122,8 @@ public class FeedbackController {
 
         } catch (Exception e) {
             long latency = System.currentTimeMillis() - startTime;
+            metricsPublisher.publishInteraction("FEEDBACK", city,
+                            false, latency);
             logger.log(Level.SEVERE, "POST /complai/feedback failed — httpStatus=500"
                     + " latencyMs=" + latency + " city=" + city, e);
 
