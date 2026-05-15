@@ -23,6 +23,16 @@ import java.util.function.Function;
  */
 public final class InMemoryLexicalIndex<T> {
 
+    /**
+     * A posting links a term occurrence in a specific document and field to its
+     * term frequency.
+     *
+     * @param docIndex       index into the {@link #documents} list
+     * @param termFrequency  how many times the term appears in this doc+field
+     */
+    private record Posting(int docIndex, int termFrequency) {
+    }
+
     private final List<IndexedDocument<T>> documents;
     private final Map<String, Double> averageFieldLength;
     private final Map<String, Map<String, Integer>> docFrequencyByField;
@@ -30,25 +40,53 @@ public final class InMemoryLexicalIndex<T> {
     private final LexicalScorer lexicalScorer;
 
     /**
-     * Constructs an index from pre-computed document statistics.
+     * Inverted index mapping term {@literal →} field {@literal →} postings.
+     * <p>
+     * Provides O(1) lookups for candidate documents containing a given term,
+     * replacing the previous O(n) linear scan over all documents.
+     */
+    private final Map<String, Map<String, List<Posting>>> invertedIndex;
+
+    /**
+     * Constructs an index from pre-computed document statistics and an inverted
+     * index.
      *
      * @param documents           list of indexed documents
      * @param averageFieldLength  average token count per field, keyed by field name
      * @param docFrequencyByField per-field document-frequency map, keyed by field
      *                            then term
      * @param fieldWeights        relative scoring weight for each field
+     * @param invertedIndex       term → field → postings for O(1) candidate lookup
      * @param lexicalScorer       BM25 scorer used at query time
      */
     public InMemoryLexicalIndex(List<IndexedDocument<T>> documents,
             Map<String, Double> averageFieldLength,
             Map<String, Map<String, Integer>> docFrequencyByField,
             Map<String, Double> fieldWeights,
+            Map<String, Map<String, List<Posting>>> invertedIndex,
             LexicalScorer lexicalScorer) {
         this.documents = List.copyOf(documents);
         this.averageFieldLength = Map.copyOf(averageFieldLength);
         this.docFrequencyByField = Map.copyOf(docFrequencyByField);
         this.fieldWeights = Map.copyOf(fieldWeights);
+        this.invertedIndex = deepCopyInvertedIndex(invertedIndex);
         this.lexicalScorer = Objects.requireNonNull(lexicalScorer, "lexicalScorer");
+    }
+
+    /**
+     * Creates an immutable deep copy of the inverted index.
+     */
+    private static <T> Map<String, Map<String, List<Posting>>> deepCopyInvertedIndex(
+            Map<String, Map<String, List<Posting>>> source) {
+        Map<String, Map<String, List<Posting>>> copy = new HashMap<>();
+        for (Map.Entry<String, Map<String, List<Posting>>> termEntry : source.entrySet()) {
+            Map<String, List<Posting>> fieldMap = new HashMap<>();
+            for (Map.Entry<String, List<Posting>> fieldEntry : termEntry.getValue().entrySet()) {
+                fieldMap.put(fieldEntry.getKey(), List.copyOf(fieldEntry.getValue()));
+            }
+            copy.put(termEntry.getKey(), Map.copyOf(fieldMap));
+        }
+        return Map.copyOf(copy);
     }
 
     /**
@@ -69,6 +107,7 @@ public final class InMemoryLexicalIndex<T> {
         List<IndexedDocument<T>> docs = new ArrayList<>();
         Map<String, Integer> totalFieldLengths = new HashMap<>();
         Map<String, Map<String, Integer>> docFrequencies = new HashMap<>();
+        Map<String, Map<String, List<Posting>>> invIndex = new HashMap<>();
 
         int sourceOrder = 0;
         for (T entity : entities) {
@@ -76,6 +115,8 @@ public final class InMemoryLexicalIndex<T> {
             Map<String, List<String>> fieldTokens = new LinkedHashMap<>();
             Map<String, Integer> fieldLengths = new LinkedHashMap<>();
             Map<String, Map<String, Integer>> termFrequenciesByField = new LinkedHashMap<>();
+
+            int docIndex = docs.size(); // index for this document in the list
 
             for (Map.Entry<String, Double> weightedField : fieldWeights.entrySet()) {
                 String fieldName = weightedField.getKey();
@@ -98,6 +139,13 @@ public final class InMemoryLexicalIndex<T> {
                             ignored -> new HashMap<>());
                     int currentDocFrequency = byField.getOrDefault(token, 0);
                     byField.put(token, currentDocFrequency + 1);
+
+                    // Build inverted index: term → field → list of postings
+                    int tf = termFrequency.get(token);
+                    invIndex
+                            .computeIfAbsent(token, k -> new HashMap<>())
+                            .computeIfAbsent(fieldName, k -> new ArrayList<>())
+                            .add(new Posting(docIndex, tf));
                 }
             }
 
@@ -125,6 +173,7 @@ public final class InMemoryLexicalIndex<T> {
                 averageFieldLength,
                 immutableDocFrequencies,
                 fieldWeights,
+                invIndex,
                 new LexicalScorer());
     }
 
@@ -148,6 +197,7 @@ public final class InMemoryLexicalIndex<T> {
         List<IndexedDocument<T>> docs = new ArrayList<>();
         Map<String, Integer> totalFieldLengths = new HashMap<>();
         Map<String, Map<String, Integer>> docFrequencies = new HashMap<>();
+        Map<String, Map<String, List<Posting>>> invIndex = new HashMap<>();
 
         int sourceOrder = 0;
         for (T entity : entities) {
@@ -155,6 +205,8 @@ public final class InMemoryLexicalIndex<T> {
             Map<String, List<String>> fieldTokens = new LinkedHashMap<>();
             Map<String, Integer> fieldLengths = new LinkedHashMap<>();
             Map<String, Map<String, Integer>> termFrequenciesByField = new LinkedHashMap<>();
+
+            int docIndex = docs.size(); // index for this document in the list
 
             for (Map.Entry<String, Double> weightedField : fieldWeights.entrySet()) {
                 String fieldName = weightedField.getKey();
@@ -177,6 +229,13 @@ public final class InMemoryLexicalIndex<T> {
                             ignored -> new HashMap<>());
                     int currentDocFrequency = byField.getOrDefault(token, 0);
                     byField.put(token, currentDocFrequency + 1);
+
+                    // Build inverted index: term → field → list of postings
+                    int tf = termFrequency.get(token);
+                    invIndex
+                            .computeIfAbsent(token, k -> new HashMap<>())
+                            .computeIfAbsent(fieldName, k -> new ArrayList<>())
+                            .add(new Posting(docIndex, tf));
                 }
             }
 
@@ -206,6 +265,7 @@ public final class InMemoryLexicalIndex<T> {
                 averageFieldLength,
                 immutableDocFrequencies,
                 fieldWeights,
+                invIndex,
                 new LexicalScorer());
     }
 
@@ -260,53 +320,79 @@ public final class InMemoryLexicalIndex<T> {
         }
 
         Map<String, Integer> queryTermFrequency = DeterministicQueryExpansion.termFrequency(queryTokens);
-
-        List<SearchResult<T>> scoredResults = new ArrayList<>();
         int totalDocuments = documents.size();
 
-        for (IndexedDocument<T> document : documents) {
-            double score = 0.0d;
+        // Accumulate scores per document (by docIndex) using the inverted index.
+        // The outer loop is over query terms, looking up only documents that contain
+        // each term (instead of scanning all documents). This changes complexity
+        // from O(numDocs · numFields · numTerms) to O(numQueryTerms · avgPostingLen).
+        Map<Integer, Double> docScores = new HashMap<>();
 
-            for (Map.Entry<String, Double> fieldWeight : fieldWeights.entrySet()) {
-                String fieldName = fieldWeight.getKey();
-                double weight = fieldWeight.getValue();
-                Map<String, Integer> fieldTermFrequency = document.fieldTermFrequency().getOrDefault(fieldName,
-                        Map.of());
-                int fieldLength = document.fieldLengths().getOrDefault(fieldName, 0);
+        for (Map.Entry<String, Integer> queryEntry : queryTermFrequency.entrySet()) {
+            String term = queryEntry.getKey();
+            int queryTf = queryEntry.getValue();
+
+            Map<String, List<Posting>> fieldPostings = invertedIndex.get(term);
+            if (fieldPostings == null) {
+                continue; // term not in any document → skip
+            }
+
+            for (Map.Entry<String, List<Posting>> fieldEntry : fieldPostings.entrySet()) {
+                String fieldName = fieldEntry.getKey();
+                List<Posting> postings = fieldEntry.getValue();
+
+                Double weight = fieldWeights.get(fieldName);
+                if (weight == null || weight <= 0.0d) {
+                    continue;
+                }
+
                 double avgFieldLength = averageFieldLength.getOrDefault(fieldName, 1.0d);
-                Map<String, Integer> fieldDocFrequency = docFrequencyByField.getOrDefault(fieldName, Map.of());
+                int docFrequency = docFrequencyByField
+                        .getOrDefault(fieldName, Map.of())
+                        .getOrDefault(term, 0);
 
-                for (Map.Entry<String, Integer> queryEntry : queryTermFrequency.entrySet()) {
-                    String term = queryEntry.getKey();
-                    int queryTf = queryEntry.getValue();
-                    int docTf = fieldTermFrequency.getOrDefault(term, 0);
-                    int docFrequency = fieldDocFrequency.getOrDefault(term, 0);
-                    score += lexicalScorer.bm25TermScore(
-                            docTf,
+                for (Posting posting : postings) {
+                    IndexedDocument<T> document = documents.get(posting.docIndex());
+                    int fieldLength = document.fieldLengths().getOrDefault(fieldName, 0);
+
+                    double termScore = lexicalScorer.bm25TermScore(
+                            posting.termFrequency(),
                             queryTf,
                             docFrequency,
                             totalDocuments,
                             fieldLength,
                             avgFieldLength,
                             weight);
+
+                    if (termScore > 0.0d) {
+                        docScores.merge(posting.docIndex(), termScore, Double::sum);
+                    }
                 }
             }
+        }
+
+        if (docScores.isEmpty()) {
+            return SearchResponse.empty(absoluteFloor, relativeFloor);
+        }
+
+        // Build scored results from accumulated document scores
+        List<SearchResult<T>> scoredResults = new ArrayList<>();
+        for (Map.Entry<Integer, Double> entry : docScores.entrySet()) {
+            int docIndex = entry.getKey();
+            double score = entry.getValue();
 
             // Apply language boost if query language matches document language
-            if (score > 0.0d && queryLanguage != null && !queryLanguage.isEmpty()) {
-                String docLanguage = document.language();
+            if (queryLanguage != null && !queryLanguage.isEmpty()) {
+                String docLanguage = documents.get(docIndex).language();
                 if (docLanguage != null && queryLanguage.equalsIgnoreCase(docLanguage)) {
                     score *= 1.5d;
                 }
             }
 
-            if (score > 0.0d) {
-                scoredResults.add(new SearchResult<>(document.source(), score, document.sourceOrder()));
-            }
-        }
-
-        if (scoredResults.isEmpty()) {
-            return SearchResponse.empty(absoluteFloor, relativeFloor);
+            scoredResults.add(new SearchResult<>(
+                    documents.get(docIndex).source(),
+                    score,
+                    documents.get(docIndex).sourceOrder()));
         }
 
         scoredResults.sort(Comparator
