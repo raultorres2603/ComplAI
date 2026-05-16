@@ -551,18 +551,17 @@ export class LambdaStack extends cdk.Stack {
       iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
     );
     // Allow CloudWatch Metrics queries (StadisticsService uses GetMetricStatistics
-    // instead of the old FilterLogEvents approach). Scoped to ComplAI namespace.
+    // to query interaction counts for the weekly report). The namespace condition
+    // is intentionally omitted — GetMetricStatistics does not reliably propagate
+    // the namespace to the IAM auth context, causing the condition to deny even
+    // legitimate requests. Least-privilege is maintained by granting only
+    // GetMetricStatistics (not the broader GetMetricData or ListMetrics).
     scheduledReportRole.addToPrincipalPolicy(
       new iam.PolicyStatement({
         sid: 'ScheduledReportCloudWatchMetrics',
         effect: iam.Effect.ALLOW,
         actions: ['cloudwatch:GetMetricStatistics'],
         resources: ['*'],
-        conditions: {
-          StringEquals: {
-            'cloudwatch:namespace': 'ComplAI',
-          },
-        },
       }),
     );
 
