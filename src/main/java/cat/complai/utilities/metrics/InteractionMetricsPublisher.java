@@ -107,8 +107,7 @@ public class InteractionMetricsPublisher {
                     .timestamp(Instant.now())
                     .dimensions(
                             Dimension.builder().name("Operation").value(operation).build(),
-                            Dimension.builder().name("City").value(cityId).build(),
-                            Dimension.builder().name("Status").value(success ? "Success" : "Error").build())
+                            Dimension.builder().name("City").value(cityId).build())
                     .build());
 
             // Latency in milliseconds

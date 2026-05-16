@@ -273,6 +273,22 @@ export class LambdaStack extends cdk.Stack {
       logGroup: logGroup
     });
 
+    // API Lambda publishes interaction metrics to CloudWatch (InteractionMetricsPublisher).
+    // Scoped to the ComplAI namespace via condition key to avoid accidental metric pollution.
+    lambdaRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        sid: 'PutCloudWatchMetrics',
+        effect: iam.Effect.ALLOW,
+        actions: ['cloudwatch:PutMetricData'],
+        resources: ['*'],
+        conditions: {
+          StringEquals: {
+            'cloudwatch:namespace': 'ComplAI',
+          },
+        },
+      }),
+    );
+
     // API Lambda needs to publish to the redact queue.
     redactQueue.grantSendMessages(lambdaRole);
     feedbackQueue.grantSendMessages(lambdaRole);
@@ -534,19 +550,21 @@ export class LambdaStack extends cdk.Stack {
     scheduledReportRole.addManagedPolicy(
       iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
     );
-    // Allow CloudWatch Logs for statistics queries (FilterLogEvents)
+    // Allow CloudWatch Metrics queries (StadisticsService uses GetMetricStatistics
+    // to query interaction counts for the weekly report). The namespace condition
+    // is intentionally omitted — GetMetricStatistics does not reliably propagate
+    // the namespace to the IAM auth context, causing the condition to deny even
+    // legitimate requests. Least-privilege is maintained by granting only
+    // GetMetricStatistics (not the broader GetMetricData or ListMetrics).
     scheduledReportRole.addToPrincipalPolicy(
       new iam.PolicyStatement({
-        sid: 'ScheduledReportCloudWatchLogs',
+        sid: 'ScheduledReportCloudWatchMetrics',
         effect: iam.Effect.ALLOW,
-        actions: ['logs:FilterLogEvents'],
-        resources: [
-          `arn:aws:logs:${this.region}:${this.account}:log-group:/aws/lambda/ComplAILambda-${environment}:*`,
-          `arn:aws:logs:${this.region}:${this.account}:log-group:/aws/lambda/ComplAIRedactorLambda-${environment}:*`,
-          `arn:aws:logs:${this.region}:${this.account}:log-group:/aws/lambda/ComplAIFeedbackWorkerLambda-${environment}:*`,
-        ],
+        actions: ['cloudwatch:GetMetricStatistics'],
+        resources: ['*'],
       }),
     );
+
     // Read from procedures, events, news, cityinfo, complaints, feedback buckets
     // (StadisticsService lists complaint and feedback files from S3 for the report)
     proceduresBucket.grantRead(scheduledReportRole);

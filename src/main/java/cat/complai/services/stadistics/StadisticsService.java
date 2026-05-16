@@ -6,9 +6,6 @@ import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,6 +85,11 @@ public class StadisticsService implements IStadisticsService {
             long rangeSeconds = Duration.between(from, to).getSeconds();
             if (rangeSeconds <= 0) {
                 rangeSeconds = 60; // minimum 1 minute
+            }
+            // CloudWatch requires Period to be a multiple of 60 seconds.
+            // Round up so the full time range is covered by a single period.
+            if (rangeSeconds % 60 != 0) {
+                rangeSeconds = ((rangeSeconds / 60) + 1) * 60;
             }
 
             GetMetricStatisticsRequest.Builder requestBuilder = GetMetricStatisticsRequest.builder()
