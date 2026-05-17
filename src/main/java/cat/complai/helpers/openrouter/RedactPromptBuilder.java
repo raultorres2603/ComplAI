@@ -69,7 +69,7 @@ public class RedactPromptBuilder {
             props.load(is);
             Map<String, String> rulesMap = new HashMap<>();
             for (String key : props.stringPropertyNames()) {
-                rulesMap.put(key, props.getProperty(key));
+                rulesMap.put(key, props.getProperty(key, ""));
             }
             logger.fine("Loaded " + rulesMap.size() + " format rules from " + PATH_FORMAT_RULES);
             return Collections.unmodifiableMap(rulesMap);

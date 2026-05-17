@@ -4,7 +4,6 @@ import java.net.URI;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.net.MalformedURLException;
-import java.net.URL;
 import java.time.Instant;
 import java.util.ArrayList;
 import org.junit.jupiter.api.DisplayName;

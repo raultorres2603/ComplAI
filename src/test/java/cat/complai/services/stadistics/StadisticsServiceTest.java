@@ -8,7 +8,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import java.net.MalformedURLException;
-import java.net.URL;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -73,9 +72,6 @@ class StadisticsServiceTest {
                     .thenReturn(GetMetricStatisticsResponse.builder()
                             .datapoints(Datapoint.builder().sum(42.0).build())
                             .build());
-
-            StadisticsService service = new StadisticsService(
-                    s3ComplaintLister, s3FeedbackLister, openRouterService, cloudWatchClient);
 
             Instant from = Instant.now().minus(30, ChronoUnit.DAYS);
             Instant to = Instant.now();
@@ -295,9 +291,6 @@ class StadisticsServiceTest {
         @Test
         @DisplayName("Should calculate comparison correctly")
         void calculateComparison_previousAndCurrent_returnsCorrectDiff() {
-            // Access via the model's logic indirectly
-            StadisticsModel model = new StadisticsModel(10, 3, 7);
-
             ComparisonData askComparison = new ComparisonData(
                 10 - 5,
                 ((double) (10 - 5) / 5) * 100.0
