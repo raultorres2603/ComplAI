@@ -19,6 +19,7 @@ Produce or update `README.md` (or another specified doc file). Every fact comes 
 - Never leave placeholder sections — a section without real content is omitted entirely
 - For PARTIAL scope, only edit the named sections; preserve all other content byte-for-byte
 - Run a security scan before saving — remove any secret, private URL, account ID, or internal ARN
+- Use emojis sparingly in section headings (e.g. 🚀 Getting Started, 🛠️ Tech Stack) to improve visual scannability — never in tables or code blocks
 - Never edit any file other than the target documentation file
 </rules>
 

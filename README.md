@@ -102,7 +102,7 @@ flowchart TD
 		end
 
 		subgraph INF[Infrastructure]
-			CB[CircuitBreaker\n(multi-city)]
+			CB["CircuitBreaker\n(multi-city)"]
 			HW[HttpWrapper\nmanual retry + circuit breaker]
 		end
 

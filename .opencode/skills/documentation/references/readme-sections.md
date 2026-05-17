@@ -4,7 +4,7 @@ Each section below is **required** unless marked `(conditional)`. Sections must 
 
 ---
 
-## 1. Title Block
+## 1. 📛 Title Block
 
 ```markdown
 # <Project Name>
@@ -21,13 +21,13 @@ Source: existing README title block + repo metadata from `settings.gradle` / `gr
 
 ---
 
-## 2. Table of Contents
+## 2. 📑 Table of Contents
 
 Auto-linked anchors to every section heading. Update every time a section is added or removed.
 
 ---
 
-## 3. What Is This Project?
+## 3. 💡 What Is This Project?
 
 - 3–5 short paragraphs.
 - Audience: citizen / product manager (no technical jargon).
@@ -37,14 +37,14 @@ Auto-linked anchors to every section heading. Update every time a section is add
 
 ---
 
-## 4. Vision and Goals
+## 4. 🎯 Vision and Goals
 
 A Markdown table with two columns: **Goal** and **How ComplAI addresses it**.  
 Derive goals from the README, `task.md`, or `.github/copilot-instructions.md`.
 
 ---
 
-## 5. Architecture Overview
+## 5. 🏗️ Architecture Overview
 
 Two parts:
 
@@ -59,7 +59,7 @@ Two parts:
 
 ---
 
-## 6. Tech Stack
+## 6. 🛠️ Tech Stack
 
 Markdown table with columns: **Layer**, **Technology**, **Version / Notes**.
 
@@ -81,7 +81,7 @@ Rows to include (add more if found):
 
 ---
 
-## 7. Getting Started
+## 7. 🚀 Getting Started
 
 ### Prerequisites
 
@@ -115,7 +115,7 @@ Source: `sam/env.json.example` and `src/main/resources/application.properties` `
 
 ---
 
-## 8. API Reference
+## 8. 📡 API Reference
 
 Markdown table: **Method**, **Path**, **Auth Required**, **Description**, **Request Body**, **Response**.
 
@@ -127,7 +127,7 @@ Source: controllers in `src/main/java/**` + Bruno collections in `E2E-ComplAI/`.
 
 ---
 
-## 9. Infrastructure
+## 9. ☁️ Infrastructure
 
 ### AWS Resources
 
@@ -146,7 +146,7 @@ Add any environment-specific notes from `cdk/deployment-environment.ts`.
 
 ---
 
-## 10. Security
+## 10. 🔒 Security
 
 - JWT Bearer auth: how tokens are validated (JJWT + Micronaut Security filter).
 - Which endpoints are public (`@Secured(SecurityRule.IS_ANONYMOUS)`) vs. protected (`@Secured(SecurityRule.IS_AUTHENTICATED)`).
@@ -154,7 +154,7 @@ Add any environment-specific notes from `cdk/deployment-environment.ts`.
 
 ---
 
-## 11. Testing
+## 11. 🧪 Testing
 
 ### Unit & Integration Tests
 
@@ -177,7 +177,7 @@ Add any environment-specific notes from `cdk/deployment-environment.ts`.
 
 ---
 
-## 12. Performance Optimizations
+## 12. ⚡ Performance Optimizations
 
 Two sub-sections derived from codebase search:
 
@@ -186,7 +186,7 @@ Two sub-sections derived from codebase search:
 
 ---
 
-## 13. Conversation History (Multi-turn)
+## 13. 💬 Conversation History (Multi-turn)
 
 - How a `conversationId` is created and used across requests.
 - Where history is stored (cache class / bean).
@@ -196,7 +196,7 @@ Source: cache-related classes and controllers.
 
 ---
 
-## 14. PDF Complaint Generation
+## 14. 📄 PDF Complaint Generation
 
 - What user input triggers it (endpoint + payload).
 - How ComplAI builds the letter (PDFBox classes).
@@ -205,7 +205,7 @@ Source: cache-related classes and controllers.
 
 ---
 
-## 15. OIDC Identity Verification
+## 15. 🆔 OIDC Identity Verification
 
 - Supported identity providers: Cl@ve, VALId, idCat (confirm from config/code).
 - Validation flow: token receipt → OIDC discovery → signature verification → claim extraction.
@@ -213,7 +213,7 @@ Source: cache-related classes and controllers.
 
 ---
 
-## 16. AI Identity and Behaviour
+## 16. 🤖 AI Identity and Behaviour
 
 - Model used (from OpenRouter integration in source).
 - Language detection and response language logic.
@@ -222,7 +222,7 @@ Source: cache-related classes and controllers.
 
 ---
 
-## 17. Contributing
+## 17. 🤝 Contributing
 
 - Branch strategy (feature branches off `master`).
 - Code style: constructor injection only, Micronaut conventions, Javadoc on all public methods.
@@ -234,6 +234,6 @@ Source: cache-related classes and controllers.
 
 ---
 
-## 18. License
+## 18. ⚖️ License
 
 Reproduce the exact license block from the existing `README.md` or `LICENSE` file. Do not paraphrase.
