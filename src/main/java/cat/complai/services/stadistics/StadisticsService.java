@@ -148,7 +148,7 @@ public class StadisticsService implements IStadisticsService {
             var entries = s3ComplaintLister.listComplaintFiles(from, to);
 
             for (S3ComplaintLister.ComplaintFileEntry entry : entries) {
-                java.net.URL url = new java.net.URL(entry.getUrl());
+                java.net.URL url = java.net.URI.create(entry.getUrl()).toURL();
                 files.add(new ComplaintFile(entry.getFileName(), url));
             }
 
@@ -168,7 +168,7 @@ public class StadisticsService implements IStadisticsService {
             var entries = s3FeedbackLister.listAllFeedbackFiles(from, to);
 
             for (S3FeedbackLister.FeedbackFileEntry entry : entries) {
-                java.net.URL url = new java.net.URL(entry.getUrl());
+                java.net.URL url = java.net.URI.create(entry.getUrl()).toURL();
                 files.add(new FeedbackFile(entry.getFileName(), url));
             }
 
@@ -214,7 +214,7 @@ public class StadisticsService implements IStadisticsService {
         for (int month = 1; month <= currentMonthValue; month++) {
             YearMonth ym = YearMonth.of(currentYear, month);
             String monthLabel = ym.atDay(1).format(
-                    java.time.format.DateTimeFormatter.ofPattern("LLLL yyyy", new java.util.Locale("ca", "ES")));
+                    java.time.format.DateTimeFormatter.ofPattern("LLLL yyyy", java.util.Locale.of("ca", "ES")));
             monthLabel = monthLabel.substring(0, 1).toUpperCase() + monthLabel.substring(1);
 
             Instant monthStart = ym.atDay(1).atStartOfDay(zone).toInstant();

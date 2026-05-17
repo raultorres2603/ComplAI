@@ -1,4 +1,5 @@
 package cat.complai.services.stadistics.models;
+import java.net.URI;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -314,7 +315,7 @@ class StadisticsModelTest {
         void shouldContainFileUrls() throws MalformedURLException {
             ArrayList<ComplaintFile> complaints = new ArrayList<>();
             complaints.add(new ComplaintFile("complaint-001.pdf",
-                    new URL("https://example.com/complaint-001.pdf")));
+                    URI.create("https://example.com/complaint-001.pdf").toURL()));
             StadisticsModel model = new StadisticsModel(1, 1, 1, complaints, new ArrayList<>());
             String result = model.toString();
             assertTrue(result.contains("href=\"https://example.com/complaint-001.pdf\""));

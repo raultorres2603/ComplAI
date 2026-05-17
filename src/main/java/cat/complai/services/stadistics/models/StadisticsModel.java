@@ -70,7 +70,7 @@ public class StadisticsModel {
          */
         public static MonthlyData fromYearMonth(YearMonth yearMonth) {
             String label = yearMonth.atDay(1).format(
-                java.time.format.DateTimeFormatter.ofPattern("LLLL yyyy", new java.util.Locale("ca", "ES"))
+                java.time.format.DateTimeFormatter.ofPattern("LLLL yyyy", java.util.Locale.of("ca", "ES"))
             );
             // Capitalize first letter
             label = label.substring(0, 1).toUpperCase() + label.substring(1);

@@ -539,6 +539,7 @@ class GencatProcedureScraperTest {
         }
 
         @Override
+        @SuppressWarnings("deprecation")
         public @NonNull Connection sslSocketFactory(@NonNull SSLSocketFactory sslSocketFactory) {
             throw new UnsupportedOperationException();
         }

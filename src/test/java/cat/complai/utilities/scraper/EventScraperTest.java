@@ -114,7 +114,7 @@ class EventScraperTest {
 
         @Override
         public @NonNull Document get() {
-            return Jsoup.parse(html, (String) "https://www.elprat.cat");
+            return Jsoup.parse(html, "https://www.elprat.cat");
         }
 
         @Override
@@ -231,8 +231,8 @@ class EventScraperTest {
         }
 
         @Override
+        @SuppressWarnings("deprecation")
         public @NonNull Connection sslSocketFactory(@NonNull SSLSocketFactory sslSocketFactory) {
-            // TODO Auto-generated method stub
             throw new UnsupportedOperationException("Unimplemented method 'sslSocketFactory'");
         }
 

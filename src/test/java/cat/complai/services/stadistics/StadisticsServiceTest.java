@@ -1,4 +1,5 @@
 package cat.complai.services.stadistics;
+import java.net.URI;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -232,11 +233,11 @@ class StadisticsServiceTest {
         @DisplayName("Should include feedback files in HTML-formatted toString() output")
         void testToStringIncludesFeedbackFiles() throws MalformedURLException {
             ArrayList<FeedbackFile> feedbackFiles = new ArrayList<>();
-            feedbackFiles.add(new FeedbackFile("fb-001.json", new URL("https://example.com/fb-001.json")));
-            feedbackFiles.add(new FeedbackFile("fb-002.json", new URL("https://example.com/fb-002.json")));
+            feedbackFiles.add(new FeedbackFile("fb-001.json", URI.create("https://example.com/fb-001.json").toURL()));
+            feedbackFiles.add(new FeedbackFile("fb-002.json", URI.create("https://example.com/fb-002.json").toURL()));
 
             ArrayList<ComplaintFile> complaintFiles = new ArrayList<>();
-            complaintFiles.add(new ComplaintFile("complaint-001.pdf", new URL("https://example.com/complaint-001.pdf")));
+            complaintFiles.add(new ComplaintFile("complaint-001.pdf", URI.create("https://example.com/complaint-001.pdf").toURL()));
 
             StadisticsModel report = new StadisticsModel(10, 5, 3, complaintFiles, feedbackFiles);
             String reportString = report.toString();

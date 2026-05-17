@@ -1,4 +1,5 @@
 package cat.complai.services.stadistics;
+import java.net.URI;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -28,11 +29,11 @@ class StadisticsHtmlRendererTest {
         @DisplayName("Should render KPI cards, month labels, files, prediction and footer")
         void testFullModel() throws MalformedURLException {
             var complaintFiles = new ArrayList<ComplaintFile>();
-            complaintFiles.add(new ComplaintFile("reclamacio-gen.pdf", new URL("https://s3.example.com/reclamacio-gen.pdf")));
-            complaintFiles.add(new ComplaintFile("reclamacio-feb.pdf", new URL("https://s3.example.com/reclamacio-feb.pdf")));
+            complaintFiles.add(new ComplaintFile("reclamacio-gen.pdf", URI.create("https://s3.example.com/reclamacio-gen.pdf").toURL()));
+            complaintFiles.add(new ComplaintFile("reclamacio-feb.pdf", URI.create("https://s3.example.com/reclamacio-feb.pdf").toURL()));
 
             var feedbackFiles = new ArrayList<FeedbackFile>();
-            feedbackFiles.add(new FeedbackFile("feedback-gen.txt", new URL("https://s3.example.com/feedback-gen.txt")));
+            feedbackFiles.add(new FeedbackFile("feedback-gen.txt", URI.create("https://s3.example.com/feedback-gen.txt").toURL()));
 
             var jan = new MonthlyData("Gener 2026", 50, 10, 5, new ArrayList<>(), new ArrayList<>());
             var feb = new MonthlyData("Febrer 2026", 60, 12, 7, new ArrayList<>(), new ArrayList<>());
@@ -176,11 +177,11 @@ class StadisticsHtmlRendererTest {
         @DisplayName("Should render file names and download links")
         void testComplaintFiles() throws MalformedURLException {
             var complaintFiles = new ArrayList<ComplaintFile>();
-            complaintFiles.add(new ComplaintFile("queixa-123.pdf", new URL("https://s3.example.com/queixa-123.pdf")));
-            complaintFiles.add(new ComplaintFile("queixa-456.pdf", new URL("https://s3.example.com/queixa-456.pdf")));
+            complaintFiles.add(new ComplaintFile("queixa-123.pdf", URI.create("https://s3.example.com/queixa-123.pdf").toURL()));
+            complaintFiles.add(new ComplaintFile("queixa-456.pdf", URI.create("https://s3.example.com/queixa-456.pdf").toURL()));
 
             var feedbackFiles = new ArrayList<FeedbackFile>();
-            feedbackFiles.add(new FeedbackFile("feedback-abc.txt", new URL("https://s3.example.com/feedback-abc.txt")));
+            feedbackFiles.add(new FeedbackFile("feedback-abc.txt", URI.create("https://s3.example.com/feedback-abc.txt").toURL()));
 
             var monthly = new MonthlyData("Maig 2026", 10, 3, 2, complaintFiles, feedbackFiles);
             var yearly = new ArrayList<MonthlyData>();

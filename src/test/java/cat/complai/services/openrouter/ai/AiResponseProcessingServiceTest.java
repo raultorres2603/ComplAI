@@ -83,7 +83,7 @@ public class AiResponseProcessingServiceTest {
         FakeHttpWrapper wrapper = new FakeHttpWrapper();
         wrapper.setNextResponse(new HttpDto("hello", 200, "POST", null));
         AiResponseProcessingService svc = new AiResponseProcessingService(wrapper, createCache(), 30);
-        OpenRouterResponseDto result = svc.callOpenRouterAndExtract(makeMessages("test"), "elprat");
+        OpenRouterResponseDto result = svc.callOpenRouterAndExtract(makeMessages("test"), "elprat", 0, 0);
         assertTrue(result.isSuccess());
         assertEquals(1, wrapper.callCount);
     }
