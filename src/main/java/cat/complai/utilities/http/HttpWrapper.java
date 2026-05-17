@@ -4,6 +4,7 @@ import cat.complai.dto.http.HttpDto;
 import cat.complai.dto.http.OpenRouterStreamStartResult;
 import cat.complai.dto.openrouter.OpenRouterErrorCode;
 import cat.complai.exceptions.OpenRouterStreamingException;
+import io.micronaut.core.annotation.Nullable;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import io.micronaut.context.annotation.Value;
@@ -310,6 +311,7 @@ return CompletableFuture.completedFuture(finalResult);
      * @return the full "Bearer …" auth value, or {@code null} if no key is
      *         available.
      */
+    @Nullable
     protected String resolveAuthHeader() {
         String authValue = headers.get("Authorization");
         if (authValue == null || authValue.isBlank()) {
@@ -323,6 +325,7 @@ return CompletableFuture.completedFuture(finalResult);
         return authValue.toLowerCase().startsWith("bearer ") ? authValue : "Bearer " + authValue;
     }
 
+    @Nullable
     private String extractTextFromOpenRouterResponse(String responseBody, ObjectMapper mapper) {
         try {
             JsonNode root = mapper.readTree(responseBody);

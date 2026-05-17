@@ -16,6 +16,7 @@ import cat.complai.helpers.openrouter.LanguageDetector;
 import cat.complai.helpers.openrouter.RedactPromptBuilder;
 import cat.complai.helpers.openrouter.SseChunkParser;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micronaut.core.annotation.Nullable;
 import jakarta.inject.Singleton;
 import jakarta.inject.Inject;
 import org.reactivestreams.Publisher;
@@ -245,6 +246,7 @@ public class StreamingOrchestrator {
     // Private: clarification resolution for streaming
     // -----------------------------------------------------------------------
 
+    @Nullable
     private AskStreamResult tryResolvePendingClarification(
             String question, String conversationId, String cityId, String detectedLanguage) {
         List<ConversationManagementService.ClarificationCandidate> streamPending =
@@ -423,6 +425,7 @@ public class StreamingOrchestrator {
         return new RagContexts(null, null, null, null, false);
     }
 
+    @Nullable
     private NewsContextResult safelyBuildNewsContext(String question, String cityId,
                                                       String conversationId, String operationName) {
         long start = System.nanoTime();
@@ -438,6 +441,7 @@ public class StreamingOrchestrator {
         }
     }
 
+    @Nullable
     private ProcedureContextResult safelyBuildProcedureContext(String question, String cityId,
                                                                 String conversationId, String operationName) {
         long start = System.nanoTime();
@@ -453,6 +457,7 @@ public class StreamingOrchestrator {
         }
     }
 
+    @Nullable
     private EventContextResult safelyBuildEventContext(String question, String cityId,
                                                         String conversationId, String operationName) {
         long start = System.nanoTime();
@@ -468,6 +473,7 @@ public class StreamingOrchestrator {
         }
     }
 
+    @Nullable
     private CityInfoContextResult safelyBuildCityInfoContext(String question, String cityId,
                                                               String conversationId, String operationName) {
         long start = System.nanoTime();

@@ -3,6 +3,7 @@ package cat.complai.services.openrouter.conversation;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import io.micronaut.context.annotation.Value;
+import io.micronaut.core.annotation.Nullable;
 import jakarta.inject.Singleton;
 import java.util.ArrayList;
 import java.util.List;
@@ -147,6 +148,7 @@ public class ConversationManagementService {
      * @param conversationId the conversation key
      * @return parked complaint text, or {@code null}
      */
+    @Nullable
     public String getPendingComplaint(String conversationId) {
         if (conversationId == null || conversationId.isBlank()) {
             return null;
@@ -172,6 +174,7 @@ public class ConversationManagementService {
         pendingClarificationCache.put(conversationId, candidates);
     }
 
+    @Nullable
     public List<ClarificationCandidate> getPendingClarification(String conversationId) {
         if (conversationId == null || conversationId.isBlank()) {
             return null;

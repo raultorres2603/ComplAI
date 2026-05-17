@@ -1,6 +1,7 @@
 package cat.complai.dto.openrouter;
 
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -93,6 +94,7 @@ public class OpenRouterPublicDto {
      * @return the external public DTO, or {@code null} if {@code dto} is
      *         {@code null}
      */
+    @Nullable
     public static OpenRouterPublicDto from(OpenRouterResponseDto dto) {
         if (dto == null)
             return null;

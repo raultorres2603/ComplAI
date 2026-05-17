@@ -3,6 +3,7 @@ package cat.complai.helpers.openrouter;
 import cat.complai.dto.openrouter.ComplainantIdentity;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micronaut.core.annotation.Nullable;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
@@ -316,6 +317,7 @@ public class RedactPromptBuilder {
      * using the city-specific procedures loaded for the caller's JWT city claim.
      * Returns {@code null} when no matches are found or the index fails to load.
      */
+    @Nullable
     public String buildProcedureContextBlock(String query, String cityId) {
         RagHelper<RagHelper.Procedure> helper;
         try {
@@ -329,6 +331,7 @@ public class RedactPromptBuilder {
         return buildProcedureContextBlockFromMatches(matches, cityId);
     }
 
+    @Nullable
     public String buildProcedureContextBlockFromMatches(List<RagHelper.Procedure> matches, String cityId) {
         if (matches == null || matches.isEmpty())
             return null;
