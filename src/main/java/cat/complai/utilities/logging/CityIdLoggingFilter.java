@@ -32,10 +32,9 @@ public class CityIdLoggingFilter {
         MDC.remove(CITY_MDC_KEY);
 
         // Extract cityId from request attributes (set by ApiKeyAuthFilter)
-        String cityId = request.getAttribute(ApiKeyAuthFilter.CITY_ATTRIBUTE, String.class).orElse(null);
-        if (cityId != null && !cityId.isBlank()) {
-            MDC.put(CITY_MDC_KEY, cityId);
-        }
+        request.getAttribute(ApiKeyAuthFilter.CITY_ATTRIBUTE, String.class)
+                .filter(id -> !id.isBlank())
+                .ifPresent(id -> MDC.put(CITY_MDC_KEY, id));
         // If no cityId (e.g., excluded paths like /health), leave MDC empty
 
         // Return null to continue filter chain

@@ -256,12 +256,15 @@ public class HealthCheckService {
      * Returns the result of a future if completed successfully, or an error
      * result if the future completed exceptionally or was cancelled.
      */
-    @SuppressWarnings("unchecked")
     private static Map<String, Object> resolveFuture(CompletableFuture<?> future, String checkName) {
         try {
             Object raw = future.get(1, TimeUnit.MILLISECONDS);
-            if (raw instanceof Map) {
-                return (Map<String, Object>) raw;
+            if (raw instanceof Map<?, ?> m) {
+                Map<String, Object> result = new LinkedHashMap<>();
+                for (Map.Entry<?, ?> entry : m.entrySet()) {
+                    result.put(String.valueOf(entry.getKey()), entry.getValue());
+                }
+                return result;
             }
             // Should never happen — all check methods return Map<String, Object>
             return errorResult("Unexpected result type from " + checkName + ": " + raw);

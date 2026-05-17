@@ -6,6 +6,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -121,16 +123,17 @@ class LazyInitializationTest {
     @Test
     @DisplayName("Concurrent requests for same city initialize only once")
     @Timeout(10) // 10 second timeout
-    @SuppressWarnings({"rawtypes", "unchecked"}) // array of parameterized RagHelper
     void test_concurrentSameCityOnlyInitializeOnce() throws InterruptedException {
         String testCity = "testcity"; // Use test city with actual data files
         CountDownLatch startLatch = new CountDownLatch(1);
         CountDownLatch endLatch = new CountDownLatch(5);
         ExecutorService executor = Executors.newFixedThreadPool(5);
 
-        // Use AtomicInteger to track how many different instances we got
-        // If lazy init is working correctly, all threads should get the same instance
-        RagHelper<RagHelper.Procedure>[] helperInstances = new RagHelper[5];
+        // Use List instead of array to avoid generic array creation warnings
+        List<RagHelper<RagHelper.Procedure>> helperInstances = new ArrayList<>(5);
+        for (int i = 0; i < 5; i++) {
+            helperInstances.add(null);
+        }
 
         try {
             for (int i = 0; i < 5; i++) {
@@ -139,7 +142,7 @@ class LazyInitializationTest {
                     try {
                         startLatch.await(); // Wait for all threads to start simultaneously
                         RagHelper<RagHelper.Procedure> helper = procedureRegistry.getForCity(testCity);
-                        helperInstances[index] = helper;
+                        helperInstances.set(index, helper);
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                     } finally {
@@ -154,7 +157,7 @@ class LazyInitializationTest {
 
             // Verify all threads got the same instance
             for (int i = 1; i < 5; i++) {
-                assertSame(helperInstances[0], helperInstances[i],
+                assertSame(helperInstances.get(0), helperInstances.get(i),
                         "All concurrent requests should return the same cached instance");
             }
         } finally {

@@ -7,6 +7,7 @@ import jakarta.inject.Singleton;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
@@ -94,8 +95,7 @@ public class ConversationManagementService {
             logger.fine(() -> "updateConversationHistory() — conversationId=" + conversationId
                     + " pruned to maxHistoryTurns=" + maxTurns);
         }
-        @SuppressWarnings("unchecked")
-        List<MessageEntry> historyList = (List<MessageEntry>) (List<?>) history;
+        List<MessageEntry> historyList = history;
         storeCacheEntry(conversationId, historyList);
         final int currentHistorySize = history.size();
         logger.fine(() -> "updateConversationHistory() — conversationId=" + conversationId
@@ -122,9 +122,8 @@ public class ConversationManagementService {
         return history != null ? history : List.of();
     }
 
-    @SuppressWarnings("null")
     private void storeCacheEntry(String conversationId, List<MessageEntry> historyList) {
-        conversationCache.put(conversationId, historyList);
+        conversationCache.put(Objects.requireNonNull(conversationId), Objects.requireNonNull(historyList));
     }
 
     /**

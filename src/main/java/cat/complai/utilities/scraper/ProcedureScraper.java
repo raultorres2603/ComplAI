@@ -125,6 +125,14 @@ public class ProcedureScraper {
     // Crawl
     // -------------------------------------------------------------------------
 
+    private static Document fetchDocument(String url) throws IOException {
+        Document doc = Jsoup.connect(url).get();
+        if (doc == null) {
+            throw new IOException("Jsoup returned null document for: " + url);
+        }
+        return doc;
+    }
+
     private static Set<String> crawlProcedureDetailUrls(ScraperMapping mapping) {
         Set<String> pendingCategoryUrls = new LinkedHashSet<>();
         Set<String> visitedCategoryUrls = new HashSet<>();
@@ -143,11 +151,9 @@ public class ProcedureScraper {
                 continue;
 
             try {
-                @SuppressWarnings("null")
-                Document doc = Jsoup.connect(currentUrl).get();
+                Document doc = fetchDocument(currentUrl);
 
                 if (mapping.crawl.categoryLinkSelector != null && !mapping.crawl.categoryLinkSelector.isBlank()) {
-                    @SuppressWarnings("null")
                     var categoryLinks = doc.select(mapping.crawl.categoryLinkSelector);
                     for (Element link : categoryLinks) {
                         String href = link.absUrl("href");
@@ -157,7 +163,6 @@ public class ProcedureScraper {
                     }
                 }
 
-                @SuppressWarnings("null")
                 var detailLinks = doc.select(mapping.crawl.detailLinkSelector);
                 for (Element link : detailLinks) {
                     String href = link.absUrl("href");
@@ -200,8 +205,7 @@ public class ProcedureScraper {
 
     private static Optional<Map<String, Object>> scrapeProcedure(String url, ScraperMapping mapping)
             throws IOException {
-        @SuppressWarnings("null")
-        Document doc = Jsoup.connect(url).get();
+        Document doc = fetchDocument(url);
 
         Map<String, Object> procedure = new LinkedHashMap<>();
         // procedureId is deterministic: same URL always produces the same ID.
@@ -213,8 +217,8 @@ public class ProcedureScraper {
 
         procedure.put("url", url);
 
-        String title = (String) procedure.get("title");
-        if (shouldSkip(title, mapping.skip)) {
+        Object rawTitle = procedure.get("title");
+        if (!(rawTitle instanceof String title) || shouldSkip(title, mapping.skip)) {
             return Optional.empty();
         }
 
@@ -223,8 +227,8 @@ public class ProcedureScraper {
 
     private static String extractFieldValue(Document doc, FieldExtractionRule rule) {
         if (rule.multiple) {
-            @SuppressWarnings("null")
             Elements elements = doc.select(rule.selector);
+            if (elements == null) elements = new Elements();
             StringBuilder sb = new StringBuilder();
             for (Element el : elements) {
                 String text = el.text().trim();
@@ -236,9 +240,7 @@ public class ProcedureScraper {
             }
             return sb.toString();
         } else {
-            @SuppressWarnings("null")
-            Element el = doc.selectFirst(rule.selector);
-            return el != null ? el.text().trim() : "";
+            return doc.selectFirst(rule.selector) instanceof Element el ? el.text().trim() : "";
         }
     }
 

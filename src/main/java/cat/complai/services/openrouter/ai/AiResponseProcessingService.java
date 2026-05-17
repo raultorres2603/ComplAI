@@ -157,9 +157,10 @@ public class AiResponseProcessingService {
         // Calculate input token count for logging
         int inputTokens = messages.stream()
                 .mapToInt(msg -> {
-                    Object rawContent = msg.get("content");
-                    String content = rawContent instanceof String s ? s : null;
-                    return content != null ? Math.max(1, content.length() / 4) : 0;
+                    if (msg.get("content") instanceof String s) {
+                        return Math.max(1, s.length() / 4);
+                    }
+                    return 0;
                 })
                 .sum();
         logger.fine(() -> "callOpenRouterAndExtract — inputTokenCount=" + inputTokens);

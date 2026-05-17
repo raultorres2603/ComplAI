@@ -239,12 +239,9 @@ public class OpenRouterServices implements IOpenRouterService {
         int tmpHistoryTokens = 0;
         int tmpUserTokens = 0;
         for (Map<String, Object> msg : messages) {
-            Object rawContent = msg.get("content");
-            String content = rawContent instanceof String s ? s : null;
-            if (content == null)
+            if (!(msg.get("content") instanceof String content))
                 continue;
-            Object rawRole = msg.get("role");
-            String role = rawRole instanceof String s ? s : "";
+            String role = msg.get("role") instanceof String s ? s : "";
             int tokens = estimateTokenCount(content);
 
             if ("system".equals(role)) {

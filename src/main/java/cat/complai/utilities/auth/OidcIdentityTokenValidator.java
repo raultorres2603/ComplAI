@@ -161,13 +161,15 @@ public class OidcIdentityTokenValidator {
             }
 
             Object rawName = claims.get("given_name");
-            String name = rawName instanceof String s ? s : null;
             Object rawSurname = claims.get("family_name");
-            String surname = rawSurname instanceof String s ? s : null;
             Object rawNif = claims.get(ctx.nifClaim());
-            String nif = rawNif instanceof String s ? s : null;
 
-            if (isBlank(name) || isBlank(surname) || isBlank(nif)) {
+            if (!(rawName instanceof String name)
+                    || !(rawSurname instanceof String surname)
+                    || !(rawNif instanceof String nif)
+                    || isBlank(name)
+                    || isBlank(surname)
+                    || isBlank(nif)) {
                 throw new IdentityTokenValidationException(
                         "Identity token is missing required claims: given_name, family_name, or "
                         + ctx.nifClaim());

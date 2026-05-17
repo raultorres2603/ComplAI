@@ -211,7 +211,7 @@ public class EventScraper {
                 try {
                     String seedHost = new java.net.URI(seed.baseUrl).getHost();
                     String urlHost  = new java.net.URI(url).getHost();
-                    if (seedHost != null && seedHost.equalsIgnoreCase(urlHost)) {
+                    if (seedHost != null && urlHost != null && seedHost.equalsIgnoreCase(urlHost)) {
                         Map<String, ProcedureScraper.FieldExtractionRule> merged =
                                 new LinkedHashMap<>(mapping.events.fields);
                         merged.putAll(seed.fields);
@@ -240,8 +240,8 @@ public class EventScraper {
 
         event.put("url", url);
 
-        String title = (String) event.get("title");
-        if (shouldSkip(title, mapping.skip)) {
+        Object rawTitle = event.get("title");
+        if (!(rawTitle instanceof String title) || shouldSkip(title, mapping.skip)) {
             return Optional.empty();
         }
 
@@ -249,11 +249,13 @@ public class EventScraper {
     }
 
     private static Document fetchDocument(@NonNull String url) throws IOException {
-        return Jsoup.connect(url)
+        Document doc = Jsoup.connect(url)
                 .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
                 .get();
+        return doc;
     }
 
+    
     private static String extractFieldValue(Document doc, ProcedureScraper.FieldExtractionRule rule) {
         if (rule.multiple) {
             Elements elements = doc.select(rule.selector);

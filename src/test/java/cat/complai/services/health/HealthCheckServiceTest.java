@@ -227,8 +227,8 @@ class HealthCheckServiceTest {
 
     private static void assertStatus(Object checkResult, boolean expectedStatus) {
         assertNotNull(checkResult);
-        @SuppressWarnings("unchecked")
-        Map<String, Object> result = (Map<String, Object>) checkResult;
+        assertTrue(checkResult instanceof Map<?, ?>, "checkResult must be a Map");
+        Map<?, ?> result = (Map<?, ?>) checkResult;
         assertEquals(expectedStatus, result.get("status"),
                 "Expected status=" + expectedStatus + " but got " + result);
     }
