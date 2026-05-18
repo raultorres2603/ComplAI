@@ -3,10 +3,12 @@ package cat.complai.services.openrouter.conversation;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import io.micronaut.context.annotation.Value;
+import io.micronaut.core.annotation.Nullable;
 import jakarta.inject.Singleton;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
@@ -94,8 +96,7 @@ public class ConversationManagementService {
             logger.fine(() -> "updateConversationHistory() — conversationId=" + conversationId
                     + " pruned to maxHistoryTurns=" + maxTurns);
         }
-        @SuppressWarnings("unchecked")
-        List<MessageEntry> historyList = (List<MessageEntry>) (List<?>) history;
+        List<MessageEntry> historyList = history;
         storeCacheEntry(conversationId, historyList);
         final int currentHistorySize = history.size();
         logger.fine(() -> "updateConversationHistory() — conversationId=" + conversationId
@@ -122,9 +123,8 @@ public class ConversationManagementService {
         return history != null ? history : List.of();
     }
 
-    @SuppressWarnings("null")
     private void storeCacheEntry(String conversationId, List<MessageEntry> historyList) {
-        conversationCache.put(conversationId, historyList);
+        conversationCache.put(Objects.requireNonNull(conversationId), Objects.requireNonNull(historyList));
     }
 
     /**
@@ -148,6 +148,7 @@ public class ConversationManagementService {
      * @param conversationId the conversation key
      * @return parked complaint text, or {@code null}
      */
+    @Nullable
     public String getPendingComplaint(String conversationId) {
         if (conversationId == null || conversationId.isBlank()) {
             return null;
@@ -173,6 +174,7 @@ public class ConversationManagementService {
         pendingClarificationCache.put(conversationId, candidates);
     }
 
+    @Nullable
     public List<ClarificationCandidate> getPendingClarification(String conversationId) {
         if (conversationId == null || conversationId.isBlank()) {
             return null;

@@ -44,27 +44,12 @@ public final class AskStreamErrorMapper {
      * @param error the throwable from the streaming pipeline
      * @return an SSE error event with an appropriate error code and public message
      */
-    /**
-     * Converts a streaming error to a {@link SseErrorEvent} to emit on the SSE
-     * channel.
-     *
-     * @param error the throwable from the streaming pipeline
-     * @return an SSE error event with an appropriate error code and public message
-     */
     public static SseErrorEvent toSseErrorEvent(Throwable error) {
         Throwable resolved = unwrap(error);
         OpenRouterErrorCode errorCode = resolveErrorCode(resolved);
         return new SseErrorEvent(publicMessage(errorCode, resolved), errorCode.getCode());
     }
 
-    /**
-     * Resolves the typed {@link OpenRouterErrorCode} for a given error after
-     * unwrapping
-     * cause chains.
-     *
-     * @param error the throwable to classify
-     * @return the resolved error code
-     */
     /**
      * Resolves the typed {@link OpenRouterErrorCode} for a given error after
      * unwrapping

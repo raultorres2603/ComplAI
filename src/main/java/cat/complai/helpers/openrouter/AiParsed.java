@@ -81,7 +81,8 @@ public record AiParsed(OutputFormat format, String message) {
             if (inlineBody == null) inlineBody = map.get("text");
             if (inlineBody == null) inlineBody = map.get("response");
 
-            OutputFormat resolvedFormat = fmt == null ? OutputFormat.AUTO : OutputFormat.fromString(fmt.toString());
+            OutputFormat parsedFormat = fmt == null ? null : OutputFormat.fromString(fmt.toString());
+            OutputFormat resolvedFormat = parsedFormat != null ? parsedFormat : OutputFormat.AUTO;
 
             // Prefer inline body key; fall back to text after the closing brace
             String resolvedBody = (inlineBody != null) ? inlineBody.toString().trim() : bodyAfterHeader;

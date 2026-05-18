@@ -295,7 +295,7 @@ class EmailServiceTest {
                 .errorMessage("Email address not verified")
                 .build();
 
-        MessageRejectedException exception = (MessageRejectedException) MessageRejectedException.builder()
+        MessageRejectedException exception = MessageRejectedException.builder()
                 .awsErrorDetails(errorDetails)
                 .message("Email address not verified")
                 .build();
@@ -321,7 +321,7 @@ class EmailServiceTest {
         when(stadisticsService.generateStadisticsReport())
                 .thenReturn(mockStadistics);
 
-        MailFromDomainNotVerifiedException exception = (MailFromDomainNotVerifiedException) MailFromDomainNotVerifiedException
+        MailFromDomainNotVerifiedException exception = MailFromDomainNotVerifiedException
                 .builder()
                 .message("Sender domain is not verified")
                 .build();

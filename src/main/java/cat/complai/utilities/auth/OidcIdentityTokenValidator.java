@@ -160,11 +160,16 @@ public class OidcIdentityTokenValidator {
                 throw new IdentityTokenValidationException("Identity token must carry an expiry (exp)");
             }
 
-            String name    = claims.get("given_name", String.class);
-            String surname = claims.get("family_name", String.class);
-            String nif     = claims.get(ctx.nifClaim(), String.class);
+            Object rawName = claims.get("given_name");
+            Object rawSurname = claims.get("family_name");
+            Object rawNif = claims.get(ctx.nifClaim());
 
-            if (isBlank(name) || isBlank(surname) || isBlank(nif)) {
+            if (!(rawName instanceof String name)
+                    || !(rawSurname instanceof String surname)
+                    || !(rawNif instanceof String nif)
+                    || isBlank(name)
+                    || isBlank(surname)
+                    || isBlank(nif)) {
                 throw new IdentityTokenValidationException(
                         "Identity token is missing required claims: given_name, family_name, or "
                         + ctx.nifClaim());
@@ -209,7 +214,10 @@ public class OidcIdentityTokenValidator {
 
     private static JwtParser buildParser(OidcConfig config, JwkSet jwkSet) {
         return Jwts.parser()
-                .keyLocator(header -> locateKey(jwkSet, (String) header.get("kid")))
+                .keyLocator(header -> {
+                    Object kid = header.get("kid");
+                    return locateKey(jwkSet, kid instanceof String s ? s : null);
+                })
                 .requireIssuer(config.issuer())
                 .requireAudience(config.audience())
                 .build();

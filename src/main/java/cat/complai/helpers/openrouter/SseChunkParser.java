@@ -2,6 +2,7 @@ package cat.complai.helpers.openrouter;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micronaut.core.annotation.Nullable;
 
 /**
  * Parses a single raw SSE line from an OpenRouter streaming response.
@@ -83,6 +84,7 @@ public final class SseChunkParser {
      * @return the content delta text, empty string "" for keep-alive/empty-delta,
      *         or null for the terminal [DONE] event or unparseable input
      */
+    @Nullable
     public static String parseDelta(String rawLine) {
         ParseResult parsed = parseLine(rawLine);
         if (parsed.state() == ParseState.DONE) {

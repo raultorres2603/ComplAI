@@ -66,6 +66,10 @@ java {
     targetCompatibility = JavaVersion.VERSION_25
 }
 
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs.addAll(['-Xlint:all,-path,-serial,-processing'])
+}
+
 
 micronaut {
     // "lambda_provided" is the correct runtime for API Gateway proxy handlers (APIGatewayV2HTTPEventFunction).
@@ -91,14 +95,12 @@ application {
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
 
-tasks.register('ciTest', Test) {
-    description = 'Run unit tests for CI pipeline. Fails build on test failures.'
-    group = 'verification'
-
-    // Ensure we run the project's test classes with the test classpath
-    testClassesDirs = sourceSets.test.output.classesDirs
-    classpath = sourceSets.test.runtimeClasspath
-
+tasks.withType(Test).configureEach {
+    // Suppress Netty native access warning and class data sharing warning
+    jvmArgs(
+        '--enable-native-access=ALL-UNNAMED',
+        '-Xshare:off'
+    )
     useJUnitPlatform()
 
     testLogging {
@@ -108,8 +110,15 @@ tasks.register('ciTest', Test) {
         showCauses = true
         showStackTraces = true
     }
+}
 
-    // Keep standard test task behaviour: don't continue build if tests fail.
+tasks.register('ciTest', Test) {
+    description = 'Run unit tests for CI pipeline. Fails build on test failures.'
+    group = 'verification'
+
+    // Ensure we run the project's test classes with the test classpath
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
 }
 
 tasks.named('shadowJar') {

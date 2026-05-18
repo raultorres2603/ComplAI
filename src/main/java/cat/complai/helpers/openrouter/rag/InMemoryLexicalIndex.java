@@ -365,7 +365,7 @@ public final class InMemoryLexicalIndex<T> {
                             weight);
 
                     if (termScore > 0.0d) {
-                        docScores.merge(posting.docIndex(), termScore, Double::sum);
+                        docScores.merge(posting.docIndex(), termScore, (arg0, arg1) -> Double.sum(arg0, arg1));
                     }
                 }
             }

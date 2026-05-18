@@ -43,17 +43,14 @@ class HealthControllerIntegrationTest {
                 "Response must include OpenRouter API key check");
 
         // Verify the mocked response values match what we configured in the mock bean
-        @SuppressWarnings("unchecked")
-        Map<String, Object> s3Result = (Map<String, Object>) checks.get("s3");
+        Map<?, ?> s3Result = (Map<?, ?>) checks.get("s3");
         assertEquals(false, s3Result.get("status"));
         assertEquals("S3 check (mocked)", s3Result.get("message"));
 
-        @SuppressWarnings("unchecked")
-        Map<String, Object> sesResult = (Map<String, Object>) checks.get("ses");
+        Map<?, ?> sesResult = (Map<?, ?>) checks.get("ses");
         assertEquals(true, sesResult.get("status"));
 
-        @SuppressWarnings("unchecked")
-        Map<String, Object> ragResult = (Map<String, Object>) checks.get("ragIndexes");
+        Map<?, ?> ragResult = (Map<?, ?>) checks.get("ragIndexes");
         assertEquals(true, ragResult.get("status"));
         assertEquals(10, ragResult.get("items"));
     }

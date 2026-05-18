@@ -6,6 +6,8 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.jspecify.annotations.NonNull;
+
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -88,6 +90,13 @@ public class GencatProcedureScraper {
     // Crawl
     // -------------------------------------------------------------------------
 
+    private static Document fetchDocument(@NonNull String url) throws IOException {
+        Document doc = Jsoup.connect(url)
+                .timeout(CONNECT_TIMEOUT_MS)
+                .get();
+        return doc;
+    }
+
     private static Set<String> crawlProcedureDetailUrls(ScraperMapping mapping) {
         Set<String> pendingCategoryUrls = new LinkedHashSet<>();
         Set<String> visitedCategoryUrls = new HashSet<>();
@@ -114,9 +123,7 @@ public class GencatProcedureScraper {
             }
 
             try {
-                Document doc = Jsoup.connect(currentUrl)
-                        .timeout(CONNECT_TIMEOUT_MS)
-                        .get();
+                Document doc = fetchDocument(currentUrl);
 
                 if (mapping.crawl.categoryLinkSelector != null && !mapping.crawl.categoryLinkSelector.isBlank()) {
                     var categoryLinks = doc.select(mapping.crawl.categoryLinkSelector);
@@ -171,9 +178,7 @@ public class GencatProcedureScraper {
 
     private static Optional<Map<String, Object>> scrapeProcedure(String url, ScraperMapping mapping)
             throws IOException {
-        Document doc = Jsoup.connect(url)
-                .timeout(CONNECT_TIMEOUT_MS)
-                .get();
+        Document doc = fetchDocument(url);
 
         Map<String, Object> procedure = new LinkedHashMap<>();
         procedure.put("procedureId", UUID.nameUUIDFromBytes(url.getBytes(StandardCharsets.UTF_8)).toString());
@@ -184,8 +189,8 @@ public class GencatProcedureScraper {
 
         procedure.put("url", url);
 
-        String title = (String) procedure.get("title");
-        if (shouldSkip(title, mapping.skip)) {
+        Object rawTitle = procedure.get("title");
+        if (!(rawTitle instanceof String title) || shouldSkip(title, mapping.skip)) {
             return Optional.empty();
         }
 

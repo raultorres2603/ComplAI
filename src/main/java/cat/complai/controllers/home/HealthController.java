@@ -90,8 +90,8 @@ class HealthService {
      * can be used to measure Lambda cold-start time without I/O.
      */
     public HealthDto getHealthStartup() {
-        boolean apiKeyConfigured = System.getenv("OPENROUTER_API_KEY") != null
-                && !System.getenv("OPENROUTER_API_KEY").isBlank();
+        String apiKey = System.getenv("OPENROUTER_API_KEY");
+        boolean apiKeyConfigured = apiKey != null && !apiKey.isBlank();
         return new HealthDto("UP", "1.0", Map.of(
                 "jvm_alive", true,
                 "openRouterApiKeyConfigured", apiKeyConfigured));

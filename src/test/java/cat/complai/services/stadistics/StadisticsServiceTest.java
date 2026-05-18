@@ -1,4 +1,5 @@
 package cat.complai.services.stadistics;
+import java.net.URI;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -7,7 +8,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import java.net.MalformedURLException;
-import java.net.URL;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -72,9 +72,6 @@ class StadisticsServiceTest {
                     .thenReturn(GetMetricStatisticsResponse.builder()
                             .datapoints(Datapoint.builder().sum(42.0).build())
                             .build());
-
-            StadisticsService service = new StadisticsService(
-                    s3ComplaintLister, s3FeedbackLister, openRouterService, cloudWatchClient);
 
             Instant from = Instant.now().minus(30, ChronoUnit.DAYS);
             Instant to = Instant.now();
@@ -232,11 +229,11 @@ class StadisticsServiceTest {
         @DisplayName("Should include feedback files in HTML-formatted toString() output")
         void testToStringIncludesFeedbackFiles() throws MalformedURLException {
             ArrayList<FeedbackFile> feedbackFiles = new ArrayList<>();
-            feedbackFiles.add(new FeedbackFile("fb-001.json", new URL("https://example.com/fb-001.json")));
-            feedbackFiles.add(new FeedbackFile("fb-002.json", new URL("https://example.com/fb-002.json")));
+            feedbackFiles.add(new FeedbackFile("fb-001.json", URI.create("https://example.com/fb-001.json").toURL()));
+            feedbackFiles.add(new FeedbackFile("fb-002.json", URI.create("https://example.com/fb-002.json").toURL()));
 
             ArrayList<ComplaintFile> complaintFiles = new ArrayList<>();
-            complaintFiles.add(new ComplaintFile("complaint-001.pdf", new URL("https://example.com/complaint-001.pdf")));
+            complaintFiles.add(new ComplaintFile("complaint-001.pdf", URI.create("https://example.com/complaint-001.pdf").toURL()));
 
             StadisticsModel report = new StadisticsModel(10, 5, 3, complaintFiles, feedbackFiles);
             String reportString = report.toString();
@@ -294,9 +291,6 @@ class StadisticsServiceTest {
         @Test
         @DisplayName("Should calculate comparison correctly")
         void calculateComparison_previousAndCurrent_returnsCorrectDiff() {
-            // Access via the model's logic indirectly
-            StadisticsModel model = new StadisticsModel(10, 3, 7);
-
             ComparisonData askComparison = new ComparisonData(
                 10 - 5,
                 ((double) (10 - 5) / 5) * 100.0

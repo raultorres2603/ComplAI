@@ -1,4 +1,5 @@
 package cat.complai.services.stadistics.models;
+import java.net.URI;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -15,7 +16,7 @@ class FeedbackFileTest {
     @Test
     @DisplayName("Should construct with fileName and URL")
     void shouldConstructWithFileNameAndUrl() throws MalformedURLException {
-        URL url = new URL("https://example.com/feedback.json");
+        URL url = URI.create("https://example.com/feedback.json").toURL();
         FeedbackFile file = new FeedbackFile("feedback.json", url);
         assertNotNull(file);
         assertEquals("feedback.json", file.getFileName());
@@ -25,14 +26,14 @@ class FeedbackFileTest {
     @Test
     @DisplayName("Should return correct fileName")
     void shouldReturnCorrectFileName() throws MalformedURLException {
-        FeedbackFile file = new FeedbackFile("test-fb.json", new URL("https://example.com/test-fb.json"));
+        FeedbackFile file = new FeedbackFile("test-fb.json", URI.create("https://example.com/test-fb.json").toURL());
         assertEquals("test-fb.json", file.getFileName());
     }
 
     @Test
     @DisplayName("Should return correct URL")
     void shouldReturnCorrectUrl() throws MalformedURLException {
-        URL url = new URL("https://example.com/test-fb.json");
+        URL url = URI.create("https://example.com/test-fb.json").toURL();
         FeedbackFile file = new FeedbackFile("test-fb.json", url);
         assertEquals(url, file.getUrl());
     }

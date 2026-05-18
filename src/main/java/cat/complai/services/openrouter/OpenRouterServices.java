@@ -11,6 +11,7 @@ import cat.complai.helpers.openrouter.RedactPromptBuilder;
 import cat.complai.services.openrouter.ai.AiResponseProcessingService;
 import cat.complai.services.openrouter.conversation.ConversationManagementService;
 import cat.complai.services.openrouter.validation.InputValidationService;
+import io.micronaut.core.annotation.Nullable;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -239,10 +240,9 @@ public class OpenRouterServices implements IOpenRouterService {
         int tmpHistoryTokens = 0;
         int tmpUserTokens = 0;
         for (Map<String, Object> msg : messages) {
-            String content = (String) msg.get("content");
-            if (content == null)
+            if (!(msg.get("content") instanceof String content))
                 continue;
-            String role = (String) msg.get("role");
+            String role = msg.get("role") instanceof String s ? s : "";
             int tokens = estimateTokenCount(content);
 
             if ("system".equals(role)) {
@@ -406,6 +406,7 @@ public class OpenRouterServices implements IOpenRouterService {
         return new RagContexts(null, null, null, null, false);
     }
 
+    @Nullable
     private NewsContextResult safelyBuildNewsContext(String question, String cityId,
                                                       String conversationId, String operationName) {
         long start = System.nanoTime();
@@ -421,6 +422,7 @@ public class OpenRouterServices implements IOpenRouterService {
         }
     }
 
+    @Nullable
     private ProcedureContextResult safelyBuildProcedureContext(String question, String cityId,
                                                                 String conversationId, String operationName) {
         long start = System.nanoTime();
@@ -436,6 +438,7 @@ public class OpenRouterServices implements IOpenRouterService {
         }
     }
 
+    @Nullable
     private EventContextResult safelyBuildEventContext(String question, String cityId,
                                                         String conversationId, String operationName) {
         long start = System.nanoTime();
@@ -451,6 +454,7 @@ public class OpenRouterServices implements IOpenRouterService {
         }
     }
 
+    @Nullable
     private CityInfoContextResult safelyBuildCityInfoContext(String question, String cityId,
                                                               String conversationId, String operationName) {
         long start = System.nanoTime();
