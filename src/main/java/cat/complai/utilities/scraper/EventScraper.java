@@ -125,8 +125,10 @@ public class EventScraper {
         // Crawl external event venue seed sites (single-page, no pagination)
         if (mapping.events.seedSites != null) {
             for (ProcedureScraper.EventSeedSite seed : mapping.events.seedSites) {
-                if (seed.baseUrl == null || seed.baseUrl.isBlank()) continue;
-                if (seed.eventLinkSelector == null || seed.eventLinkSelector.isBlank()) continue;
+                if (seed.baseUrl == null || seed.baseUrl.isBlank())
+                    continue;
+                if (seed.eventLinkSelector == null || seed.eventLinkSelector.isBlank())
+                    continue;
                 try {
                     Document doc = fetchDocument(seed.baseUrl);
                     var seedLinks = doc.select(seed.eventLinkSelector);
@@ -207,13 +209,14 @@ public class EventScraper {
             String url, ProcedureScraper.ScraperMapping mapping) {
         if (mapping.events.seedSites != null) {
             for (ProcedureScraper.EventSeedSite seed : mapping.events.seedSites) {
-                if (seed.fields == null || seed.fields.isEmpty()) continue;
+                if (seed.fields == null || seed.fields.isEmpty())
+                    continue;
                 try {
                     String seedHost = new java.net.URI(seed.baseUrl).getHost();
-                    String urlHost  = new java.net.URI(url).getHost();
+                    String urlHost = new java.net.URI(url).getHost();
                     if (seedHost != null && urlHost != null && seedHost.equalsIgnoreCase(urlHost)) {
-                        Map<String, ProcedureScraper.FieldExtractionRule> merged =
-                                new LinkedHashMap<>(mapping.events.fields);
+                        Map<String, ProcedureScraper.FieldExtractionRule> merged = new LinkedHashMap<>(
+                                mapping.events.fields);
                         merged.putAll(seed.fields);
                         return merged;
                     }
@@ -255,7 +258,6 @@ public class EventScraper {
         return doc;
     }
 
-    
     private static String extractFieldValue(Document doc, ProcedureScraper.FieldExtractionRule rule) {
         if (rule.multiple) {
             Elements elements = doc.select(rule.selector);
