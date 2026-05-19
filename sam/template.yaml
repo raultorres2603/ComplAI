@@ -40,6 +40,14 @@ Parameters:
     Type: String
     Default: 'true'
     Description: Enable scheduled statistics report Lambda (set to 'false' to disable local poller)
+  TokenTelegramElprat:
+    Type: String
+    Default: ''
+    Description: Telegram bot token for city 'elprat'. Get from @BotFather.
+  TelegramWebhookSecretElprat:
+    Type: String
+    Default: ''
+    Description: Webhook secret token for Telegram bot (city 'elprat').
 Conditions:
   IsProduction: !Equals [!Ref Environment, production]
 
@@ -318,6 +326,9 @@ Resources:
           OPENROUTER_MODEL: openrouter/free
           API_KEY_ENABLED: 'true'
           API_KEY_ELPRAT: !Ref ApiKeyElprat
+          # Telegram Bot — per-city token and webhook secret
+          TOKEN_TELEGRAM_ELPRAT: !Ref TokenTelegramElprat
+          TELEGRAM_WEBHOOK_SECRET_ELPRAT: !Ref TelegramWebhookSecretElprat
           REDACT_QUEUE_URL: !Ref RedactQueue
           FEEDBACK_QUEUE_URL: !Ref FeedbackQueue
           FEEDBACK_QUEUE_REGION: !Ref LambdaRegion
