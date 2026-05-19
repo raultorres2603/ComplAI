@@ -107,11 +107,11 @@ public class TelegramBotService {
             sessionStore.clearSession(chatId);
             sendWelcome(chatId, cityId, lang);
         } else if (text.startsWith("/mode")) {
-            sendModeSelection(chatId, lang);
+            sendModeSelection(chatId, cityId, lang);
         } else if (text.startsWith("/help")) {
-            sendHelp(chatId, lang);
+            sendHelp(chatId, cityId, lang);
         } else if (text.startsWith("/language")) {
-            sendLanguageSelection(chatId);
+            sendLanguageSelection(chatId, cityId);
         } else {
             handleTextByMode(chatId, text, cityId, lang);
         }
@@ -127,7 +127,7 @@ public class TelegramBotService {
         if (data.startsWith("mode_")) {
             handleModeSelection(chatId, data.substring("mode_".length()), cityId, lang);
         } else if (data.startsWith("lang_")) {
-            handleLanguageSelection(chatId, data.substring("lang_".length()), lang);
+            handleLanguageSelection(chatId, data.substring("lang_".length()), lang, cityId);
         }
 
         // Acknowledge the callback query
@@ -163,16 +163,16 @@ public class TelegramBotService {
         sendMessage(chatId, message, buildMainKeyboard(lang), cityId);
     }
 
-    private void sendModeSelection(long chatId, String lang) {
+    private void sendModeSelection(long chatId, String cityId, String lang) {
         String message = switch (lang) {
             case "CA" -> "Selecciona una opció:";
             case "ES" -> "Selecciona una opción:";
             default -> "Select an option:";
         };
-        sendMessage(chatId, message, buildMainKeyboard(lang), null);
+        sendMessage(chatId, message, buildMainKeyboard(lang), cityId);
     }
 
-    private void sendHelp(long chatId, String lang) {
+    private void sendHelp(long chatId, String cityId, String lang) {
         String message = switch (lang) {
             case "CA" -> "🤖 Assistent Municipal - Ajuda\n\n"
                     + "Comandes disponibles:\n"
@@ -202,10 +202,10 @@ public class TelegramBotService {
                     + "📝 Complaint Mode: Draft a formal complaint.\n"
                     + "💡 Feedback Mode: Send your suggestions.";
         };
-        sendMessage(chatId, message, null, null);
+        sendMessage(chatId, message, null, cityId);
     }
 
-    private void sendLanguageSelection(long chatId) {
+    private void sendLanguageSelection(long chatId, String cityId) {
         TelegramInlineKeyboardMarkup keyboard = new TelegramInlineKeyboardMarkup(List.of(
                 List.of(
                         new TelegramInlineKeyboardButton("🇨🇦 Català", "lang_ca"),
@@ -216,7 +216,7 @@ public class TelegramBotService {
                 )
         ));
         sendMessage(chatId, "Selecciona el teu idioma / Selecciona tu idioma / Select your language:",
-                keyboard, null);
+                keyboard, cityId);
     }
 
     // -------------------------------------------------------------------------
@@ -252,11 +252,11 @@ public class TelegramBotService {
                 };
                 sendMessage(chatId, msg, null, cityId);
             }
-            default -> sendModeSelection(chatId, lang);
+            default -> sendModeSelection(chatId, cityId, lang);
         }
     }
 
-    private void handleLanguageSelection(long chatId, String langCode, String currentLang) {
+    private void handleLanguageSelection(long chatId, String langCode, String currentLang, String cityId) {
         String effectiveCode = switch (langCode.toLowerCase()) {
             case "ca" -> "CA";
             case "es" -> "ES";
@@ -270,7 +270,7 @@ public class TelegramBotService {
             case "ES" -> "✅ Idioma cambiado a Español. ¿Cómo puedo ayudarte?";
             default -> "✅ Language changed to English. How can I help you?";
         };
-        sendMessage(chatId, confirmMsg, buildMainKeyboard(effectiveCode), null);
+        sendMessage(chatId, confirmMsg, buildMainKeyboard(effectiveCode), cityId);
     }
 
     // -------------------------------------------------------------------------
@@ -314,7 +314,7 @@ public class TelegramBotService {
                 case "ES" -> "❌ Error al procesar la consulta. Por favor, inténtalo más tarde.";
                 default -> "❌ Error processing your query. Please try again later.";
             };
-            sendMessage(chatId, errorMsg, null, null);
+            sendMessage(chatId, errorMsg, null, cityId);
         }
     }
 
@@ -336,7 +336,7 @@ public class TelegramBotService {
                         + "Please write your name, surname and ID number in one line:\n"
                         + "Example: <b>John Doe, 12345678Z</b>";
             };
-            sendMessage(chatId, msg, null, null);
+            sendMessage(chatId, msg, null, cityId);
             return;
         }
 
@@ -347,7 +347,7 @@ public class TelegramBotService {
             // Re-store the complaint and ask again
             sessionStore.setPendingComplaintText(chatId, pendingComplaint);
             String missingFields = buildMissingFieldsMessage(identity, lang);
-            sendMessage(chatId, missingFields, null, null);
+            sendMessage(chatId, missingFields, null, cityId);
             return;
         }
 
@@ -386,7 +386,7 @@ public class TelegramBotService {
                 case "ES" -> "❌ Error al generar la reclamación. Por favor, inténtalo de nuevo.";
                 default -> "❌ Error generating the complaint. Please try again.";
             };
-            sendMessage(chatId, errorMsg, null, null);
+            sendMessage(chatId, errorMsg, null, cityId);
         }
     }
 
@@ -423,7 +423,7 @@ public class TelegramBotService {
                 case "ES" -> "❌ Error al procesar la sugerencia. Por favor, inténtalo de nuevo.";
                 default -> "❌ Error processing feedback. Please try again.";
             };
-            sendMessage(chatId, errorMsg, null, null);
+            sendMessage(chatId, errorMsg, null, cityId);
         }
     }
 

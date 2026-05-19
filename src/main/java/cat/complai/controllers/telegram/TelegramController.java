@@ -5,9 +5,9 @@ import cat.complai.controllers.telegram.dto.TelegramUpdate;
 import cat.complai.services.telegram.TelegramBotService;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Status;
 import io.micronaut.http.HttpStatus;
@@ -56,7 +56,7 @@ public class TelegramController {
     @Post("/webhook/{cityId}")
     @Status(HttpStatus.OK)
     public HttpResponse<?> webhook(@Body TelegramUpdate update,
-                                   String cityId,
+                                   @PathVariable String cityId,
                                    HttpRequest<?> request) {
         // Validate cityId
         if (cityId == null || cityId.isBlank()) {
