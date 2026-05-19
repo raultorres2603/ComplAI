@@ -1,8 +1,8 @@
 package cat.complai.services.ses;
 
+import java.util.Map;
 import java.util.logging.Logger;
 
-import com.amazonaws.services.lambda.runtime.events.ScheduledEvent;
 import io.micronaut.function.aws.MicronautRequestHandler;
 import jakarta.inject.Inject;
 
@@ -24,7 +24,7 @@ import jakarta.inject.Inject;
  * <p>Local development: the handler is invoked via {@code sam local invoke} by
  * {@code ses_scheduled_poller.py}, which runs on a cron-like loop through SAM.
  */
-public class SesScheduledReportHandler extends MicronautRequestHandler<ScheduledEvent, String> {
+public class SesScheduledReportHandler extends MicronautRequestHandler<Map<String, Object>, String> {
 
     private static final Logger logger = Logger.getLogger(SesScheduledReportHandler.class.getName());
 
@@ -32,10 +32,10 @@ public class SesScheduledReportHandler extends MicronautRequestHandler<Scheduled
     private MultiCitySesService multiCityService;
 
     @Override
-    public String execute(ScheduledEvent event) {
+    public String execute(Map<String, Object> event) {
         logger.info("SesScheduledReportHandler — scheduled invocation received");
-        logger.info(() -> "Event source: " + event.getSource()
-                + " | detail-type: " + event.getDetailType());
+        logger.info(() -> "Event source: " + event.get("source")
+                + " | detail-type: " + event.get("detail-type"));
         return multiCityService.runReportsForAllCities();
     }
 }
