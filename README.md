@@ -22,8 +22,9 @@
 12. [📄 PDF Complaint Generation](#-pdf-complaint-generation)
 13. [🆔 OIDC Identity Verification](#-oidc-identity-verification)
 14. [🤖 AI Identity and Behaviour](#-ai-identity-and-behaviour)
-15. [🤝 Contributing](#-contributing)
-16. [⚖️ License](#-license)
+15. [🤖 Telegram Bot](#-telegram-bot)
+16. [🤝 Contributing](#-contributing)
+17. [⚖️ License](#-license)
 
 ---
 
@@ -340,6 +341,8 @@ Key environment variables (see `sam/env.json.example` for the full list):
 | `AWS_SES_TO_EMAIL_ELPRAT` | Report recipient for El Prat | `elprat@example.com` |
 | `OPENROUTER_MODEL` | OpenRouter model ID | `openrouter/free` |
 | `RESPONSE_CACHE_ENABLED` | Enable response caching | `true` |
+| `TOKEN_TELEGRAM_ELPRAT` | Telegram bot token for El Prat (see [Telegram Bot](#-telegram-bot)) | `123456:ABC-DEF1234...` |
+| `TELEGRAM_WEBHOOK_SECRET_ELPRAT` | Telegram webhook secret for El Prat | `your-secret-token` |
 
 ---
 
@@ -352,6 +355,7 @@ Key environment variables (see `sam/env.json.example` for the full list):
 | `POST` | `/complai/ask` | `X-Api-Key` | Ask municipal questions (SSE stream) | `AskRequest` | `Publisher<Event<String>>` (SSE) or `OpenRouterPublicDto` (error) |
 | `POST` | `/complai/redact` | `X-Api-Key` (+ `X-Identity-Token` for OIDC-enabled cities) | Complaint drafting and async PDF queueing | `RedactRequest` | `RedactAcceptedDto` (202) or `OpenRouterPublicDto` |
 | `POST` | `/complai/feedback` | `X-Api-Key` | Queue user feedback for async processing | `FeedbackRequest` | `FeedbackAcceptedDto` (202) |
+| `POST` | `/telegram/webhook/{cityId}` | `X-Telegram-Bot-Api-Secret-Token` (secret) | Telegram bot webhook callback | `TelegramUpdate` | `200 OK` |
 
 ---
 
@@ -392,7 +396,8 @@ npx cdk deploy 'ComplAI*Stack-development'
 
 All `POST` endpoints require an `X-Api-Key` header. The `ApiKeyAuthFilter` reads `API_KEY_<CITYID>` environment variables at startup to build an apiKey-to-cityId mapping. Requests are rejected with 401 if the key is missing or unknown.
 
-- **Excluded routes** (no key required): `GET /health`, `GET /health/startup`, `OPTIONS` preflight.
+- **Excluded routes** (no key required): `GET /health`, `GET /health/startup`, `OPTIONS` preflight, `POST /telegram/webhook/{cityId}`.
+- **Telegram webhook auth**: Uses `X-Telegram-Bot-Api-Secret-Token` header verification instead of API key.
 
 ### Rate Limiting
 
@@ -513,6 +518,83 @@ City-specific OIDC configuration is bundled in `src/main/resources/oidc/oidc-map
 - **Civic vocabulary**: The `CivicVocabularyService` expands English/Spanish/French user queries with Catalan civic synonyms for improved cross-language retrieval.
 - **Guardrails**: The assistant refuses to draft anonymous complaints (the Ajuntament does not accept them). Off-topic queries beyond municipal scope are detected and politely declined.
 - **Redact prompt**: A specialized `RedactPromptBuilder` constructs prompts for formal complaint letter generation with proper legal formatting.
+
+---
+
+## 🤖 Telegram Bot
+
+ComplAI includes a **Telegram Bot** integration that allows citizens to interact with the municipal AI assistant directly through Telegram. The bot supports multi-city deployments — each city has its own bot token and webhook secret.
+
+### Architecture
+
+```
+Telegram → POST /telegram/webhook/{cityId} → TelegramController
+                                                 ↓
+                                          TelegramBotService
+                                           ↙        ↓        ↘
+                              OpenRouterServices  SQS Queue  FeedbackPublisher
+```
+
+- **Webhook endpoint**: `POST /telegram/webhook/{cityId}` — receives updates from Telegram
+- **Auth**: Excluded from `X-Api-Key` filter; secured via `X-Telegram-Bot-Api-Secret-Token` header
+- **Bot token**: Resolved from `TOKEN_TELEGRAM_<cityId>` environment variable at startup
+- **Session state**: Per-chat mode/language stored in Caffeine cache (30 min TTL)
+
+### Setup
+
+1. **Create a bot** via [@BotFather](https://t.me/botfather) on Telegram and get the API token.
+2. **Set the environment variables** for each city:
+   ```bash
+   TOKEN_TELEGRAM_ELPRAT=123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11
+   TELEGRAM_WEBHOOK_SECRET_ELPRAT=your-random-secret-token
+   ```
+3. **Register the webhook** with Telegram (run once per bot):
+   ```bash
+   curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
+     -d "url=https://<your-api-gateway-url>/telegram/webhook/elprat" \
+     -d "secret_token=<YOUR_WEBHOOK_SECRET>"
+   ```
+   Replace `<TOKEN>` with your bot token, `<your-api-gateway-url>` with the deployed API Gateway endpoint, and `<YOUR_WEBHOOK_SECRET>` with the same value set in `TELEGRAM_WEBHOOK_SECRET_ELPRAT`.
+
+4. **Verify the webhook**:
+   ```bash
+   curl -X POST "https://api.telegram.org/bot<TOKEN>/getWebhookInfo"
+   ```
+
+### Commands
+
+| Command | Description |
+|---|---|
+| `/start` | Welcome message with inline keyboard (Ask, Complaint, Feedback, Language) |
+| `/mode` | Show mode selection keyboard |
+| `/help` | Show available commands and usage |
+| `/language` | Change language (Català / Español / English) |
+
+### Flows
+
+| Mode | Flow |
+|---|---|
+| **Ask** | User types a question → AI responds via `OpenRouterServices.ask()` synchronously |
+| **Complaint** | Collect complaint text → collect identity (name, surname, NIF) → queue async PDF generation via SQS → return presigned URL |
+| **Feedback** | Collect suggestion text → publish to SQS feedback queue → confirmation message |
+
+### Multi-city Support
+
+The bot automatically discovers cities by scanning env vars at startup. To add a new city:
+1. Set `TOKEN_TELEGRAM_<CITYID>` and optionally `TELEGRAM_WEBHOOK_SECRET_<CITYID>`
+2. Register the webhook with Telegram pointing to `/telegram/webhook/<cityId>`
+3. The city displays its name automatically (add a mapping in `TelegramBotService.resolveCityDisplayName()` for custom display names)
+
+### Files
+
+| Layer | File |
+|---|---|
+| Controller | `controllers/telegram/TelegramController.java` |
+| Service | `services/telegram/TelegramBotService.java` |
+| Session Store | `services/telegram/TelegramSessionStore.java` |
+| Configuration | `config/TelegramConfiguration.java` |
+| DTOs | `controllers/telegram/dto/Telegram*.java` (11 records) |
+| Tests | `controllers/telegram/TelegramControllerTest.java`, `services/telegram/TelegramBotServiceTest.java` |
 
 ---
 

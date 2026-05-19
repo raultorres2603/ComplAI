@@ -236,6 +236,12 @@ export class LambdaStack extends cdk.Stack {
         // GitHub Environment secret (API_KEY_<CITYID_UPPER>) for both development and production.
         API_KEY_ENABLED: 'true',
         API_KEY_ELPRAT: process.env.API_KEY_ELPRAT || '',
+        // Telegram Bot configuration — per-city token and webhook secret.
+        // To add a new city: add TOKEN_TELEGRAM_<CITYID_UPPER> and
+        // TELEGRAM_WEBHOOK_SECRET_<CITYID_UPPER> here and set the corresponding
+        // GitHub Environment secrets for both development and production.
+        TOKEN_TELEGRAM_ELPRAT: process.env.TOKEN_TELEGRAM_ELPRAT || '',
+        TELEGRAM_WEBHOOK_SECRET_ELPRAT: process.env.TELEGRAM_WEBHOOK_SECRET_ELPRAT || '',
         // Async redact flow: queue URL for publishing + bucket details for pre-signed URLs.
         REDACT_QUEUE_URL: redactQueue.queueUrl,
         FEEDBACK_QUEUE_URL: feedbackQueue.queueUrl,
