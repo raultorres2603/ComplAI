@@ -27,9 +27,6 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-import java.util.concurrent.Callable;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -326,33 +323,27 @@ public class TelegramBotService {
     // -------------------------------------------------------------------------
 
     private void handleTextByMode(long chatId, String text, String cityId, String lang) {
-        // 1. Start typing indicator (will be refreshed by withTypingRefresh)
+        // 1. Send typing indicator so the user sees the bot is active
         sendChatAction(chatId, "typing", cityId);
-
         TelegramMode mode = sessionStore.getMode(chatId);
-        String conversationId = sessionStore.getOrCreateConversationId(chatId);
 
         // 2. For potentially long operations (ASK mode), send a brief
-        //    "processing" message so the user gets immediate feedback
+        //    "processing" message with keyboard so the user gets immediate
+        //    feedback and can still interact if the AI takes too long.
         if (mode == TelegramMode.ASK || mode == TelegramMode.NONE) {
             sendProcessingMessage(chatId, lang, cityId);
         }
 
-        // 3. Execute with typing-indicator refresh
+        // 3. Execute the operation
+        String conversationId = sessionStore.getOrCreateConversationId(chatId);
         switch (mode) {
-            case ASK -> withTypingRefresh(chatId, cityId, () -> {
-                handleAsk(chatId, text, cityId, lang, conversationId);
-                return null;
-            });
+            case ASK -> handleAsk(chatId, text, cityId, lang, conversationId);
             case REDACT -> handleRedact(chatId, text, cityId, lang, conversationId);
             case FEEDBACK -> handleFeedback(chatId, text, cityId, lang);
             default -> {
                 // Default to ask mode for unmatched mode
                 sessionStore.setMode(chatId, TelegramMode.ASK);
-                withTypingRefresh(chatId, cityId, () -> {
-                    handleAsk(chatId, text, cityId, lang, conversationId);
-                    return null;
-                });
+                handleAsk(chatId, text, cityId, lang, conversationId);
             }
         }
     }
@@ -374,45 +365,6 @@ public class TelegramBotService {
             default -> "\uD83E\uDD16 Thinking...";
         };
         sendMessage(chatId, msg, buildMainKeyboard(lang), cityId);
-    }
-
-    /**
-     * Executes a long-running task while periodically sending the Telegram
-     * "typing" chat action every 4 seconds. This keeps the typing indicator
-     * visible to the user even when AI processing takes 20-30+ seconds.
-     * <p>
-     * The refresher runs on a daemon thread and is always shut down in the
-     * {@code finally} block, so it cannot outlive the request even if the
-     * task throws.
-     *
-     * @param chatId  Telegram chat ID
-     * @param cityId  city identifier (for token resolution)
-     * @param task    the blocking work to execute
-     * @param <T>     return type of the task
-     * @return the task's result
-     */
-    private <T> T withTypingRefresh(long chatId, String cityId, Callable<T> task) {
-        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "telegram-typing-" + chatId);
-            t.setDaemon(true);
-            return t;
-        });
-        scheduler.scheduleAtFixedRate(
-                () -> sendChatAction(chatId, "typing", cityId),
-                3, 4, TimeUnit.SECONDS);
-        try {
-            return task.call();
-        } catch (Exception e) {
-            if (e instanceof RuntimeException re) throw re;
-            throw new RuntimeException("Unexpected error during typing-refreshed task", e);
-        } finally {
-            scheduler.shutdown();
-            try {
-                scheduler.awaitTermination(2, TimeUnit.SECONDS);
-            } catch (InterruptedException ie) {
-                Thread.currentThread().interrupt();
-            }
-        }
     }
 
     private void handleAsk(long chatId, String text, String cityId, String lang, String conversationId) {
