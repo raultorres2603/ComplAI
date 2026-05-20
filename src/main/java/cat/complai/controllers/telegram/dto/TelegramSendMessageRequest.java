@@ -1,5 +1,6 @@
 package cat.complai.controllers.telegram.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.Nullable;
@@ -19,6 +20,7 @@ import io.micronaut.core.annotation.Nullable;
  *                            or {@code null} for no keyboard
  */
 @Introspected
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record TelegramSendMessageRequest(
         @JsonProperty("chat_id") long chatId,
         String text,

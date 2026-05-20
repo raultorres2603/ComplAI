@@ -180,6 +180,12 @@ public class TelegramBotService {
                     + "📝 Redacción de quejas y reclamaciones\n"
                     + "💡 Enviar sugerencias\n\n"
                     + "Selecciona una opción o escribe tu consulta directamente.";
+            case "FR" -> "Bienvenue à l'assistant municipal de " + cityDisplayName + "! 👋\n\n"
+                    + "Je peux vous aider avec:\n"
+                    + "💬 Des questions sur les procédures, événements et services municipaux\n"
+                    + "📝 Rédaction de plaintes et réclamations\n"
+                    + "💡 Envoyer des suggestions\n\n"
+                    + "Sélectionnez une option ou écrivez votre question directement.";
             default -> "Welcome to the municipal assistant of " + cityDisplayName + "! 👋\n\n"
                     + "I can help you with:\n"
                     + "💬 Questions about procedures, events and municipal services\n"
@@ -219,6 +225,15 @@ public class TelegramBotService {
                     + "💬 Modo Pregunta: Haz cualquier consulta sobre trámites, eventos o servicios.\n"
                     + "📝 Modo Queja: Redacta una reclamación formal.\n"
                     + "💡 Modo Sugerencia: Envía tus sugerencias.";
+            case "FR" -> "🤖 Assistant Municipal - Aide\n\n"
+                    + "Commandes disponibles:\n"
+                    + "/start - Démarrer la conversation\n"
+                    + "/mode - Changer de mode\n"
+                    + "/language - Changer de langue\n"
+                    + "/help - Afficher cette aide\n\n"
+                    + "💬 Mode Question: Posez des questions sur les procédures, événements ou services.\n"
+                    + "📝 Mode Plainte: Rédiger une réclamation formelle.\n"
+                    + "💡 Mode Suggestion: Envoyez vos suggestions.";
             default -> "🤖 Municipal Assistant - Help\n\n"
                     + "Available commands:\n"
                     + "/start - Start conversation\n"
@@ -239,10 +254,11 @@ public class TelegramBotService {
                         new TelegramInlineKeyboardButton("🇪🇸 Español", "lang_es")
                 ),
                 List.of(
-                        new TelegramInlineKeyboardButton("🇬🇧 English", "lang_en")
+                        new TelegramInlineKeyboardButton("🇬🇧 English", "lang_en"),
+                        new TelegramInlineKeyboardButton("🇫🇷 Français", "lang_fr")
                 )
         ));
-        sendMessage(chatId, "Selecciona el teu idioma / Selecciona tu idioma / Select your language:",
+        sendMessage(chatId, "Selecciona el teu idioma / Selecciona tu idioma / Select your language / Choisissez votre langue:",
                 keyboard, cityId);
     }
 
@@ -257,6 +273,7 @@ public class TelegramBotService {
                 String msg = switch (lang) {
                     case "CA" -> "💬 Mode Pregunta activat. Escriu la teva consulta sobre tràmits, esdeveniments o serveis municipals.";
                     case "ES" -> "💬 Modo Pregunta activado. Escribe tu consulta sobre trámites, eventos o servicios municipales.";
+                    case "FR" -> "💬 Mode Question activé. Écrivez votre question sur les procédures, événements ou services municipaux.";
                     default -> "💬 Ask Mode activated. Write your question about procedures, events or municipal services.";
                 };
                 sendMessage(chatId, msg, null, cityId);
@@ -266,6 +283,7 @@ public class TelegramBotService {
                 String msg = switch (lang) {
                     case "CA" -> "📝 Mode Queixa activat. Descriu la teva queixa o reclamació en detall.";
                     case "ES" -> "📝 Modo Queja activado. Describe tu queja o reclamación en detalle.";
+                    case "FR" -> "📝 Mode Plainte activé. Décrivez votre plainte ou réclamation en détail.";
                     default -> "📝 Complaint Mode activated. Describe your complaint or claim in detail.";
                 };
                 sendMessage(chatId, msg, null, cityId);
@@ -275,6 +293,7 @@ public class TelegramBotService {
                 String msg = switch (lang) {
                     case "CA" -> "💡 Mode Suggeriment activat. Explica'ns el teu suggeriment o opinió.";
                     case "ES" -> "💡 Modo Sugerencia activado. Cuéntanos tu sugerencia u opinión.";
+                    case "FR" -> "💡 Mode Suggestion activé. Partagez votre suggestion ou opinion.";
                     default -> "💡 Feedback Mode activated. Tell us your suggestion or opinion.";
                 };
                 sendMessage(chatId, msg, null, cityId);
@@ -288,6 +307,7 @@ public class TelegramBotService {
             case "ca" -> "CA";
             case "es" -> "ES";
             case "en" -> "EN";
+            case "fr" -> "FR";
             default -> currentLang;
         };
         sessionStore.setLanguage(chatId, effectiveCode);
@@ -295,6 +315,7 @@ public class TelegramBotService {
         String confirmMsg = switch (effectiveCode) {
             case "CA" -> "✅ Idioma canviat a Català. Com puc ajudar-te?";
             case "ES" -> "✅ Idioma cambiado a Español. ¿Cómo puedo ayudarte?";
+            case "FR" -> "✅ Langue changée en Français. Comment puis-je vous aider ?";
             default -> "✅ Language changed to English. How can I help you?";
         };
         sendMessage(chatId, confirmMsg, buildMainKeyboard(effectiveCode), cityId);
@@ -305,13 +326,19 @@ public class TelegramBotService {
     // -------------------------------------------------------------------------
 
     private void handleTextByMode(long chatId, String text, String cityId, String lang) {
-        // Send typing indicator and a brief "processing" message
+        // 1. Start typing indicator (will be refreshed by withTypingRefresh)
         sendChatAction(chatId, "typing", cityId);
-        sendProcessingMessage(chatId, lang, cityId);
 
         TelegramMode mode = sessionStore.getMode(chatId);
         String conversationId = sessionStore.getOrCreateConversationId(chatId);
 
+        // 2. For potentially long operations (ASK mode), send a brief
+        //    "processing" message so the user gets immediate feedback
+        if (mode == TelegramMode.ASK || mode == TelegramMode.NONE) {
+            sendProcessingMessage(chatId, lang, cityId);
+        }
+
+        // 3. Execute with typing-indicator refresh
         switch (mode) {
             case ASK -> withTypingRefresh(chatId, cityId, () -> {
                 handleAsk(chatId, text, cityId, lang, conversationId);
@@ -332,16 +359,21 @@ public class TelegramBotService {
 
     /**
      * Sends a brief "processing" message to the user so they get immediate
-     * feedback while the AI is computing the answer. The message is ephemeral
-     * in nature — once the real answer arrives it supersedes this placeholder.
+     * feedback while the AI is computing the answer.
+     * <p>
+     * The message is sent WITH the main inline keyboard so the user can
+     * still interact even if the AI response is slow or times out. Without
+     * the keyboard, a timeout would leave the user stranded with no way to
+     * continue the conversation.
      */
     private void sendProcessingMessage(long chatId, String lang, String cityId) {
         String msg = switch (lang) {
             case "CA" -> "\uD83E\uDD16 Estic pensant...";
             case "ES" -> "\uD83E\uDD16 Estoy pensando...";
+            case "FR" -> "\uD83E\uDD16 Je r\u00E9fl\u00E9chis...";
             default -> "\uD83E\uDD16 Thinking...";
         };
-        sendMessage(chatId, msg, null, cityId);
+        sendMessage(chatId, msg, buildMainKeyboard(lang), cityId);
     }
 
     /**
@@ -394,12 +426,14 @@ public class TelegramBotService {
                 reply = switch (lang) {
                     case "CA" -> "\u23F1\uFE0F La consulta est\u00E0 trigant m\u00E9s del compte. Si us plau, torna-ho a intentar en uns segons.";
                     case "ES" -> "\u23F1\uFE0F La consulta est\u00E1 tardando m\u00E1s de lo normal. Por favor, int\u00E9ntalo de nuevo en unos segundos.";
+                    case "FR" -> "\u23F1\uFE0F La requ\u00EAte prend plus de temps que pr\u00E9vu. Veuillez r\u00E9essayer dans quelques secondes.";
                     default -> "\u23F1\uFE0F The query is taking longer than expected. Please try again in a few seconds.";
                 };
             } else {
                 reply = switch (lang) {
                     case "CA" -> "No he pogut processar la teva consulta. Si us plau, torna-ho a intentar.";
                     case "ES" -> "No he podido procesar tu consulta. Por favor, int\u00E9ntalo de nuevo.";
+                    case "FR" -> "Je n\u2019ai pas pu traiter votre demande. Veuillez r\u00E9essayer.";
                     default -> "I could not process your query. Please try again.";
                 };
             }
@@ -409,6 +443,7 @@ public class TelegramBotService {
             String errorMsg = switch (lang) {
                 case "CA" -> "\u274C Error en processar la consulta. Si us plau, torna-ho a intentar m\u00E9s tard.";
                 case "ES" -> "\u274C Error al procesar la consulta. Por favor, int\u00E9ntalo m\u00E1s tarde.";
+                case "FR" -> "\u274C Erreur lors du traitement de la demande. Veuillez r\u00E9essayer plus tard.";
                 default -> "\u274C Error processing your query. Please try again later.";
             };
             sendMessage(chatId, errorMsg, null, cityId);
@@ -429,6 +464,9 @@ public class TelegramBotService {
                 case "ES" -> "Gracias. Ahora necesito tu identificación para la reclamación.\n\n"
                         + "Por favor, escribe tu nombre, apellidos y NIF en una sola línea:\n"
                         + "Ejemplo: <b>Juan García Pérez, 12345678Z</b>";
+                case "FR" -> "Merci. J\u2019ai besoin de votre identit\u00E9 pour la r\u00E9clamation.\n\n"
+                        + "Veuillez \u00E9crire votre nom, pr\u00E9nom et NIF sur une seule ligne :\n"
+                        + "Exemple : <b>Jean Dupont, 12345678Z</b>";
                 default -> "Thank you. Now I need your identity for the complaint.\n\n"
                         + "Please write your name, surname and ID number in one line:\n"
                         + "Example: <b>John Doe, 12345678Z</b>";
@@ -468,6 +506,8 @@ public class TelegramBotService {
                         + "Estarà disponible en breu a: " + pdfUrl;
                 case "ES" -> "✅ Tu reclamación se está generando.\n\n"
                         + "Estará disponible en breve en: " + pdfUrl;
+                case "FR" -> "✅ Votre r\u00E9clamation est en cours de g\u00E9n\u00E9ration.\n\n"
+                        + "Elle sera bient\u00F4t disponible \u00E0 : " + pdfUrl;
                 default -> "✅ Your complaint is being generated.\n\n"
                         + "It will be available shortly at: " + pdfUrl;
             };
@@ -481,6 +521,7 @@ public class TelegramBotService {
             String errorMsg = switch (lang) {
                 case "CA" -> "❌ Error en generar la reclamació. Si us plau, torna-ho a intentar.";
                 case "ES" -> "❌ Error al generar la reclamación. Por favor, inténtalo de nuevo.";
+                case "FR" -> "❌ Erreur lors de la g\u00E9n\u00E9ration de la r\u00E9clamation. Veuillez r\u00E9essayer.";
                 default -> "❌ Error generating the complaint. Please try again.";
             };
             sendMessage(chatId, errorMsg, null, cityId);
@@ -499,12 +540,14 @@ public class TelegramBotService {
                 msg = switch (lang) {
                     case "CA" -> "✅ Gràcies pel teu suggeriment! El teu feedback és molt valuós per millorar el servei.";
                     case "ES" -> "✅ ¡Gracias por tu sugerencia! Tu feedback es muy valioso para mejorar el servicio.";
+                    case "FR" -> "✅ Merci pour votre suggestion ! Votre avis est tr\u00E8s pr\u00E9cieux pour am\u00E9liorer le service.";
                     default -> "✅ Thank you for your feedback! Your input is very valuable to improve the service.";
                 };
             } else {
                 msg = switch (lang) {
                     case "CA" -> "❌ No s'ha pogut processar el suggeriment. Si us plau, torna-ho a intentar.";
                     case "ES" -> "❌ No se ha podido procesar la sugerencia. Por favor, inténtalo de nuevo.";
+                    case "FR" -> "❌ Impossible de traiter votre suggestion. Veuillez r\u00E9essayer.";
                     default -> "❌ Could not process your feedback. Please try again.";
                 };
             }
@@ -518,6 +561,7 @@ public class TelegramBotService {
             String errorMsg = switch (lang) {
                 case "CA" -> "❌ Error en processar el suggeriment. Si us plau, torna-ho a intentar.";
                 case "ES" -> "❌ Error al procesar la sugerencia. Por favor, inténtalo de nuevo.";
+                case "FR" -> "❌ Erreur lors du traitement de la suggestion. Veuillez r\u00E9essayer.";
                 default -> "❌ Error processing feedback. Please try again.";
             };
             sendMessage(chatId, errorMsg, null, cityId);
@@ -601,6 +645,11 @@ public class TelegramBotService {
                 redactLabel = "📝 Queja";
                 feedbackLabel = "💡 Sugerencia";
             }
+            case "FR" -> {
+                askLabel = "💬 Demander";
+                redactLabel = "📝 Plainte";
+                feedbackLabel = "💡 Suggestion";
+            }
             default -> {
                 askLabel = "💬 Ask";
                 redactLabel = "📝 Complaint";
@@ -675,17 +724,19 @@ public class TelegramBotService {
     private String buildMissingFieldsMessage(ComplainantIdentity identity, String lang) {
         StringBuilder missing = new StringBuilder();
         if (!isPresent(identity.name())) missing.append("- ").append(
-                switch (lang) { case "CA" -> "Nom"; case "ES" -> "Nombre"; default -> "Name"; }).append("\n");
+                switch (lang) { case "CA" -> "Nom"; case "ES" -> "Nombre"; case "FR" -> "Nom"; default -> "Name"; }).append("\n");
         if (!isPresent(identity.surname())) missing.append("- ").append(
-                switch (lang) { case "CA" -> "Cognoms"; case "ES" -> "Apellidos"; default -> "Surname"; }).append("\n");
+                switch (lang) { case "CA" -> "Cognoms"; case "ES" -> "Apellidos"; case "FR" -> "Pr\u00E9nom"; default -> "Surname"; }).append("\n");
         if (!isPresent(identity.idNumber())) missing.append("- ").append(
-                switch (lang) { case "CA" -> "NIF"; case "ES" -> "NIF"; default -> "ID Number (NIF)"; }).append("\n");
+                switch (lang) { case "CA" -> "NIF"; case "ES" -> "NIF"; case "FR" -> "NIF"; default -> "ID Number (NIF)"; }).append("\n");
 
         return switch (lang) {
             case "CA" -> "Falten les següents dades:\n" + missing + "\n"
                     + "Si us plau, escriu-les en el format: <b>Nom Cognoms, NIF</b>";
             case "ES" -> "Faltan los siguientes datos:\n" + missing + "\n"
                     + "Por favor, escríbelos en el formato: <b>Nombre Apellidos, NIF</b>";
+            case "FR" -> "Donn\u00E9es manquantes :\n" + missing + "\n"
+                    + "Veuillez les fournir au format : <b>Nom Pr\u00E9nom, NIF</b>";
             default -> "Missing the following information:\n" + missing + "\n"
                     + "Please provide them in the format: <b>Name Surname, NIF</b>";
         };

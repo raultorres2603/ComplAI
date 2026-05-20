@@ -1,5 +1,6 @@
 package cat.complai.controllers.telegram.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.Nullable;
@@ -17,6 +18,7 @@ import io.micronaut.core.annotation.Nullable;
  *                  {@code "MarkdownV2"}), or {@code null}
  */
 @Introspected
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record TelegramSendDocumentRequest(
         @JsonProperty("chat_id") long chatId,
         String document,
