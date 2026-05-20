@@ -320,8 +320,8 @@ Resources:
           NEWS_BUCKET: !Ref NewsBucket
           NEWS_REGION: !Ref LambdaRegion
           AWS_ENDPOINT_URL: "http://host.docker.internal:4566"
-          OPENROUTER_REQUEST_TIMEOUT_SECONDS: "60"
-          OPENROUTER_OVERALL_TIMEOUT_SECONDS: "60"
+          OPENROUTER_REQUEST_TIMEOUT_SECONDS: "30"
+          OPENROUTER_OVERALL_TIMEOUT_SECONDS: "30"
           OPENROUTER_MAX_RETRIES: "3"
           OPENROUTER_MODEL: openrouter/free
           API_KEY_ENABLED: 'true'
@@ -369,8 +369,8 @@ Resources:
       Environment:
         Variables:
           OPENROUTER_API_KEY: !Ref OpenRouterApiKey
-          OPENROUTER_REQUEST_TIMEOUT_SECONDS: "60"
-          OPENROUTER_OVERALL_TIMEOUT_SECONDS: "60"
+          OPENROUTER_REQUEST_TIMEOUT_SECONDS: "30"
+          OPENROUTER_OVERALL_TIMEOUT_SECONDS: "30"
           OPENROUTER_MAX_RETRIES: "3"
           OPENROUTER_MODEL: openrouter/free
           COMPLAINTS_BUCKET: !Ref ComplaintsBucket

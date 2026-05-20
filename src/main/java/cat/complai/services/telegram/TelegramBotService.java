@@ -5,10 +5,9 @@ import cat.complai.controllers.feedback.dto.FeedbackRequest;
 import cat.complai.controllers.telegram.dto.*;
 import cat.complai.dto.feedback.FeedbackResult;
 import cat.complai.dto.openrouter.ComplainantIdentity;
+import cat.complai.dto.openrouter.OpenRouterErrorCode;
 import cat.complai.dto.openrouter.OpenRouterResponseDto;
-import cat.complai.dto.openrouter.OutputFormat;
 import cat.complai.dto.sqs.RedactSqsMessage;
-import cat.complai.helpers.openrouter.RedactPromptBuilder;
 import cat.complai.services.feedback.FeedbackPublisherService;
 import cat.complai.services.openrouter.IOpenRouterService;
 import cat.complai.services.openrouter.conversation.ConversationManagementService;
@@ -19,6 +18,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -26,7 +27,10 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -45,6 +49,13 @@ public class TelegramBotService {
     private static final String TELEGRAM_API_BASE = "https://api.telegram.org";
     private static final Duration HTTP_TIMEOUT = Duration.ofSeconds(30);
     private static final String S3_KEY_PREFIX = "complaints/telegram/";
+
+    // Deduplication cache for Telegram update IDs
+    // TTL of 60 seconds covers Telegram's retry window; entries expire naturally.
+    static final Cache<Long, Boolean> PROCESSED_UPDATE_IDS = Caffeine.newBuilder()
+            .expireAfterWrite(1, TimeUnit.MINUTES)
+            .maximumSize(10_000)
+            .build();
 
     private final TelegramConfiguration telegramConfig;
     private final TelegramSessionStore sessionStore;
@@ -85,8 +96,24 @@ public class TelegramBotService {
     /**
      * Process an incoming Telegram update for the given city.
      * Routes callback queries and text messages to their appropriate handlers.
+     * <p>
+     * Deduplicates webhook deliveries by {@code updateId}: if an update has
+     * already been seen (Caffeine cache, 60 s TTL) it is silently skipped.
+     * This prevents duplicate processing when Telegram retries the webhook
+     * because our synchronous AI processing takes longer than Telegram's
+     * webhook timeout window.
      */
     public void processUpdate(TelegramUpdate update, String cityId) {
+        if (update == null) return;
+
+        // Deduplication: skip if we already processed this updateId
+        long updateId = update.updateId();
+        if (PROCESSED_UPDATE_IDS.getIfPresent(updateId) != null) {
+            logger.fine(() -> "Skipping duplicate updateId=" + updateId);
+            return;
+        }
+        PROCESSED_UPDATE_IDS.put(updateId, Boolean.TRUE);
+
         if (update.callbackQuery() != null) {
             handleCallbackQuery(update.callbackQuery(), cityId);
         } else if (update.message() != null && update.message().text() != null) {
@@ -278,20 +305,80 @@ public class TelegramBotService {
     // -------------------------------------------------------------------------
 
     private void handleTextByMode(long chatId, String text, String cityId, String lang) {
-        // Send typing indicator
+        // Send typing indicator and a brief "processing" message
         sendChatAction(chatId, "typing", cityId);
+        sendProcessingMessage(chatId, lang, cityId);
 
         TelegramMode mode = sessionStore.getMode(chatId);
         String conversationId = sessionStore.getOrCreateConversationId(chatId);
 
         switch (mode) {
-            case ASK -> handleAsk(chatId, text, cityId, lang, conversationId);
+            case ASK -> withTypingRefresh(chatId, cityId, () -> {
+                handleAsk(chatId, text, cityId, lang, conversationId);
+                return null;
+            });
             case REDACT -> handleRedact(chatId, text, cityId, lang, conversationId);
             case FEEDBACK -> handleFeedback(chatId, text, cityId, lang);
             default -> {
                 // Default to ask mode for unmatched mode
                 sessionStore.setMode(chatId, TelegramMode.ASK);
-                handleAsk(chatId, text, cityId, lang, conversationId);
+                withTypingRefresh(chatId, cityId, () -> {
+                    handleAsk(chatId, text, cityId, lang, conversationId);
+                    return null;
+                });
+            }
+        }
+    }
+
+    /**
+     * Sends a brief "processing" message to the user so they get immediate
+     * feedback while the AI is computing the answer. The message is ephemeral
+     * in nature — once the real answer arrives it supersedes this placeholder.
+     */
+    private void sendProcessingMessage(long chatId, String lang, String cityId) {
+        String msg = switch (lang) {
+            case "CA" -> "\uD83E\uDD16 Estic pensant...";
+            case "ES" -> "\uD83E\uDD16 Estoy pensando...";
+            default -> "\uD83E\uDD16 Thinking...";
+        };
+        sendMessage(chatId, msg, null, cityId);
+    }
+
+    /**
+     * Executes a long-running task while periodically sending the Telegram
+     * "typing" chat action every 4 seconds. This keeps the typing indicator
+     * visible to the user even when AI processing takes 20-30+ seconds.
+     * <p>
+     * The refresher runs on a daemon thread and is always shut down in the
+     * {@code finally} block, so it cannot outlive the request even if the
+     * task throws.
+     *
+     * @param chatId  Telegram chat ID
+     * @param cityId  city identifier (for token resolution)
+     * @param task    the blocking work to execute
+     * @param <T>     return type of the task
+     * @return the task's result
+     */
+    private <T> T withTypingRefresh(long chatId, String cityId, Callable<T> task) {
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "telegram-typing-" + chatId);
+            t.setDaemon(true);
+            return t;
+        });
+        scheduler.scheduleAtFixedRate(
+                () -> sendChatAction(chatId, "typing", cityId),
+                3, 4, TimeUnit.SECONDS);
+        try {
+            return task.call();
+        } catch (Exception e) {
+            if (e instanceof RuntimeException re) throw re;
+            throw new RuntimeException("Unexpected error during typing-refreshed task", e);
+        } finally {
+            scheduler.shutdown();
+            try {
+                scheduler.awaitTermination(2, TimeUnit.SECONDS);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
             }
         }
     }
@@ -299,20 +386,30 @@ public class TelegramBotService {
     private void handleAsk(long chatId, String text, String cityId, String lang, String conversationId) {
         try {
             OpenRouterResponseDto response = openRouterService.ask(text, conversationId, cityId);
-            String reply = response != null && response.getMessage() != null
-                    ? response.getMessage()
-                    : switch (lang) {
-                        case "CA" -> "No he pogut processar la teva consulta. Si us plau, torna-ho a intentar.";
-                        case "ES" -> "No he podido procesar tu consulta. Por favor, inténtalo de nuevo.";
-                        default -> "I could not process your query. Please try again.";
-                    };
+            String reply;
+            if (response != null && response.getMessage() != null) {
+                reply = response.getMessage();
+            } else if (response != null && response.getErrorCode() == OpenRouterErrorCode.TIMEOUT) {
+                // Specific timeout message — AI took too long
+                reply = switch (lang) {
+                    case "CA" -> "\u23F1\uFE0F La consulta est\u00E0 trigant m\u00E9s del compte. Si us plau, torna-ho a intentar en uns segons.";
+                    case "ES" -> "\u23F1\uFE0F La consulta est\u00E1 tardando m\u00E1s de lo normal. Por favor, int\u00E9ntalo de nuevo en unos segundos.";
+                    default -> "\u23F1\uFE0F The query is taking longer than expected. Please try again in a few seconds.";
+                };
+            } else {
+                reply = switch (lang) {
+                    case "CA" -> "No he pogut processar la teva consulta. Si us plau, torna-ho a intentar.";
+                    case "ES" -> "No he podido procesar tu consulta. Por favor, int\u00E9ntalo de nuevo.";
+                    default -> "I could not process your query. Please try again.";
+                };
+            }
             sendMessage(chatId, reply, buildMainKeyboard(lang), cityId);
         } catch (Exception e) {
             logger.log(Level.SEVERE, "Ask failed — chatId=" + chatId + " city=" + cityId, e);
             String errorMsg = switch (lang) {
-                case "CA" -> "❌ Error en processar la consulta. Si us plau, torna-ho a intentar més tard.";
-                case "ES" -> "❌ Error al procesar la consulta. Por favor, inténtalo más tarde.";
-                default -> "❌ Error processing your query. Please try again later.";
+                case "CA" -> "\u274C Error en processar la consulta. Si us plau, torna-ho a intentar m\u00E9s tard.";
+                case "ES" -> "\u274C Error al procesar la consulta. Por favor, int\u00E9ntalo m\u00E1s tarde.";
+                default -> "\u274C Error processing your query. Please try again later.";
             };
             sendMessage(chatId, errorMsg, null, cityId);
         }

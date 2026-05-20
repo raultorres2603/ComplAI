@@ -62,6 +62,13 @@ class TelegramBotServiceTest {
     // Fixture helpers
     // -------------------------------------------------------------------------
 
+    /**
+     * Unique updateId counter to avoid deduplication collisions across tests.
+     * The dedup cache in {@link TelegramBotService#PROCESSED_UPDATE_IDS} is
+     * static, so every test must use a distinct updateId.
+     */
+    private static long nextUpdateId = 1000L;
+
     @BeforeEach
     void setUp() {
         // All tests that pass a cityId will eventually trigger resolveToken(cityId)
@@ -74,14 +81,14 @@ class TelegramBotServiceTest {
     private static TelegramUpdate textUpdate(long chatId, String text) {
         TelegramChat chat = new TelegramChat(chatId, "private", "Test");
         TelegramMessage message = new TelegramMessage(1, null, chat, 1000, text);
-        return new TelegramUpdate(1, message, null);
+        return new TelegramUpdate(nextUpdateId++, message, null);
     }
 
     /** Build a TelegramUpdate containing a callback query. */
     private static TelegramUpdate callbackUpdate(long chatId, String callbackId, String data) {
         TelegramUser user = new TelegramUser(chatId, false, "Test", null);
         TelegramCallbackQuery callback = new TelegramCallbackQuery(callbackId, user, null, data);
-        return new TelegramUpdate(1, null, callback);
+        return new TelegramUpdate(nextUpdateId++, null, callback);
     }
 
     // -------------------------------------------------------------------------
