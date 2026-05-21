@@ -28,6 +28,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 QUEUES = [
     {"name": "complai-redact-local", "function": "ComplAIRedactorFunction"},
     {"name": "complai-feedback-local", "function": "ComplAIFeedbackWorkerFunction"},
+    {"name": "complai-ask-local", "function": "ComplAIAskWorkerFunction"},
 ]
 
 REGION = "eu-west-1"

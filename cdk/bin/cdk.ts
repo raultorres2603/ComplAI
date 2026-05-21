@@ -79,6 +79,7 @@ for (const environment of environments) {
     environment,
     redactQueue: queueStack.redactQueue,
     feedbackQueue: queueStack.feedbackQueue,
+    askQueue: queueStack.askQueue,
     isDestroyMode,
     env: awsEnv,
     crossRegionReferences: true,

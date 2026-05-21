@@ -3,14 +3,15 @@ package cat.complai.services.telegram;
 import cat.complai.config.TelegramConfiguration;
 import cat.complai.controllers.telegram.dto.*;
 import cat.complai.dto.openrouter.ComplainantIdentity;
-import cat.complai.dto.openrouter.OpenRouterErrorCode;
-import cat.complai.dto.openrouter.OpenRouterResponseDto;
+import cat.complai.dto.sqs.AskSqsMessage;
 import cat.complai.services.feedback.FeedbackPublisherService;
 import cat.complai.services.openrouter.IOpenRouterService;
 import cat.complai.services.openrouter.conversation.ConversationManagementService;
 import cat.complai.services.telegram.TelegramSessionStore.TelegramMode;
 import cat.complai.utilities.s3.S3PdfUploader;
+import cat.complai.utilities.sqs.SqsAskPublisher;
 import cat.complai.utilities.sqs.SqsComplaintPublisher;
+import cat.complai.dto.sqs.AskSqsMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -48,6 +49,9 @@ class TelegramBotServiceTest {
 
     @Mock
     private SqsComplaintPublisher sqsPublisher;
+
+    @Mock
+    private SqsAskPublisher askPublisher;
 
     @Mock
     private S3PdfUploader s3PdfUploader;
@@ -122,7 +126,7 @@ class TelegramBotServiceTest {
     // -------------------------------------------------------------------------
 
     @Test
-    void processUpdate_withAskModeAndText_callsOpenRouterService() {
+    void processUpdate_withAskModeAndText_publishesToSqsAskQueue() {
         long chatId = 300L;
         String query = "Quins són els horaris de l'ajuntament?";
         String conversationId = "telegram:" + chatId;
@@ -131,14 +135,18 @@ class TelegramBotServiceTest {
         when(sessionStore.getMode(chatId)).thenReturn(TelegramMode.ASK);
         when(sessionStore.getOrCreateConversationId(chatId)).thenReturn(conversationId);
 
-        OpenRouterResponseDto response = new OpenRouterResponseDto(
-                true, "L'horari és de 9 a 14h.", null, 200, OpenRouterErrorCode.NONE);
-        when(openRouterService.ask(query, conversationId, "testcity")).thenReturn(response);
-
         service.processUpdate(textUpdate(chatId, query), "testcity");
 
-        verify(openRouterService).ask(query, conversationId, "testcity");
+        verify(askPublisher).publish(argThat(msg ->
+                msg.chatId() == chatId
+                        && query.equals(msg.question())
+                        && "testcity".equals(msg.cityId())
+                        && "CA".equals(msg.lang())
+                        && conversationId.equals(msg.conversationId())
+        ));
         verify(sessionStore).getOrCreateConversationId(chatId);
+        // Should NOT call openRouterService directly anymore
+        verifyNoInteractions(openRouterService);
     }
 
     // -------------------------------------------------------------------------

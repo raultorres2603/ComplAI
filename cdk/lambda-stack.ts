@@ -32,6 +32,7 @@ export interface LambdaStackProps extends cdk.StackProps {
   // the EventSourceMapping logical ID — remains stable.
   readonly redactQueue: sqs.IQueue;
   readonly feedbackQueue: sqs.IQueue;
+  readonly askQueue: sqs.IQueue;
   // When true (destroy command), skip local JAR artifact validation and use a
   // placeholder S3 code reference. All stacks must still be instantiated so CDK
   // can match stack IDs to CloudFormation stacks for the destroy operation.
@@ -44,7 +45,7 @@ export class LambdaStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: LambdaStackProps) {
     super(scope, id, props);
 
-    const { environment, redactQueue, feedbackQueue, isDestroyMode } = props;
+    const { environment, redactQueue, feedbackQueue, askQueue, isDestroyMode } = props;
 
     // Reconstruct cross-stack bucket references from their deterministic names
     // rather than accepting CDK construct objects as props. Passing construct
@@ -245,6 +246,7 @@ export class LambdaStack extends cdk.Stack {
         // Async redact flow: queue URL for publishing + bucket details for pre-signed URLs.
         REDACT_QUEUE_URL: redactQueue.queueUrl,
         FEEDBACK_QUEUE_URL: feedbackQueue.queueUrl,
+        ASK_QUEUE_URL: askQueue.queueUrl,
         FEEDBACK_QUEUE_REGION: this.region,
         COMPLAINTS_BUCKET: complaintsBucket.bucketName,
         COMPLAINTS_REGION: this.region,
@@ -298,6 +300,7 @@ export class LambdaStack extends cdk.Stack {
     // API Lambda needs to publish to the redact queue.
     redactQueue.grantSendMessages(lambdaRole);
     feedbackQueue.grantSendMessages(lambdaRole);
+    askQueue.grantSendMessages(lambdaRole);
 
     // API Lambda needs s3:GetObject to sign pre-signed GET URLs on behalf of callers.
     // Pre-signed URLs embed the signer's credentials; without this permission the
@@ -547,6 +550,89 @@ export class LambdaStack extends cdk.Stack {
     }));
 
     // -------------------------------------------------------------------------
+    // Ask Worker Lambda — processes SQS messages from the ask queue, calls the AI,
+    // and sends the answer back to the user via the Telegram Bot API.
+    // Runs the same shadow JAR with a different handler class.
+    // -------------------------------------------------------------------------
+    const askWorkerRole = new iam.Role(this, `ComplAIAskWorkerRole-${environment}`, {
+      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+      description: `IAM role for ComplAI ask worker Lambda (${environment}) - SQS consume + Telegram API`,
+    });
+    askWorkerRole.addManagedPolicy(
+      iam.ManagedPolicy.fromAwsManagedPolicyName('service-role/AWSLambdaBasicExecutionRole'),
+    );
+    // Ask worker consumes from ask queue
+    askQueue.grantConsumeMessages(askWorkerRole);
+    // Ask worker needs procedures/events/news/cityinfo access for RAG context in the AI prompt.
+    proceduresBucket.grantRead(askWorkerRole);
+    eventsBucket.grantRead(askWorkerRole);
+    newsBucket.grantRead(askWorkerRole);
+    cityInfoBucket.grantRead(askWorkerRole);
+
+    const askWorkerLogGroup = new logs.LogGroup(this, `ComplAIAskWorkerLogGroup-${environment}`, {
+      logGroupName: `/aws/lambda/ComplAIAskWorkerLambda-${environment}`,
+      retention: logRetention,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+
+    const askWorkerFn = new lambda.Function(this, `ComplAIAskWorkerLambda-${environment}`, {
+      runtime: JAVA_25,
+      architecture: lambda.Architecture.ARM_64,
+      functionName: `ComplAIAskWorkerLambda-${environment}`,
+      handler: 'cat.complai.services.worker.AskWorkerHandler::handleRequest',
+      code,
+      // CPU-bound: RAG context building, AI call, Telegram API call.
+      // 1024 MB provides good CPU proportionality for this workload.
+      memorySize: 1024,
+      // Must be ≤ SQS visibility timeout (120s). Lambda extends visibility automatically
+      // while running, so using a lower duration is the safest choice.
+      timeout: cdk.Duration.seconds(90),
+      environment: {
+        OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY || '',
+        OPENROUTER_REQUEST_TIMEOUT_SECONDS: process.env.OPENROUTER_REQUEST_TIMEOUT_SECONDS || '60',
+        OPENROUTER_OVERALL_TIMEOUT_SECONDS: process.env.OPENROUTER_OVERALL_TIMEOUT_SECONDS || '60',
+        OPENROUTER_MAX_RETRIES: process.env.OPENROUTER_MAX_RETRIES || '3',
+        OPENROUTER_MODEL: process.env.OPENROUTER_MODEL || 'openrouter/free',
+        PROCEDURES_BUCKET: proceduresBucket.bucketName,
+        PROCEDURES_REGION: this.region,
+        EVENTS_BUCKET: eventsBucket.bucketName,
+        EVENTS_REGION: this.region,
+        NEWS_BUCKET: newsBucket.bucketName,
+        NEWS_REGION: this.region,
+        CITYINFO_BUCKET: cityInfoBucket.bucketName,
+        CITYINFO_REGION: this.region,
+        // HTTP Client configuration for Micronaut (operational flexibility)
+        HTTP_CLIENT_CONNECT_TIMEOUT: process.env.HTTP_CLIENT_CONNECT_TIMEOUT || '10s',
+        HTTP_CLIENT_READ_TIMEOUT: process.env.HTTP_CLIENT_READ_TIMEOUT || '60s',
+        HTTP_CLIENT_MAX_CONNECTIONS: process.env.HTTP_CLIENT_MAX_CONNECTIONS || '20',
+        HTTP_CLIENT_LOG_LEVEL: process.env.HTTP_CLIENT_LOG_LEVEL || 'WARN',
+        // Response caching configuration for OpenRouter API responses
+        RESPONSE_CACHE_ENABLED: process.env.RESPONSE_CACHE_ENABLED || 'true',
+        RESPONSE_CACHE_TTL_MINUTES: process.env.RESPONSE_CACHE_TTL_MINUTES || '10',
+        RESPONSE_CACHE_MAX_ENTRIES: process.env.RESPONSE_CACHE_MAX_ENTRIES || '500',
+        // SES Configuration — sender and recipient emails from GitHub Environment Variables
+        AWS_SES_FROM_EMAIL: process.env.SES_FROM_EMAIL || '',
+        AWS_SES_TO_EMAIL: process.env.SES_TO_EMAIL || '',
+        AWS_SES_REGION: process.env.AWS_SES_REGION || 'eu-west-1',
+        // Per-city Telegram bot tokens for sending answers back
+        TOKEN_TELEGRAM_ELPRAT: process.env.TOKEN_TELEGRAM_ELPRAT || '',
+        // Allow LocalStack endpoint for local development
+        ...(process.env.AWS_ENDPOINT_URL ? { AWS_ENDPOINT_URL: process.env.AWS_ENDPOINT_URL } : {}),
+      },
+      role: askWorkerRole,
+      logGroup: askWorkerLogGroup,
+    });
+
+    // Wire SQS → ask worker Lambda.
+    // batchSize=1: each ask is independent and takes ~30-60s; batching adds
+    // complexity with no throughput benefit at this scale.
+    // reportBatchItemFailures=true: partial failures don't re-process succeeded items.
+    askWorkerFn.addEventSource(new lambdaEventSources.SqsEventSource(askQueue, {
+      batchSize: 1,
+      reportBatchItemFailures: true,
+    }));
+
+    // -------------------------------------------------------------------------
     // Scheduled Lambda — sends weekly statistics report via SES every Monday 03:00.
     // -------------------------------------------------------------------------
     const scheduledReportRole = new iam.Role(this, `ComplAIScheduledReportRole-${environment}`, {
@@ -722,6 +808,16 @@ export class LambdaStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'ComplAIFeedbackWorkerLogGroupName', {
       value: feedbackWorkerLogGroup.logGroupName,
       description: `CloudWatch Log Group for the feedback worker Lambda function (${environment})`,
+    });
+
+    new cdk.CfnOutput(this, 'ComplAIAskWorkerLambdaName', {
+      value: askWorkerFn.functionName,
+      description: `Name of the ask worker Lambda function (${environment})`,
+    });
+
+    new cdk.CfnOutput(this, 'ComplAIAskWorkerLogGroupName', {
+      value: askWorkerLogGroup.logGroupName,
+      description: `CloudWatch Log Group for the ask worker Lambda function (${environment})`,
     });
 
     new cdk.CfnOutput(this, 'ComplAIApiGatewayEndpoint', {

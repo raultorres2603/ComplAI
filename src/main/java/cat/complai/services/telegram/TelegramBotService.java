@@ -5,14 +5,14 @@ import cat.complai.controllers.feedback.dto.FeedbackRequest;
 import cat.complai.controllers.telegram.dto.*;
 import cat.complai.dto.feedback.FeedbackResult;
 import cat.complai.dto.openrouter.ComplainantIdentity;
-import cat.complai.dto.openrouter.OpenRouterErrorCode;
-import cat.complai.dto.openrouter.OpenRouterResponseDto;
+import cat.complai.dto.sqs.AskSqsMessage;
 import cat.complai.dto.sqs.RedactSqsMessage;
 import cat.complai.services.feedback.FeedbackPublisherService;
 import cat.complai.services.openrouter.IOpenRouterService;
 import cat.complai.services.openrouter.conversation.ConversationManagementService;
 import cat.complai.services.telegram.TelegramSessionStore.TelegramMode;
 import cat.complai.utilities.s3.S3PdfUploader;
+import cat.complai.utilities.sqs.SqsAskPublisher;
 import cat.complai.utilities.sqs.SqsComplaintPublisher;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.inject.Inject;
@@ -59,6 +59,7 @@ public class TelegramBotService {
     private final IOpenRouterService openRouterService;
     private final ConversationManagementService conversationService;
     private final SqsComplaintPublisher sqsPublisher;
+    private final SqsAskPublisher askPublisher;
     private final S3PdfUploader s3PdfUploader;
     private final FeedbackPublisherService feedbackPublisher;
     private final HttpClient httpClient;
@@ -71,6 +72,7 @@ public class TelegramBotService {
                               IOpenRouterService openRouterService,
                               ConversationManagementService conversationService,
                               SqsComplaintPublisher sqsPublisher,
+                              SqsAskPublisher askPublisher,
                               S3PdfUploader s3PdfUploader,
                               FeedbackPublisherService feedbackPublisher) {
         this.telegramConfig = telegramConfig;
@@ -78,6 +80,7 @@ public class TelegramBotService {
         this.openRouterService = openRouterService;
         this.conversationService = conversationService;
         this.sqsPublisher = sqsPublisher;
+        this.askPublisher = askPublisher;
         this.s3PdfUploader = s3PdfUploader;
         this.feedbackPublisher = feedbackPublisher;
         this.httpClient = HttpClient.newBuilder()
@@ -367,31 +370,22 @@ public class TelegramBotService {
         sendMessage(chatId, msg, buildMainKeyboard(lang), cityId);
     }
 
+    /**
+     * Enqueues the user's question to SQS for async processing by the AskWorker Lambda.
+     *
+     * <p>The "Estic pensant..." message was already sent by {@link #handleTextByMode}
+     * before this method was called. The worker Lambda will consume the SQS message,
+     * call the AI, and send the answer back to the user via the Telegram Bot API —
+     * all outside the 60-second Lambda timeout window.
+     */
     private void handleAsk(long chatId, String text, String cityId, String lang, String conversationId) {
         try {
-            OpenRouterResponseDto response = openRouterService.ask(text, conversationId, cityId);
-            String reply;
-            if (response != null && response.getMessage() != null) {
-                reply = response.getMessage();
-            } else if (response != null && response.getErrorCode() == OpenRouterErrorCode.TIMEOUT) {
-                // Specific timeout message — AI took too long
-                reply = switch (lang) {
-                    case "CA" -> "\u23F1\uFE0F La consulta est\u00E0 trigant m\u00E9s del compte. Si us plau, torna-ho a intentar en uns segons.";
-                    case "ES" -> "\u23F1\uFE0F La consulta est\u00E1 tardando m\u00E1s de lo normal. Por favor, int\u00E9ntalo de nuevo en unos segundos.";
-                    case "FR" -> "\u23F1\uFE0F La requ\u00EAte prend plus de temps que pr\u00E9vu. Veuillez r\u00E9essayer dans quelques secondes.";
-                    default -> "\u23F1\uFE0F The query is taking longer than expected. Please try again in a few seconds.";
-                };
-            } else {
-                reply = switch (lang) {
-                    case "CA" -> "No he pogut processar la teva consulta. Si us plau, torna-ho a intentar.";
-                    case "ES" -> "No he podido procesar tu consulta. Por favor, int\u00E9ntalo de nuevo.";
-                    case "FR" -> "Je n\u2019ai pas pu traiter votre demande. Veuillez r\u00E9essayer.";
-                    default -> "I could not process your query. Please try again.";
-                };
-            }
-            sendMessage(chatId, reply, buildMainKeyboard(lang), cityId);
+            AskSqsMessage sqsMessage = new AskSqsMessage(chatId, text, cityId, lang, conversationId);
+            askPublisher.publish(sqsMessage);
+            logger.info(() -> "Ask enqueued — chatId=" + chatId + " city=" + cityId
+                    + " conversationId=" + conversationId);
         } catch (Exception e) {
-            logger.log(Level.SEVERE, "Ask failed — chatId=" + chatId + " city=" + cityId, e);
+            logger.log(Level.SEVERE, "Ask enqueue failed — chatId=" + chatId + " city=" + cityId, e);
             String errorMsg = switch (lang) {
                 case "CA" -> "\u274C Error en processar la consulta. Si us plau, torna-ho a intentar m\u00E9s tard.";
                 case "ES" -> "\u274C Error al procesar la consulta. Por favor, int\u00E9ntalo m\u00E1s tarde.";

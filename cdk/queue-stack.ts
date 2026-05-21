@@ -14,6 +14,8 @@ export class QueueStack extends cdk.Stack {
   readonly redactDlq: sqs.Queue;
   readonly feedbackQueue: sqs.Queue;
   readonly feedbackDlq: sqs.Queue;
+  readonly askQueue: sqs.Queue;
+  readonly askDlq: sqs.Queue;
 
   constructor(scope: Construct, id: string, props: QueueStackProps) {
     super(scope, id, props);
@@ -87,6 +89,36 @@ export class QueueStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'ComplAIFeedbackDLQUrl', {
       value: this.feedbackDlq.queueUrl,
       description: `SQS dead-letter queue for feedback (${environment})`,
+    });
+
+    // Ask queue DLQ — receives ask messages that fail after maxReceiveCount attempts
+    this.askDlq = new sqs.Queue(this, `ComplAIAskDLQ-${environment}`, {
+      queueName: `complai-ask-dlq-${environment}`,
+      retentionPeriod: cdk.Duration.days(7),
+      removalPolicy: environment === 'production'
+        ? cdk.RemovalPolicy.RETAIN
+        : cdk.RemovalPolicy.DESTROY,
+    });
+
+    // Main ask queue
+    // Visibility timeout (90s) must be ≥ 1.5× the worker Lambda timeout (90s)
+    // Retention is kept short (4 hours) as ask requests are typically processed within seconds
+    this.askQueue = new sqs.Queue(this, `ComplAIAskQueue-${environment}`, {
+      queueName: `complai-ask-${environment}`,
+      visibilityTimeout: cdk.Duration.seconds(120),
+      retentionPeriod: cdk.Duration.hours(4),
+      deadLetterQueue: {
+        maxReceiveCount: 3,
+        queue: this.askDlq,
+      },
+      removalPolicy: environment === 'production'
+        ? cdk.RemovalPolicy.RETAIN
+        : cdk.RemovalPolicy.DESTROY,
+    });
+
+    new cdk.CfnOutput(this, 'ComplAIAskQueueUrl', {
+      value: this.askQueue.queueUrl,
+      description: `SQS queue URL for the async ask flow (${environment})`,
     });
   }
 }
