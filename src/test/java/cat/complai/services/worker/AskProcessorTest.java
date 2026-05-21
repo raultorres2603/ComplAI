@@ -64,12 +64,12 @@ class AskProcessorTest {
         CapturingTelegramSender sender = new CapturingTelegramSender();
         AskProcessor processor = new AskProcessor(openRouterService, TOKEN, sender);
 
-        when(openRouterService.ask(QUESTION, CONVERSATION_ID, CITY_ID))
+        when(openRouterService.ask(QUESTION, CONVERSATION_ID, CITY_ID, LANG))
                 .thenReturn(successResponse("L'horari és de 9 a 14h."));
 
         processor.process(message());
 
-        verify(openRouterService).ask(QUESTION, CONVERSATION_ID, CITY_ID);
+        verify(openRouterService).ask(QUESTION, CONVERSATION_ID, CITY_ID, LANG);
         assertEquals(CHAT_ID, sender.capturedChatId.get());
         assertEquals("L'horari és de 9 a 14h.", sender.capturedText.get());
         assertEquals(TOKEN, sender.capturedToken.get());
@@ -80,7 +80,7 @@ class AskProcessorTest {
         CapturingTelegramSender sender = new CapturingTelegramSender();
         AskProcessor processor = new AskProcessor(openRouterService, TOKEN, sender);
 
-        when(openRouterService.ask(anyString(), anyString(), anyString())).thenReturn(null);
+        when(openRouterService.ask(anyString(), anyString(), anyString(), anyString())).thenReturn(null);
 
         processor.process(message());
 
@@ -94,7 +94,7 @@ class AskProcessorTest {
         CapturingTelegramSender sender = new CapturingTelegramSender();
         AskProcessor processor = new AskProcessor(openRouterService, TOKEN, sender);
 
-        when(openRouterService.ask(anyString(), anyString(), anyString()))
+        when(openRouterService.ask(anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(new OpenRouterResponseDto(false, null, "Some error", 500, OpenRouterErrorCode.UPSTREAM));
 
         processor.process(message());
@@ -109,7 +109,7 @@ class AskProcessorTest {
         CapturingTelegramSender sender = new CapturingTelegramSender();
         AskProcessor processor = new AskProcessor(openRouterService, TOKEN, sender);
 
-        when(openRouterService.ask(anyString(), anyString(), anyString()))
+        when(openRouterService.ask(anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(successResponse("   "));
 
         processor.process(message());
@@ -124,7 +124,7 @@ class AskProcessorTest {
         CapturingTelegramSender sender = new CapturingTelegramSender();
         AskProcessor processor = new AskProcessor(openRouterService, TOKEN, sender);
 
-        when(openRouterService.ask(anyString(), anyString(), anyString())).thenReturn(null);
+        when(openRouterService.ask(anyString(), anyString(), anyString(), anyString())).thenReturn(null);
 
         AskSqsMessage msg = new AskSqsMessage(CHAT_ID, QUESTION, CITY_ID, "ES", CONVERSATION_ID);
         processor.process(msg);
@@ -139,7 +139,7 @@ class AskProcessorTest {
         CapturingTelegramSender sender = new CapturingTelegramSender();
         AskProcessor processor = new AskProcessor(openRouterService, TOKEN, sender);
 
-        when(openRouterService.ask(anyString(), anyString(), anyString())).thenReturn(null);
+        when(openRouterService.ask(anyString(), anyString(), anyString(), anyString())).thenReturn(null);
 
         AskSqsMessage msg = new AskSqsMessage(CHAT_ID, QUESTION, CITY_ID, "FR", CONVERSATION_ID);
         processor.process(msg);
@@ -154,7 +154,7 @@ class AskProcessorTest {
         CapturingTelegramSender sender = new CapturingTelegramSender();
         AskProcessor processor = new AskProcessor(openRouterService, TOKEN, sender);
 
-        when(openRouterService.ask(anyString(), anyString(), anyString())).thenReturn(null);
+        when(openRouterService.ask(anyString(), anyString(), anyString(), anyString())).thenReturn(null);
 
         AskSqsMessage msg = new AskSqsMessage(CHAT_ID, QUESTION, CITY_ID, "EN", CONVERSATION_ID);
         processor.process(msg);
@@ -209,13 +209,13 @@ class AskProcessorTest {
         CapturingTelegramSender sender = new CapturingTelegramSender();
         AskProcessor processor = new AskProcessor(openRouterService, TOKEN, sender);
 
-        when(openRouterService.ask(eq(QUESTION), eq("telegram-" + CHAT_ID), eq(CITY_ID)))
+        when(openRouterService.ask(eq(QUESTION), eq("telegram-" + CHAT_ID), eq(CITY_ID), eq(LANG)))
                 .thenReturn(successResponse("Answer"));
 
         AskSqsMessage msg = new AskSqsMessage(CHAT_ID, QUESTION, CITY_ID, LANG, null);
         processor.process(msg);
 
-        verify(openRouterService).ask(QUESTION, "telegram-" + CHAT_ID, CITY_ID);
+        verify(openRouterService).ask(QUESTION, "telegram-" + CHAT_ID, CITY_ID, LANG);
     }
 
     @Test
@@ -223,13 +223,13 @@ class AskProcessorTest {
         CapturingTelegramSender sender = new CapturingTelegramSender();
         AskProcessor processor = new AskProcessor(openRouterService, TOKEN, sender);
 
-        when(openRouterService.ask(eq(QUESTION), eq("telegram-" + CHAT_ID), eq(CITY_ID)))
+        when(openRouterService.ask(eq(QUESTION), eq("telegram-" + CHAT_ID), eq(CITY_ID), eq(LANG)))
                 .thenReturn(successResponse("Answer"));
 
         AskSqsMessage msg = new AskSqsMessage(CHAT_ID, QUESTION, CITY_ID, LANG, "   ");
         processor.process(msg);
 
-        verify(openRouterService).ask(QUESTION, "telegram-" + CHAT_ID, CITY_ID);
+        verify(openRouterService).ask(QUESTION, "telegram-" + CHAT_ID, CITY_ID, LANG);
     }
 
     @Test
@@ -239,7 +239,7 @@ class AskProcessorTest {
         };
         AskProcessor processor = new AskProcessor(openRouterService, TOKEN, failingSender);
 
-        when(openRouterService.ask(anyString(), anyString(), anyString()))
+        when(openRouterService.ask(anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(successResponse("Answer"));
 
         assertThrows(RuntimeException.class, () -> processor.process(message()),

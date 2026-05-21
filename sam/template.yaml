@@ -473,6 +473,7 @@ Resources:
           AWS_ENDPOINT_URL: "http://host.docker.internal:4566"
           AWS_SES_REGION: !Ref LambdaRegion
           AWS_SES_FROM_EMAIL: !Ref SesFromEmail
+          COMPLAI_DEFAULT_CITY_ID: elprat
           # Per-city Telegram bot tokens for sending answers back
           TOKEN_TELEGRAM_ELPRAT: !Ref TokenTelegramElprat
       Events:

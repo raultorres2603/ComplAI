@@ -166,6 +166,14 @@ class AskWorkerHandlerTest {
             }
 
             @Override
+            public OpenRouterResponseDto ask(String question, String conversationId, String cityId, String preferredLang) {
+                if (callCount.incrementAndGet() == 2) {
+                    throw new RuntimeException("AI service unavailable");
+                }
+                return successResponse("Answer");
+            }
+
+            @Override
             public AskStreamResult streamAsk(String question, String conversationId, String cityId) {
                 throw new UnsupportedOperationException();
             }
@@ -254,6 +262,11 @@ class AskWorkerHandlerTest {
 
         @Override
         public OpenRouterResponseDto ask(String question, String conversationId, String cityId) {
+            return response;
+        }
+
+        @Override
+        public OpenRouterResponseDto ask(String question, String conversationId, String cityId, String preferredLang) {
             return response;
         }
 

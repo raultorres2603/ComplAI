@@ -83,9 +83,9 @@ class AskProcessor {
             conversationId = "telegram-" + message.chatId();
         }
 
-        // Call the AI service
+        // Call the AI service with the user's preferred language from the Telegram session
         OpenRouterResponseDto response = openRouterService.ask(
-                message.question(), conversationId, cityId);
+                message.question(), conversationId, cityId, message.lang());
 
         logger.info(() -> "AskProcessor — AI responded chatId=" + message.chatId()
                 + " success=" + (response != null && response.isSuccess())

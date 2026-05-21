@@ -614,6 +614,8 @@ export class LambdaStack extends cdk.Stack {
         AWS_SES_FROM_EMAIL: process.env.SES_FROM_EMAIL || '',
         AWS_SES_TO_EMAIL: process.env.SES_TO_EMAIL || '',
         AWS_SES_REGION: process.env.AWS_SES_REGION || 'eu-west-1',
+        // Default city for RAG index pre-warming at startup
+        COMPLAI_DEFAULT_CITY_ID: process.env.COMPLAI_DEFAULT_CITY_ID || 'elprat',
         // Per-city Telegram bot tokens for sending answers back
         TOKEN_TELEGRAM_ELPRAT: process.env.TOKEN_TELEGRAM_ELPRAT || '',
         // Allow LocalStack endpoint for local development
