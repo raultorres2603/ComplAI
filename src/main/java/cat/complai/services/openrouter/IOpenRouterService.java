@@ -19,6 +19,19 @@ public interface IOpenRouterService {
     OpenRouterResponseDto ask(String question, String conversationId, String cityId);
 
     /**
+     * Synchronously sends a question to the AI and returns the assembled response,
+     * with an explicit preferred language that overrides heuristic detection.
+     *
+     * @param question       the user's question text
+     * @param conversationId optional conversation key for multi-turn context
+     * @param cityId         city identifier used to select RAG context
+     * @param preferredLang  preferred response language (CA, ES, EN, FR); if null
+     *                       or blank, language is detected from the question text
+     * @return the AI response DTO
+     */
+    OpenRouterResponseDto ask(String question, String conversationId, String cityId, String preferredLang);
+
+    /**
      * Streams an answer to {@code question} as raw text deltas via SSE.
      * After the stream completes, the assembled response is saved to conversation
      * history.

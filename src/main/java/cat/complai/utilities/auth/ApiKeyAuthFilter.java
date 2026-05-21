@@ -28,7 +28,7 @@ import java.util.logging.Logger;
  * map, and sets the {@code "city"} and {@code "user"} request attributes for
  * downstream controllers.
  *
- * Excluded paths (no key required): GET /, GET /health, GET /health/startup.
+ * Excluded paths (no key required): GET /, GET /health, GET /health/startup, /telegram/**.
  *
  * Returning null from a {@code @RequestFilter} method tells Micronaut to
  * continue
@@ -106,6 +106,12 @@ public class ApiKeyAuthFilter {
     private boolean isExcluded(HttpRequest<?> request) {
         String path = request.getPath();
         HttpMethod method = request.getMethod();
+
+        // Exclude Telegram webhook paths from auth (Telegram cannot send X-Api-Key)
+        if (path != null && path.startsWith("/telegram/")) {
+            return true;
+        }
+
         return HttpMethod.GET.equals(method)
                 && (path.equals("/") || path.equals("/health") || path.equals("/health/startup"));
     }

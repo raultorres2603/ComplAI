@@ -40,6 +40,14 @@ Parameters:
     Type: String
     Default: 'true'
     Description: Enable scheduled statistics report Lambda (set to 'false' to disable local poller)
+  TokenTelegramElprat:
+    Type: String
+    Default: ''
+    Description: Telegram bot token for city 'elprat'. Get from @BotFather.
+  TelegramWebhookSecretElprat:
+    Type: String
+    Default: ''
+    Description: Webhook secret token for Telegram bot (city 'elprat').
 Conditions:
   IsProduction: !Equals [!Ref Environment, production]
 
@@ -119,6 +127,12 @@ Resources:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Sub /aws/lambda/${ComplAIScheduledReportFunction}
+      RetentionInDays: !If [IsProduction, 90, 7]
+
+  ComplAIAskWorkerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${ComplAIAskWorkerFunction}
       RetentionInDays: !If [IsProduction, 90, 7]
 
   ComplAIErrorMetricFilter:
@@ -293,6 +307,22 @@ Resources:
         deadLetterTargetArn: !GetAtt FeedbackDLQ.Arn
         maxReceiveCount: 3
 
+  AskDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub complai-ask-dlq-${Environment}
+      MessageRetentionPeriod: 604800  # 7 days
+
+  AskQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub complai-ask-${Environment}
+      VisibilityTimeout: 90
+      MessageRetentionPeriod: 14400  # 4 hours
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt AskDLQ.Arn
+        maxReceiveCount: 3
+
   ComplAIFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -312,14 +342,18 @@ Resources:
           NEWS_BUCKET: !Ref NewsBucket
           NEWS_REGION: !Ref LambdaRegion
           AWS_ENDPOINT_URL: "http://host.docker.internal:4566"
-          OPENROUTER_REQUEST_TIMEOUT_SECONDS: "60"
-          OPENROUTER_OVERALL_TIMEOUT_SECONDS: "60"
+          OPENROUTER_REQUEST_TIMEOUT_SECONDS: "45"
+          OPENROUTER_OVERALL_TIMEOUT_SECONDS: "45"
           OPENROUTER_MAX_RETRIES: "3"
           OPENROUTER_MODEL: openrouter/free
           API_KEY_ENABLED: 'true'
           API_KEY_ELPRAT: !Ref ApiKeyElprat
+          # Telegram Bot — per-city token and webhook secret
+          TOKEN_TELEGRAM_ELPRAT: !Ref TokenTelegramElprat
+          TELEGRAM_WEBHOOK_SECRET_ELPRAT: !Ref TelegramWebhookSecretElprat
           REDACT_QUEUE_URL: !Ref RedactQueue
           FEEDBACK_QUEUE_URL: !Ref FeedbackQueue
+          ASK_QUEUE_URL: !Ref AskQueue
           FEEDBACK_QUEUE_REGION: !Ref LambdaRegion
           COMPLAINTS_BUCKET: !Ref ComplaintsBucket
           COMPLAINTS_REGION: !Ref LambdaRegion
@@ -358,8 +392,8 @@ Resources:
       Environment:
         Variables:
           OPENROUTER_API_KEY: !Ref OpenRouterApiKey
-          OPENROUTER_REQUEST_TIMEOUT_SECONDS: "60"
-          OPENROUTER_OVERALL_TIMEOUT_SECONDS: "60"
+          OPENROUTER_REQUEST_TIMEOUT_SECONDS: "45"
+          OPENROUTER_OVERALL_TIMEOUT_SECONDS: "45"
           OPENROUTER_MAX_RETRIES: "3"
           OPENROUTER_MODEL: openrouter/free
           COMPLAINTS_BUCKET: !Ref ComplaintsBucket
@@ -411,6 +445,46 @@ Resources:
             FunctionResponseTypes:
               - ReportBatchItemFailures
 
+  ComplAIAskWorkerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ../build/libs/complai-all.jar
+      Handler: cat.complai.services.worker.AskWorkerHandler::handleRequest
+      Runtime: java25
+      Architectures: [x86_64]
+      MemorySize: 1024
+      Timeout: 90
+      Role: !GetAtt ComplAIWorkerRole.Arn
+      Environment:
+        Variables:
+          OPENROUTER_API_KEY: !Ref OpenRouterApiKey
+          OPENROUTER_REQUEST_TIMEOUT_SECONDS: "45"
+          OPENROUTER_OVERALL_TIMEOUT_SECONDS: "45"
+          OPENROUTER_MAX_RETRIES: "3"
+          OPENROUTER_MODEL: openrouter/free
+          PROCEDURES_BUCKET: !Ref ProceduresBucket
+          PROCEDURES_REGION: !Ref LambdaRegion
+          EVENTS_BUCKET: !Ref EventsBucket
+          EVENTS_REGION: !Ref LambdaRegion
+          NEWS_BUCKET: !Ref NewsBucket
+          NEWS_REGION: !Ref LambdaRegion
+          CITYINFO_BUCKET: !Ref CityInfoBucket
+          CITYINFO_REGION: !Ref LambdaRegion
+          AWS_ENDPOINT_URL: "http://host.docker.internal:4566"
+          AWS_SES_REGION: !Ref LambdaRegion
+          AWS_SES_FROM_EMAIL: !Ref SesFromEmail
+          COMPLAI_DEFAULT_CITY_ID: elprat
+          # Per-city Telegram bot tokens for sending answers back
+          TOKEN_TELEGRAM_ELPRAT: !Ref TokenTelegramElprat
+      Events:
+        SQSTrigger:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt AskQueue.Arn
+            BatchSize: 1
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+
   # IAM Policy for the scheduled report role — inline (SAM doesn't support managed policy for custom role)
   ComplAIScheduledReportPolicy:
     Type: AWS::IAM::Policy
@@ -434,6 +508,7 @@ Resources:
               - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/ComplAILambda-${Environment}:*
               - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/ComplAIRedactorLambda-${Environment}:*
               - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/ComplAIFeedbackWorkerLambda-${Environment}:*
+              - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/ComplAIAskWorkerLambda-${Environment}:*
           - Effect: Allow
             Action:
               - s3:GetObject
@@ -502,6 +577,9 @@ Outputs:
   ComplAIFeedbackQueueUrl:
     Description: SQS queue URL for the async feedback flow
     Value: !Ref FeedbackQueue
+  ComplAIAskQueueUrl:
+    Description: SQS queue URL for the async ask flow
+    Value: !Ref AskQueue
   ComplAIFeedbackBucketName:
     Description: S3 bucket for user feedback JSON files
     Value: !Ref FeedbackBucket

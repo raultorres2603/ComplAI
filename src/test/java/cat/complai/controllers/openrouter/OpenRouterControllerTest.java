@@ -40,6 +40,10 @@ public class OpenRouterControllerTest {
             return new OpenRouterResponseDto(true, "OK from AI", null, 200, OpenRouterErrorCode.NONE);
         }
 
+        public OpenRouterResponseDto ask(String question, String conversationId, String cityId, String preferredLang) {
+            return new OpenRouterResponseDto(true, "OK from AI", null, 200, OpenRouterErrorCode.NONE);
+        }
+
         public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format, String conversationId,
                 ComplainantIdentity identity, String cityId) {
             return new OpenRouterResponseDto(true, "Redacted letter", null, 200, OpenRouterErrorCode.NONE);
@@ -65,6 +69,11 @@ public class OpenRouterControllerTest {
                     OpenRouterErrorCode.REFUSAL);
         }
 
+        public OpenRouterResponseDto ask(String question, String conversationId, String cityId, String preferredLang) {
+            return new OpenRouterResponseDto(false, null, "Request is not about El Prat de Llobregat.", 200,
+                    OpenRouterErrorCode.REFUSAL);
+        }
+
         public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format, String conversationId,
                 ComplainantIdentity identity, String cityId) {
             return new OpenRouterResponseDto(false, null, "Request is not about El Prat de Llobregat.", 200,
@@ -85,6 +94,11 @@ public class OpenRouterControllerTest {
 
     static class FakeServiceUpstream implements IOpenRouterService {
         public OpenRouterResponseDto ask(String question, String conversationId, String cityId) {
+            return new OpenRouterResponseDto(false, null, "Missing OPENROUTER_API_KEY", 500,
+                    OpenRouterErrorCode.UPSTREAM);
+        }
+
+        public OpenRouterResponseDto ask(String question, String conversationId, String cityId, String preferredLang) {
             return new OpenRouterResponseDto(false, null, "Missing OPENROUTER_API_KEY", 500,
                     OpenRouterErrorCode.UPSTREAM);
         }
@@ -115,6 +129,10 @@ public class OpenRouterControllerTest {
             return new OpenRouterResponseDto(true, "OK", null, 200, OpenRouterErrorCode.NONE);
         }
 
+        public OpenRouterResponseDto ask(String question, String conversationId, String cityId, String preferredLang) {
+            return new OpenRouterResponseDto(true, "OK", null, 200, OpenRouterErrorCode.NONE);
+        }
+
         public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format, String conversationId,
                 ComplainantIdentity identity, String cityId) {
             return new OpenRouterResponseDto(false, null,
@@ -139,6 +157,10 @@ public class OpenRouterControllerTest {
 
     static class FakeServiceRequestsIdentity implements IOpenRouterService {
         public OpenRouterResponseDto ask(String question, String conversationId, String cityId) {
+            return new OpenRouterResponseDto(true, "OK", null, 200, OpenRouterErrorCode.NONE);
+        }
+
+        public OpenRouterResponseDto ask(String question, String conversationId, String cityId, String preferredLang) {
             return new OpenRouterResponseDto(true, "OK", null, 200, OpenRouterErrorCode.NONE);
         }
 

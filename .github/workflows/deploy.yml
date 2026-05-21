@@ -280,6 +280,9 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
           API_KEY_ELPRAT: ${{ secrets.API_KEY_ELPRAT }}
+          # Telegram Bot — per-city token and webhook secret
+          TOKEN_TELEGRAM_ELPRAT: ${{ secrets.TOKEN_TELEGRAM_ELPRAT }}
+          TELEGRAM_WEBHOOK_SECRET_ELPRAT: ${{ secrets.TELEGRAM_WEBHOOK_SECRET_ELPRAT }}
           SES_FROM_EMAIL: ${{ vars.SES_FROM_EMAIL }}
           SES_TO_EMAIL_ELPRAT: ${{ vars.SES_TO_EMAIL_ELPRAT }}
           TARGET_ENV: ${{ steps.target.outputs.environment }}

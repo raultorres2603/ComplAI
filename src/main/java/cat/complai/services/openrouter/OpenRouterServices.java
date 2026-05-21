@@ -97,8 +97,14 @@ public class OpenRouterServices implements IOpenRouterService {
 
     @Override
     public OpenRouterResponseDto ask(String question, String conversationId, String cityId) {
+        return ask(question, conversationId, cityId, null);
+    }
+
+    @Override
+    public OpenRouterResponseDto ask(String question, String conversationId, String cityId, String preferredLang) {
         int inputLength = question != null ? question.length() : 0;
-        log.info("ask() called — conversationId={} inputLength={} city={}", conversationId, inputLength, cityId);
+        log.info("ask() called — conversationId={} inputLength={} city={} preferredLang={}",
+                conversationId, inputLength, cityId, preferredLang);
 
         var validationError = validationService.validateQuestion(question);
         if (validationError.isPresent()) {
@@ -107,8 +113,16 @@ public class OpenRouterServices implements IOpenRouterService {
         }
 
         List<Map<String, Object>> messages = new ArrayList<>();
-        String detectedLanguage = RedactPromptBuilder.normalizeLanguageCode(
-                LanguageDetector.detect(question));
+        // Use preferred language if provided, otherwise detect from question text
+        String detectedLanguage;
+        if (preferredLang != null && !preferredLang.isBlank()) {
+            detectedLanguage = RedactPromptBuilder.normalizeLanguageCode(preferredLang);
+            log.debug("ask() using preferred language={} conversationId={}", detectedLanguage, conversationId);
+        } else {
+            detectedLanguage = RedactPromptBuilder.normalizeLanguageCode(
+                    LanguageDetector.detect(question));
+            log.debug("ask() detected language={} conversationId={}", detectedLanguage, conversationId);
+        }
 
         if (intentDetector.requiresEventDateWindowClarification(question, cityId)) {
             String clarificationMessage = buildEventDateWindowClarificationMessage(detectedLanguage);
