@@ -12,6 +12,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 
 /**
  * Standalone (non-Micronaut) class that processes a single Telegram ask job.
@@ -90,8 +91,8 @@ class AskProcessor {
                 + " success=" + (response != null && response.isSuccess())
                 + " hasMessage=" + (response != null && response.getMessage() != null));
 
-        // Build the reply text
-        String reply = buildReply(response, message.lang());
+        // Build the reply text and sanitize for Telegram HTML
+        String reply = sanitizeForTelegramHtml(buildReply(response, message.lang()));
 
         // Send the answer back to the user via Telegram Bot API
         telegramSender.sendMessage(message.chatId(), reply, telegramToken);
@@ -116,6 +117,34 @@ class AskProcessor {
             case "EN" -> "\u274C I could not process your query. Please try again.";
             default -> "\u274C No he pogut processar la teva consulta. Si us plau, torna-ho a intentar.";
         };
+    }
+
+    /**
+     * Sanitises AI response text for Telegram's limited HTML parser.
+     *
+     * <p>Telegram only supports {@code <b>}, {@code <i>}, {@code <u>}, {@code <s>},
+     * {@code <code>}, {@code <pre>}, {@code <a>}, and {@code <tg-spoiler>}.
+     * All other HTML tags are stripped, with {@code <p>} and {@code <br>} converted
+     * to newlines for readability.
+     */
+    static String sanitizeForTelegramHtml(String text) {
+        if (text == null) return null;
+
+        // Replace <p> and <br> tags with newlines (use word boundary to avoid matching <pre>)
+        String result = Pattern.compile("</?p(?:\\s[^>]*)?\\s*/?>", Pattern.CASE_INSENSITIVE)
+                .matcher(text).replaceAll("\n");
+        result = Pattern.compile("<br\\s*/?>", Pattern.CASE_INSENSITIVE)
+                .matcher(result).replaceAll("\n");
+
+        // Strip all remaining HTML tags that Telegram doesn't support
+        // Keep only: b, i, u, s, code, pre, a, tg-spoiler
+        result = Pattern.compile("<(?!(?:/?(?:b|i|u|s|code|pre|a|tg-spoiler))\\b)[^>]*>", Pattern.CASE_INSENSITIVE)
+                .matcher(result).replaceAll("");
+
+        // Collapse multiple consecutive newlines into at most two
+        result = Pattern.compile("\n{3,}").matcher(result).replaceAll("\n\n");
+
+        return result.trim();
     }
 
     /**

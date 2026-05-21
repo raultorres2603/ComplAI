@@ -278,4 +278,90 @@ class AskProcessorTest {
         assertNotNull(reply);
         assertTrue(reply.contains("No he pogut"));
     }
+
+    // -------------------------------------------------------------------------
+    // sanitizeForTelegramHtml tests
+    // -------------------------------------------------------------------------
+
+    @Test
+    void sanitizeForTelegramHtml_stripsPTags() {
+        String input = "<p>Hello world</p>";
+        String result = AskProcessor.sanitizeForTelegramHtml(input);
+        assertEquals("Hello world", result);
+    }
+
+    @Test
+    void sanitizeForTelegramHtml_replacesPWithNewlines() {
+        String input = "<p>First paragraph</p><p>Second paragraph</p>";
+        String result = AskProcessor.sanitizeForTelegramHtml(input);
+        assertEquals("First paragraph\n\nSecond paragraph", result);
+    }
+
+    @Test
+    void sanitizeForTelegramHtml_replacesBrWithNewlines() {
+        String input = "Line one<br/>Line two<br>Line three";
+        String result = AskProcessor.sanitizeForTelegramHtml(input);
+        assertEquals("Line one\nLine two\nLine three", result);
+    }
+
+    @Test
+    void sanitizeForTelegramHtml_keepsSupportedTags() {
+        String input = "<b>Bold</b> <i>italic</i> <u>underline</u> <s>strike</s>";
+        String result = AskProcessor.sanitizeForTelegramHtml(input);
+        assertEquals(input, result);
+    }
+
+    @Test
+    void sanitizeForTelegramHtml_keepsCodeAndPreTags() {
+        String input = "Use <code>example()</code> inside <pre>block</pre>";
+        String result = AskProcessor.sanitizeForTelegramHtml(input);
+        assertEquals(input, result);
+    }
+
+    @Test
+    void sanitizeForTelegramHtml_keepsAnchorTags() {
+        String input = "Visit <a href=\"https://example.com\">this link</a>";
+        String result = AskProcessor.sanitizeForTelegramHtml(input);
+        assertEquals(input, result);
+    }
+
+    @Test
+    void sanitizeForTelegramHtml_stripsUnsupportedTags() {
+        String input = "<div>Content</div><span>more</span><h1>Title</h1>";
+        String result = AskProcessor.sanitizeForTelegramHtml(input);
+        assertEquals("ContentmoreTitle", result);
+    }
+
+    @Test
+    void sanitizeForTelegramHtml_handlesNestedUnsupportedTags() {
+        String input = "<div><p>Nested</p></div>";
+        String result = AskProcessor.sanitizeForTelegramHtml(input);
+        assertEquals("Nested", result);
+    }
+
+    @Test
+    void sanitizeForTelegramHtml_collapsesMultipleNewlines() {
+        String input = "<p>A</p><p>B</p><p>C</p>";
+        String result = AskProcessor.sanitizeForTelegramHtml(input);
+        assertEquals("A\n\nB\n\nC", result);
+    }
+
+    @Test
+    void sanitizeForTelegramHtml_nullReturnsNull() {
+        assertNull(AskProcessor.sanitizeForTelegramHtml(null));
+    }
+
+    @Test
+    void sanitizeForTelegramHtml_plainTextUnchanged() {
+        String input = "This is plain text with no HTML.";
+        String result = AskProcessor.sanitizeForTelegramHtml(input);
+        assertEquals(input, result);
+    }
+
+    @Test
+    void sanitizeForTelegramHtml_mixedSupportedAndUnsupported() {
+        String input = "<p><b>Bold text</b> and <span>span text</span></p>";
+        String result = AskProcessor.sanitizeForTelegramHtml(input);
+        assertEquals("<b>Bold text</b> and span text", result);
+    }
 }
