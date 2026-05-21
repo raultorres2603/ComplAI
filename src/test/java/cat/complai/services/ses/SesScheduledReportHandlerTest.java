@@ -1,11 +1,11 @@
 package cat.complai.services.ses;
 
-import com.amazonaws.services.lambda.runtime.events.ScheduledEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.lang.reflect.Field;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -25,7 +25,11 @@ class SesScheduledReportHandlerTest {
         field.setAccessible(true);
         field.set(handler, multiCityService);
 
-        ScheduledEvent event = new ScheduledEvent();
+        Map<String, Object> event = Map.of(
+            "source", "aws.events",
+            "detail-type", "Scheduled Event",
+            "time", "2026-05-18T03:00:00Z"
+        );
         String result = handler.execute(event);
 
         assertEquals("OK: all reports sent", result);
@@ -45,7 +49,11 @@ class SesScheduledReportHandlerTest {
         field.setAccessible(true);
         field.set(handler, multiCityService);
 
-        ScheduledEvent event = new ScheduledEvent();
+        Map<String, Object> event = Map.of(
+            "source", "aws.events",
+            "detail-type", "Scheduled Event",
+            "time", "2026-05-18T03:00:00Z"
+        );
         String result = handler.execute(event);
 
         assertEquals(expected, result);
