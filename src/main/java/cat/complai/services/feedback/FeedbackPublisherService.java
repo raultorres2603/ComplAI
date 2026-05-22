@@ -12,12 +12,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.context.annotation.Value;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
-import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.sqs.SqsClient;
-import software.amazon.awssdk.services.sqs.SqsClientBuilder;
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
-
-import java.net.URI;
 import java.time.Instant;
 import java.util.UUID;
 import java.util.logging.Level;
@@ -54,23 +50,18 @@ public class FeedbackPublisherService {
     @Inject
     public FeedbackPublisherService(
             @Value("${feedback.queue-url:}") String queueUrl,
-            @Value("${feedback.queue-region:eu-west-1}") String queueRegion,
-            @Value("${AWS_ENDPOINT_URL:}") String endpointUrl,
             @Value("${feedback.max-message-length:5000}") int maxMessageLength,
             @Value("${feedback.max-username-length:200}") int maxUsernameLength,
             CivicVocabularyService civicVocabularyService,
-            CivicVocabularyConfig civicVocabularyConfig) {
+            CivicVocabularyConfig civicVocabularyConfig,
+            SqsClient sqsClient) {
         this.queueUrl = queueUrl;
         this.mapper = new ObjectMapper();
         this.maxMessageLength = maxMessageLength;
         this.maxUsernameLength = maxUsernameLength;
         this.civicVocabularyService = civicVocabularyService;
         this.civicVocabularyConfig = civicVocabularyConfig;
-        SqsClientBuilder builder = SqsClient.builder().region(Region.of(queueRegion));
-        if (endpointUrl != null && !endpointUrl.isBlank()) {
-            builder.endpointOverride(URI.create(endpointUrl));
-        }
-        this.sqsClient = builder.build();
+        this.sqsClient = sqsClient;
     }
 
     /**

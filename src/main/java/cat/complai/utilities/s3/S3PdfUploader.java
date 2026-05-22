@@ -1,18 +1,14 @@
 package cat.complai.utilities.s3;
 
 import io.micronaut.context.annotation.Value;
-import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
 import jakarta.inject.Inject;
 import software.amazon.awssdk.core.sync.RequestBody;
-import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.S3ClientBuilder;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 
-import java.net.URI;
 import java.time.Duration;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -41,24 +37,11 @@ public class S3PdfUploader {
     @Inject
     public S3PdfUploader(
             @Value("${COMPLAINTS_BUCKET:complai-complaints-development}") String bucketName,
-            @Value("${COMPLAINTS_REGION:eu-west-1}") String region,
-            // Optional LocalStack / test override. Empty string means "use the default AWS endpoint".
-            @Value("${AWS_ENDPOINT_URL:}") String endpointUrl) {
+            S3Client s3Client,
+            S3Presigner s3Presigner) {
         this.bucketName = bucketName;
-        Region awsRegion = Region.of(region);
-
-        S3ClientBuilder clientBuilder = S3Client.builder().region(awsRegion);
-        software.amazon.awssdk.services.s3.presigner.S3Presigner.Builder presignerBuilder =
-                S3Presigner.builder().region(awsRegion);
-
-        if (endpointUrl != null && !endpointUrl.isBlank()) {
-            URI endpoint = URI.create(endpointUrl);
-            clientBuilder.endpointOverride(endpoint).forcePathStyle(true);
-            presignerBuilder.endpointOverride(endpoint);
-        }
-
-        this.s3Client   = clientBuilder.build();
-        this.s3Presigner = presignerBuilder.build();
+        this.s3Client = s3Client;
+        this.s3Presigner = s3Presigner;
     }
 
     /**
@@ -108,28 +91,5 @@ public class S3PdfUploader {
         }
     }
 
-    /**
-     * Closes the S3Client and S3Presigner when the bean is destroyed.
-     * Prevents resource leaks in warm Lambda invocations.
-     */
-    @PreDestroy
-    public void close() {
-        try {
-            if (s3Client != null) {
-                s3Client.close();
-                logger.info("S3Client closed");
-            }
-        } catch (Exception e) {
-            logger.log(Level.WARNING, "Failed to close S3Client", e);
-        }
-        try {
-            if (s3Presigner != null) {
-                s3Presigner.close();
-                logger.info("S3Presigner closed");
-            }
-        } catch (Exception e) {
-            logger.log(Level.WARNING, "Failed to close S3Presigner", e);
-        }
-    }
 }
 

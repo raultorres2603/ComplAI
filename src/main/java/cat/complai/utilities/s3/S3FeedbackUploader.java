@@ -4,12 +4,9 @@ import io.micronaut.context.annotation.Value;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import software.amazon.awssdk.core.sync.RequestBody;
-import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.S3ClientBuilder;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
-import java.net.URI;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -33,14 +30,9 @@ public class S3FeedbackUploader {
     @Inject
     public S3FeedbackUploader(
             @Value("${feedback.bucket-name:}") String bucketName,
-            @Value("${feedback.queue-region:eu-west-1}") String bucketRegion,
-            @Value("${AWS_ENDPOINT_URL:}") String endpointUrl) {
+            S3Client s3Client) {
         this.bucketName = bucketName;
-        S3ClientBuilder builder = S3Client.builder().region(Region.of(bucketRegion));
-        if (endpointUrl != null && !endpointUrl.isBlank()) {
-            builder.endpointOverride(URI.create(endpointUrl)).forcePathStyle(true);
-        }
-        this.s3Client = builder.build();
+        this.s3Client = s3Client;
     }
 
     /**

@@ -1,6 +1,5 @@
 plugins {
-    id("io.micronaut.minimal.application") version "4.6.1"
-    id("com.gradleup.shadow") version "8.3.9"
+    id("io.micronaut.application") version "4.6.2"
 }
 
 version = "1.0.0"
@@ -15,8 +14,8 @@ dependencies {
     testImplementation("org.mockito:mockito-inline:5.2.0")
     testImplementation("org.mockito:mockito-junit-jupiter:5.2.0")
     implementation("com.amazonaws:aws-lambda-java-events")
-    implementation("software.amazon.awssdk:cloudwatchlogs:2.25.x") // Use the latest 2.x version
-    implementation("software.amazon.awssdk:cloudwatch:2.25.x") // CloudWatch Metrics (putMetricData, getMetricStatistics)
+    implementation("software.amazon.awssdk:cloudwatchlogs")
+    implementation("software.amazon.awssdk:cloudwatch")
     implementation("io.micronaut:micronaut-http-client")
     implementation("io.micronaut.email:micronaut-email-amazon-ses")
     // Reactor support for SSE streaming on @Client interfaces (Publisher<String> return type)
@@ -43,8 +42,14 @@ dependencies {
     // Jsoup for HTML parsing
     implementation("org.jsoup:jsoup:1.17.2")
     // AWS SDK for S3 and SQS integration
-    implementation("software.amazon.awssdk:s3:2.25.18")
-    implementation("software.amazon.awssdk:sqs:2.25.18")
+    implementation("software.amazon.awssdk:s3")
+    implementation("software.amazon.awssdk:sqs")
+
+    // GraalVM native image support
+    implementation("io.micronaut:micronaut-graal")
+    implementation("io.micronaut.aws:micronaut-function-aws-custom-runtime")
+    implementation("io.micronaut.aws:micronaut-aws-sdk-v2")
+    implementation("software.amazon.awssdk:url-connection-client")
 
     // JJWT — used by OidcIdentityTokenValidator for OIDC/JWK validation (HS256 JWT auth was removed).
     // jjwt-api is the compile-time dependency; impl and jackson are runtime-only.
@@ -121,6 +126,19 @@ tasks.register('ciTest', Test) {
     classpath = sourceSets.test.runtimeClasspath
 }
 
-tasks.named('shadowJar') {
-    archiveFileName.set('complai-all.jar')
+graalvmNative {
+    binaries {
+        main {
+            imageName.set("complai")
+            buildArgs.add("--no-fallback")
+            buildArgs.add("--enable-url-protocols=http,https")
+            buildArgs.add("-H:+AddAllCharsets")
+            buildArgs.add("-H:+ReportExceptionStackTraces")
+        }
+    }
+}
+
+tasks.named("dockerfileNative", io.micronaut.gradle.docker.NativeImageDockerfile) {
+    graalArch.set("aarch64")
+    args("-Xmx64m")
 }

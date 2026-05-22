@@ -22,7 +22,6 @@ import cat.complai.utilities.s3.S3ComplaintLister;
 import cat.complai.utilities.s3.S3FeedbackLister;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
-import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.cloudwatch.CloudWatchClient;
 import software.amazon.awssdk.services.cloudwatch.model.Dimension;
 import software.amazon.awssdk.services.cloudwatch.model.GetMetricStatisticsRequest;
@@ -41,19 +40,6 @@ public class StadisticsService implements IStadisticsService {
 
     @Inject
     public StadisticsService(S3ComplaintLister s3ComplaintLister, S3FeedbackLister s3FeedbackLister,
-            IOpenRouterService openRouterService) {
-        this.s3ComplaintLister = s3ComplaintLister;
-        this.s3FeedbackLister = s3FeedbackLister;
-        this.openRouterService = openRouterService;
-        this.cloudWatchClient = CloudWatchClient.builder()
-                .region(Region.EU_WEST_1)
-                .build();
-    }
-
-    /**
-     * Protected constructor for testing — allows injecting a mock CloudWatchClient.
-     */
-    protected StadisticsService(S3ComplaintLister s3ComplaintLister, S3FeedbackLister s3FeedbackLister,
             IOpenRouterService openRouterService, CloudWatchClient cloudWatchClient) {
         this.s3ComplaintLister = s3ComplaintLister;
         this.s3FeedbackLister = s3FeedbackLister;

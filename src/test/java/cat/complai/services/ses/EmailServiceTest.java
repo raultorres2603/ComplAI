@@ -77,13 +77,11 @@ class EmailServiceTest {
         MockitoAnnotations.openMocks(this);
 
         when(sesConfiguration.getFromEmail()).thenReturn(TEST_FROM_EMAIL);
-        when(sesConfiguration.getRegion()).thenReturn("eu-west-1");
 
-        // Create EmailService with the mocked SES configuration
-        emailService = new EmailService(sesConfiguration);
+        // Create EmailService with mocked SES configuration and SES client
+        emailService = new EmailService(sesConfiguration, sesClient);
 
         // Inject mocked dependencies using reflection since they are private fields
-        injectField(emailService, "sesClient", sesClient);
         injectField(emailService, "stadisticsService", stadisticsService);
         injectField(emailService, "htmlRenderer", htmlRenderer);
     }
@@ -108,7 +106,7 @@ class EmailServiceTest {
         @DisplayName("Constructor throws IllegalArgumentException when SesConfiguration is null")
         void testConstructorThrowsExceptionWhenSesConfigurationIsNull() {
             assertThrows(IllegalArgumentException.class, () -> {
-                new EmailService(null);
+                new EmailService(null, null);
             });
         }
 
@@ -121,7 +119,7 @@ class EmailServiceTest {
                 when(mockConfig.getFromEmail()).thenReturn(null);
 
                 assertThrows(IllegalArgumentException.class, () -> {
-                    new EmailService(mockConfig);
+                    new EmailService(mockConfig, null);
                 });
             } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -137,7 +135,7 @@ class EmailServiceTest {
                 when(mockConfig.getFromEmail()).thenReturn("   ");
 
                 assertThrows(IllegalArgumentException.class, () -> {
-                    new EmailService(mockConfig);
+                    new EmailService(mockConfig, null);
                 });
             } catch (Exception e) {
                 throw new RuntimeException(e);

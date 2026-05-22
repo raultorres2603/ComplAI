@@ -11,7 +11,6 @@ import cat.complai.services.stadistics.models.StadisticsModel;
 import io.micronaut.context.annotation.Bean;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
-import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.ses.SesClient;
 import software.amazon.awssdk.services.ses.model.MailFromDomainNotVerifiedException;
 import software.amazon.awssdk.services.ses.model.MessageRejectedException;
@@ -50,14 +49,14 @@ public class EmailService implements IEmailService {
     private StadisticsHtmlRenderer htmlRenderer;
 
     /**
-     * Constructs the EmailService with SES sender configuration.
+     * Constructs the EmailService with SES sender configuration and an injected SES client.
      *
-     * @param senderConfig The SesSenderConfig containing fromEmail and region
+     * @param senderConfig The SesSenderConfig containing fromEmail
+     * @param sesClient    The SES client (produced by AwsClientFactory)
      * @throws IllegalArgumentException if fromEmail is blank or invalid
-     * @throws IllegalStateException    if SES client cannot be initialized
      */
     @Inject
-    public EmailService(ISesSenderConfig senderConfig) {
+    public EmailService(ISesSenderConfig senderConfig, SesClient sesClient) {
         if (senderConfig == null) {
             throw new IllegalArgumentException("SesSenderConfig bean is required");
         }
@@ -70,21 +69,7 @@ public class EmailService implements IEmailService {
                             "Set AWS_SES_FROM_EMAIL environment variable and ensure it's a valid email.");
         }
 
-        String region = senderConfig.getRegion();
-        if (region == null || region.isBlank()) {
-            region = "eu-west-1";
-        }
-
-        try {
-            this.sesClient = SesClient.builder()
-                    .region(Region.of(region))
-                    .build();
-            logger.info("EmailService initialized with sender: {} in region: {}",
-                    maskEmail(this.fromEmail), region);
-        } catch (Exception e) {
-            logger.error("Failed to initialize SES client: {}", e.getMessage());
-            throw new IllegalStateException("Cannot initialize Amazon SES client", e);
-        }
+        this.sesClient = sesClient;
     }
 
     /**

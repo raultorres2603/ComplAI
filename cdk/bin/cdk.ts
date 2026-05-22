@@ -9,7 +9,7 @@ import { EdgeStack } from '../edge-stack';
 
 const app = new cdk.App();
 
-// Detect destroy command so LambdaStack can skip local JAR artifact validation.
+// Detect destroy command so LambdaStack can skip local ZIP artifact validation.
 //
 // Two detection strategies are used together because CDK CLI does NOT pass the
 // subcommand ('destroy') to the app subprocess — it only forwards --output and

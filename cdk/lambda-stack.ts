@@ -14,8 +14,6 @@ import { DeploymentEnvironment } from './deployment-environment';
 import { HttpApi, HttpMethod, CorsHttpMethod, PayloadFormatVersion, CfnStage } from 'aws-cdk-lib/aws-apigatewayv2';
 import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 
-const JAVA_25 = new lambda.Runtime('java25', lambda.RuntimeFamily.JAVA);
-
 export interface LambdaStackProps extends cdk.StackProps {
   // Identifies which environment this stack owns. Every AWS resource is suffixed
   // with this value so the two stacks can coexist in the same AWS account without
@@ -33,7 +31,7 @@ export interface LambdaStackProps extends cdk.StackProps {
   readonly redactQueue: sqs.IQueue;
   readonly feedbackQueue: sqs.IQueue;
   readonly askQueue: sqs.IQueue;
-  // When true (destroy command), skip local JAR artifact validation and use a
+  // When true (destroy command), skip local ZIP artifact validation and use a
   // placeholder S3 code reference. All stacks must still be instantiated so CDK
   // can match stack IDs to CloudFormation stacks for the destroy operation.
   readonly isDestroyMode?: boolean;
@@ -106,75 +104,75 @@ export class LambdaStack extends cdk.Stack {
     );
 
     // --- Lambda code source ------------------------------------------------
-    // CI path: the GitHub Actions workflow uploads the fat JAR to the
+    // CI path: the GitHub Actions workflow uploads the native ZIP to the
     // deployments bucket before calling `cdk deploy`, then sets
-    // DEPLOYMENT_JAR_KEY to the S3 key (e.g. complai-all-<git-sha>.jar).
+    // DEPLOYMENT_JAR_KEY to the S3 key (e.g. complai-all-<git-sha>.zip).
     // Code.fromBucket does NOT stage anything to the CDK bootstrap bucket,
-    // so the cdk-hnb659fds-assets-* bucket never receives the JAR.
+    // so the cdk-hnb659fds-assets-* bucket never receives the ZIP.
     //
     // Local dev path: no DEPLOYMENT_JAR_KEY → fall back to Code.fromAsset,
     // which stages via the bootstrap bucket.  This keeps the local workflow
-    // unchanged and avoids requiring developers to pre-upload the JAR.
+    // unchanged and avoids requiring developers to pre-upload the ZIP.
     // -----------------------------------------------------------------------
     let code: lambda.Code | undefined;
-    const deploymentJarKey = process.env.DEPLOYMENT_JAR_KEY ?? this.node.tryGetContext('jarS3Key');
-    if (deploymentJarKey) {
-      code = lambda.Code.fromBucket(deploymentsBucket, deploymentJarKey);
+    const deploymentArtifactKey = process.env.DEPLOYMENT_JAR_KEY ?? this.node.tryGetContext('artifactS3Key');
+    if (deploymentArtifactKey) {
+      code = lambda.Code.fromBucket(deploymentsBucket, deploymentArtifactKey);
     } else {
-      // Minimal JAR selection:
-      // 1) If CI sets JAR_PATH (or CDK context 'jarPath'), use it.
-      // 2) Otherwise require a '*-all.jar' (shadowJar) in build/libs and use the first one found.
+      // Minimal artifact selection:
+      // 1) If CI sets ARTIFACT_PATH (or CDK context 'artifactPath'), use it.
+      // 2) Otherwise require a '*-all.zip' (buildNativeLambda) in build/libs and use the first one found.
       // This keeps behavior explicit and avoids brittle heuristics.
-      const explicit = process.env.JAR_PATH || this.node.tryGetContext?.('jarPath');
-      let jarPath: string | undefined;
+      const explicit = process.env.ARTIFACT_PATH || this.node.tryGetContext?.('artifactPath');
+      let artifactPath: string | undefined;
       if (explicit) {
         const candidate = path.isAbsolute(explicit) ? explicit : path.resolve(__dirname, '..', '..', explicit);
         if (!fs.existsSync(candidate)) {
           if (isDestroyMode) {
-            code = lambda.Code.fromBucket(deploymentsBucket, `destroy-placeholder-${environment}.jar`);
-            jarPath = undefined;
+            code = lambda.Code.fromBucket(deploymentsBucket, `destroy-placeholder-${environment}.zip`);
+            artifactPath = undefined;
           } else {
-            throw new Error(`Configured JAR_PATH does not exist: ${candidate}`);
+            throw new Error(`Configured ARTIFACT_PATH does not exist: ${candidate}`);
           }
         } else {
-          jarPath = candidate;
+          artifactPath = candidate;
         }
       } else {
         const libsDir = path.resolve(__dirname, '..', '..', 'build', 'libs');
         if (!fs.existsSync(libsDir)) {
           if (isDestroyMode) {
-            code = lambda.Code.fromBucket(deploymentsBucket, `destroy-placeholder-${environment}.jar`);
-            jarPath = undefined;
+            code = lambda.Code.fromBucket(deploymentsBucket, `destroy-placeholder-${environment}.zip`);
+            artifactPath = undefined;
           } else {
-            throw new Error(`Expected build/libs not found at ${libsDir}. Run './gradlew clean shadowJar'.`);
+            throw new Error(`Expected build/libs not found at ${libsDir}. Run './gradlew buildNativeLambda'.`);
           }
         } else {
-          const jars = fs.readdirSync(libsDir).filter((f: string) => f.endsWith('.jar'));
-          if (jars.length === 0) {
+          const zips = fs.readdirSync(libsDir).filter((f: string) => f.endsWith('.zip'));
+          if (zips.length === 0) {
             if (isDestroyMode) {
-              code = lambda.Code.fromBucket(deploymentsBucket, `destroy-placeholder-${environment}.jar`);
-              jarPath = undefined;
+              code = lambda.Code.fromBucket(deploymentsBucket, `destroy-placeholder-${environment}.zip`);
+              artifactPath = undefined;
             } else {
-              throw new Error(`No JARs found in ${libsDir}. Run './gradlew clean shadowJar'.`);
+              throw new Error(`No ZIPs found in ${libsDir}. Run './gradlew buildNativeLambda'.`);
             }
           } else {
-            const allJar = jars.find((f: string) => f.includes('-all.jar') || f.endsWith('-all.jar'));
-            if (!allJar) {
+            const allZip = zips.find((f: string) => f.includes('-all.zip') || f.endsWith('-all.zip'));
+            if (!allZip) {
               if (isDestroyMode) {
-                code = lambda.Code.fromBucket(deploymentsBucket, `destroy-placeholder-${environment}.jar`);
-                jarPath = undefined;
+                code = lambda.Code.fromBucket(deploymentsBucket, `destroy-placeholder-${environment}.zip`);
+                artifactPath = undefined;
               } else {
-                throw new Error(`No '*-all.jar' found in ${libsDir}. Set JAR_PATH env to the produced jar or produce a shadow JAR.`);
+                throw new Error(`No '*-all.zip' found in ${libsDir}. Set ARTIFACT_PATH env to the produced archive or run './gradlew buildNativeLambda'.`);
               }
             } else {
-              jarPath = path.join(libsDir, allJar);
+              artifactPath = path.join(libsDir, allZip);
             }
           }
         }
       }
       if (!code) {
-        if (!jarPath || !fs.existsSync(jarPath)) throw new Error(`Unable to determine JAR path. Computed: ${jarPath}`);
-        code = lambda.Code.fromAsset(jarPath);
+        if (!artifactPath || !fs.existsSync(artifactPath)) throw new Error(`Unable to determine artifact path. Computed: ${artifactPath}`);
+        code = lambda.Code.fromAsset(artifactPath);
       }
     }
     if (!code) {
@@ -199,16 +197,10 @@ export class LambdaStack extends cdk.Stack {
     });
 
     const lambdaFn = new lambda.Function(this, `ComplAILambda-${environment}`, {
-      runtime: JAVA_25,
+      runtime: lambda.Runtime.PROVIDED_AL2023,
       architecture: lambda.Architecture.ARM_64,
       // Explicit function name to ensure it matches the log group and is under the 64-char limit.
       functionName: `ComplAILambda-${environment}`,
-      // The project uses the Micronaut APIGateway V2 runtime; use the Micronaut
-      // APIGateway v2 HTTP event function handler which the Micronaut build
-      // packages in the shadow JAR.
-      // This handler expects the APIGateway V2 payload (HTTP API) which matches
-      // our CDK HttpApi integration.
-      handler: 'io.micronaut.function.aws.proxy.payload2.APIGatewayV2HTTPEventFunction::handleRequest',
       code,
       // CPU-bound: JSON processing, BM25 scoring, AI streaming orchestration.
       // 1536 MB provides better CPU proportionality (more vCPU) for these workloads
@@ -371,7 +363,7 @@ export class LambdaStack extends cdk.Stack {
 
     // -------------------------------------------------------------------------
     // Worker Lambda — processes SQS messages and uploads generated PDFs to S3.
-    // Runs the same shadow JAR with a different handler class.
+    // Runs the same native ZIP with a different entry point class.
     // -------------------------------------------------------------------------
     const workerRole = new iam.Role(this, `ComplAIWorkerRole-${environment}`, {
       assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
@@ -420,12 +412,10 @@ export class LambdaStack extends cdk.Stack {
     });
 
     const workerFn = new lambda.Function(this, `ComplAIRedactorLambda-${environment}`, {
-      runtime: JAVA_25,
+      runtime: lambda.Runtime.PROVIDED_AL2023,
       architecture: lambda.Architecture.ARM_64,
       // Explicit function name to ensure it matches the log group and is under the 64-char limit.
       functionName: `ComplAIRedactorLambda-${environment}`,
-      // Same shadow JAR, different handler class — no separate build needed.
-      handler: 'cat.complai.services.worker.RedactWorkerHandler::handleRequest',
       code,
       // Memory-bound (PDFBox rendering + AI call).  1024 MB is appropriate;
       // verified with AWS Lambda Power Tuning — lower values cause GC thrashing
@@ -487,12 +477,10 @@ export class LambdaStack extends cdk.Stack {
     }
 
     const feedbackWorkerFn = new lambda.Function(this, `ComplAIFeedbackWorkerLambda-${environment}`, {
-      runtime: JAVA_25,
+      runtime: lambda.Runtime.PROVIDED_AL2023,
       architecture: lambda.Architecture.ARM_64,
       // Explicit function name to ensure it matches the log group and is under the 64-char limit.
       functionName: `ComplAIFeedbackWorkerLambda-${environment}`,
-      // Handler must match the feedback worker: FeedbackWorkerHandler::handleRequest
-      handler: 'cat.complai.services.worker.FeedbackWorkerHandler::handleRequest',
       code,
       // I/O-bound: simple JSON deserialization, S3 upload, no AI calls.
       // 256 MB is sufficient and reduces cost by ~50% vs. 512 MB for this
@@ -552,7 +540,7 @@ export class LambdaStack extends cdk.Stack {
     // -------------------------------------------------------------------------
     // Ask Worker Lambda — processes SQS messages from the ask queue, calls the AI,
     // and sends the answer back to the user via the Telegram Bot API.
-    // Runs the same shadow JAR with a different handler class.
+    // Runs the same native ZIP with a different entry point class.
     // -------------------------------------------------------------------------
     const askWorkerRole = new iam.Role(this, `ComplAIAskWorkerRole-${environment}`, {
       assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
@@ -576,10 +564,9 @@ export class LambdaStack extends cdk.Stack {
     });
 
     const askWorkerFn = new lambda.Function(this, `ComplAIAskWorkerLambda-${environment}`, {
-      runtime: JAVA_25,
+      runtime: lambda.Runtime.PROVIDED_AL2023,
       architecture: lambda.Architecture.ARM_64,
       functionName: `ComplAIAskWorkerLambda-${environment}`,
-      handler: 'cat.complai.services.worker.AskWorkerHandler::handleRequest',
       code,
       // CPU-bound: RAG context building, AI call, Telegram API call.
       // 1024 MB provides good CPU proportionality for this workload.
@@ -691,10 +678,9 @@ export class LambdaStack extends cdk.Stack {
     });
 
     const scheduledReportFn = new lambda.Function(this, `ComplAIScheduledReportLambda-${environment}`, {
-      runtime: JAVA_25,
+      runtime: lambda.Runtime.PROVIDED_AL2023,
       architecture: lambda.Architecture.ARM_64,
       functionName: `ComplAIScheduledReportLambda-${environment}`,
-      handler: 'cat.complai.services.ses.SesScheduledReportHandler::handleRequest',
       code,
       // CPU+: CloudWatch FilterLogEvents queries, AI call (OpenRouter), HTML report
       // rendering. 1024 MB provides better CPU proportionality, reducing the

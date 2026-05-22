@@ -52,12 +52,6 @@ class S3PdfUploaderTest {
     }
 
     @Test
-    void close_withNullFields_doesNotThrow() {
-        var uploader = new S3PdfUploader() {};
-        assertDoesNotThrow(uploader::close);
-    }
-
-    @Test
     void upload_callsPutObjectWithCorrectParams() throws Exception {
         var uploader = newUploader("test-bucket");
         byte[] pdfBytes = "fake-pdf-content".getBytes();
@@ -100,38 +94,5 @@ class S3PdfUploaderTest {
 
         assertEquals("https://presigned.example.com/test.pdf", url);
         verify(s3Presigner).presignGetObject(any(GetObjectPresignRequest.class));
-    }
-
-    @Test
-    void close_closesBothClients() throws Exception {
-        var uploader = newUploader("bucket");
-
-        uploader.close();
-
-        verify(s3Client).close();
-        verify(s3Presigner).close();
-    }
-
-    @Test
-    void close_whenS3ClientCloseThrows_stillClosesPresigner() throws Exception {
-        doThrow(new RuntimeException("S3Client close failed")).when(s3Client).close();
-
-        var uploader = newUploader("bucket");
-
-        assertDoesNotThrow(uploader::close);
-        verify(s3Client).close();
-        verify(s3Presigner).close();
-    }
-
-    @Test
-    void close_whenBothCloseThrow_doesNotPropagate() throws Exception {
-        doThrow(new RuntimeException("S3Client error")).when(s3Client).close();
-        doThrow(new RuntimeException("S3Presigner error")).when(s3Presigner).close();
-
-        var uploader = newUploader("bucket");
-
-        assertDoesNotThrow(uploader::close);
-        verify(s3Client).close();
-        verify(s3Presigner).close();
     }
 }

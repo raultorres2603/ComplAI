@@ -1,19 +1,15 @@
 package cat.complai.utilities.s3;
 
 import io.micronaut.context.annotation.Value;
-import jakarta.annotation.PreDestroy;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
-import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.S3ClientBuilder;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Request;
 import software.amazon.awssdk.services.s3.model.ListObjectsV2Response;
 import software.amazon.awssdk.services.s3.model.S3Object;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 
-import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -40,26 +36,14 @@ public class S3FeedbackLister {
 
     private final Logger logger = Logger.getLogger(S3FeedbackLister.class.getName());
 
-@Inject
+    @Inject
     public S3FeedbackLister(
             @Value("${FEEDBACK_BUCKET_NAME:}") String bucketName,
-            @Value("${FEEDBACK_QUEUE_REGION:eu-west-1}") String region,
-            @Value("${AWS_ENDPOINT_URL:}") String endpointUrl) {
+            S3Client s3Client,
+            S3Presigner s3Presigner) {
         this.bucketName = bucketName;
-        Region awsRegion = Region.of(region);
-
-        S3ClientBuilder clientBuilder = S3Client.builder().region(awsRegion);
-        software.amazon.awssdk.services.s3.presigner.S3Presigner.Builder presignerBuilder =
-                S3Presigner.builder().region(awsRegion);
-
-        if (endpointUrl != null && !endpointUrl.isBlank()) {
-            URI endpoint = URI.create(endpointUrl);
-            clientBuilder.endpointOverride(endpoint).forcePathStyle(true);
-            presignerBuilder.endpointOverride(endpoint);
-        }
-
-        this.s3Client = clientBuilder.build();
-        this.s3Presigner = presignerBuilder.build();
+        this.s3Client = s3Client;
+        this.s3Presigner = s3Presigner;
     }
 
     /**
@@ -214,29 +198,6 @@ public class S3FeedbackLister {
     private String extractFileName(String key) {
         int lastSlash = key.lastIndexOf('/');
         return lastSlash >= 0 ? key.substring(lastSlash + 1) : key;
-    }
-
-    /**
-     * Closes the S3Client and S3Presigner when the bean is destroyed.
-     */
-    @PreDestroy
-    public void close() {
-        try {
-            if (s3Client != null) {
-                s3Client.close();
-                logger.info("S3Client closed");
-            }
-        } catch (Exception e) {
-            logger.log(Level.WARNING, "Failed to close S3Client", e);
-        }
-        try {
-            if (s3Presigner != null) {
-                s3Presigner.close();
-                logger.info("S3Presigner closed");
-            }
-        } catch (Exception e) {
-            logger.log(Level.WARNING, "Failed to close S3Presigner", e);
-        }
     }
 
     /**
