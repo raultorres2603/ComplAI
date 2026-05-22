@@ -69,6 +69,8 @@ export class EdgeStack extends cdk.Stack {
       {
         // The read timeout must match the Lambda timeout (60 s) so that long-running
         // requests like SSE streaming on /complai/ask are not terminated by CloudFront.
+        // 60 s matches the API Lambda timeout (GraalVM native image — sub-second cold
+        // start, but AI streaming can take the full 60 s for long responses).
         readTimeout: cdk.Duration.seconds(60),
       },
     );

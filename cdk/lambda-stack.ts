@@ -31,10 +31,6 @@ export interface LambdaStackProps extends cdk.StackProps {
   readonly redactQueue: sqs.IQueue;
   readonly feedbackQueue: sqs.IQueue;
   readonly askQueue: sqs.IQueue;
-  // When true (destroy command), skip local ZIP artifact validation and use a
-  // placeholder S3 code reference. All stacks must still be instantiated so CDK
-  // can match stack IDs to CloudFormation stacks for the destroy operation.
-  readonly isDestroyMode?: boolean;
 }
 
 export class LambdaStack extends cdk.Stack {
@@ -43,7 +39,7 @@ export class LambdaStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: LambdaStackProps) {
     super(scope, id, props);
 
-    const { environment, redactQueue, feedbackQueue, askQueue, isDestroyMode } = props;
+    const { environment, redactQueue, feedbackQueue, askQueue } = props;
 
     // Reconstruct cross-stack bucket references from their deterministic names
     // rather than accepting CDK construct objects as props. Passing construct
