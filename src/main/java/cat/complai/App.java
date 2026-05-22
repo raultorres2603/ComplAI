@@ -7,6 +7,7 @@ import cat.complai.services.worker.RedactWorkerHandler;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.SQSBatchResponse;
 import com.amazonaws.services.lambda.runtime.events.SQSEvent;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.function.aws.runtime.APIGatewayV2HTTPEventMicronautLambdaRuntime;
 import io.micronaut.function.aws.runtime.AbstractMicronautLambdaRuntime;
 
@@ -21,6 +22,7 @@ import java.util.function.Supplier;
  * Without {@link AbstractMicronautLambdaRuntime} the process would start,
  * log "No embedded container found", and exit immediately.</p>
  */
+@Introspected(classes = {SQSBatchResponse.class, SQSBatchResponse.BatchItemFailure.class})
 public class App {
 
     public static void main(String[] args) throws Exception {
