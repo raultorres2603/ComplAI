@@ -22,7 +22,10 @@ import java.util.function.Supplier;
  * Without {@link AbstractMicronautLambdaRuntime} the process would start,
  * log "No embedded container found", and exit immediately.</p>
  */
-@Introspected(classes = {SQSBatchResponse.class, SQSBatchResponse.BatchItemFailure.class})
+@Introspected(classes = {
+    SQSBatchResponse.class, SQSBatchResponse.BatchItemFailure.class,
+    SQSEvent.class, SQSEvent.SQSMessage.class
+})
 public class App {
 
     public static void main(String[] args) throws Exception {
