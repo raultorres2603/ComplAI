@@ -104,6 +104,11 @@ export class LambdaStack extends cdk.Stack {
     );
 
     // --- Lambda code source ------------------------------------------------
+    // CDK synthesises ALL stacks in the app even when deploying only one
+    // (e.g. cdk deploy "ComplAIStorageStack-*"). The LambdaStack constructor
+    // must therefore NEVER throw when the native image artifact is missing;
+    // doing so would block deployment of unrelated stacks.
+    //
     // CI path: the GitHub Actions workflow uploads the native ZIP to the
     // deployments bucket before calling `cdk deploy`, then sets
     // DEPLOYMENT_JAR_KEY to the S3 key (e.g. complai-all-<git-sha>.zip).
@@ -113,70 +118,58 @@ export class LambdaStack extends cdk.Stack {
     // Local dev path: no DEPLOYMENT_JAR_KEY → fall back to Code.fromAsset,
     // which stages via the bootstrap bucket.  This keeps the local workflow
     // unchanged and avoids requiring developers to pre-upload the ZIP.
+    //
+    // When no artifact can be found, a placeholder S3 reference is used
+    // instead of throwing. This allows CDK synth to succeed for all stacks.
+    // Only an actual LambdaStack deployment will fail at CloudFormation time
+    // (the placeholder key doesn't exist on S3), which is the correct
+    // behaviour — you can't deploy a Lambda without code.
     // -----------------------------------------------------------------------
-    let code: lambda.Code | undefined;
+    const annotations = cdk.Annotations.of(this);
+    const placeholderKey = `missing-artifact-${environment}.zip`;
+    let code: lambda.Code;
+
+    // Priority 1: CI-provided S3 key (DEPLOYMENT_JAR_KEY from workflow env).
     const deploymentArtifactKey = process.env.DEPLOYMENT_JAR_KEY ?? this.node.tryGetContext('artifactS3Key');
     if (deploymentArtifactKey) {
       code = lambda.Code.fromBucket(deploymentsBucket, deploymentArtifactKey);
     } else {
-      // Minimal artifact selection:
-      // 1) If CI sets ARTIFACT_PATH (or CDK context 'artifactPath'), use it.
-      // 2) Otherwise require a '*-all.zip' (buildNativeLambda) in build/libs and use the first one found.
-      // This keeps behavior explicit and avoids brittle heuristics.
+      // Priority 2: explicit ARTIFACT_PATH (env var or CDK context).
       const explicit = process.env.ARTIFACT_PATH || this.node.tryGetContext?.('artifactPath');
-      let artifactPath: string | undefined;
       if (explicit) {
         const candidate = path.isAbsolute(explicit) ? explicit : path.resolve(__dirname, '..', '..', explicit);
-        if (!fs.existsSync(candidate)) {
-          if (isDestroyMode) {
-            code = lambda.Code.fromBucket(deploymentsBucket, `destroy-placeholder-${environment}.zip`);
-            artifactPath = undefined;
-          } else {
-            throw new Error(`Configured ARTIFACT_PATH does not exist: ${candidate}`);
-          }
+        if (fs.existsSync(candidate)) {
+          code = lambda.Code.fromAsset(candidate);
         } else {
-          artifactPath = candidate;
+          annotations.addWarning(
+            `ARTIFACT_PATH set to "${explicit}" but file not found at "${candidate}". ` +
+            `Using placeholder — LambdaStack deploy will fail until the artifact exists.`,
+          );
+          code = lambda.Code.fromBucket(deploymentsBucket, placeholderKey);
         }
       } else {
+        // Priority 3: auto-discover a *-all.zip from build/libs.
         const libsDir = path.resolve(__dirname, '..', '..', 'build', 'libs');
         if (!fs.existsSync(libsDir)) {
-          if (isDestroyMode) {
-            code = lambda.Code.fromBucket(deploymentsBucket, `destroy-placeholder-${environment}.zip`);
-            artifactPath = undefined;
-          } else {
-            throw new Error(`Expected build/libs not found at ${libsDir}. Run './gradlew buildNativeLambda'.`);
-          }
+          annotations.addWarning(
+            `build/libs not found at "${libsDir}". ` +
+            `Using placeholder — LambdaStack deploy will fail until './gradlew buildNativeLambda' is run.`,
+          );
+          code = lambda.Code.fromBucket(deploymentsBucket, placeholderKey);
         } else {
           const zips = fs.readdirSync(libsDir).filter((f: string) => f.endsWith('.zip'));
-          if (zips.length === 0) {
-            if (isDestroyMode) {
-              code = lambda.Code.fromBucket(deploymentsBucket, `destroy-placeholder-${environment}.zip`);
-              artifactPath = undefined;
-            } else {
-              throw new Error(`No ZIPs found in ${libsDir}. Run './gradlew buildNativeLambda'.`);
-            }
+          const allZip = zips.find((f: string) => f.includes('-all.zip') || f.endsWith('-all.zip'));
+          if (allZip) {
+            code = lambda.Code.fromAsset(path.join(libsDir, allZip));
           } else {
-            const allZip = zips.find((f: string) => f.includes('-all.zip') || f.endsWith('-all.zip'));
-            if (!allZip) {
-              if (isDestroyMode) {
-                code = lambda.Code.fromBucket(deploymentsBucket, `destroy-placeholder-${environment}.zip`);
-                artifactPath = undefined;
-              } else {
-                throw new Error(`No '*-all.zip' found in ${libsDir}. Set ARTIFACT_PATH env to the produced archive or run './gradlew buildNativeLambda'.`);
-              }
-            } else {
-              artifactPath = path.join(libsDir, allZip);
-            }
+            annotations.addWarning(
+              `No '*-all.zip' found in "${libsDir}". ` +
+              `Using placeholder — LambdaStack deploy will fail until './gradlew buildNativeLambda' is run.`,
+            );
+            code = lambda.Code.fromBucket(deploymentsBucket, placeholderKey);
           }
         }
       }
-      if (!code) {
-        if (!artifactPath || !fs.existsSync(artifactPath)) throw new Error(`Unable to determine artifact path. Computed: ${artifactPath}`);
-        code = lambda.Code.fromAsset(artifactPath);
-      }
-    }
-    if (!code) {
-      throw new Error('Unable to configure Lambda code source.');
     }
 
     // Explicit log group so we control retention and can attach metric filters.
