@@ -34,7 +34,8 @@ public class AskWorkerHandler extends MicronautRequestHandler<SQSEvent, SQSBatch
     @Inject
     private TelegramConfiguration telegramConfig;
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    @Inject
+    private ObjectMapper mapper;
 
     @Override
     public SQSBatchResponse execute(SQSEvent event) {
@@ -58,7 +59,7 @@ public class AskWorkerHandler extends MicronautRequestHandler<SQSEvent, SQSBatch
                         + " chatId=" + message.chatId() + " cityId=" + message.cityId());
 
                 String token = telegramConfig.getToken(message.cityId());
-                AskProcessor processor = new AskProcessor(openRouterService, token);
+                AskProcessor processor = new AskProcessor(openRouterService, token, mapper);
                 processor.process(message);
 
                 logger.info(() -> "AskWorkerHandler — record completed successfully messageId=" + messageId

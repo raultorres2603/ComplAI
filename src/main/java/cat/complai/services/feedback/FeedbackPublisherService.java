@@ -54,9 +54,10 @@ public class FeedbackPublisherService {
             @Value("${feedback.max-username-length:200}") int maxUsernameLength,
             CivicVocabularyService civicVocabularyService,
             CivicVocabularyConfig civicVocabularyConfig,
-            SqsClient sqsClient) {
+            SqsClient sqsClient,
+            ObjectMapper mapper) {
         this.queueUrl = queueUrl;
-        this.mapper = new ObjectMapper();
+        this.mapper = mapper;
         this.maxMessageLength = maxMessageLength;
         this.maxUsernameLength = maxUsernameLength;
         this.civicVocabularyService = civicVocabularyService;

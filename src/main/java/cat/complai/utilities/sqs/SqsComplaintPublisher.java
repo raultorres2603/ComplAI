@@ -31,9 +31,10 @@ public class SqsComplaintPublisher {
     @Inject
     public SqsComplaintPublisher(
             @Value("${REDACT_QUEUE_URL:}") String queueUrl,
-            SqsClient sqsClient) {
+            SqsClient sqsClient,
+            ObjectMapper mapper) {
         this.queueUrl = queueUrl;
-        this.mapper   = new ObjectMapper();
+        this.mapper   = mapper;
         this.sqsClient = sqsClient;
     }
 

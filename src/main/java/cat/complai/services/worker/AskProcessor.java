@@ -39,18 +39,27 @@ class AskProcessor {
     /**
      * Production constructor — uses a real {@link HttpClient} for Telegram API calls.
      */
-    AskProcessor(IOpenRouterService openRouterService, String telegramToken) {
-        this(openRouterService, telegramToken, new RealTelegramSender());
+    AskProcessor(IOpenRouterService openRouterService, String telegramToken, ObjectMapper mapper) {
+        this(openRouterService, telegramToken, new RealTelegramSender(mapper), mapper);
     }
 
     /**
      * Test constructor — accepts a custom {@link TelegramSender} for mocking.
      */
-    AskProcessor(IOpenRouterService openRouterService, String telegramToken, TelegramSender telegramSender) {
+    AskProcessor(IOpenRouterService openRouterService, String telegramToken, TelegramSender telegramSender,
+            ObjectMapper mapper) {
         this.openRouterService = openRouterService;
         this.telegramToken = telegramToken;
         this.telegramSender = telegramSender;
-        this.mapper = new ObjectMapper();
+        this.mapper = mapper;
+    }
+
+    /**
+     * Backward-compatible constructor for tests. Uses a standalone mapper
+     * (safe because tests run in JIT mode, not native image).
+     */
+    AskProcessor(IOpenRouterService openRouterService, String telegramToken, TelegramSender telegramSender) {
+        this(openRouterService, telegramToken, telegramSender, new ObjectMapper());
     }
 
     /**
@@ -163,7 +172,11 @@ class AskProcessor {
         private final HttpClient httpClient = HttpClient.newBuilder()
                 .connectTimeout(HTTP_TIMEOUT)
                 .build();
-        private final ObjectMapper mapper = new ObjectMapper();
+        private final ObjectMapper mapper;
+
+        RealTelegramSender(ObjectMapper mapper) {
+            this.mapper = mapper;
+        }
 
         @Override
         public void sendMessage(long chatId, String text, String token) throws Exception {

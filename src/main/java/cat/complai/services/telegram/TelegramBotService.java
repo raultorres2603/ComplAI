@@ -74,7 +74,8 @@ public class TelegramBotService {
                               SqsComplaintPublisher sqsPublisher,
                               SqsAskPublisher askPublisher,
                               S3PdfUploader s3PdfUploader,
-                              FeedbackPublisherService feedbackPublisher) {
+                              FeedbackPublisherService feedbackPublisher,
+                              ObjectMapper mapper) {
         this.telegramConfig = telegramConfig;
         this.sessionStore = sessionStore;
         this.openRouterService = openRouterService;
@@ -86,7 +87,7 @@ public class TelegramBotService {
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(HTTP_TIMEOUT)
                 .build();
-        this.mapper = new ObjectMapper();
+        this.mapper = mapper;
     }
 
     // -------------------------------------------------------------------------

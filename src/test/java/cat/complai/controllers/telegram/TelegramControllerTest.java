@@ -57,7 +57,7 @@ public class TelegramControllerTest {
 
     /**
      * A {@link TelegramBotService} that records received updates instead of
-     * processing them. All 7 constructor parameters are passed as {@code null}
+     * processing them. All constructor parameters are passed as {@code null}
      * since the overridden {@link #processUpdate(TelegramUpdate, String)} never
      * delegates to the parent.
      */
@@ -66,7 +66,7 @@ public class TelegramControllerTest {
         final List<String> receivedCities = new ArrayList<>();
 
         FakeBotService() {
-            super(null, null, null, null, null, null, null, null);
+            super(null, null, null, null, null, null, null, null, null);
         }
 
         @Override

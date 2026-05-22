@@ -33,7 +33,8 @@ public class FeedbackWorkerHandler extends MicronautRequestHandler<SQSEvent, SQS
     @Inject
     private S3FeedbackUploader s3Uploader;
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    @Inject
+    private ObjectMapper mapper;
 
     private final Logger logger = Logger.getLogger(FeedbackWorkerHandler.class.getName());
 
@@ -67,7 +68,7 @@ public class FeedbackWorkerHandler extends MicronautRequestHandler<SQSEvent, SQS
 
         logger.info(() -> "Feedback worker processing batch — recordCount=" + event.getRecords().size());
 
-        FeedbackProcessor processor = new FeedbackProcessor(s3Uploader);
+        FeedbackProcessor processor = new FeedbackProcessor(s3Uploader, mapper);
 
         for (SQSEvent.SQSMessage sqsMessage : event.getRecords()) {
             try {

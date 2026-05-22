@@ -42,7 +42,8 @@ public class RedactWorkerHandler extends MicronautRequestHandler<SQSEvent, SQSBa
     @Value("${OPENROUTER_OVERALL_TIMEOUT_SECONDS:60}")
     private int overallTimeoutSeconds;
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    @Inject
+    private ObjectMapper mapper;
 
     @Override
     public SQSBatchResponse execute(SQSEvent event) {
