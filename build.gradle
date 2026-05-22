@@ -139,6 +139,6 @@ graalvmNative {
 }
 
 tasks.named("dockerfileNative", io.micronaut.gradle.docker.NativeImageDockerfile) {
-    graalArch.set("x64")
+    graalArch.set("aarch64")
     args("-Xmx64m")
 }

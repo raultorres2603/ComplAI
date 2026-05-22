@@ -187,15 +187,17 @@ export class LambdaStack extends cdk.Stack {
 
     const lambdaFn = new lambda.Function(this, `ComplAILambda-${environment}`, {
       runtime: lambda.Runtime.PROVIDED_AL2023,
-      architecture: lambda.Architecture.X86_64,
+      architecture: lambda.Architecture.ARM_64,
       // Explicit function name to ensure it matches the log group and is under the 64-char limit.
       functionName: `ComplAILambda-${environment}`,
       code,
       handler: 'bootstrap',
       // CPU-bound: JSON processing, BM25 scoring, AI streaming orchestration.
       // GraalVM native image removes JIT compiler overhead — native code runs at
-      // full speed immediately. 1024 MB provides ~0.58 vCPU, which is equivalent
-      // to ~1 vCPU on a JIT JVM (native code is ~2x more efficient per cycle).
+      // full speed immediately. ARM_64 (Graviton2) provides up to 34% better
+      // price-performance than x86_64 for Lambda workloads.
+      // 1024 MB provides ~0.58 vCPU, which is equivalent to ~1 vCPU on a JIT JVM
+      // (native code is ~2x more efficient per cycle).
       // BM25 index (~5-20 MB per city) + Caffeine caches (~10 MB) fit comfortably.
       // Verified with AWS Lambda Power Tuning on native image.
       memorySize: 1024,
@@ -406,7 +408,7 @@ export class LambdaStack extends cdk.Stack {
 
     const workerFn = new lambda.Function(this, `ComplAIRedactorLambda-${environment}`, {
       runtime: lambda.Runtime.PROVIDED_AL2023,
-      architecture: lambda.Architecture.X86_64,
+      architecture: lambda.Architecture.ARM_64,
       // Explicit function name to ensure it matches the log group and is under the 64-char limit.
       functionName: `ComplAIRedactorLambda-${environment}`,
       code,
@@ -474,7 +476,7 @@ export class LambdaStack extends cdk.Stack {
 
     const feedbackWorkerFn = new lambda.Function(this, `ComplAIFeedbackWorkerLambda-${environment}`, {
       runtime: lambda.Runtime.PROVIDED_AL2023,
-      architecture: lambda.Architecture.X86_64,
+      architecture: lambda.Architecture.ARM_64,
       // Explicit function name to ensure it matches the log group and is under the 64-char limit.
       functionName: `ComplAIFeedbackWorkerLambda-${environment}`,
       code,
@@ -564,7 +566,7 @@ export class LambdaStack extends cdk.Stack {
 
     const askWorkerFn = new lambda.Function(this, `ComplAIAskWorkerLambda-${environment}`, {
       runtime: lambda.Runtime.PROVIDED_AL2023,
-      architecture: lambda.Architecture.X86_64,
+      architecture: lambda.Architecture.ARM_64,
       functionName: `ComplAIAskWorkerLambda-${environment}`,
       code,
       handler: 'bootstrap',
@@ -682,7 +684,7 @@ export class LambdaStack extends cdk.Stack {
 
     const scheduledReportFn = new lambda.Function(this, `ComplAIScheduledReportLambda-${environment}`, {
       runtime: lambda.Runtime.PROVIDED_AL2023,
-      architecture: lambda.Architecture.X86_64,
+      architecture: lambda.Architecture.ARM_64,
       functionName: `ComplAIScheduledReportLambda-${environment}`,
       code,
       handler: 'bootstrap',
