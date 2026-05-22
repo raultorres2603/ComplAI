@@ -72,7 +72,10 @@ jobs:
   build:
     name: Build Native Image
     needs: [guard]
-    runs-on: ubuntu-latest
+    # ARM64 runner required — GraalVM native-image cannot cross-compile under
+    # QEMU emulation (binary syscall-heavy process fails with exit code 126).
+    # The runner natively executes ARM64 Docker containers for buildNativeLambda.
+    runs-on: ubuntu-24.04-arm
     # guard only runs on workflow_dispatch; on pull_request it is skipped.
     # A skipped dependency would block this job, so we explicitly allow both
     # "success" (manual dispatch that passed guard) and "skipped" (PR trigger).
@@ -95,12 +98,6 @@ jobs:
             exit 1
           fi
           echo "Branch '${{ inputs.branch }}' verified."
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
 
       - name: Set up JDK 25 (needed for JVM compilation before native image)
         uses: actions/setup-java@v4
