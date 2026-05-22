@@ -187,7 +187,7 @@ export class LambdaStack extends cdk.Stack {
 
     const lambdaFn = new lambda.Function(this, `ComplAILambda-${environment}`, {
       runtime: lambda.Runtime.PROVIDED_AL2023,
-      architecture: lambda.Architecture.ARM_64,
+      architecture: lambda.Architecture.X86_64,
       // Explicit function name to ensure it matches the log group and is under the 64-char limit.
       functionName: `ComplAILambda-${environment}`,
       code,
@@ -406,7 +406,7 @@ export class LambdaStack extends cdk.Stack {
 
     const workerFn = new lambda.Function(this, `ComplAIRedactorLambda-${environment}`, {
       runtime: lambda.Runtime.PROVIDED_AL2023,
-      architecture: lambda.Architecture.ARM_64,
+      architecture: lambda.Architecture.X86_64,
       // Explicit function name to ensure it matches the log group and is under the 64-char limit.
       functionName: `ComplAIRedactorLambda-${environment}`,
       code,
@@ -474,7 +474,7 @@ export class LambdaStack extends cdk.Stack {
 
     const feedbackWorkerFn = new lambda.Function(this, `ComplAIFeedbackWorkerLambda-${environment}`, {
       runtime: lambda.Runtime.PROVIDED_AL2023,
-      architecture: lambda.Architecture.ARM_64,
+      architecture: lambda.Architecture.X86_64,
       // Explicit function name to ensure it matches the log group and is under the 64-char limit.
       functionName: `ComplAIFeedbackWorkerLambda-${environment}`,
       code,
@@ -564,7 +564,7 @@ export class LambdaStack extends cdk.Stack {
 
     const askWorkerFn = new lambda.Function(this, `ComplAIAskWorkerLambda-${environment}`, {
       runtime: lambda.Runtime.PROVIDED_AL2023,
-      architecture: lambda.Architecture.ARM_64,
+      architecture: lambda.Architecture.X86_64,
       functionName: `ComplAIAskWorkerLambda-${environment}`,
       code,
       handler: 'bootstrap',
@@ -682,7 +682,7 @@ export class LambdaStack extends cdk.Stack {
 
     const scheduledReportFn = new lambda.Function(this, `ComplAIScheduledReportLambda-${environment}`, {
       runtime: lambda.Runtime.PROVIDED_AL2023,
-      architecture: lambda.Architecture.ARM_64,
+      architecture: lambda.Architecture.X86_64,
       functionName: `ComplAIScheduledReportLambda-${environment}`,
       code,
       handler: 'bootstrap',
