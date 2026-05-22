@@ -11,122 +11,74 @@ import io.micronaut.function.aws.runtime.APIGatewayV2HTTPEventMicronautLambdaRun
 import io.micronaut.function.aws.runtime.AbstractMicronautLambdaRuntime;
 
 import java.util.Map;
+import java.util.function.Supplier;
 
 /**
- * ComplAI Lambda Application Entry Point (Native Image Custom Runtime).
+ * ComplAI Lambda entry point — dispatches to the correct runtime event loop
+ * based on the {@code AWS_LAMBDA_FUNCTION_NAME} environment variable.
  *
- * <p>This class replaces the standard {@code Micronaut.run()} launcher with
- * {@link AbstractMicronautLambdaRuntime} subclasses that enter the AWS Lambda
- * Runtime API event loop. Without this, the native binary would start up, log
- * "No embedded container found. Running as CLI application", and then exit
- * immediately with a {@code Runtime.ExitError}.
- *
- * <p>The native image is shared across five Lambda functions (one HTTP API
- * plus four workers). The {@code AWS_LAMBDA_FUNCTION_NAME} environment variable
- * is used at startup to select the correct runtime event loop and handler:
- *
- * <ul>
- *   <li><b>ComplAILambda-*</b> (API Gateway HTTP API v2) →
- *       {@link APIGatewayV2HTTPEventMicronautLambdaRuntime}</li>
- *   <li><b>ComplAIRedactorLambda-*</b> (SQS) →
- *       {@link SqsWorkerRuntime} → {@link RedactWorkerHandler}</li>
- *   <li><b>ComplAIFeedbackWorkerLambda-*</b> (SQS) →
- *       {@link SqsWorkerRuntime} → {@link FeedbackWorkerHandler}</li>
- *   <li><b>ComplAIAskWorkerLambda-*</b> (SQS) →
- *       {@link SqsWorkerRuntime} → {@link AskWorkerHandler}</li>
- *   <li><b>ComplAIScheduledReportLambda-*</b> (EventBridge) →
- *       {@link ScheduledReportRuntime} → {@link SesScheduledReportHandler}</li>
- * </ul>
- *
- * <p>Each handler creates its own {@code ApplicationContext} through the
- * {@code MicronautLambdaHandler} base class constructor, which also processes
- * {@code @Inject} annotations. All handler dependencies ({@code HttpWrapper},
- * {@code S3PdfUploader}, etc.) are annotated {@code @Singleton} and are
- * discoverable by the annotation processor.
+ * <p>The same native binary is shared across five Lambda functions.
+ * Without {@link AbstractMicronautLambdaRuntime} the process would start,
+ * log "No embedded container found", and exit immediately.</p>
  */
 public class App {
 
     public static void main(String[] args) throws Exception {
-        // AWS_LAMBDA_FUNCTION_NAME is set by the Lambda runtime. Each of our
-        // five CDK-deployed functions has its own name pattern. We match on
-        // substrings to select the correct runtime loop and handler.
-        String functionName = System.getenv("AWS_LAMBDA_FUNCTION_NAME");
+        String fn = System.getenv("AWS_LAMBDA_FUNCTION_NAME");
 
-        if (functionName != null) {
-            // SQS-triggered workers
-            if (functionName.contains("Redactor")) {
-                new RedactWorkerRuntime().run(args);
-                return;
-            }
-            if (functionName.contains("FeedbackWorker")) {
-                new FeedbackWorkerRuntime().run(args);
-                return;
-            }
-            if (functionName.contains("AskWorker")) {
-                new AskWorkerRuntime().run(args);
-                return;
-            }
-            // EventBridge-scheduled report
-            if (functionName.contains("ScheduledReport")) {
-                new ScheduledReportRuntime().run(args);
-                return;
-            }
+        AbstractMicronautLambdaRuntime<?, ?, ?, ?> runtime;
+        if (fn == null) {
+            runtime = new APIGatewayV2HTTPEventMicronautLambdaRuntime();
+        } else if (fn.contains("Redactor")) {
+            runtime = new SqsWorkerRuntime(RedactWorkerHandler::new);
+        } else if (fn.contains("FeedbackWorker")) {
+            runtime = new SqsWorkerRuntime(FeedbackWorkerHandler::new);
+        } else if (fn.contains("AskWorker")) {
+            runtime = new SqsWorkerRuntime(AskWorkerHandler::new);
+        } else if (fn.contains("ScheduledReport")) {
+            runtime = new ScheduledEventRuntime();
+        } else {
+            runtime = new APIGatewayV2HTTPEventMicronautLambdaRuntime();
         }
-
-        // Default (and most common): API Gateway HTTP API v2 triggered Lambda.
-        new APIGatewayV2HTTPEventMicronautLambdaRuntime().run(args);
+        runtime.run(args);
     }
 
     // -----------------------------------------------------------------------
-    // SQS Worker Runtimes
+    // SQS Worker Runtime (reusable for all three SQS-triggered functions)
     // -----------------------------------------------------------------------
 
     /**
-     * Base runtime for SQS-triggered worker Lambdas. The type parameters
-     * {@code <SQSEvent, SQSBatchResponse, SQSEvent, SQSBatchResponse>}
-     * ensure the Lambda Runtime API event JSON is deserialised to
-     * {@link SQSEvent} and the handler response to {@link SQSBatchResponse}.
+     * Generic runtime for SQS-triggered workers. Accepts a handler factory
+     * so the same class serves {@link RedactWorkerHandler},
+     * {@link FeedbackWorkerHandler}, and {@link AskWorkerHandler}.
      */
-    private abstract static class BaseSqsWorkerRuntime
+    private static final class SqsWorkerRuntime
             extends AbstractMicronautLambdaRuntime<SQSEvent, SQSBatchResponse, SQSEvent, SQSBatchResponse> {
-        // Concrete subclasses override createRequestHandler to return the
-        // specific MicronautRequestHandler for each worker function.
-    }
 
-    private static final class RedactWorkerRuntime extends BaseSqsWorkerRuntime {
-        @Override
-        protected RequestHandler<SQSEvent, SQSBatchResponse> createRequestHandler(String... args) {
-            // The handler constructor (inherited from MicronautLambdaHandler)
-            // creates the ApplicationContext and wires @Inject fields.
-            return new RedactWorkerHandler();
+        private final Supplier<RequestHandler<SQSEvent, SQSBatchResponse>> handlerFactory;
+
+        SqsWorkerRuntime(Supplier<RequestHandler<SQSEvent, SQSBatchResponse>> handlerFactory) {
+            this.handlerFactory = handlerFactory;
         }
-    }
 
-    private static final class FeedbackWorkerRuntime extends BaseSqsWorkerRuntime {
         @Override
         protected RequestHandler<SQSEvent, SQSBatchResponse> createRequestHandler(String... args) {
-            return new FeedbackWorkerHandler();
-        }
-    }
-
-    private static final class AskWorkerRuntime extends BaseSqsWorkerRuntime {
-        @Override
-        protected RequestHandler<SQSEvent, SQSBatchResponse> createRequestHandler(String... args) {
-            return new AskWorkerHandler();
+            return handlerFactory.get();
         }
     }
 
     // -----------------------------------------------------------------------
-    // Scheduled Report Runtime
+    // Scheduled Report Runtime (EventBridge-triggered)
     // -----------------------------------------------------------------------
 
     /**
-     * Runtime for the EventBridge-scheduled SES report Lambda. The type
-     * parameters {@code <Map<String, Object>, String, Map<String, Object>, String>}
-     * handle the generic EventBridge ScheduledEvent structure.
+     * Runtime for the EventBridge-scheduled statistics report Lambda.
+     * The type parameters handle the generic {@code ScheduledEvent} structure
+     * as a {@code Map<String, Object>}.
      */
-    private static final class ScheduledReportRuntime
+    private static final class ScheduledEventRuntime
             extends AbstractMicronautLambdaRuntime<Map<String, Object>, String, Map<String, Object>, String> {
+
         @Override
         protected RequestHandler<Map<String, Object>, String> createRequestHandler(String... args) {
             return new SesScheduledReportHandler();
