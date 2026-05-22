@@ -6,7 +6,6 @@ import com.amazonaws.services.lambda.runtime.events.SQSBatchResponse;
 import com.amazonaws.services.lambda.runtime.events.SQSEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.function.aws.MicronautRequestHandler;
-import jakarta.inject.Inject;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,6 +19,11 @@ import java.util.logging.Logger;
  * failure responses. The handler processes each message and reports failures for
  * retry/DLQ routing.
  *
+ * <p>Beans are resolved lazily from {@link #getApplicationContext()} rather than via
+ * {@code @Inject} fields. Field-level injection uses {@code Class.getDeclaredField()}
+ * internally, which requires explicit GraalVM reflection registration and is fragile in
+ * native images. Looking beans up directly from the context is the safe equivalent.
+ *
  * <p>Lambda configuration:
  * <ul>
  *   <li>Handler: cat.complai.services.worker.FeedbackWorkerHandler::handleRequest</li>
@@ -30,13 +34,19 @@ import java.util.logging.Logger;
  */
 public class FeedbackWorkerHandler extends MicronautRequestHandler<SQSEvent, SQSBatchResponse> {
 
-    @Inject
-    private S3FeedbackUploader s3Uploader;
-
-    @Inject
-    private ObjectMapper mapper;
-
     private final Logger logger = Logger.getLogger(FeedbackWorkerHandler.class.getName());
+
+    // Lazily initialised from getApplicationContext() — see ensureInitialized().
+    private S3FeedbackUploader s3Uploader;
+    private ObjectMapper mapper;
+    private boolean initialized = false;
+
+    private void ensureInitialized() {
+        if (initialized) return;
+        s3Uploader = getApplicationContext().getBean(S3FeedbackUploader.class);
+        mapper = getApplicationContext().getBean(ObjectMapper.class);
+        initialized = true;
+    }
 
     /**
      * Processes a batch of SQS messages from the feedback queue.
@@ -59,6 +69,8 @@ public class FeedbackWorkerHandler extends MicronautRequestHandler<SQSEvent, SQS
      */
     @Override
     public SQSBatchResponse execute(SQSEvent event) {
+        ensureInitialized();
+
         List<SQSBatchResponse.BatchItemFailure> batchItemFailures = new ArrayList<>();
 
         if (event == null || event.getRecords() == null || event.getRecords().isEmpty()) {
