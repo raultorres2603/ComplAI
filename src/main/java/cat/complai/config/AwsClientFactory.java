@@ -42,7 +42,7 @@ public class AwsClientFactory {
         var builder = S3Client.builder()
                 .region(region)
                 .httpClient(UrlConnectionHttpClient.builder().build())
-                .credentialsProvider(DefaultCredentialsProvider.create());
+                .credentialsProvider(DefaultCredentialsProvider.builder().build());
         if (endpointUrl != null && !endpointUrl.isBlank()) {
             LOGGER.fine(() -> "Overriding S3 endpoint to " + endpointUrl);
             builder.endpointOverride(URI.create(endpointUrl));
@@ -59,7 +59,7 @@ public class AwsClientFactory {
     public S3Presigner s3Presigner() {
         var builder = S3Presigner.builder()
                 .region(region)
-                .credentialsProvider(DefaultCredentialsProvider.create());
+                .credentialsProvider(DefaultCredentialsProvider.builder().build());
         if (endpointUrl != null && !endpointUrl.isBlank()) {
             LOGGER.fine(() -> "Overriding S3 Presigner endpoint to " + endpointUrl);
             builder.endpointOverride(URI.create(endpointUrl));
@@ -74,7 +74,7 @@ public class AwsClientFactory {
         var builder = SqsClient.builder()
                 .region(region)
                 .httpClient(UrlConnectionHttpClient.builder().build())
-                .credentialsProvider(DefaultCredentialsProvider.create());
+                .credentialsProvider(DefaultCredentialsProvider.builder().build());
         if (endpointUrl != null && !endpointUrl.isBlank()) {
             LOGGER.fine(() -> "Overriding SQS endpoint to " + endpointUrl);
             builder.endpointOverride(URI.create(endpointUrl));
@@ -89,7 +89,7 @@ public class AwsClientFactory {
         var builder = CloudWatchClient.builder()
                 .region(region)
                 .httpClient(UrlConnectionHttpClient.builder().build())
-                .credentialsProvider(DefaultCredentialsProvider.create());
+                .credentialsProvider(DefaultCredentialsProvider.builder().build());
         if (endpointUrl != null && !endpointUrl.isBlank()) {
             LOGGER.fine(() -> "Overriding CloudWatch endpoint to " + endpointUrl);
             builder.endpointOverride(URI.create(endpointUrl));
@@ -104,7 +104,7 @@ public class AwsClientFactory {
         var builder = SesClient.builder()
                 .region(region)
                 .httpClient(UrlConnectionHttpClient.builder().build())
-                .credentialsProvider(DefaultCredentialsProvider.create());
+                .credentialsProvider(DefaultCredentialsProvider.builder().build());
         if (endpointUrl != null && !endpointUrl.isBlank()) {
             LOGGER.fine(() -> "Overriding SES endpoint to " + endpointUrl);
             builder.endpointOverride(URI.create(endpointUrl));
