@@ -260,6 +260,7 @@ export class LambdaStack extends cdk.Stack {
         // Email must be verified in SES before sending. See cdk/README.md for setup.
         AWS_SES_FROM_EMAIL: process.env.SES_FROM_EMAIL || '',
         AWS_SES_TO_EMAIL: process.env.SES_TO_EMAIL || '',
+        AWS_SES_TO_EMAIL_ELPRAT: process.env.SES_TO_EMAIL_ELPRAT || '',
         AWS_SES_REGION: process.env.AWS_SES_REGION || 'eu-west-1',
         ENVIRONMENT: environment,
         FEEDBACK_BUCKET_NAME: feedbackBucket.bucketName,
@@ -450,7 +451,15 @@ export class LambdaStack extends cdk.Stack {
         // SES Configuration — sender and recipient emails from GitHub Environment Variables
         AWS_SES_FROM_EMAIL: process.env.SES_FROM_EMAIL || '',
         AWS_SES_TO_EMAIL: process.env.SES_TO_EMAIL || '',
-        AWS_SES_REGION: process.env.AWS_SES_REGION || 'eu-west-1'
+        AWS_SES_TO_EMAIL_ELPRAT: process.env.SES_TO_EMAIL_ELPRAT || '',
+        AWS_SES_REGION: process.env.AWS_SES_REGION || 'eu-west-1',
+        // Per-city API keys for MultiCitySesService discovery (city must have BOTH API_KEY_* and AWS_SES_TO_EMAIL_*)
+        API_KEY_ELPRAT: process.env.API_KEY_ELPRAT || '',
+        // Telegram Bot — per-city token and webhook secret
+        TOKEN_TELEGRAM_ELPRAT: process.env.TOKEN_TELEGRAM_ELPRAT || '',
+        TELEGRAM_WEBHOOK_SECRET_ELPRAT: process.env.TELEGRAM_WEBHOOK_SECRET_ELPRAT || '',
+        // Deployment environment identifier
+        ENVIRONMENT: environment,
       },
       role: workerRole,
       logGroup: workerLogGroup
