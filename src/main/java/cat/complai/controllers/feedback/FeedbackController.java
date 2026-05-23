@@ -16,6 +16,7 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import jakarta.inject.Inject;
 
+import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -86,7 +87,8 @@ public class FeedbackController {
             FeedbackResult result = publisherService.publishFeedback(request, city);
 
             // Pattern match on the result type
-            HttpResponse<?> response = switch (result) {
+
+            return switch (result) {
                 case FeedbackResult.Success success -> {
                     long latency = System.currentTimeMillis() - startTime;
                     FeedbackAcceptedDto data = success.data();
@@ -105,7 +107,7 @@ public class FeedbackController {
                     logger.info(() -> "POST /complai/feedback — httpStatus=" + httpStatus
                             + " errorCode=" + code.getCode() + " latencyMs=" + latency + " city=" + city);
 
-                    var errorResponse = new java.util.HashMap<String, Object>();
+                    var errorResponse = new HashMap<>();
                     errorResponse.put("success", false);
                     errorResponse.put("errorCode", code.getCode());
                     errorResponse.put("message", error.message());
@@ -117,8 +119,6 @@ public class FeedbackController {
                     }
                 }
             };
-
-            return response;
 
         } catch (Exception e) {
             long latency = System.currentTimeMillis() - startTime;

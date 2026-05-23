@@ -7,10 +7,8 @@ import jakarta.validation.constraints.NotBlank;
 
 /**
  * Amazon SES (Simple Email Service) configuration bean.
- *
  * Properties are bound from application.properties with the prefix "aws.ses".
  * All configuration values are injected from environment variables at runtime.
- *
  * Example application.properties:
  * {@code
  * aws.ses.from-email=${AWS_SES_FROM_EMAIL:}
@@ -35,7 +33,6 @@ public class SesConfiguration implements ISesRecipientProvider, ISesSenderConfig
     /**
      * The verified sender email address in Amazon SES.
      * Must be a valid email address verified in the AWS SES console.
-     * 
      * Injected from: AWS_SES_FROM_EMAIL environment variable
      * Required: YES
      */
@@ -46,7 +43,6 @@ public class SesConfiguration implements ISesRecipientProvider, ISesSenderConfig
     /**
      * AWS region where SES service is deployed.
      * Must be a valid AWS region supporting SES.
-     * 
      * Injected from: AWS_SES_REGION environment variable
      * Default: eu-west-1
      * Common regions: eu-west-1, us-east-1, ap-southeast-1
@@ -55,7 +51,6 @@ public class SesConfiguration implements ISesRecipientProvider, ISesSenderConfig
 
     /**
      * The recipient email address for statistics reports.
-     * 
      * Injected from: AWS_SES_RECIPIENT_EMAIL environment variable
      * Required: YES
      */
@@ -126,6 +121,7 @@ public class SesConfiguration implements ISesRecipientProvider, ISesSenderConfig
      *
      * @return The email address to receive statistics reports
      */
+    @Override
     public String getRecipientEmail() {
         return recipientEmail;
     }

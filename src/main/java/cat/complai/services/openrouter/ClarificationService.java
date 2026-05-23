@@ -10,7 +10,15 @@ import cat.complai.services.openrouter.conversation.ConversationManagementServic
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import java.text.Normalizer;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.Set;
 
 /**
  * Handles ambiguity detection and resolution for procedure queries.

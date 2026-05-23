@@ -325,12 +325,10 @@ public class StadisticsHtmlRenderer {
 
       double pct = total > 0 ? vals[i] * 100.0 / total : 0;
       legends.append("<div style=\"display:flex;align-items:center;margin-bottom:6px;\">");
-      legends.append("<div style=\"width:10px;height:10px;border-radius:2px;background-color:" + colors[i]
-          + ";margin-right:7px;flex-shrink:0;\"></div>");
-      legends.append("<span style=\"font-size:11px;color:#374151;flex:1;\">" + names[i] + "</span>");
-      legends.append(
-          "<span style=\"font-size:11px;font-weight:700;color:#1F2937;margin-left:4px;\">" + vals[i] + "</span>");
-      legends.append("<span style=\"font-size:10px;color:#9CA3AF;margin-left:2px;\">(" + Math.round(pct) + "%)</span>");
+      legends.append("<div style=\"width:10px;height:10px;border-radius:2px;background-color:").append(colors[i]).append(";margin-right:7px;flex-shrink:0;\"></div>");
+      legends.append("<span style=\"font-size:11px;color:#374151;flex:1;\">").append(names[i]).append("</span>");
+      legends.append("<span style=\"font-size:11px;font-weight:700;color:#1F2937;margin-left:4px;\">").append(vals[i]).append("</span>");
+      legends.append("<span style=\"font-size:10px;color:#9CA3AF;margin-left:2px;\">(").append(Math.round(pct)).append("%)</span>");
       legends.append("</div>");
 
       cursor = end;

@@ -18,7 +18,16 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import java.util.logging.Logger;
 
 /**
@@ -221,7 +230,7 @@ public class EventScraper {
                         return merged;
                     }
                 } catch (Exception ignored) {
-                    // Malformed URI — skip this seed entry and fall through to global.
+                    logger.warning("Malformed URI seed entry: " + ignored.getMessage());
                 }
             }
         }

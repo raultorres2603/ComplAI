@@ -92,6 +92,7 @@ public class EmailService implements IEmailService {
      * @param cityId  The city identifier for prediction (null for all cities)
      * @throws IllegalArgumentException if to or subject is invalid
      */
+    @Override
     public void sendStadistics(String to, String subject, String cityId) throws CloudWatchLogsException {
         sendStadisticsWithCityId(to, subject, cityId);
     }

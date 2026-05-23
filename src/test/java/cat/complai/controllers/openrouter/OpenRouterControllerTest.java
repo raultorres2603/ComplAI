@@ -36,19 +36,23 @@ public class OpenRouterControllerTest {
     // -------------------------------------------------------------------------
 
     static class FakeServiceSuccess implements IOpenRouterService {
+        @Override
         public OpenRouterResponseDto ask(String question, String conversationId, String cityId) {
             return new OpenRouterResponseDto(true, "OK from AI", null, 200, OpenRouterErrorCode.NONE);
         }
 
+        @Override
         public OpenRouterResponseDto ask(String question, String conversationId, String cityId, String preferredLang) {
             return new OpenRouterResponseDto(true, "OK from AI", null, 200, OpenRouterErrorCode.NONE);
         }
 
+        @Override
         public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format, String conversationId,
                 ComplainantIdentity identity, String cityId) {
             return new OpenRouterResponseDto(true, "Redacted letter", null, 200, OpenRouterErrorCode.NONE);
         }
 
+        @Override
         public Optional<OpenRouterResponseDto> validateRedactInput(String complaint) {
             return Optional.empty();
         }
@@ -64,22 +68,26 @@ public class OpenRouterControllerTest {
     }
 
     static class FakeServiceRefuse implements IOpenRouterService {
+        @Override
         public OpenRouterResponseDto ask(String question, String conversationId, String cityId) {
             return new OpenRouterResponseDto(false, null, "Request is not about El Prat de Llobregat.", 200,
                     OpenRouterErrorCode.REFUSAL);
         }
 
+        @Override
         public OpenRouterResponseDto ask(String question, String conversationId, String cityId, String preferredLang) {
             return new OpenRouterResponseDto(false, null, "Request is not about El Prat de Llobregat.", 200,
                     OpenRouterErrorCode.REFUSAL);
         }
 
+        @Override
         public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format, String conversationId,
                 ComplainantIdentity identity, String cityId) {
             return new OpenRouterResponseDto(false, null, "Request is not about El Prat de Llobregat.", 200,
                     OpenRouterErrorCode.REFUSAL);
         }
 
+        @Override
         public Optional<OpenRouterResponseDto> validateRedactInput(String complaint) {
             return Optional.empty();
         }
@@ -93,22 +101,26 @@ public class OpenRouterControllerTest {
     }
 
     static class FakeServiceUpstream implements IOpenRouterService {
+        @Override
         public OpenRouterResponseDto ask(String question, String conversationId, String cityId) {
             return new OpenRouterResponseDto(false, null, "Missing OPENROUTER_API_KEY", 500,
                     OpenRouterErrorCode.UPSTREAM);
         }
 
+        @Override
         public OpenRouterResponseDto ask(String question, String conversationId, String cityId, String preferredLang) {
             return new OpenRouterResponseDto(false, null, "Missing OPENROUTER_API_KEY", 500,
                     OpenRouterErrorCode.UPSTREAM);
         }
 
+        @Override
         public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format, String conversationId,
                 ComplainantIdentity identity, String cityId) {
             return new OpenRouterResponseDto(false, null, "OpenRouter non-2xx response: 500", 500,
                     OpenRouterErrorCode.UPSTREAM);
         }
 
+        @Override
         public Optional<OpenRouterResponseDto> validateRedactInput(String complaint) {
             return Optional.empty();
         }
@@ -125,14 +137,17 @@ public class OpenRouterControllerTest {
     }
 
     static class FakeServiceRejectAnonymous implements IOpenRouterService {
+        @Override
         public OpenRouterResponseDto ask(String question, String conversationId, String cityId) {
             return new OpenRouterResponseDto(true, "OK", null, 200, OpenRouterErrorCode.NONE);
         }
 
+        @Override
         public OpenRouterResponseDto ask(String question, String conversationId, String cityId, String preferredLang) {
             return new OpenRouterResponseDto(true, "OK", null, 200, OpenRouterErrorCode.NONE);
         }
 
+        @Override
         public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format, String conversationId,
                 ComplainantIdentity identity, String cityId) {
             return new OpenRouterResponseDto(false, null,
@@ -140,6 +155,7 @@ public class OpenRouterControllerTest {
                     null, OpenRouterErrorCode.VALIDATION);
         }
 
+        @Override
         public Optional<OpenRouterResponseDto> validateRedactInput(String complaint) {
             if (complaint != null && complaint.toLowerCase().contains("anonymous")) {
                 return Optional.of(new OpenRouterResponseDto(false, null,
@@ -156,14 +172,17 @@ public class OpenRouterControllerTest {
     }
 
     static class FakeServiceRequestsIdentity implements IOpenRouterService {
+        @Override
         public OpenRouterResponseDto ask(String question, String conversationId, String cityId) {
             return new OpenRouterResponseDto(true, "OK", null, 200, OpenRouterErrorCode.NONE);
         }
 
+        @Override
         public OpenRouterResponseDto ask(String question, String conversationId, String cityId, String preferredLang) {
             return new OpenRouterResponseDto(true, "OK", null, 200, OpenRouterErrorCode.NONE);
         }
 
+        @Override
         public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format, String conversationId,
                 ComplainantIdentity identity, String cityId) {
             return new OpenRouterResponseDto(true,
@@ -171,6 +190,7 @@ public class OpenRouterControllerTest {
                     null, 200, OpenRouterErrorCode.NONE);
         }
 
+        @Override
         public Optional<OpenRouterResponseDto> validateRedactInput(String complaint) {
             return Optional.empty();
         }

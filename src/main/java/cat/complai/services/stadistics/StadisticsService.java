@@ -304,6 +304,7 @@ public class StadisticsService implements IStadisticsService {
      * @param cityId the city identifier
      * @return prediction text from AI, or fallback message on failure
      */
+    @Override
     public String generatePrediction(StadisticsModel model, String cityId) {
         logger.info("Generating AI prediction for city: {}", cityId);
 

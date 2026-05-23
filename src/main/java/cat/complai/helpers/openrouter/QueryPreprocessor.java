@@ -3,19 +3,22 @@ package cat.complai.helpers.openrouter;
 import cat.complai.config.CivicVocabularyConfig;
 import cat.complai.helpers.openrouter.rag.TokenNormalizer;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.logging.Logger;
 
 /**
  * Utility class for preprocessing and normalizing search queries before
  * indexing.
- *
  * Provides methods to:
  * - Detect the user's language (CA/ES/EN/FR) at the START of preprocessing
  * - Normalize whitespace (collapse multiple spaces to single space)
  * - Remove accents (é → e, à → a, etc.) for cross-dialect matching
  * - Filter stop words (language-aware) to reduce noise in search queries
- *
  * This preprocessing improves search quality by applying language-specific
  * filtering and normalizing query variations (e.g., "Quan tanca?" vs "quan
  * tanca").
