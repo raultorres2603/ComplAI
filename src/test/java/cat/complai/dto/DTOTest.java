@@ -649,11 +649,12 @@ class DTOTest {
         }
 
         @Test
-        @DisplayName("isSupportedClientFormat should only accept PDF")
-        void isSupportedClientFormatShouldOnlyAcceptPdf() {
+        @DisplayName("isSupportedClientFormat should accept PDF and AUTO")
+        void isSupportedClientFormatShouldAcceptPdfAndAuto() {
             assertTrue(OutputFormat.isSupportedClientFormat(OutputFormat.PDF));
+            assertTrue(OutputFormat.isSupportedClientFormat(OutputFormat.AUTO),
+                    "AUTO is accepted at the HTTP boundary and resolved to PDF by the controller");
             assertFalse(OutputFormat.isSupportedClientFormat(OutputFormat.JSON));
-            assertFalse(OutputFormat.isSupportedClientFormat(OutputFormat.AUTO));
             assertFalse(OutputFormat.isSupportedClientFormat(null));
         }
     }

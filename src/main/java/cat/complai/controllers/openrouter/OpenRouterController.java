@@ -170,6 +170,9 @@ public class OpenRouterController {
                 long start = System.currentTimeMillis();
                 try {
                         String text = request != null ? request.getText() : null;
+                        // format is kept effectively final (no reassignment) so lambdas below
+                        // can capture it. AUTO is allowed through isSupportedClientFormat and then
+                        // resolved to PDF via a separate variable.
                         OutputFormat format = request == null ? OutputFormat.PDF : request.getFormat();
                         ComplainantIdentity identity = request != null ? request.getComplainantIdentity() : null;
 
@@ -189,6 +192,10 @@ public class OpenRouterController {
                                 return HttpResponse.badRequest(err).contentType(MediaType.APPLICATION_JSON);
                         }
 
+                        // Resolve AUTO to PDF — clients may send "auto" to delegate format
+                        // selection, and the redact endpoint always produces PDFs.
+                        OutputFormat resolvedFormat = format == OutputFormat.AUTO ? OutputFormat.PDF : format;
+
                         // When OIDC is enabled for this city (via oidc-mapping.json), the
                         // X-Identity-Token header is mandatory. The verified IdP identity overrides
                         // any self-reported body fields, ensuring the PDF carries a cryptographically
@@ -202,7 +209,7 @@ public class OpenRouterController {
                                         long latency = System.currentTimeMillis() - start;
                                         AuditLogger.log("/complai/redact", AuditLogger.hashText(text),
                                                         OpenRouterErrorCode.UNAUTHORIZED.getCode(), latency,
-                                                        format != null ? format.name() : null, null);
+                                                        resolvedFormat != null ? resolvedFormat.name() : null, null);
                                         metricsPublisher.publishInteraction("REDACT", cityId,
                                                         false, latency);
                                         logger.warning(() -> "POST /complai/redact rejected — httpStatus=401"
@@ -223,7 +230,7 @@ public class OpenRouterController {
                                         long latency = System.currentTimeMillis() - start;
                                         AuditLogger.log("/complai/redact", AuditLogger.hashText(text),
                                                         OpenRouterErrorCode.UNAUTHORIZED.getCode(), latency,
-                                                        format != null ? format.name() : null, null);
+                                                        resolvedFormat != null ? resolvedFormat.name() : null, null);
                                         metricsPublisher.publishInteraction("REDACT", cityId,
                                                         false, latency);
                                         logger.warning(() -> "POST /complai/redact rejected — httpStatus=401"
@@ -240,15 +247,15 @@ public class OpenRouterController {
                         boolean identityComplete = identity != null && identity.isComplete();
 
                         if (identityComplete) {
-                                return handleAsyncRedact(text, format, conversationId, identity, cityId, start);
+                                return handleAsyncRedact(text, resolvedFormat, conversationId, identity, cityId, start);
                         }
 
-                        OpenRouterResponseDto dto = service.redactComplaint(text, format, conversationId, identity,
+                        OpenRouterResponseDto dto = service.redactComplaint(text, resolvedFormat, conversationId, identity,
                                         cityId);
                         long latency = System.currentTimeMillis() - start;
                         AuditLogger.log("/complai/redact", AuditLogger.hashText(text),
                                         dto != null ? dto.getErrorCode().getCode() : -1, latency,
-                                        format != null ? format.name() : null, null);
+                                        resolvedFormat != null ? resolvedFormat.name() : null, null);
 
                         boolean success = dto != null && dto.isSuccess();
                         metricsPublisher.publishInteraction("REDACT", cityId,

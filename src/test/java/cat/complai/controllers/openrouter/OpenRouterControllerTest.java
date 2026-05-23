@@ -417,16 +417,18 @@ public class OpenRouterControllerTest {
     }
 
     @Test
-    void redact_autoFormat_returns400() {
+    void redact_autoFormat_resolvesToPdfAndReturns200() {
         OpenRouterController c = new OpenRouterController(new FakeServiceSuccess(), ASSERT_NOT_CALLED_PUBLISHER,
                 ASSERT_NOT_CALLED_UPLOADER, NOOP_METRICS, null);
         RedactRequest req = RedactRequest.fromJson("Noise from the airport", "auto", null, null, null, null);
         HttpResponse<?> raw = c.redact(req, requestWithCity("testcity"));
-        assertEquals(400, raw.getStatus().getCode());
+        // AUTO is now accepted at the HTTP boundary and resolved to PDF by the
+        // controller. The sync path produces 200 with the redacted letter.
+        assertEquals(200, raw.getStatus().getCode());
         OpenRouterPublicDto body = (OpenRouterPublicDto) raw.getBody().get();
         assertNotNull(body);
-        assertFalse(body.isSuccess());
-        assertEquals(OpenRouterErrorCode.VALIDATION.getCode(), body.getErrorCode());
+        assertTrue(body.isSuccess());
+        assertEquals(OpenRouterErrorCode.NONE.getCode(), body.getErrorCode());
     }
 
     @Test

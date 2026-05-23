@@ -30,11 +30,12 @@ public enum OutputFormat {
     }
 
     /**
-     * Returns true only for PDF — the sole format a client is allowed to send.
+     * Returns true for PDF and AUTO — the two formats a client may send.
+     * {@code AUTO} is resolved to {@code PDF} at the HTTP boundary in the controller.
      * Used at the HTTP boundary to reject unsupported format strings early.
      */
     public static boolean isSupportedClientFormat(OutputFormat f) {
-        return f == PDF;
+        return f == PDF || f == AUTO;
     }
 }
 

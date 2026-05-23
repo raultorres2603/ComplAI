@@ -36,8 +36,10 @@ dependencies {
     // Jackson Joda module — required for ScheduledEvent deserialization (time field uses org.joda.time.DateTime)
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-joda:2.17.2")
 
-    // PDF generation
-    implementation("org.apache.pdfbox:pdfbox:2.0.29")
+    // PDF generation — OpenPDF replaces PDFBox because PDFBox requires AWT native
+    // libraries (libawt) which are unavailable in GraalVM native-image on Lambda.
+    // OpenPDF has zero AWT dependency and works reliably in native-image environments.
+    implementation("com.github.librepdf:openpdf:2.0.5")
 
     // Jsoup for HTML parsing
     implementation("org.jsoup:jsoup:1.17.2")

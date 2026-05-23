@@ -8,12 +8,10 @@ import cat.complai.dto.openrouter.OutputFormat;
 
 /**
  * Inbound DTO for POST /complai/redact.
- *
  * Identity fields (requesterName, requesterSurname, requesterIdNumber) are optional at the HTTP
  * boundary. When all three are provided the service embeds them directly into the AI prompt.
  * When any of them is missing the AI is instructed to ask the user for the missing data before
  * drafting the letter, exploiting the multi-turn conversation flow.
- *
  * Anonymous requests are rejected outright at the service layer: the Ajuntament requires
  * identification on all formal complaints.
  */
@@ -52,6 +50,8 @@ public class RedactRequest {
      * Jackson deserialization entry point. The format field is received as a raw String so
      * that OutputFormat.fromString can return null for unrecognised values (e.g. "xml"), which
      * the controller then rejects with a 400. A null/absent format field maps to PDF.
+     * The value "auto" maps to AUTO, which is also accepted by the controller and resolved
+     * to PDF.
      */
     @JsonCreator
     public static RedactRequest fromJson(
@@ -61,9 +61,9 @@ public class RedactRequest {
             @JsonProperty("requesterName") String requesterName,
             @JsonProperty("requesterSurname") String requesterSurname,
             @JsonProperty("requesterIdNumber") String requesterIdNumber) {
-        // OutputFormat.fromString returns null for unrecognised values (e.g. "xml") and AUTO
-        // for null (absent field). Passing null through to the constructor preserves the
-        // "unknown format" sentinel so isSupportedClientFormat in the controller can reject it.
+        // OutputFormat.fromString returns null for unrecognised values (e.g. "xml"),
+        // PDF for null/absent, and AUTO for "auto". Passing through preserves the sentinel
+        // so isSupportedClientFormat in the controller can validate and then resolve AUTO → PDF.
         return new RedactRequest(text, OutputFormat.fromString(format), conversationId,
                 requesterName, requesterSurname, requesterIdNumber);
     }
@@ -78,18 +78,6 @@ public class RedactRequest {
 
     public String getConversationId() {
         return conversationId;
-    }
-
-    public String getRequesterName() {
-        return requesterName;
-    }
-
-    public String getRequesterSurname() {
-        return requesterSurname;
-    }
-
-    public String getRequesterIdNumber() {
-        return requesterIdNumber;
     }
 
     /**
