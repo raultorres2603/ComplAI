@@ -390,11 +390,11 @@ public class StadisticsHtmlRenderer {
       Object f = files.get(i);
       String name = null, url = null;
       if (f instanceof ComplaintFile cf) {
-        name = cf.getFileName();
-        url = cf.getUrl() != null ? cf.getUrl().toString() : "";
+        name = cf.fileName();
+        url = cf.url() != null ? cf.url().toString() : "";
       } else if (f instanceof FeedbackFile ff) {
-        name = ff.getFileName();
-        url = ff.getUrl() != null ? ff.getUrl().toString() : "";
+        name = ff.fileName();
+        url = ff.url() != null ? ff.url().toString() : "";
       }
       if (name == null)
         continue;

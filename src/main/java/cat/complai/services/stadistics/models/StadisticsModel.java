@@ -186,8 +186,8 @@ public class StadisticsModel {
         if (complaintFile != null && !complaintFile.isEmpty()) {
             sb.append("<ul>\n");
             for (ComplaintFile file : complaintFile) {
-                String url = file.getUrl() != null ? file.getUrl().toString() : "";
-                sb.append("  <li>").append(file.getFileName()).append(": <a href=\"").append(url)
+                String url = file.url() != null ? file.url().toString() : "";
+                sb.append("  <li>").append(file.fileName()).append(": <a href=\"").append(url)
                         .append("\">Click here</a></li>\n");
             }
             sb.append("</ul>\n");
@@ -196,8 +196,8 @@ public class StadisticsModel {
         if (feedbackFile != null && !feedbackFile.isEmpty()) {
             sb.append("<ul>\n");
             for (FeedbackFile file : feedbackFile) {
-                String url = file.getUrl() != null ? file.getUrl().toString() : "";
-                sb.append("  <li>").append(file.getFileName()).append(": <a href=\"").append(url)
+                String url = file.url() != null ? file.url().toString() : "";
+                sb.append("  <li>").append(file.fileName()).append(": <a href=\"").append(url)
                         .append("\">Click here</a></li>\n");
             }
             sb.append("</ul>\n");

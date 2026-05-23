@@ -59,17 +59,26 @@ public class PdfGenerator {
 
             Font font = loadFont();
 
+            // Track whether at least one element was added. OpenPDF does not
+            // auto-create a page — an empty document.close() throws
+            // "the.document.has.no.pages".
+            boolean hasContent = false;
+
             String[] paragraphs = content.split("\n");
             for (String para : paragraphs) {
                 String trimmed = para.replace("\r", "").trim();
-                if (trimmed.isEmpty()) {
-                    // Preserve paragraph spacing — a space-only paragraph keeps the
-                    // vertical gap between blocks, just as the original PDFBox code did
-                    // by inserting a blank visual line.
-                    document.add(new Paragraph(" ", font));
-                } else {
-                    document.add(new Paragraph(trimmed, font));
-                }
+                Paragraph p = trimmed.isEmpty()
+                        ? new Paragraph(" ", font)
+                        : new Paragraph(trimmed, font);
+                document.add(p);
+                hasContent = true;
+            }
+
+            // Safety net: if the font was invalid and no content was rendered,
+            // add a fallback paragraph with the built-in Helvetica.
+            if (!hasContent) {
+                document.add(new Paragraph("No content was generated or extracted.",
+                        FontFactory.getFont(FontFactory.HELVETICA, FONT_SIZE)));
             }
 
             document.close();
@@ -85,22 +94,20 @@ public class PdfGenerator {
      * Helvetica.
      *
      * <p>
-     * OpenPDF's {@link FontFactory#register(String, String)} requires a file path,
-     * so the classpath resource is extracted to a temporary file for registration.
-     * The temp file is marked for deletion on JVM exit.
+     * OpenPDF's {@link FontFactory#register(String, String)} stores a file path
+     * reference and loads the font lazily, so the temp file must remain accessible
+     * until the font is first rendered. The file is therefore marked for deletion
+     * on JVM exit rather than removed immediately.
      */
     private static Font loadFont() throws IOException, DocumentException {
         try (InputStream fontStream = PdfGenerator.class.getResourceAsStream("/NotoSans-Regular.ttf")) {
             if (fontStream != null) {
                 Path tempFile = Files.createTempFile("NotoSans", ".ttf");
-                try {
-                    Files.copy(fontStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
-                    FontFactory.register(tempFile.toString(), FONT_ALIAS);
-                } finally {
-                    // The font data is loaded into memory by FontFactory, so the temp
-                    // file is no longer needed after registration.
-                    Files.deleteIfExists(tempFile);
-                }
+                Files.copy(fontStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
+                FontFactory.register(tempFile.toString(), FONT_ALIAS);
+                // Do NOT delete immediately — FontFactory loads fonts lazily from the
+                // stored path. Mark for cleanup at JVM exit instead.
+                tempFile.toFile().deleteOnExit();
             }
         }
 

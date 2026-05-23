@@ -19,15 +19,15 @@ class ComplaintFileTest {
         URL url = URI.create("https://example.com/complaint.pdf").toURL();
         ComplaintFile file = new ComplaintFile("complaint.pdf", url);
         assertNotNull(file);
-        assertEquals("complaint.pdf", file.getFileName());
-        assertEquals(url, file.getUrl());
+        assertEquals("complaint.pdf", file.fileName());
+        assertEquals(url, file.url());
     }
 
     @Test
     @DisplayName("Should return correct fileName")
     void shouldReturnCorrectFileName() throws MalformedURLException {
         ComplaintFile file = new ComplaintFile("test-file.pdf", URI.create("https://example.com/test-file.pdf").toURL());
-        assertEquals("test-file.pdf", file.getFileName());
+        assertEquals("test-file.pdf", file.fileName());
     }
 
     @Test
@@ -35,6 +35,6 @@ class ComplaintFileTest {
     void shouldReturnCorrectUrl() throws MalformedURLException {
         URL url = URI.create("https://example.com/test-file.pdf").toURL();
         ComplaintFile file = new ComplaintFile("test-file.pdf", url);
-        assertEquals(url, file.getUrl());
+        assertEquals(url, file.url());
     }
 }
