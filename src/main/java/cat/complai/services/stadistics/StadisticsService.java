@@ -134,8 +134,8 @@ public class StadisticsService implements IStadisticsService {
             var entries = s3ComplaintLister.listComplaintFiles(from, to);
 
             for (S3ComplaintLister.ComplaintFileEntry entry : entries) {
-                java.net.URL url = java.net.URI.create(entry.getUrl()).toURL();
-                files.add(new ComplaintFile(entry.getFileName(), url));
+                java.net.URL url = java.net.URI.create(entry.url()).toURL();
+                files.add(new ComplaintFile(entry.fileName(), url));
             }
 
             logger.info("Found {} complaint files from S3", files.size());
@@ -154,8 +154,8 @@ public class StadisticsService implements IStadisticsService {
             var entries = s3FeedbackLister.listAllFeedbackFiles(from, to);
 
             for (S3FeedbackLister.FeedbackFileEntry entry : entries) {
-                java.net.URL url = java.net.URI.create(entry.getUrl()).toURL();
-                files.add(new FeedbackFile(entry.getFileName(), url));
+                java.net.URL url = java.net.URI.create(entry.url()).toURL();
+                files.add(new FeedbackFile(entry.fileName(), url));
             }
 
             logger.info("Found {} feedback files from S3", files.size());

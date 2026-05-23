@@ -238,7 +238,7 @@ class InMemoryLexicalIndexLanguageBoostTest {
 
         // Search with null language
         InMemoryLexicalIndex.SearchResponse<TestDocument> responses = index.search(
-                queryTokens, 10, 0.0, 0.1, (String) null);
+                queryTokens, 10, 0.0, 0.1, null);
 
         assertNotNull(responses);
         // Should not crash, just no language boost applied

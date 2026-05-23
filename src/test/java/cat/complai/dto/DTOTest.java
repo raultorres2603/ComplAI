@@ -1,11 +1,5 @@
 package cat.complai.dto;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 import java.util.List;
 
 import org.junit.jupiter.api.DisplayName;
@@ -40,6 +34,8 @@ import cat.complai.utilities.auth.OidcConfig;
 import cat.complai.utilities.auth.VerifiedCitizenIdentity;
 import cat.complai.utilities.cache.QuestionCategory;
 import reactor.core.publisher.Flux;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 @DisplayName("DTO Tests")
 class DTOTest {
@@ -89,7 +85,7 @@ class DTOTest {
         @Test
         @DisplayName("Should create SseDoneEvent with null conversationId")
         void shouldCreateWithNullConversationId() {
-            SseDoneEvent event = new SseDoneEvent((String) null);
+            SseDoneEvent event = new SseDoneEvent(null);
             assertEquals("done", event.type());
             assertNull(event.conversationId());
         }
@@ -141,7 +137,7 @@ class DTOTest {
         @Test
         @DisplayName("Should handle null sources as empty list")
         void shouldHandleNullSources() {
-            SseSourcesEvent event = new SseSourcesEvent((List<SseSources>) null);
+            SseSourcesEvent event = new SseSourcesEvent(null);
             assertEquals("sources", event.type());
             assertNotNull(event.sources());
             assertTrue(event.sources().isEmpty());
@@ -227,7 +223,7 @@ class DTOTest {
         void shouldCreateSuccess() {
             FeedbackAcceptedDto dto = new FeedbackAcceptedDto("fb-1", "queued", "ok");
             FeedbackResult result = new FeedbackResult.Success(dto);
-            assertTrue(result instanceof FeedbackResult.Success);
+            assertInstanceOf(FeedbackResult.Success.class, result);
             assertEquals("fb-1", ((FeedbackResult.Success) result).data().feedbackId());
         }
 
@@ -235,7 +231,7 @@ class DTOTest {
         @DisplayName("Should create Error result")
         void shouldCreateError() {
             FeedbackResult result = new FeedbackResult.Error(FeedbackErrorCode.VALIDATION, "Invalid");
-            assertTrue(result instanceof FeedbackResult.Error);
+            assertInstanceOf(FeedbackResult.Error.class, result);
             assertEquals(FeedbackErrorCode.VALIDATION, ((FeedbackResult.Error) result).errorCode());
             assertEquals("Invalid", ((FeedbackResult.Error) result).message());
         }

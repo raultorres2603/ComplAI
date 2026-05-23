@@ -58,7 +58,7 @@ public class ClarificationService {
                     AmbiguityDetector.getTopCandidates(response, 3).stream()
                             .filter(sr -> isCandidateRelevantToQuery(sr.source(), question))
                             .map(sr -> new ConversationManagementService.ClarificationCandidate(
-                                    sr.source().procedureId, sr.source().title))
+                                    sr.source().procedureId(), sr.source().title()))
                             .toList();
             if (candidates.size() < 2) {
                 return Optional.empty();
@@ -132,8 +132,8 @@ public class ClarificationService {
             return false;
         }
         Set<String> candidateTokens = new LinkedHashSet<>();
-        candidateTokens.addAll(tokenizeForRelevance(procedure.title));
-        candidateTokens.addAll(tokenizeForRelevance(procedure.description));
+        candidateTokens.addAll(tokenizeForRelevance(procedure.title()));
+        candidateTokens.addAll(tokenizeForRelevance(procedure.description()));
         for (String token : queryTokens) {
             if (candidateTokens.contains(token)) {
                 return true;

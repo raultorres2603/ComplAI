@@ -8,10 +8,7 @@ import java.util.List;
 /**
  * Result type for news context extraction.
  */
-public final class NewsContextResult {
-    private final String contextBlock;
-    private final List<Source> sources;
-
+public record NewsContextResult(String contextBlock, List<Source> sources) {
     /**
      * Constructs a news context result.
      *
@@ -28,7 +25,8 @@ public final class NewsContextResult {
      *
      * @return context block text
      */
-    public String getContextBlock() {
+    @Override
+    public String contextBlock() {
         return contextBlock;
     }
 
@@ -37,7 +35,8 @@ public final class NewsContextResult {
      *
      * @return list of sources
      */
-    public List<Source> getSources() {
+    @Override
+    public List<Source> sources() {
         return sources;
     }
 }

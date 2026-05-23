@@ -140,20 +140,20 @@ public class StreamingOrchestrator {
         NewsContextResult newsCtx = ragContexts.newsContext();
         CityInfoContextResult cityInfoCtx = ragContexts.cityInfoContext();
 
-        if (ragContexts.newsIntent() && (newsCtx == null || newsCtx.getSources().isEmpty())) {
+        if (ragContexts.newsIntent() && (newsCtx == null || newsCtx.sources().isEmpty())) {
             String fallbackMessage = buildNoNewsFoundMessage(detectedLanguage, cityId);
             log.info("streamAsk() news fallback used - conversationId={} city={}", conversationId, cityId);
             return buildFallbackStreamResult(fallbackMessage, conversationId, question);
         }
 
-        if (procCtx != null && procCtx.getContextBlock() != null)
-            messages.add(Map.of("role", "system", "content", procCtx.getContextBlock()));
-        if (eventCtx != null && eventCtx.getContextBlock() != null)
-            messages.add(Map.of("role", "system", "content", eventCtx.getContextBlock()));
-        if (newsCtx != null && newsCtx.getContextBlock() != null)
-            messages.add(Map.of("role", "system", "content", newsCtx.getContextBlock()));
-        if (cityInfoCtx != null && cityInfoCtx.getContextBlock() != null)
-            messages.add(Map.of("role", "system", "content", cityInfoCtx.getContextBlock()));
+        if (procCtx != null && procCtx.contextBlock() != null)
+            messages.add(Map.of("role", "system", "content", procCtx.contextBlock()));
+        if (eventCtx != null && eventCtx.contextBlock() != null)
+            messages.add(Map.of("role", "system", "content", eventCtx.contextBlock()));
+        if (newsCtx != null && newsCtx.contextBlock() != null)
+            messages.add(Map.of("role", "system", "content", newsCtx.contextBlock()));
+        if (cityInfoCtx != null && cityInfoCtx.contextBlock() != null)
+            messages.add(Map.of("role", "system", "content", cityInfoCtx.contextBlock()));
 
         var history = conversationService.getConversationHistory(conversationId);
         conversationService.addToMessages(messages, history);
@@ -161,10 +161,10 @@ public class StreamingOrchestrator {
 
         // 6. Collect sources
         List<Source> validatedSources = new ArrayList<>();
-        ragContextBuilder.validateAndAddSources(validatedSources, procCtx != null ? procCtx.getSources() : null, "procedure");
-        ragContextBuilder.validateAndAddSources(validatedSources, eventCtx != null ? eventCtx.getSources() : null, "event");
-        ragContextBuilder.validateAndAddSources(validatedSources, newsCtx != null ? newsCtx.getSources() : null, "news");
-        ragContextBuilder.validateAndAddSources(validatedSources, cityInfoCtx != null ? cityInfoCtx.getSources() : null, "city_info");
+        ragContextBuilder.validateAndAddSources(validatedSources, procCtx != null ? procCtx.sources() : null, "procedure");
+        ragContextBuilder.validateAndAddSources(validatedSources, eventCtx != null ? eventCtx.sources() : null, "event");
+        ragContextBuilder.validateAndAddSources(validatedSources, newsCtx != null ? newsCtx.sources() : null, "news");
+        ragContextBuilder.validateAndAddSources(validatedSources, cityInfoCtx != null ? cityInfoCtx.sources() : null, "city_info");
 
         List<SseSources> allSources = validatedSources.stream()
                 .map(s -> new SseSources(s.getTitle(), s.getUrl()))
@@ -185,8 +185,10 @@ public class StreamingOrchestrator {
         }
 
         OpenRouterStreamStartResult streamStartResult = httpWrapper.streamFromOpenRouter(messages);
-        if (streamStartResult instanceof OpenRouterStreamStartResult.Error error) {
-            return new AskStreamResult.Error(AskStreamErrorMapper.toResponseDto(error.failure()));
+        if (streamStartResult instanceof OpenRouterStreamStartResult.Error(
+                cat.complai.exceptions.OpenRouterStreamingException failure
+        )) {
+            return new AskStreamResult.Error(AskStreamErrorMapper.toResponseDto(failure));
         }
 
         Publisher<String> stream = ((OpenRouterStreamStartResult.Success) streamStartResult).stream();
@@ -271,8 +273,8 @@ public class StreamingOrchestrator {
         List<Map<String, Object>> streamResolvedMsgs = new ArrayList<>();
         streamResolvedMsgs.add(Map.of("role", "system", "content",
                 promptBuilder.getSystemMessage(cityId, detectedLanguage)));
-        if (streamResolvedCtx != null && streamResolvedCtx.getContextBlock() != null) {
-            streamResolvedMsgs.add(Map.of("role", "system", "content", streamResolvedCtx.getContextBlock()));
+        if (streamResolvedCtx != null && streamResolvedCtx.contextBlock() != null) {
+            streamResolvedMsgs.add(Map.of("role", "system", "content", streamResolvedCtx.contextBlock()));
         }
         var streamResolvedHistory = conversationService.getConversationHistory(conversationId);
         conversationService.addToMessages(streamResolvedMsgs, streamResolvedHistory);
@@ -281,7 +283,7 @@ public class StreamingOrchestrator {
 
         List<Source> streamResolvedSrcs = new ArrayList<>();
         ragContextBuilder.validateAndAddSources(streamResolvedSrcs,
-                streamResolvedCtx != null ? streamResolvedCtx.getSources() : null, "procedure");
+                streamResolvedCtx != null ? streamResolvedCtx.sources() : null, "procedure");
         List<SseSources> streamResolvedAllSources = streamResolvedSrcs.stream()
                 .map(s -> new SseSources(s.getTitle(), s.getUrl()))
                 .collect(Collectors.toList());
@@ -296,8 +298,10 @@ public class StreamingOrchestrator {
                 conversationId, streamChosen.procedureId());
 
         OpenRouterStreamStartResult srStreamStart = httpWrapper.streamFromOpenRouter(streamResolvedMsgs);
-        if (srStreamStart instanceof OpenRouterStreamStartResult.Error srErr) {
-            return new AskStreamResult.Error(AskStreamErrorMapper.toResponseDto(srErr.failure()));
+        if (srStreamStart instanceof OpenRouterStreamStartResult.Error(
+                cat.complai.exceptions.OpenRouterStreamingException failure
+        )) {
+            return new AskStreamResult.Error(AskStreamErrorMapper.toResponseDto(failure));
         }
         Publisher<String> srStream = ((OpenRouterStreamStartResult.Success) srStreamStart).stream();
 

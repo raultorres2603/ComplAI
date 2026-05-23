@@ -4,8 +4,8 @@ import java.net.URL;
 
 public class ComplaintFile {
 
-    private String fileName;
-    private URL url;
+    private final String fileName;
+    private final URL url;
 
     public ComplaintFile(String fileName, URL url) {
         this.fileName = fileName;

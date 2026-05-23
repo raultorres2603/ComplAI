@@ -3,14 +3,10 @@ package cat.complai.services.openrouter;
 /**
  * Captures which RAG context domains are required for a given query.
  */
-public final class ContextRequirements {
+public record ContextRequirements(boolean needsProcedureContext, boolean needsEventContext, boolean needsNewsContext,
+                                  boolean needsCityInfoContext) {
 
     private static final ContextRequirements NONE = new ContextRequirements(false, false, false, false);
-
-    private final boolean needsProcedureContext;
-    private final boolean needsEventContext;
-    private final boolean needsNewsContext;
-    private final boolean needsCityInfoContext;
 
     /**
      * Constructs a requirements descriptor.
@@ -22,12 +18,7 @@ public final class ContextRequirements {
      * @param needsCityInfoContext  {@code true} if city-info context should be
      *                              fetched
      */
-    public ContextRequirements(boolean needsProcedureContext, boolean needsEventContext, boolean needsNewsContext,
-            boolean needsCityInfoContext) {
-        this.needsProcedureContext = needsProcedureContext;
-        this.needsEventContext = needsEventContext;
-        this.needsNewsContext = needsNewsContext;
-        this.needsCityInfoContext = needsCityInfoContext;
+    public ContextRequirements {
     }
 
     /**
@@ -44,6 +35,7 @@ public final class ContextRequirements {
      *
      * @return needs-procedure flag
      */
+    @Override
     public boolean needsProcedureContext() {
         return needsProcedureContext;
     }
@@ -53,6 +45,7 @@ public final class ContextRequirements {
      *
      * @return needs-event flag
      */
+    @Override
     public boolean needsEventContext() {
         return needsEventContext;
     }
@@ -62,6 +55,7 @@ public final class ContextRequirements {
      *
      * @return needs-news flag
      */
+    @Override
     public boolean needsNewsContext() {
         return needsNewsContext;
     }
@@ -71,6 +65,7 @@ public final class ContextRequirements {
      *
      * @return needs-city-info flag
      */
+    @Override
     public boolean needsCityInfoContext() {
         return needsCityInfoContext;
     }

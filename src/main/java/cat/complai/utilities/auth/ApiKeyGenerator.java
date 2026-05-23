@@ -20,7 +20,7 @@ import java.util.Base64;
  */
 public class ApiKeyGenerator {
 
-    public static void main(String[] args) {
+    static void main(String[] args) {
         if (args.length != 1) {
             System.err.println("Usage: ApiKeyGenerator <cityId>");
             System.err.println("  cityId — lowercase city identifier (e.g. elprat)");

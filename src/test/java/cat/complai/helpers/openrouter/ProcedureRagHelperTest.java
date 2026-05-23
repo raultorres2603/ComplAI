@@ -68,10 +68,10 @@ class ProcedureRagHelperTest {
         // Results should be properly structured
         if (!results.isEmpty()) {
             for (RagHelper.Procedure proc : results) {
-                assertNotNull(proc.procedureId);
-                assertNotNull(proc.title);
-                assertFalse(proc.procedureId.isBlank());
-                assertFalse(proc.title.isBlank());
+                assertNotNull(proc.procedureId());
+                assertNotNull(proc.title());
+                assertFalse(proc.procedureId().isBlank());
+                assertFalse(proc.title().isBlank());
             }
         }
     }
@@ -85,11 +85,11 @@ class ProcedureRagHelperTest {
         RagHelper.Procedure procedure = results.get(0);
 
         // Verify all important fields are preserved
-        assertNotNull(procedure.procedureId);
-        assertNotNull(procedure.title);
-        assertNotNull(procedure.url);
-        assertFalse(procedure.procedureId.isBlank());
-        assertFalse(procedure.title.isBlank());
+        assertNotNull(procedure.procedureId());
+        assertNotNull(procedure.title());
+        assertNotNull(procedure.url());
+        assertFalse(procedure.procedureId().isBlank());
+        assertFalse(procedure.title().isBlank());
     }
 
     @Test
@@ -108,7 +108,7 @@ class ProcedureRagHelperTest {
 
         assertFalse(results.isEmpty());
         assertTrue(results.size() <= 3);
-        assertEquals("p1", results.get(0).procedureId);
+        assertEquals("p1", results.get(0).procedureId());
     }
 
     @Test
@@ -116,7 +116,7 @@ class ProcedureRagHelperTest {
         List<RagHelper.Procedure> results = procedureRagHelper.search("  tràmit   recycling  ");
 
         assertFalse(results.isEmpty());
-        assertEquals("p1", results.get(0).procedureId);
+        assertEquals("p1", results.get(0).procedureId());
     }
 
     @Test
@@ -127,7 +127,7 @@ class ProcedureRagHelperTest {
 
         assertEquals(firstResults.size(), secondResults.size());
         if (!firstResults.isEmpty()) {
-            assertEquals(firstResults.get(0).procedureId, secondResults.get(0).procedureId);
+            assertEquals(firstResults.get(0).procedureId(), secondResults.get(0).procedureId());
         }
     }
 
@@ -157,8 +157,8 @@ class ProcedureRagHelperTest {
         if (!results.isEmpty()) {
             RagHelper.Procedure firstResult = results.get(0);
             // Top result should be most relevant (likely title match due to boost)
-            assertTrue(firstResult.title.toLowerCase().contains("recycling")
-                    || firstResult.description.toLowerCase().contains("recycling"),
+            assertTrue(firstResult.title().toLowerCase().contains("recycling")
+                    || firstResult.description().toLowerCase().contains("recycling"),
                     "Top result should match the query");
         }
     }
@@ -176,8 +176,8 @@ class ProcedureRagHelperTest {
         // All results should match the query with reasonable relevance
         for (RagHelper.Procedure proc : results) {
             assertTrue(
-                    proc.title.toLowerCase().contains("waste") ||
-                            proc.description.toLowerCase().contains("waste"),
+                    proc.title().toLowerCase().contains("waste") ||
+                            proc.description().toLowerCase().contains("waste"),
                     "All returned results should match the query (relevance threshold applied)");
         }
     }
@@ -195,7 +195,7 @@ class ProcedureRagHelperTest {
         RagHelper.Procedure proc = results.get(0);
 
         // requirements field was removed from SEARCH_FIELDS but stored
-        assertNotNull(proc.requirements, "requirements field should be accessible");
+        assertNotNull(proc.requirements(), "requirements field should be accessible");
     }
 
     @Test
@@ -209,7 +209,7 @@ class ProcedureRagHelperTest {
         RagHelper.Procedure proc = results.get(0);
 
         // steps field was removed from SEARCH_FIELDS but stored
-        assertNotNull(proc.steps, "steps field should be accessible");
+        assertNotNull(proc.steps(), "steps field should be accessible");
     }
 
     @Test

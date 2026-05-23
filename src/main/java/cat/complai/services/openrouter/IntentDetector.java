@@ -359,7 +359,7 @@ public class IntentDetector {
     private List<String> loadNormalizedProcedureTitles(String cityId) {
         try {
             return ragRegistry.getForCity(cityId).getAll().stream()
-                    .map(procedure -> normalize(procedure.title))
+                    .map(procedure -> normalize(procedure.title()))
                     .filter(title -> !title.isBlank())
                     .distinct()
                     .toList();
@@ -373,7 +373,7 @@ public class IntentDetector {
     private List<String> loadNormalizedEventTitles(String cityId) {
         try {
             return eventRagRegistry.getForCity(cityId).getAll().stream()
-                    .map(event -> normalize(event.title))
+                    .map(event -> normalize(event.title()))
                     .filter(title -> !title.isBlank())
                     .distinct()
                     .toList();
@@ -387,7 +387,7 @@ public class IntentDetector {
     private List<String> loadNormalizedNewsTitles(String cityId) {
         try {
             return newsRagRegistry.getForCity(cityId).getAll().stream()
-                    .map(item -> normalize(item.title))
+                    .map(item -> normalize(item.title()))
                     .filter(title -> !title.isBlank())
                     .distinct()
                     .toList();
@@ -401,7 +401,7 @@ public class IntentDetector {
     private List<String> loadNormalizedCityInfoTitles(String cityId) {
         try {
             return cityInfoRagRegistry.getForCity(cityId).getAll().stream()
-                    .map(item -> normalize(item.title))
+                    .map(item -> normalize(item.title()))
                     .filter(title -> !title.isBlank())
                     .distinct()
                     .toList();
@@ -422,55 +422,48 @@ public class IntentDetector {
                                       int cityInfoTitleCount) {
     }
 
-    private static final class TitleMatcher {
-        private final Map<String, List<String>> titlesByToken;
-        private final List<String> fallbackTitles;
-
-        private TitleMatcher(Map<String, List<String>> titlesByToken, List<String> fallbackTitles) {
-            this.titlesByToken = titlesByToken;
-            this.fallbackTitles = fallbackTitles;
-        }
+    private record TitleMatcher(Map<String, List<String>> titlesByToken, List<String> fallbackTitles) {
 
         private static TitleMatcher fromTitles(List<String> normalizedTitles) {
-            Map<String, LinkedHashSet<String>> byToken = new LinkedHashMap<>();
-            List<String> fallbackTitles = new ArrayList<>();
+                Map<String, LinkedHashSet<String>> byToken = new LinkedHashMap<>();
+                List<String> fallbackTitles = new ArrayList<>();
 
-            for (String normalizedTitle : normalizedTitles) {
-                Set<String> tokens = tokenize(normalizedTitle);
-                if (tokens.isEmpty()) {
-                    fallbackTitles.add(normalizedTitle);
-                    continue;
+                for (String normalizedTitle : normalizedTitles) {
+                    Set<String> tokens = tokenize(normalizedTitle);
+                    if (tokens.isEmpty()) {
+                        fallbackTitles.add(normalizedTitle);
+                        continue;
+                    }
+                    for (String token : tokens) {
+                        byToken.computeIfAbsent(token, ignored -> new LinkedHashSet<>()).add(normalizedTitle);
+                    }
                 }
-                for (String token : tokens) {
-                    byToken.computeIfAbsent(token, ignored -> new LinkedHashSet<>()).add(normalizedTitle);
-                }
+
+                Map<String, List<String>> immutableIndex = new LinkedHashMap<>();
+                byToken.forEach((token, titles) -> immutableIndex.put(token, List.copyOf(titles)));
+                return new TitleMatcher(Map.copyOf(immutableIndex), List.copyOf(fallbackTitles));
             }
 
-            Map<String, List<String>> immutableIndex = new LinkedHashMap<>();
-            byToken.forEach((token, titles) -> immutableIndex.put(token, List.copyOf(titles)));
-            return new TitleMatcher(Map.copyOf(immutableIndex), List.copyOf(fallbackTitles));
-        }
-
-        private boolean matches(String normalizedQuestion) {
-            if (normalizedQuestion == null || normalizedQuestion.isBlank()) {
+            private boolean matches(String normalizedQuestion) {
+                if (normalizedQuestion == null || normalizedQuestion.isBlank()) {
+                    return false;
+                }
+                LinkedHashSet<String> candidates = new LinkedHashSet<>();
+                for (String token : tokenize(normalizedQuestion)) {
+                    List<String> titles = titlesByToken.get(token);
+                    if (titles != null) {
+                        candidates.addAll(titles);
+                    }
+                }
+                if (candidates.isEmpty()) {
+                    candidates.addAll(fallbackTitles);
+                }
+                for (String candidate : candidates) {
+                    if (normalizedQuestion.contains(candidate)) {
+                        return true;
+                    }
+                }
                 return false;
             }
-            LinkedHashSet<String> candidates = new LinkedHashSet<>();
-            for (String token : tokenize(normalizedQuestion)) {
-                List<String> titles = titlesByToken.get(token);
-                if (titles != null) {
-                    candidates.addAll(titles);
-                }
-            }
-            if (candidates.isEmpty()) {
-                candidates.addAll(fallbackTitles);
-            }
-            for (String candidate : candidates) {
-                if (normalizedQuestion.contains(candidate)) {
-                    return true;
-                }
-            }
-            return false;
         }
-    }
 }

@@ -384,7 +384,7 @@ public final class InMemoryLexicalIndex<T> {
             // Apply language boost if query language matches document language
             if (queryLanguage != null && !queryLanguage.isEmpty()) {
                 String docLanguage = documents.get(docIndex).language();
-                if (docLanguage != null && queryLanguage.equalsIgnoreCase(docLanguage)) {
+                if (queryLanguage.equalsIgnoreCase(docLanguage)) {
                     score *= 1.5d;
                 }
             }
@@ -398,7 +398,7 @@ public final class InMemoryLexicalIndex<T> {
         scoredResults.sort(Comparator
                 .comparingDouble(SearchResult<T>::score)
                 .reversed()
-                .thenComparingInt(SearchResult<T>::sourceOrder));
+                .thenComparingInt(SearchResult::sourceOrder));
 
         double bestScore = scoredResults.get(0).score();
         double appliedThreshold = Math.max(absoluteFloor, bestScore * relativeFloor);

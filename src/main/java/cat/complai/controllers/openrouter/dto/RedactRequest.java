@@ -80,6 +80,23 @@ public class RedactRequest {
         return conversationId;
     }
 
+    /** Individual identity field getters — required so Jackson serializes these
+     *  as top-level JSON properties matching the @JsonProperty names expected
+     *  by fromJson() on the server side. Without them, an HTTP client
+     *  serializing this DTO omits the identity fields and the server receives
+     *  null, routing incorrectly to the sync path. */
+    public String getRequesterName() {
+        return requesterName;
+    }
+
+    public String getRequesterSurname() {
+        return requesterSurname;
+    }
+
+    public String getRequesterIdNumber() {
+        return requesterIdNumber;
+    }
+
     /**
      * Assembles the identity record from the individual fields.
      * Blank or whitespace-only strings are treated as absent (normalized to null) so that

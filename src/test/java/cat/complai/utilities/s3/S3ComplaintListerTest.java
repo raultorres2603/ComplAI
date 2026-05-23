@@ -50,16 +50,16 @@ class S3ComplaintListerTest {
         List<ComplaintFileEntry> result = lister.listComplaintFiles();
 
         assertEquals(2, result.size());
-        assertEquals("1700000001-complaint.pdf", result.get(0).getFileName());
-        assertEquals("https://example.com/1.pdf", result.get(0).getUrl());
+        assertEquals("1700000001-complaint.pdf", result.get(0).fileName());
+        assertEquals("https://example.com/1.pdf", result.get(0).url());
     }
 
     @Test
     void complaintFileEntry_storesFileNameAndUrl() {
         ComplaintFileEntry entry = new ComplaintFileEntry("test-file.pdf", "https://example.com/test-file.pdf");
 
-        assertEquals("test-file.pdf", entry.getFileName());
-        assertEquals("https://example.com/test-file.pdf", entry.getUrl());
+        assertEquals("test-file.pdf", entry.fileName());
+        assertEquals("https://example.com/test-file.pdf", entry.url());
     }
 
     @Test

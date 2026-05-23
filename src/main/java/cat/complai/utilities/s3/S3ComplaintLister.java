@@ -136,23 +136,8 @@ public class S3ComplaintLister {
     }
 
     /**
-     * Simple data class for complaint file entries returned by listComplaintFiles.
-     */
-    public static class ComplaintFileEntry {
-        private final String fileName;
-        private final String url;
-
-        public ComplaintFileEntry(String fileName, String url) {
-            this.fileName = fileName;
-            this.url = url;
-        }
-
-        public String getFileName() {
-            return fileName;
-        }
-
-        public String getUrl() {
-            return url;
-        }
+         * Simple data class for complaint file entries returned by listComplaintFiles.
+         */
+        public record ComplaintFileEntry(String fileName, String url) {
     }
 }

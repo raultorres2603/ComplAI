@@ -49,7 +49,7 @@ public class ProcedureScraper {
     private static final String MAPPING_RESOURCE_PATTERN = "/scrapers/procedures-mapping-%s.json";
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    public static void main(String[] args) throws IOException {
+    static void main(String[] args) throws IOException {
         if (args.length != 1 || args[0].isBlank()) {
             System.err.println("Usage: ProcedureScraper <cityId>");
             System.err.println("  cityId — must match a procedures-mapping-<cityId>.json in resources/scrapers");

@@ -104,9 +104,8 @@ public class OpenRouterController {
                 String questionText = request != null ? request.getText() : null;
 
                 AskStreamResult streamResult = service.streamAsk(questionText, conversationId, cityId);
-                if (streamResult instanceof AskStreamResult.Error error) {
-                        OpenRouterResponseDto dto = error.errorResponse();
-                        long latency = System.currentTimeMillis() - start;
+                if (streamResult instanceof AskStreamResult.Error(OpenRouterResponseDto dto)) {
+                    long latency = System.currentTimeMillis() - start;
                         OpenRouterErrorCode errorCode = dto != null ? dto.getErrorCode() : OpenRouterErrorCode.INTERNAL;
                         AuditLogger.log("/complai/ask",
                                         AuditLogger.hashText(questionText),

@@ -65,7 +65,7 @@ class S3PdfUploaderTest {
         assertEquals("test-bucket", request.bucket());
         assertEquals("complaints/test-123.pdf", request.key());
         assertEquals("application/pdf", request.contentType());
-        assertEquals((long) pdfBytes.length, request.contentLength());
+        assertEquals(pdfBytes.length, request.contentLength());
         assertEquals("inline; filename=\"complaint.pdf\"", request.contentDisposition());
     }
 
