@@ -1,5 +1,20 @@
 plugins {
     id("io.micronaut.application") version "4.6.2"
+    // Shadow plugin for building fat JARs — needed by sam/start-local.sh for local
+    // development. The Micronaut plugin with runtime("lambda_provided") assumes
+    // native image and does not apply Shadow automatically. We add it explicitly
+    // so `./gradlew shadowJar` produces build/libs/complai-all.jar for SAM local.
+    // Not used in production (CI deploys GraalVM native images via buildNativeLambda).
+    id("com.gradleup.shadow") version "9.0.0-beta4"
+}
+
+// Configure the shadow JAR to match the SAM template expectation
+// (complai-all.jar without version number) and merge Micronaut service files.
+tasks.named("shadowJar", com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar) {
+    archiveBaseName.set("complai")
+    archiveVersion.set("")
+    archiveClassifier.set("all")
+    mergeServiceFiles()
 }
 
 version = "1.0.0"

@@ -414,12 +414,13 @@ export class LambdaStack extends cdk.Stack {
       functionName: `ComplAIRedactorLambda-${environment}`,
       code,
       handler: 'bootstrap',
-      // Memory-bound (PDFBox rendering + AI call). PDF generation is the dominant
-      // memory consumer regardless of native image vs JIT. 1024 MB gives PDFBox
-      // safe headroom for complaint documents with embedded images or large text.
-      // Verified with AWS Lambda Power Tuning on native image — lower values cause
-      // out-of-memory during rendering, higher values offer no improvement.
-      memorySize: 1024,
+      // Mixed I/O + CPU (OpenRouter AI call + OpenPDF rendering). No RAG indexes
+      // or Caffeine caches loaded — only the DI beans for prompt building, HTTP
+      // wrapper, and S3 upload. OpenPDF has zero AWT dependency (unlike the
+      // original PDFBox) and works reliably in native image. Font (615 KB) is
+      // cached after first load. AI call dominates latency. 512 MB provides
+      // >10x headroom over estimated ~50 MB peak (font + PDF buffer + response).
+      memorySize: 512,
       // Must be ≤ SQS visibility timeout (90s). Lambda extends visibility automatically
       // while running, so using the same duration is the safest choice here.
       timeout: cdk.Duration.seconds(60),
