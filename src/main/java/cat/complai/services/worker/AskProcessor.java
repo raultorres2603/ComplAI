@@ -10,6 +10,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
@@ -181,7 +182,12 @@ class AskProcessor {
         @Override
         public void sendMessage(long chatId, String text, String token) throws Exception {
             String url = TELEGRAM_API_BASE + "/bot" + token + "/sendMessage";
-            String json = mapper.writeValueAsString(new TelegramSendMessageRequest(chatId, text, "HTML"));
+            // Use a Map instead of a record to avoid GraalVM native image reflection issues
+            String json = mapper.writeValueAsString(Map.of(
+                    "chat_id", chatId,
+                    "text", text,
+                    "parse_mode", "HTML"
+            ));
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .header("Content-Type", "application/json")
@@ -195,10 +201,4 @@ class AskProcessor {
             }
         }
     }
-
-    /**
-     * Minimal request payload for Telegram sendMessage API.
-     * Kept as a private inner class to avoid coupling to the controller DTO layer.
-     */
-    private record TelegramSendMessageRequest(long chat_id, String text, String parse_mode) {}
 }
