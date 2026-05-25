@@ -583,10 +583,10 @@ export class LambdaStack extends cdk.Stack {
       // I/O-bound: RAG context building, AI call (waits on network), Telegram API.
       // GraalVM native image eliminates JIT warmup and reduces baseline memory by
       // ~70%. The dominant cost is waiting for the AI response, not CPU cycles.
-      // 248 MB provides ~79 MB headroom above the measured 169 MB peak (cold start
+      // 256 MB provides ~87 MB headroom above the measured 169 MB peak (cold start
       // with RAG warmup). Lower values would risk OOM during concurrent requests.
       // Verified with Max Memory Used=169 MB in production logs.
-      memorySize: 248,
+      memorySize: 256,
       // Must be ≤ SQS visibility timeout (120s). Lambda extends visibility automatically
       // while running, so using a lower duration is the safest choice.
       timeout: cdk.Duration.seconds(90),
@@ -701,10 +701,10 @@ export class LambdaStack extends cdk.Stack {
       handler: 'bootstrap',
       // I/O-bound: CloudWatch FilterLogEvents queries (API wait), AI call, HTML
       // report rendering, SES send. Native image removes JIT overhead — the
-      // CloudWatch API response time dominates, not CPU. 248 MB is sufficient for
-      // working memory (log event gathering, HTML generation) and keeps cost low
-      // for this weekly invocation. No PDF generation or large caches.
-      memorySize: 248,
+      // CloudWatch API response time dominates, not CPU. 256 MB provides ample
+      // working memory (log event gathering, HTML generation, AI context) while
+      // keeping cost low for this weekly invocation. No PDF generation or caches.
+      memorySize: 256,
       timeout: cdk.Duration.seconds(60),
       environment: {
         // OpenRouter API key for AI predictions in statistics reports

@@ -386,7 +386,7 @@ Resources:
       Handler: cat.complai.services.worker.RedactWorkerHandler::handleRequest
       Runtime: java25
       Architectures: [arm64]
-      MemorySize: 1024
+      MemorySize: 512
       Timeout: 60
       Role: !GetAtt ComplAIWorkerRole.Arn
       Environment:
@@ -456,7 +456,7 @@ Resources:
       Handler: cat.complai.services.worker.AskWorkerHandler::handleRequest
       Runtime: java25
       Architectures: [arm64]
-      MemorySize: 248
+      MemorySize: 256
       Timeout: 90
       Role: !GetAtt ComplAIWorkerRole.Arn
       Environment:
@@ -538,7 +538,7 @@ Resources:
       Handler: cat.complai.services.ses.SesScheduledReportHandler::handleRequest
       Runtime: java25
       Architectures: [arm64]
-      MemorySize: 248
+      MemorySize: 256
       Timeout: 60
       Role: !GetAtt ComplAIScheduledReportRole.Arn
       Environment:
