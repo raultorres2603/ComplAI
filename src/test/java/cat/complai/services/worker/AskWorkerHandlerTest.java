@@ -253,37 +253,32 @@ class AskWorkerHandlerTest {
     // Helper: minimal fake IOpenRouterService that only implements ask()
     // -------------------------------------------------------------------------
 
-    private static class FakeAiService implements IOpenRouterService {
-        private final OpenRouterResponseDto response;
-
-        FakeAiService(OpenRouterResponseDto response) {
-            this.response = response;
-        }
+    private record FakeAiService(OpenRouterResponseDto response) implements IOpenRouterService {
 
         @Override
-        public OpenRouterResponseDto ask(String question, String conversationId, String cityId) {
-            return response;
-        }
+            public OpenRouterResponseDto ask(String question, String conversationId, String cityId) {
+                return response;
+            }
 
-        @Override
-        public OpenRouterResponseDto ask(String question, String conversationId, String cityId, String preferredLang) {
-            return response;
-        }
+            @Override
+            public OpenRouterResponseDto ask(String question, String conversationId, String cityId, String preferredLang) {
+                return response;
+            }
 
-        @Override
-        public AskStreamResult streamAsk(String question, String conversationId, String cityId) {
-            throw new UnsupportedOperationException();
-        }
+            @Override
+            public AskStreamResult streamAsk(String question, String conversationId, String cityId) {
+                throw new UnsupportedOperationException();
+            }
 
-        @Override
-        public Optional<OpenRouterResponseDto> validateRedactInput(String complaint) {
-            throw new UnsupportedOperationException();
-        }
+            @Override
+            public Optional<OpenRouterResponseDto> validateRedactInput(String complaint) {
+                throw new UnsupportedOperationException();
+            }
 
-        @Override
-        public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format,
-                String conversationId, ComplainantIdentity identity, String cityId) {
-            throw new UnsupportedOperationException();
+            @Override
+            public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format,
+                                                         String conversationId, ComplainantIdentity identity, String cityId) {
+                throw new UnsupportedOperationException();
+            }
         }
-    }
 }

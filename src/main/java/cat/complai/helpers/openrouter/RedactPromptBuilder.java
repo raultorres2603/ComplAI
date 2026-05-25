@@ -11,7 +11,13 @@ import java.io.InputStream;
 import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -341,25 +347,25 @@ public class RedactPromptBuilder {
         sb.append("CONTEXT FROM MUNICIPAL PROCEDURES:\n\n");
         for (RagHelper.Procedure p : matches) {
             sb.append("---\n");
-            sb.append("**").append(p.title).append("**\n");
+            sb.append("**").append(p.title()).append("**\n");
             // Prefer HTML anchor tags in the RAG context and ensure they open in a new tab
-            if (p.url != null && !p.url.isBlank()) {
-                sb.append("<a href=\"").append(p.url)
+            if (p.url() != null && !p.url().isBlank()) {
+                sb.append("<a href=\"").append(p.url())
                         .append("\" target=\"_blank\" rel=\"noopener noreferrer\">Més informació / Más información / More information</a>\n\n");
             }
-            if (!p.description.isBlank())
-                sb.append(p.description).append("\n\n");
-            if (!p.requirements.isBlank()) {
+            if (!p.description().isBlank())
+                sb.append(p.description()).append("\n\n");
+            if (!p.requirements().isBlank()) {
                 sb.append("**Requirements:**\n");
-                for (String req : p.requirements.split("\\n")) {
+                for (String req : p.requirements().split("\\n")) {
                     if (!req.isBlank())
                         sb.append("- ").append(req.trim()).append("\n");
                 }
                 sb.append("\n");
             }
-            if (!p.steps.isBlank()) {
+            if (!p.steps().isBlank()) {
                 sb.append("**Steps:**\n");
-                for (String step : p.steps.split("\\n")) {
+                for (String step : p.steps().split("\\n")) {
                     if (!step.isBlank())
                         sb.append("- ").append(step.trim()).append("\n");
                 }

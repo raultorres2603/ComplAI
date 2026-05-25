@@ -16,8 +16,7 @@ import org.mockito.MockitoAnnotations;
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -126,7 +125,7 @@ class OpenRouterServicesAmbiguityTest {
         OpenRouterResponseDto response = service.ask("tramite aparcamiento municipal", "conv-1", "elprat");
 
         assertTrue(response.isSuccess());
-        assertTrue("ok".equals(response.getMessage()));
+        assertEquals("ok", response.getMessage());
         verify(conversationService, never()).storePendingClarification(anyString(), anyList());
         verify(conversationService, never()).updateConversationHistory(eq("conv-1"), anyString(),
                 eq("Encuentro varias opciones relacionadas en El Prat."));

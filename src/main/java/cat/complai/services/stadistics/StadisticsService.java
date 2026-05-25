@@ -22,7 +22,6 @@ import cat.complai.utilities.s3.S3ComplaintLister;
 import cat.complai.utilities.s3.S3FeedbackLister;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
-import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.cloudwatch.CloudWatchClient;
 import software.amazon.awssdk.services.cloudwatch.model.Dimension;
 import software.amazon.awssdk.services.cloudwatch.model.GetMetricStatisticsRequest;
@@ -41,19 +40,6 @@ public class StadisticsService implements IStadisticsService {
 
     @Inject
     public StadisticsService(S3ComplaintLister s3ComplaintLister, S3FeedbackLister s3FeedbackLister,
-            IOpenRouterService openRouterService) {
-        this.s3ComplaintLister = s3ComplaintLister;
-        this.s3FeedbackLister = s3FeedbackLister;
-        this.openRouterService = openRouterService;
-        this.cloudWatchClient = CloudWatchClient.builder()
-                .region(Region.EU_WEST_1)
-                .build();
-    }
-
-    /**
-     * Protected constructor for testing — allows injecting a mock CloudWatchClient.
-     */
-    protected StadisticsService(S3ComplaintLister s3ComplaintLister, S3FeedbackLister s3FeedbackLister,
             IOpenRouterService openRouterService, CloudWatchClient cloudWatchClient) {
         this.s3ComplaintLister = s3ComplaintLister;
         this.s3FeedbackLister = s3FeedbackLister;
@@ -148,8 +134,8 @@ public class StadisticsService implements IStadisticsService {
             var entries = s3ComplaintLister.listComplaintFiles(from, to);
 
             for (S3ComplaintLister.ComplaintFileEntry entry : entries) {
-                java.net.URL url = java.net.URI.create(entry.getUrl()).toURL();
-                files.add(new ComplaintFile(entry.getFileName(), url));
+                java.net.URL url = java.net.URI.create(entry.url()).toURL();
+                files.add(new ComplaintFile(entry.fileName(), url));
             }
 
             logger.info("Found {} complaint files from S3", files.size());
@@ -168,8 +154,8 @@ public class StadisticsService implements IStadisticsService {
             var entries = s3FeedbackLister.listAllFeedbackFiles(from, to);
 
             for (S3FeedbackLister.FeedbackFileEntry entry : entries) {
-                java.net.URL url = java.net.URI.create(entry.getUrl()).toURL();
-                files.add(new FeedbackFile(entry.getFileName(), url));
+                java.net.URL url = java.net.URI.create(entry.url()).toURL();
+                files.add(new FeedbackFile(entry.fileName(), url));
             }
 
             logger.info("Found {} feedback files from S3", files.size());
@@ -318,6 +304,7 @@ public class StadisticsService implements IStadisticsService {
      * @param cityId the city identifier
      * @return prediction text from AI, or fallback message on failure
      */
+    @Override
     public String generatePrediction(StadisticsModel model, String cityId) {
         logger.info("Generating AI prediction for city: {}", cityId);
 

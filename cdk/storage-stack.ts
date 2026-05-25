@@ -15,10 +15,10 @@ export class StorageStack extends cdk.Stack {
   readonly cityInfoBucket: s3.Bucket;
   readonly complaintsBucket: s3.Bucket;
   readonly feedbackBucket: s3.Bucket;
-  // Stores the compiled fat JARs used by both Lambda functions.
-  // Keeping deployment artifacts here lets CI upload the JAR once and reference
+  // Stores the compiled native image ZIPs used by all Lambda functions.
+  // Keeping deployment artifacts here lets CI upload the ZIP once and reference
   // it with Code.fromBucket(), which means the CDK bootstrap bucket never
-  // receives the JAR and does not accumulate large, stale objects.
+  // receives the artifact and does not accumulate large, stale objects.
   readonly deploymentsBucket: s3.Bucket;
 
   constructor(scope: Construct, id: string, props: StorageStackProps) {
@@ -100,12 +100,13 @@ export class StorageStack extends cdk.Stack {
       }],
     });
 
-    // Compiled fat JARs — written by CI once per build, read by CloudFormation
-    // during Lambda deployment (Code.fromBucket).  Keeping these here instead of
-    // relying on the CDK bootstrap staging bucket (cdk-hnb659fds-assets-*) means
-    // we own the lifecycle and the bootstrap bucket never accumulates large JARs.
-    // 30-day expiry is generous: a deploy is complete within minutes; old JARs
-    // beyond 30 days are never needed again.
+    // Compiled native image ZIPs — written by CI once per build, read by
+    // CloudFormation during Lambda deployment (Code.fromBucket).  Keeping these
+    // here instead of relying on the CDK bootstrap staging bucket
+    // (cdk-hnb659fds-assets-*) means we own the lifecycle and the bootstrap
+    // bucket never accumulates large artifacts.  30-day expiry is generous:
+    // a deploy is complete within minutes; old ZIPs beyond 30 days are never
+    // needed again.
     this.deploymentsBucket = new s3.Bucket(this, `ComplAIDeploymentsBucket-${environment}`, {
       bucketName: `complai-deployments-${environment}`,
       // Always RETAIN — losing this bucket mid-deploy would break rollbacks.
@@ -148,7 +149,7 @@ export class StorageStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, 'ComplAIDeploymentsBucketName', {
       value: this.deploymentsBucket.bucketName,
-      description: `S3 bucket for fat JAR deployments (${environment})`,
+      description: `S3 bucket for native image deployments (${environment})`,
     });
   }
 }

@@ -18,7 +18,16 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import java.util.logging.Logger;
 
 /**
@@ -47,7 +56,7 @@ public class EventScraper {
     private static final Logger logger = Logger.getLogger(EventScraper.class.getName());
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    public static void main(String[] args) throws IOException {
+    static void main(String[] args) throws IOException {
         if (args.length != 1 || args[0].isBlank()) {
             System.err.println("Usage: EventScraper <cityId>");
             System.err.println("  cityId — must match a procedures-mapping-<cityId>.json in resources/scrapers");
@@ -214,14 +223,14 @@ public class EventScraper {
                 try {
                     String seedHost = new java.net.URI(seed.baseUrl).getHost();
                     String urlHost = new java.net.URI(url).getHost();
-                    if (seedHost != null && urlHost != null && seedHost.equalsIgnoreCase(urlHost)) {
+                    if (seedHost != null && seedHost.equalsIgnoreCase(urlHost)) {
                         Map<String, ProcedureScraper.FieldExtractionRule> merged = new LinkedHashMap<>(
                                 mapping.events.fields);
                         merged.putAll(seed.fields);
                         return merged;
                     }
                 } catch (Exception ignored) {
-                    // Malformed URI — skip this seed entry and fall through to global.
+                    logger.warning("Malformed URI seed entry: " + ignored.getMessage());
                 }
             }
         }

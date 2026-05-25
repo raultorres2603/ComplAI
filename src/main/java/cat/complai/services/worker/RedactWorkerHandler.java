@@ -7,9 +7,7 @@ import cat.complai.dto.sqs.RedactSqsMessage;
 import com.amazonaws.services.lambda.runtime.events.SQSBatchResponse;
 import com.amazonaws.services.lambda.runtime.events.SQSEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.micronaut.context.annotation.Value;
 import io.micronaut.function.aws.MicronautRequestHandler;
-import jakarta.inject.Inject;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,29 +21,42 @@ import java.util.logging.Logger;
  * concerns itself with DI wiring and SQS batch-item-failure reporting. This separation also
  * makes the core logic unit-testable without starting a Micronaut application context.
  *
- * <p>Failures are reported as batch item failures so SQS retries only the failed records
- * (up to {@code maxReceiveCount} times before routing to the DLQ).
+ * <p>Beans are resolved lazily from {@link #getApplicationContext()} rather than via
+ * {@code @Inject} fields. Field-level injection uses {@code Class.getDeclaredField()}
+ * internally, which requires explicit GraalVM reflection registration and is fragile in
+ * native images. Looking beans up directly from the context is the safe equivalent.
  */
 public class RedactWorkerHandler extends MicronautRequestHandler<SQSEvent, SQSBatchResponse> {
 
     private static final Logger logger = Logger.getLogger(RedactWorkerHandler.class.getName());
 
-    @Inject
+    private static final String TIMEOUT_PROP = "OPENROUTER_OVERALL_TIMEOUT_SECONDS";
+
+    // Lazily initialised from getApplicationContext() — see ensureInitialized().
     private RedactPromptBuilder promptBuilder;
-
-    @Inject
     private HttpWrapper httpWrapper;
-
-    @Inject
     private S3PdfUploader s3PdfUploader;
-
-    @Value("${OPENROUTER_OVERALL_TIMEOUT_SECONDS:60}")
+    private ObjectMapper mapper;
     private int overallTimeoutSeconds;
+    private boolean initialized = false;
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    private void ensureInitialized() {
+        if (initialized) return;
+        promptBuilder = getApplicationContext().getBean(RedactPromptBuilder.class);
+        httpWrapper = getApplicationContext().getBean(HttpWrapper.class);
+        s3PdfUploader = getApplicationContext().getBean(S3PdfUploader.class);
+        mapper = getApplicationContext().getBean(ObjectMapper.class);
+        overallTimeoutSeconds = Integer.parseInt(
+                getApplicationContext().getEnvironment()
+                        .getProperty(TIMEOUT_PROP, String.class)
+                        .orElse("60"));
+        initialized = true;
+    }
 
     @Override
     public SQSBatchResponse execute(SQSEvent event) {
+        ensureInitialized();
+
         int recordCount = event.getRecords() != null ? event.getRecords().size() : 0;
         logger.info(() -> "RedactWorkerHandler — received SQS batch recordCount=" + recordCount);
 

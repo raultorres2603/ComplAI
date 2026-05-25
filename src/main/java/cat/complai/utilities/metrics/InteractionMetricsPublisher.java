@@ -1,17 +1,14 @@
 package cat.complai.utilities.metrics;
 
-import io.micronaut.context.annotation.Value;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
 
-import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.cloudwatch.CloudWatchClient;
 import software.amazon.awssdk.services.cloudwatch.model.Dimension;
 import software.amazon.awssdk.services.cloudwatch.model.MetricDatum;
@@ -55,23 +52,13 @@ public class InteractionMetricsPublisher {
     private final CloudWatchClient cloudWatchClient;
 
     /**
-     * Constructs the publisher with Micronaut-injected config.
+     * Constructs the publisher with an injected CloudWatch client.
      *
-     * @param region     the AWS region (default: eu-west-1)
-     * @param endpointUrl optional LocalStack endpoint override
+     * @param cloudWatchClient the CloudWatch client (produced by AwsClientFactory)
      */
     @jakarta.inject.Inject
-    public InteractionMetricsPublisher(
-            @Value("${aws.cloudwatch.region:eu-west-1}") String region,
-            @Value("${AWS_ENDPOINT_URL:}") String endpointUrl) {
-        var builder = CloudWatchClient.builder()
-                .region(Region.of(region));
-        if (endpointUrl != null && !endpointUrl.isBlank()) {
-            builder.endpointOverride(URI.create(endpointUrl));
-        }
-        this.cloudWatchClient = builder.build();
-        logger.info(() -> "InteractionMetricsPublisher initialized — region=" + region
-                + " endpointUrl=" + (endpointUrl != null && !endpointUrl.isBlank() ? endpointUrl : "default"));
+    public InteractionMetricsPublisher(CloudWatchClient cloudWatchClient) {
+        this.cloudWatchClient = cloudWatchClient;
     }
 
     /**

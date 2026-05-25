@@ -5,7 +5,7 @@ Infrastructure-as-Code for ComplAI using AWS CDK (TypeScript) and Gradle-based J
 ## Overview
 
 This CDK project defines the complete AWS infrastructure for ComplAI:
-- **Compute**: Lambda functions for API and asynchronous workers (Java 25 Micronaut runtime)
+- **Compute**: Lambda functions for API and asynchronous workers (GraalVM native images from Micronaut 4 + Java 25)
 - **API Gateway**: HTTP API (v2) with CORS, throttling, and Lambda integration
 - **Messaging**: SQS queues for async complaint redaction and feedback processing
 - **Storage**: S3 buckets for procedures, events, news, city info, complaints, feedback, and deployments
@@ -26,8 +26,8 @@ This CDK project defines the complete AWS infrastructure for ComplAI:
 
 ### Backend Code
 - Java 25 and Gradle configured
-- Build the fat JAR: `./gradlew clean shadowJar`
-- JAR location: `build/libs/complai-all-*.jar`
+- Build the native image ZIP: `./gradlew clean buildNativeLambda`
+- ZIP location: `build/libs/complai-all-*.zip`
 
 ## Environment Setup
 
@@ -155,10 +155,11 @@ npm run cdk deploy -- ComplAILambdaStackDev --require-approval never
 ### GitHub Actions CI/CD
 
 The GitHub Actions workflow handles:
-1. Building the Java JAR (`./gradlew clean shadowJar`)
-2. Uploading JAR to S3 deployment bucket
-3. Running CDK deploy with GitHub Actions secrets
-4. Two separate deployments: Development and Production
+1. Building the GraalVM native image ZIP (`./gradlew clean buildNativeLambda`)
+2. Uploading the ZIP to S3 deployment bucket
+3. Setting `DEPLOYMENT_JAR_KEY` so CDK uses `Code.fromBucket` (avoids bootstrap bucket staging)
+4. Running CDK deploy with GitHub Actions secrets
+5. Two separate deployments: Development and Production
 
 GitHub Actions passes environment variables to CDK automatically:
 - Secrets are injected as environment variables (e.g., `OPENROUTER_API_KEY`)
@@ -180,9 +181,11 @@ npm run cdk deploy -- --context environment=development
 ## Stacks
 
 ### LambdaStack
-- API Lambda function (HTTP endpoints)
-- Redact worker Lambda (asynchronous complaint processing)
-- Feedback worker Lambda (asynchronous feedback collection)
+- API Lambda function (HTTP endpoints, GraalVM native image, 1024 MB)
+- Redact worker Lambda (asynchronous PDF generation, GraalVM native image, 1024 MB)
+- Feedback worker Lambda (asynchronous feedback collection, GraalVM native image, 256 MB)
+- Ask worker Lambda (Telegram bot answers, GraalVM native image, 512 MB)
+- Scheduled report Lambda (weekly statistics via SES, GraalVM native image, 512 MB)
 - HTTP API Gateway with CORS
 - IAM roles and policies (including SES permissions)
 - CloudWatch log groups and metric filters
@@ -246,13 +249,13 @@ aws sns list-subscriptions-by-topic --topic-arn arn:aws:sns:REGION:ACCOUNT:Compl
 
 ## Troubleshooting
 
-### CDK Deploy Fails - JAR Not Found
+### CDK Deploy Fails - Native ZIP Not Found
 
-**Error**: `Expected build/libs not found at ...`
+**Error**: `build/libs not found` or placeholder warning during synth
 
 **Solution**:
-1. Build the JAR: `./gradlew clean shadowJar`
-2. Verify JAR exists: `ls build/libs/*-all.jar`
+1. Build the native image: `./gradlew clean buildNativeLambda`
+2. Verify ZIP exists: `ls build/libs/*-all.zip`
 3. Deploy again: `npm run cdk deploy`
 
 ### Lambda Function Gets 403 Forbidden

@@ -35,7 +35,7 @@ class EventRagHelperTest {
         // Should return 1 or fewer results (Film Festival match)
         assertTrue(results.size() <= 3, "Should respect max 3 limit");
         // At least one result should be a film event
-        assertTrue(results.stream().anyMatch(e -> e.eventType.contains("Cinema") || e.title.contains("Film")),
+        assertTrue(results.stream().anyMatch(e -> e.eventType().contains("Cinema") || e.title().contains("Film")),
                 "Should find film-related event");
     }
 
@@ -71,7 +71,7 @@ class EventRagHelperTest {
         if (!results.isEmpty()) {
             // First result should be most relevant
             assertNotNull(results.get(0));
-            assertNotNull(results.get(0).title);
+            assertNotNull(results.get(0).title());
         }
     }
 
@@ -84,11 +84,11 @@ class EventRagHelperTest {
         RagHelper.Event event = results.get(0);
 
         // Verify all important fields are preserved
-        assertNotNull(event.eventId);
-        assertNotNull(event.title);
-        assertNotNull(event.url);
-        assertFalse(event.eventId.isBlank());
-        assertFalse(event.title.isBlank());
+        assertNotNull(event.eventId());
+        assertNotNull(event.title());
+        assertNotNull(event.url());
+        assertFalse(event.eventId().isBlank());
+        assertFalse(event.title().isBlank());
     }
 
     // ============================================================================
@@ -130,8 +130,8 @@ class EventRagHelperTest {
         if (!results.isEmpty()) {
             RagHelper.Event firstResult = results.get(0);
             // Verify the top result is meaningful (would be title-focused due to boost)
-            assertTrue(firstResult.title.toLowerCase().contains("festival")
-                    || firstResult.description.toLowerCase().contains("festival"),
+            assertTrue(firstResult.title().toLowerCase().contains("festival")
+                    || firstResult.description().toLowerCase().contains("festival"),
                     "Top result should match the query");
         }
     }
@@ -153,8 +153,8 @@ class EventRagHelperTest {
         // All results should at least have title or description matching the query
         for (RagHelper.Event event : results) {
             assertTrue(
-                    event.title.toLowerCase().contains("event") ||
-                            event.description.toLowerCase().contains("event"),
+                    event.title().toLowerCase().contains("event") ||
+                            event.description().toLowerCase().contains("event"),
                     "All returned results should match the query (relevance threshold applied)");
         }
     }
@@ -175,9 +175,9 @@ class EventRagHelperTest {
             RagHelper.Event topResult = results.get(0);
             // Cinema query should match cinema/film events
             assertTrue(
-                    topResult.eventType.toLowerCase().contains("cinema") ||
-                            topResult.title.toLowerCase().contains("film") ||
-                            topResult.description.toLowerCase().contains("cinema"),
+                    topResult.eventType().toLowerCase().contains("cinema") ||
+                            topResult.title().toLowerCase().contains("film") ||
+                            topResult.description().toLowerCase().contains("cinema"),
                     "Top result should be highly relevant to cinema/film query");
         }
     }
@@ -195,8 +195,8 @@ class EventRagHelperTest {
         RagHelper.Event event = results.get(0);
 
         // eventType was removed from SEARCH_FIELDS but stored (not null)
-        assertNotNull(event.eventType, "eventType field should be accessible even though not indexed");
-        assertFalse(event.eventType.isBlank(), "eventType should have a value");
+        assertNotNull(event.eventType(), "eventType field should be accessible even though not indexed");
+        assertFalse(event.eventType().isBlank(), "eventType should have a value");
     }
 
     @Test
@@ -210,8 +210,8 @@ class EventRagHelperTest {
         RagHelper.Event event = results.get(0);
 
         // location was removed from SEARCH_FIELDS but stored
-        assertNotNull(event.location, "location field should be accessible");
-        assertFalse(event.location.isBlank(), "location should have a value");
+        assertNotNull(event.location(), "location field should be accessible");
+        assertFalse(event.location().isBlank(), "location should have a value");
     }
 
     @Test
@@ -221,9 +221,9 @@ class EventRagHelperTest {
         assertFalse(results.isEmpty());
         assertTrue(results.size() <= 3);
         RagHelper.Event topResult = results.get(0);
-        assertTrue(topResult.eventType.equalsIgnoreCase("Cinema")
-                || topResult.title.toLowerCase().contains("film")
-                || topResult.description.toLowerCase().contains("cinema"));
+        assertTrue(topResult.eventType().equalsIgnoreCase("Cinema")
+                || topResult.title().toLowerCase().contains("film")
+                || topResult.description().toLowerCase().contains("cinema"));
     }
 
     @Test
@@ -231,7 +231,7 @@ class EventRagHelperTest {
         List<RagHelper.Event> results = eventRagHelper.search("  cinèma, film!  ");
 
         assertFalse(results.isEmpty());
-        assertTrue(results.stream().anyMatch(event -> event.eventType.equalsIgnoreCase("Cinema")));
+        assertTrue(results.stream().anyMatch(event -> event.eventType().equalsIgnoreCase("Cinema")));
     }
 
     @Test
@@ -242,7 +242,7 @@ class EventRagHelperTest {
 
         assertEquals(firstResults.size(), secondResults.size());
         if (!firstResults.isEmpty()) {
-            assertEquals(firstResults.get(0).eventId, secondResults.get(0).eventId);
+            assertEquals(firstResults.get(0).eventId(), secondResults.get(0).eventId());
         }
     }
 }

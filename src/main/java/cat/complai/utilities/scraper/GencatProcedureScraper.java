@@ -20,7 +20,15 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import java.util.logging.Logger;
 
 /**
@@ -51,7 +59,7 @@ public class GencatProcedureScraper {
     private static final int CONNECT_TIMEOUT_MS = 60000; // 60 seconds for slow pages
     private static final int MAX_CATEGORY_PAGES = 50; // Limit crawling to prevent timeout
 
-    public static void main(String[] args) throws IOException {
+    static void main(String[] args) throws IOException {
         String bucket = System.getenv("PROCEDURES_BUCKET");
         if (bucket == null || bucket.isBlank()) {
             System.err.println("PROCEDURES_BUCKET environment variable is required.");

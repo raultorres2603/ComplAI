@@ -23,12 +23,21 @@ import java.util.logging.Logger;
 public class FeedbackProcessor {
 
     private final S3FeedbackUploader s3Uploader;
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper;
 
     private final Logger logger = Logger.getLogger(FeedbackProcessor.class.getName());
 
-    public FeedbackProcessor(S3FeedbackUploader s3Uploader) {
+    public FeedbackProcessor(S3FeedbackUploader s3Uploader, ObjectMapper mapper) {
         this.s3Uploader = s3Uploader;
+        this.mapper = mapper;
+    }
+
+    /**
+     * Backward-compatible constructor for tests. Uses a standalone mapper
+     * (safe because tests run in JIT mode, not native image).
+     */
+    public FeedbackProcessor(S3FeedbackUploader s3Uploader) {
+        this(s3Uploader, new ObjectMapper());
     }
 
     /**

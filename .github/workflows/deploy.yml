@@ -1,4 +1,4 @@
-# Workflow for building the Micronaut JAR and deploying via AWS CDK.
+# Workflow for building the Micronaut GraalVM native image and deploying via AWS CDK.
 #
 # Triggers:
 #   - Manual (workflow_dispatch): choose environment (development | production) and branch.
@@ -67,12 +67,15 @@ jobs:
           fi
 
   # ---------------------------------------------------------------------------
-  # Build: compile and test the JAR, then upload it as an artifact.
+  # Build: compile the project and build the GraalVM native image, then upload it as an artifact.
   # ---------------------------------------------------------------------------
   build:
-    name: Build JAR
+    name: Build Native Image
     needs: [guard]
-    runs-on: ubuntu-latest
+    # ARM64 runner required — GraalVM native-image cannot cross-compile under
+    # QEMU emulation (binary syscall-heavy process fails with exit code 126).
+    # The runner natively executes ARM64 Docker containers for buildNativeLambda.
+    runs-on: ubuntu-24.04-arm
     # guard only runs on workflow_dispatch; on pull_request it is skipped.
     # A skipped dependency would block this job, so we explicitly allow both
     # "success" (manual dispatch that passed guard) and "skipped" (PR trigger).
@@ -96,7 +99,7 @@ jobs:
           fi
           echo "Branch '${{ inputs.branch }}' verified."
 
-      - name: Set up JDK 25
+      - name: Set up JDK 25 (needed for JVM compilation before native image)
         uses: actions/setup-java@v4
         with:
           java-version: '25'
@@ -114,17 +117,17 @@ jobs:
         # Fail early if any test fails, before building the deployable artifact.
         run: ./gradlew --no-daemon ciTest
 
-      - name: Build JAR (shadowJar)
-        run: ./gradlew --no-daemon clean shadowJar
+      - name: Build GraalVM native image
+        run: ./gradlew --no-daemon clean buildNativeLambda
 
-      - name: Upload JAR artifact
+      - name: Upload native image artifact
         uses: actions/upload-artifact@v4
         with:
-          name: lambda-jar
-          path: build/libs/*.jar
+          name: lambda-native-zip
+          path: build/libs/*.zip
 
   # ---------------------------------------------------------------------------
-  # Deploy: download the JAR and deploy the correct CDK stack for the target
+  # Deploy: download the native ZIP and deploy the correct CDK stack for the target
   # environment. The GitHub Environment binding is what gates production behind
   # a required manual approval (configured in Settings → Environments).
   # ---------------------------------------------------------------------------
@@ -158,21 +161,21 @@ jobs:
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.branch || github.sha }}
 
-      - name: Download JAR artifact
+      - name: Download native image artifact
         uses: actions/download-artifact@v4
         with:
-          name: lambda-jar
+          name: lambda-native-zip
           path: build/libs
 
-      - name: Verify JAR artifact exists
+      - name: Verify native image artifact exists
         run: |
-          echo "Checking for build/libs/*.jar artifacts..."
-          if ! ls build/libs/*.jar 1>/dev/null 2>&1; then
-            echo "ERROR: No JAR found in build/libs. Ensure the build job produced an artifact." >&2
+          echo "Checking for build/libs/*.zip artifacts..."
+          if ! ls build/libs/*.zip 1>/dev/null 2>&1; then
+            echo "ERROR: No native image ZIP found in build/libs. Ensure the build job produced an artifact." >&2
             exit 1
           fi
           echo "Found artifacts:"
-          ls -1 build/libs/*.jar
+          ls -1 build/libs/*.zip
 
       - name: Verify OPENROUTER_API_KEY is set
         # Do NOT print the key value. Only log that it is present and its length.
@@ -235,7 +238,7 @@ jobs:
           echo "CDK (global) version:" && npx cdk --version || true
 
       # Deploy StorageStack first so the complai-deployments-<env> bucket exists
-      # before we try to upload the JAR. StorageStack no longer exports any values
+      # before we try to upload the native image ZIP. StorageStack no longer exports any values
       # imported by LambdaStack (buckets are resolved via fromBucketName inside
       # LambdaStack), so StorageStack can be updated freely at any time.
       - name: Deploy storage stack
@@ -246,25 +249,22 @@ jobs:
           npx cdk deploy "ComplAIStorageStack-${TARGET_ENV}" \
             --require-approval never
 
-      # Upload the fat JAR to the deployments bucket with a key that includes the
+      # Upload the native image ZIP to the deployments bucket with a key that includes the
       # short git SHA. The unique key is what tells CloudFormation "code changed,
       # update the Lambda function" — without it, a same-key re-upload would be
       # invisible to CloudFormation and the Lambda would not be updated.
-      - name: Upload JAR to deployments bucket
+      - name: Upload native image ZIP to deployments bucket
         env:
           TARGET_ENV: ${{ steps.target.outputs.environment }}
         run: |
           # Bash glob expansion — no dependency on PATH-resolved 'ls' or 'head'.
           CANDIDATE=""
-          for f in build/libs/*-all.jar; do [[ -f "$f" ]] && CANDIDATE="$f" && break; done
+          for f in build/libs/*.zip; do [[ -f "$f" ]] && CANDIDATE="$f" && break; done
           if [[ -z "$CANDIDATE" ]]; then
-            for f in build/libs/*.jar; do [[ -f "$f" ]] && CANDIDATE="$f" && break; done
-          fi
-          if [[ -z "$CANDIDATE" ]]; then
-            echo "ERROR: No usable JAR found in build/libs." >&2
+            echo "ERROR: No usable native image ZIP found in build/libs." >&2
             exit 1
           fi
-          JAR_KEY="complai-all-${GITHUB_SHA::8}.jar"
+          JAR_KEY="complai-all-${GITHUB_SHA::8}.zip"
           aws s3 cp "$CANDIDATE" "s3://complai-deployments-${TARGET_ENV}/${JAR_KEY}"
           echo "Uploaded $(basename "$CANDIDATE") → s3://complai-deployments-${TARGET_ENV}/${JAR_KEY}"
           # Make the key available to the CDK deploy step via the job environment.
@@ -272,7 +272,7 @@ jobs:
 
       # Deploy the Lambda stack. CDK CLI respects addDependency and deploys
       # QueueStack first if it has pending changes. StorageStack is a no-op here
-      # (already deployed above). The JAR is read from S3 via Code.fromBucket()
+      # (already deployed above). The native ZIP is read from S3 via Code.fromBucket()
       # using DEPLOYMENT_JAR_KEY — nothing is staged to the CDK bootstrap bucket.
       - name: Deploy Lambda stack
         env:
@@ -286,7 +286,7 @@ jobs:
           SES_FROM_EMAIL: ${{ vars.SES_FROM_EMAIL }}
           SES_TO_EMAIL_ELPRAT: ${{ vars.SES_TO_EMAIL_ELPRAT }}
           TARGET_ENV: ${{ steps.target.outputs.environment }}
-          # DEPLOYMENT_JAR_KEY is written to $GITHUB_ENV in the Upload JAR step.
+          # DEPLOYMENT_JAR_KEY is written to $GITHUB_ENV in the Upload native image ZIP step.
           # Re-expose it explicitly here so the step contract is obvious.
           DEPLOYMENT_JAR_KEY: ${{ env.DEPLOYMENT_JAR_KEY }}
 

@@ -9,25 +9,8 @@ import { EdgeStack } from '../edge-stack';
 
 const app = new cdk.App();
 
-// Detect destroy command so LambdaStack can skip local JAR artifact validation.
-//
-// Two detection strategies are used together because CDK CLI does NOT pass the
-// subcommand ('destroy') to the app subprocess — it only forwards --output and
-// --context flags.  Relying solely on process.argv therefore never triggers when
-// the app is invoked by the CDK CLI (cdk destroy ...).
-//
-// Strategy 1 — direct invocation (local dev / manual testing):
-//   node dist/bin/cdk.js destroy ...  → 'destroy' appears in process.argv
-// Strategy 2 — CDK CLI invocation (CI / npx cdk destroy):
-//   Set CDK_DESTROY_MODE=1 in the environment before calling cdk destroy.
-//   The CI workflow must export this variable so the app subprocess inherits it.
-//
 // ALL stacks must always be instantiated so CDK can match stack IDs to
 // CloudFormation stacks for any command (deploy, destroy, diff, synth).
-const isDestroyMode =
-  process.argv.slice(2).some((arg) => arg.toLowerCase() === 'destroy') ||
-  process.env.CDK_DESTROY_MODE === '1' ||
-  process.env.CDK_DESTROY_MODE === 'true';
 
 const awsEnv = {
   account: '134267836527',
@@ -80,7 +63,6 @@ for (const environment of environments) {
     redactQueue: queueStack.redactQueue,
     feedbackQueue: queueStack.feedbackQueue,
     askQueue: queueStack.askQueue,
-    isDestroyMode,
     env: awsEnv,
     crossRegionReferences: true,
   });

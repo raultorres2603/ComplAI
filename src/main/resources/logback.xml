@@ -12,14 +12,6 @@
         </encoder>
     </appender>
 
-    <!--
-        Route java.util.logging to SLF4J (JUL-to-SLF4J bridge).
-        This ensures that existing java.util.logging calls also get cityId via SLF4J MDC.
-    -->
-    <contextListener class="ch.qos.logback.classic.jul.LevelChangePropagator">
-        <resetJUL>true</resetJUL>
-    </contextListener>
-
     <logger name="cat.complai" level="INFO"/>
     <logger name="io.micronaut" level="INFO"/>
     <logger name="software.amazon.awssdk" level="WARN"/>

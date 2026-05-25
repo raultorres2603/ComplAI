@@ -1,11 +1,13 @@
 package cat.complai.helpers.openrouter;
 
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.text.PDFTextStripper;
-import org.junit.jupiter.api.Assertions;
+import com.lowagie.text.pdf.PdfReader;
+import com.lowagie.text.pdf.parser.PdfTextExtractor;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PdfGeneratorTest {
 
@@ -14,23 +16,29 @@ class PdfGeneratorTest {
         String text = "This is a test complaint.\nIt has multiple lines.\nAnd even more lines.";
         byte[] pdfBytes = PdfGenerator.generatePdf(text);
 
-        Assertions.assertNotNull(pdfBytes);
-        Assertions.assertTrue(pdfBytes.length > 0);
+        assertNotNull(pdfBytes);
+        assertTrue(pdfBytes.length > 0);
 
         // Load document and extract text to verify content
-        try (PDDocument doc = PDDocument.load(pdfBytes)) {
-            PDFTextStripper stripper = new PDFTextStripper();
-            String extracted = stripper.getText(doc);
+        try (PdfReader reader = new PdfReader(pdfBytes)) {
+            PdfTextExtractor extractor = new PdfTextExtractor(reader);
+            StringBuilder sb = new StringBuilder();
+            for (int i = 1; i <= reader.getNumberOfPages(); i++) {
+                sb.append(extractor.getTextFromPage(i));
+            }
+            String extracted = sb.toString();
 
             System.out.println("Extracted text:\n" + extracted);
 
-            Assertions.assertTrue(extracted.contains("This is a test complaint."));
+            assertTrue(extracted.contains("This is a test complaint."),
+                    "PDF should contain the complaint text");
         }
     }
 
     @Test
     void testGeneratePdf_catalanCharacters() throws IOException {
-        // Realistic Catalan complaint letter — exercises diacritics (à, é, è, ò, ú, ç, ï, l·l)
+        // Realistic Catalan complaint letter — exercises diacritics
+        // (à, é, è, ò, ú, ç, ï, l·l)
         String text = """
                 Benvolgut/da Alcalde/ssa de l'Ajuntament d'El Prat de Llobregat,
 
@@ -46,24 +54,29 @@ class PdfGeneratorTest {
 
         byte[] pdfBytes = PdfGenerator.generatePdf(text);
 
-        Assertions.assertNotNull(pdfBytes);
-        Assertions.assertTrue(pdfBytes.length > 0);
+        assertNotNull(pdfBytes);
+        assertTrue(pdfBytes.length > 0);
 
-        try (PDDocument doc = PDDocument.load(pdfBytes)) {
-            PDFTextStripper stripper = new PDFTextStripper();
-            String extracted = stripper.getText(doc);
+        try (PdfReader reader = new PdfReader(pdfBytes)) {
+            PdfTextExtractor extractor = new PdfTextExtractor(reader);
+            StringBuilder sb = new StringBuilder();
+            for (int i = 1; i <= reader.getNumberOfPages(); i++) {
+                sb.append(extractor.getTextFromPage(i));
+            }
+            String extracted = sb.toString();
 
-            Assertions.assertTrue(extracted.contains("Benvolgut/da"), "PDF should contain greeting");
-            Assertions.assertTrue(extracted.contains("Ajuntament"), "PDF should contain Ajuntament");
-            Assertions.assertTrue(extracted.contains("Un veí preocupat"), "PDF should contain sign-off");
-            Assertions.assertTrue(extracted.contains("necessàries"), "PDF should contain necessàries (à)");
+            assertTrue(extracted.contains("Benvolgut/da"), "PDF should contain greeting");
+            assertTrue(extracted.contains("Ajuntament"), "PDF should contain Ajuntament");
+            assertTrue(extracted.contains("Un veí preocupat"), "PDF should contain sign-off");
+            assertTrue(extracted.contains("necessàries"), "PDF should contain necessàries (à)");
         }
     }
 
     @Test
     void testGeneratePdf_realisticAiResponseBody() throws IOException {
         // Simulates the parsed body after AiParsed strips the JSON header.
-        // The AI typically leaves a blank line between the header and the letter body.
+        // The AI typically leaves a blank line between the header and the letter
+        // body.
         // After AiParsed.trim(), the body starts directly with the letter text.
         String parsedBody = """
                 Estimat/da Senyor/a,
@@ -76,18 +89,20 @@ class PdfGeneratorTest {
 
         byte[] pdfBytes = PdfGenerator.generatePdf(parsedBody);
 
-        Assertions.assertNotNull(pdfBytes);
-        Assertions.assertTrue(pdfBytes.length > 0);
+        assertNotNull(pdfBytes);
+        assertTrue(pdfBytes.length > 0);
 
-        try (PDDocument doc = PDDocument.load(pdfBytes)) {
-            PDFTextStripper stripper = new PDFTextStripper();
-            String extracted = stripper.getText(doc);
+        try (PdfReader reader = new PdfReader(pdfBytes)) {
+            PdfTextExtractor extractor = new PdfTextExtractor(reader);
+            StringBuilder sb = new StringBuilder();
+            for (int i = 1; i <= reader.getNumberOfPages(); i++) {
+                sb.append(extractor.getTextFromPage(i));
+            }
+            String extracted = sb.toString();
 
-
-            Assertions.assertTrue(extracted.contains("Estimat/da Senyor/a"), "PDF should contain greeting");
-            Assertions.assertTrue(extracted.contains("Ajuntament"), "PDF should contain Ajuntament");
-            Assertions.assertTrue(extracted.contains("Raul Torres"), "PDF should contain signature");
+            assertTrue(extracted.contains("Estimat/da Senyor/a"), "PDF should contain greeting");
+            assertTrue(extracted.contains("Ajuntament"), "PDF should contain Ajuntament");
+            assertTrue(extracted.contains("Raul Torres"), "PDF should contain signature");
         }
     }
 }
-

@@ -202,10 +202,10 @@ class ProcedureContextServiceAmbiguityTest {
                 ragContextBuilder.buildProcedureContextResultForId("proc-1", CITY);
 
         assertNotNull(result);
-        assertEquals("CONTEXT BLOCK", result.getContextBlock());
-        assertEquals(1, result.getSources().size());
-        assertEquals("https://example.com/proc-1", result.getSources().get(0).getUrl());
-        assertEquals("Llicència d'obres menors", result.getSources().get(0).getTitle());
+        assertEquals("CONTEXT BLOCK", result.contextBlock());
+        assertEquals(1, result.sources().size());
+        assertEquals("https://example.com/proc-1", result.sources().get(0).getUrl());
+        assertEquals("Llicència d'obres menors", result.sources().get(0).getTitle());
     }
 
     @Test
@@ -217,7 +217,7 @@ class ProcedureContextServiceAmbiguityTest {
                 ragContextBuilder.buildProcedureContextResultForId("proc-unknown", CITY);
 
         assertNotNull(result);
-        assertNull(result.getContextBlock());
-        assertTrue(result.getSources().isEmpty());
+        assertNull(result.contextBlock());
+        assertTrue(result.sources().isEmpty());
     }
 }

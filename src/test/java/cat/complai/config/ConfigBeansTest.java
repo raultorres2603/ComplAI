@@ -94,15 +94,15 @@ class ConfigBeansTest {
         @DisplayName("ISesRecipientProvider returns recipient email")
         void implementsISesRecipientProvider() {
             SesConfiguration config = new SesConfiguration("f@t.com", "eu-west-1", "r@t.com");
-            assertEquals("r@t.com", ((ISesRecipientProvider) config).getRecipientEmail());
+            assertEquals("r@t.com", config.getRecipientEmail());
         }
 
         @Test
         @DisplayName("ISesSenderConfig returns from email and region")
         void implementsISesSenderConfig() {
             SesConfiguration config = new SesConfiguration("f@t.com", "eu-west-1", "r@t.com");
-            assertEquals("f@t.com", ((ISesSenderConfig) config).getFromEmail());
-            assertEquals("eu-west-1", ((ISesSenderConfig) config).getRegion());
+            assertEquals("f@t.com", config.getFromEmail());
+            assertEquals("eu-west-1", config.getRegion());
         }
     }
 

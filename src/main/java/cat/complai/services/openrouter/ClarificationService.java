@@ -10,7 +10,15 @@ import cat.complai.services.openrouter.conversation.ConversationManagementServic
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import java.text.Normalizer;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.Set;
 
 /**
  * Handles ambiguity detection and resolution for procedure queries.
@@ -58,7 +66,7 @@ public class ClarificationService {
                     AmbiguityDetector.getTopCandidates(response, 3).stream()
                             .filter(sr -> isCandidateRelevantToQuery(sr.source(), question))
                             .map(sr -> new ConversationManagementService.ClarificationCandidate(
-                                    sr.source().procedureId, sr.source().title))
+                                    sr.source().procedureId(), sr.source().title()))
                             .toList();
             if (candidates.size() < 2) {
                 return Optional.empty();
@@ -132,8 +140,8 @@ public class ClarificationService {
             return false;
         }
         Set<String> candidateTokens = new LinkedHashSet<>();
-        candidateTokens.addAll(tokenizeForRelevance(procedure.title));
-        candidateTokens.addAll(tokenizeForRelevance(procedure.description));
+        candidateTokens.addAll(tokenizeForRelevance(procedure.title()));
+        candidateTokens.addAll(tokenizeForRelevance(procedure.description()));
         for (String token : queryTokens) {
             if (candidateTokens.contains(token)) {
                 return true;

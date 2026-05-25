@@ -5,12 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.context.annotation.Value;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
-import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.sqs.SqsClient;
-import software.amazon.awssdk.services.sqs.SqsClientBuilder;
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
-
-import java.net.URI;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -37,15 +33,11 @@ public class SqsAskPublisher {
     @Inject
     public SqsAskPublisher(
             @Value("${ASK_QUEUE_URL:}") String queueUrl,
-            @Value("${COMPLAINTS_REGION:eu-west-1}") String region,
-            @Value("${AWS_ENDPOINT_URL:}") String endpointUrl) {
+            SqsClient sqsClient,
+            ObjectMapper mapper) {
         this.queueUrl = queueUrl;
-        this.mapper   = new ObjectMapper();
-        SqsClientBuilder builder = SqsClient.builder().region(Region.of(region));
-        if (endpointUrl != null && !endpointUrl.isBlank()) {
-            builder.endpointOverride(URI.create(endpointUrl));
-        }
-        this.sqsClient = builder.build();
+        this.mapper   = mapper;
+        this.sqsClient = sqsClient;
     }
 
     /**

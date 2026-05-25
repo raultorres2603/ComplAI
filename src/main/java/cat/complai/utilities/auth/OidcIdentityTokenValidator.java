@@ -78,8 +78,8 @@ public class OidcIdentityTokenValidator {
     private final Map<String, CityValidationContext> cityContexts;
 
     @Inject
-    public OidcIdentityTokenValidator() {
-        Map<String, OidcConfig> mapping = loadMapping();
+    public OidcIdentityTokenValidator(ObjectMapper objectMapper) {
+        Map<String, OidcConfig> mapping = loadMapping(objectMapper);
         Map<String, CityValidationContext> contexts = new HashMap<>(mapping.size());
         for (Map.Entry<String, OidcConfig> entry : mapping.entrySet()) {
             String cityId = entry.getKey();
@@ -198,13 +198,13 @@ public class OidcIdentityTokenValidator {
     // Private helpers
     // -------------------------------------------------------------------------
 
-    private static Map<String, OidcConfig> loadMapping() {
+    private static Map<String, OidcConfig> loadMapping(ObjectMapper mapper) {
         try (InputStream is = OidcIdentityTokenValidator.class.getClassLoader()
                 .getResourceAsStream("oidc/oidc-mapping.json")) {
             if (is == null) {
                 throw new IllegalStateException("oidc-mapping.json not found on classpath");
             }
-            return new ObjectMapper().readValue(is, new TypeReference<>() {});
+            return mapper.readValue(is, new TypeReference<>() {});
         } catch (IllegalStateException e) {
             throw e;
         } catch (Exception e) {

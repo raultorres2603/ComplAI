@@ -1,6 +1,20 @@
 plugins {
-    id("io.micronaut.minimal.application") version "4.6.1"
-    id("com.gradleup.shadow") version "8.3.9"
+    id("io.micronaut.application") version "4.6.2"
+    // Shadow plugin for building fat JARs — needed by sam/start-local.sh for local
+    // development. The Micronaut plugin with runtime("lambda_provided") assumes
+    // native image and does not apply Shadow automatically. We add it explicitly
+    // so `./gradlew shadowJar` produces build/libs/complai-all.jar for SAM local.
+    // Not used in production (CI deploys GraalVM native images via buildNativeLambda).
+    id("com.gradleup.shadow") version "9.0.0-beta4"
+}
+
+// Configure the shadow JAR to match the SAM template expectation
+// (complai-all.jar without version number) and merge Micronaut service files.
+tasks.named("shadowJar", com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar) {
+    archiveBaseName.set("complai")
+    archiveVersion.set("")
+    archiveClassifier.set("all")
+    mergeServiceFiles()
 }
 
 version = "1.0.0"
@@ -15,8 +29,8 @@ dependencies {
     testImplementation("org.mockito:mockito-inline:5.2.0")
     testImplementation("org.mockito:mockito-junit-jupiter:5.2.0")
     implementation("com.amazonaws:aws-lambda-java-events")
-    implementation("software.amazon.awssdk:cloudwatchlogs:2.25.x") // Use the latest 2.x version
-    implementation("software.amazon.awssdk:cloudwatch:2.25.x") // CloudWatch Metrics (putMetricData, getMetricStatistics)
+    implementation("software.amazon.awssdk:cloudwatchlogs")
+    implementation("software.amazon.awssdk:cloudwatch")
     implementation("io.micronaut:micronaut-http-client")
     implementation("io.micronaut.email:micronaut-email-amazon-ses")
     // Reactor support for SSE streaming on @Client interfaces (Publisher<String> return type)
@@ -37,14 +51,22 @@ dependencies {
     // Jackson Joda module — required for ScheduledEvent deserialization (time field uses org.joda.time.DateTime)
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-joda:2.17.2")
 
-    // PDF generation
-    implementation("org.apache.pdfbox:pdfbox:2.0.29")
+    // PDF generation — OpenPDF replaces PDFBox because PDFBox requires AWT native
+    // libraries (libawt) which are unavailable in GraalVM native-image on Lambda.
+    // OpenPDF has zero AWT dependency and works reliably in native-image environments.
+    implementation("com.github.librepdf:openpdf:2.0.5")
 
     // Jsoup for HTML parsing
     implementation("org.jsoup:jsoup:1.17.2")
     // AWS SDK for S3 and SQS integration
-    implementation("software.amazon.awssdk:s3:2.25.18")
-    implementation("software.amazon.awssdk:sqs:2.25.18")
+    implementation("software.amazon.awssdk:s3")
+    implementation("software.amazon.awssdk:sqs")
+
+    // GraalVM native image support
+    implementation("io.micronaut:micronaut-graal")
+    implementation("io.micronaut.aws:micronaut-function-aws-custom-runtime")
+    implementation("io.micronaut.aws:micronaut-aws-sdk-v2")
+    implementation("software.amazon.awssdk:url-connection-client")
 
     // JJWT — used by OidcIdentityTokenValidator for OIDC/JWK validation (HS256 JWT auth was removed).
     // jjwt-api is the compile-time dependency; impl and jackson are runtime-only.
@@ -121,6 +143,19 @@ tasks.register('ciTest', Test) {
     classpath = sourceSets.test.runtimeClasspath
 }
 
-tasks.named('shadowJar') {
-    archiveFileName.set('complai-all.jar')
+graalvmNative {
+    binaries {
+        main {
+            imageName.set("complai")
+            buildArgs.add("--no-fallback")
+            buildArgs.add("--enable-url-protocols=http,https")
+            buildArgs.add("-H:+AddAllCharsets")
+            buildArgs.add("-H:+ReportExceptionStackTraces")
+        }
+    }
+}
+
+tasks.named("dockerfileNative", io.micronaut.gradle.docker.NativeImageDockerfile) {
+    graalArch.set("aarch64")
+    args("-Xmx64m")
 }

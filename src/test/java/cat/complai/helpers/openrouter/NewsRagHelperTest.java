@@ -18,7 +18,7 @@ class NewsRagHelperTest {
 
         assertFalse(results.isEmpty());
         assertTrue(results.size() <= 3);
-        assertEquals("TestCity launches new recycling campaign", results.get(0).title);
+        assertEquals("TestCity launches new recycling campaign", results.get(0).title());
     }
 
     @Test

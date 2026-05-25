@@ -14,7 +14,7 @@ class SseChunkParserTest {
 
     @Test
     void parseDelta_doneSentinel_returnsNull() {
-        assertEquals(null, SseChunkParser.parseDelta("data: [DONE]"));
+        assertNull(SseChunkParser.parseDelta("data: [DONE]"));
     }
 
     @Test

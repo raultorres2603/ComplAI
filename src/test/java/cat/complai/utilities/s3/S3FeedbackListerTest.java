@@ -55,8 +55,8 @@ class S3FeedbackListerTest {
         List<FeedbackFileEntry> result = lister.listFeedbackFiles("elprat");
 
         assertEquals(2, result.size());
-        assertEquals("fb-001.json", result.get(0).getFileName());
-        assertEquals("https://example.com/fb-001.json", result.get(0).getUrl());
+        assertEquals("fb-001.json", result.get(0).fileName());
+        assertEquals("https://example.com/fb-001.json", result.get(0).url());
     }
 
     @Test
@@ -80,15 +80,15 @@ class S3FeedbackListerTest {
         List<FeedbackFileEntry> result = lister.listAllFeedbackFiles();
 
         assertEquals(2, result.size());
-        assertEquals("elprat/fb-001.json", result.get(0).getFileName());
+        assertEquals("elprat/fb-001.json", result.get(0).fileName());
     }
 
     @Test
     void feedbackFileEntry_storesFileNameAndUrl() {
         FeedbackFileEntry entry = new FeedbackFileEntry("test-file.json", "https://example.com/test-file.json");
 
-        assertEquals("test-file.json", entry.getFileName());
-        assertEquals("https://example.com/test-file.json", entry.getUrl());
+        assertEquals("test-file.json", entry.fileName());
+        assertEquals("https://example.com/test-file.json", entry.url());
     }
 
     @Test

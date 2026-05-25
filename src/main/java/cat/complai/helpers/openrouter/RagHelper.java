@@ -47,29 +47,20 @@ public class RagHelper<T> {
 
     /**
      * A single event loaded from the JSON knowledge base.
+     *
+     * @param eventId        Unique identifier for this event.
+     * @param title          Event title.
+     * @param description    Event description.
+     * @param eventType      Event type (e.g. "concert", "exhibition").
+     * @param targetAudience Target audience (e.g. "families", "adults").
+     * @param date           Event date.
+     * @param time           Event time.
+     * @param location       Event location.
+     * @param theme          Event theme or category.
+     * @param url            Canonical URL of the event page.
      */
-    public static class Event {
-        /** Unique identifier for this event. */
-        public final String eventId;
-        /** Event title. */
-        public final String title;
-        /** Event description. */
-        public final String description;
-        /** Event type (e.g. "concert", "exhibition"). */
-        public final String eventType;
-        /** Target audience (e.g. "families", "adults"). */
-        public final String targetAudience;
-        /** Event date. */
-        public final String date;
-        /** Event time. */
-        public final String time;
-        /** Event location. */
-        public final String location;
-        /** Event theme or category. */
-        public final String theme;
-        /** Canonical URL of the event page. */
-        public final String url;
-
+        public record Event(String eventId, String title, String description, String eventType, String targetAudience,
+                            String date, String time, String location, String theme, String url) {
         /**
          * Constructs an {@code Event} entry.
          *
@@ -84,43 +75,24 @@ public class RagHelper<T> {
          * @param theme          event theme or category
          * @param url            canonical URL
          */
-        public Event(String eventId, String title, String description, String eventType,
-                String targetAudience, String date, String time, String location,
-                String theme, String url) {
-            this.eventId = eventId;
-            this.title = title;
-            this.description = description;
-            this.eventType = eventType;
-            this.targetAudience = targetAudience;
-            this.date = date;
-            this.time = time;
-            this.location = location;
-            this.theme = theme;
-            this.url = url;
+        public Event {
         }
-    }
+        }
 
     /**
      * A single news article loaded from the JSON knowledge base.
+     *
+     * @param newsId      Unique identifier for this news article.
+     * @param title       Article headline.
+     * @param summary     Short summary of the article.
+     * @param body        Full body text of the article.
+     * @param publishedAt ISO-8601 publication timestamp.
+     * @param categories  Comma-separated categories.
+     * @param author      Author name, if available.
+     * @param url         Canonical URL of the article.
      */
-    public static class News {
-        /** Unique identifier for this news article. */
-        public final String newsId;
-        /** Article headline. */
-        public final String title;
-        /** Short summary of the article. */
-        public final String summary;
-        /** Full body text of the article. */
-        public final String body;
-        /** ISO-8601 publication timestamp. */
-        public final String publishedAt;
-        /** Comma-separated categories. */
-        public final String categories;
-        /** Author name, if available. */
-        public final String author;
-        /** Canonical URL of the article. */
-        public final String url;
-
+        public record News(String newsId, String title, String summary, String body, String publishedAt, String categories,
+                           String author, String url) {
         /**
          * Constructs a {@code News} article entry.
          *
@@ -133,38 +105,23 @@ public class RagHelper<T> {
          * @param author      author name
          * @param url         canonical URL
          */
-        public News(String newsId, String title, String summary, String body, String publishedAt,
-                String categories, String author, String url) {
-            this.newsId = newsId;
-            this.title = title;
-            this.summary = summary;
-            this.body = body;
-            this.publishedAt = publishedAt;
-            this.categories = categories;
-            this.author = author;
-            this.url = url;
+        public News {
         }
-    }
+        }
 
     /**
      * A single city-information document loaded from the JSON knowledge base.
+     *
+     * @param cityInfoId  Unique identifier for this city-info entry.
+     * @param theme       Theme or category of the page (e.g. "tourism", "services").
+     * @param title       Page title.
+     * @param summary     Short summary of the page content.
+     * @param body        Full body text of the page.
+     * @param breadcrumbs Breadcrumb navigation path.
+     * @param url         Canonical URL of the source page.
      */
-    public static class CityInfo {
-        /** Unique identifier for this city-info entry. */
-        public final String cityInfoId;
-        /** Theme or category of the page (e.g. "tourism", "services"). */
-        public final String theme;
-        /** Page title. */
-        public final String title;
-        /** Short summary of the page content. */
-        public final String summary;
-        /** Full body text of the page. */
-        public final String body;
-        /** Breadcrumb navigation path. */
-        public final String breadcrumbs;
-        /** Canonical URL of the source page. */
-        public final String url;
-
+        public record CityInfo(String cityInfoId, String theme, String title, String summary, String body,
+                               String breadcrumbs, String url) {
         /**
          * Constructs a {@code CityInfo} entry.
          *
@@ -176,55 +133,35 @@ public class RagHelper<T> {
          * @param breadcrumbs breadcrumb navigation path
          * @param url         canonical URL
          */
-        public CityInfo(String cityInfoId, String theme, String title, String summary,
-                String body, String breadcrumbs, String url) {
-            this.cityInfoId = cityInfoId;
-            this.theme = theme;
-            this.title = title;
-            this.summary = summary;
-            this.body = body;
-            this.breadcrumbs = breadcrumbs;
-            this.url = url;
+        public CityInfo {
         }
-    }
+        }
 
     /**
      * A single municipal procedure loaded from the JSON knowledge base.
+     *
+     * @param procedureId  Unique identifier for this procedure.
+     * @param title        Procedure title.
+     * @param description  Short description of the procedure.
+     * @param requirements Requirements to fulfil before starting the procedure.
+     * @param steps        Step-by-step instructions.
+     * @param url          Canonical URL of the procedure page.
      */
-    public static class Procedure {
-        /** Unique identifier for this procedure. */
-        public final String procedureId;
-        /** Procedure title. */
-        public final String title;
-        /** Short description of the procedure. */
-        public final String description;
-        /** Requirements to fulfil before starting the procedure. */
-        public final String requirements;
-        /** Step-by-step instructions. */
-        public final String steps;
-        /** Canonical URL of the procedure page. */
-        public final String url;
-
+        public record Procedure(String procedureId, String title, String description, String requirements, String steps,
+                                String url) {
         /**
          * Constructs a {@code Procedure} entry.
          *
-         * @param procedureId unique identifier
-         * @param title       procedure title
-         * @param description short description
+         * @param procedureId  unique identifier
+         * @param title        procedure title
+         * @param description  short description
          * @param requirements pre-requisites
-         * @param steps       step-by-step instructions
-         * @param url         canonical URL
+         * @param steps        step-by-step instructions
+         * @param url          canonical URL
          */
-        public Procedure(String procedureId, String title, String description, String requirements, String steps,
-                String url) {
-            this.procedureId = procedureId;
-            this.title = title;
-            this.description = description;
-            this.requirements = requirements;
-            this.steps = steps;
-            this.url = url;
+        public Procedure {
         }
-    }
+        }
 
     // =========================================================================
     // Domain configuration

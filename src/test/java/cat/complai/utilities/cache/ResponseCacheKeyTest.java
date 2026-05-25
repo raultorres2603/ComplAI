@@ -136,7 +136,7 @@ class ResponseCacheKeyTest {
         ResponseCacheKey key1 = new ResponseCacheKey("city1", 12345, 67890, QuestionCategory.ADMINISTRATION, 0);
         ResponseCacheKey key2 = new ResponseCacheKey("city2", 12345, 67890, QuestionCategory.ADMINISTRATION, 0);
 
-        assertFalse(key1.equals(key2), "Different keys should not be equal");
+        assertNotEquals(key1, key2, "Different keys should not be equal");
     }
 
     @Test

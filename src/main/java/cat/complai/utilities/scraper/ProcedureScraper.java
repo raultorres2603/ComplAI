@@ -18,7 +18,16 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import java.util.logging.Logger;
 
 /**
@@ -49,7 +58,7 @@ public class ProcedureScraper {
     private static final String MAPPING_RESOURCE_PATTERN = "/scrapers/procedures-mapping-%s.json";
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    public static void main(String[] args) throws IOException {
+    static void main(String[] args) throws IOException {
         if (args.length != 1 || args[0].isBlank()) {
             System.err.println("Usage: ProcedureScraper <cityId>");
             System.err.println("  cityId — must match a procedures-mapping-<cityId>.json in resources/scrapers");

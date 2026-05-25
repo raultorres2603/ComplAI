@@ -41,7 +41,7 @@ class FeedbackPublisherServiceTest {
         FeedbackRequest request = new FeedbackRequest(null, "12345678A", "message");
         FeedbackResult result = publisher.publishFeedback(request, "elprat");
 
-        assertTrue(result instanceof FeedbackResult.Error);
+        assertInstanceOf(FeedbackResult.Error.class, result);
         FeedbackResult.Error error = (FeedbackResult.Error) result;
         assertEquals(FeedbackErrorCode.VALIDATION, error.errorCode());
         assertTrue(error.message().contains("userName"));
@@ -54,7 +54,7 @@ class FeedbackPublisherServiceTest {
         FeedbackRequest request = new FeedbackRequest("  ", "12345678A", "message");
         FeedbackResult result = publisher.publishFeedback(request, "elprat");
 
-        assertTrue(result instanceof FeedbackResult.Error);
+        assertInstanceOf(FeedbackResult.Error.class, result);
         FeedbackResult.Error error = (FeedbackResult.Error) result;
         assertEquals(FeedbackErrorCode.VALIDATION, error.errorCode());
     }
@@ -66,7 +66,7 @@ class FeedbackPublisherServiceTest {
         FeedbackRequest request = new FeedbackRequest("Joan Garcia", null, "message");
         FeedbackResult result = publisher.publishFeedback(request, "elprat");
 
-        assertTrue(result instanceof FeedbackResult.Error);
+        assertInstanceOf(FeedbackResult.Error.class, result);
         FeedbackResult.Error error = (FeedbackResult.Error) result;
         assertEquals(FeedbackErrorCode.VALIDATION, error.errorCode());
         assertTrue(error.message().contains("idUser"));
@@ -79,7 +79,7 @@ class FeedbackPublisherServiceTest {
         FeedbackRequest request = new FeedbackRequest("Joan Garcia", "", "message");
         FeedbackResult result = publisher.publishFeedback(request, "elprat");
 
-        assertTrue(result instanceof FeedbackResult.Error);
+        assertInstanceOf(FeedbackResult.Error.class, result);
         FeedbackResult.Error error = (FeedbackResult.Error) result;
         assertEquals(FeedbackErrorCode.VALIDATION, error.errorCode());
     }
@@ -91,7 +91,7 @@ class FeedbackPublisherServiceTest {
         FeedbackRequest request = new FeedbackRequest("Joan Garcia", "12345678A", null);
         FeedbackResult result = publisher.publishFeedback(request, "elprat");
 
-        assertTrue(result instanceof FeedbackResult.Error);
+        assertInstanceOf(FeedbackResult.Error.class, result);
         FeedbackResult.Error error = (FeedbackResult.Error) result;
         assertEquals(FeedbackErrorCode.VALIDATION, error.errorCode());
         assertTrue(error.message().contains("message"));
@@ -104,7 +104,7 @@ class FeedbackPublisherServiceTest {
         FeedbackRequest request = new FeedbackRequest("Joan Garcia", "12345678A", "\t\n");
         FeedbackResult result = publisher.publishFeedback(request, "elprat");
 
-        assertTrue(result instanceof FeedbackResult.Error);
+        assertInstanceOf(FeedbackResult.Error.class, result);
         FeedbackResult.Error error = (FeedbackResult.Error) result;
         assertEquals(FeedbackErrorCode.VALIDATION, error.errorCode());
     }
@@ -139,7 +139,7 @@ class FeedbackPublisherServiceTest {
         FeedbackRequest request = new FeedbackRequest("Joan Garcia", "12345678A", "Noise from airport");
         FeedbackResult result = publisher.publishFeedback(request, "elprat");
 
-        assertTrue(result instanceof FeedbackResult.Success);
+        assertInstanceOf(FeedbackResult.Success.class, result);
         FeedbackResult.Success success = (FeedbackResult.Success) result;
         FeedbackAcceptedDto dto = success.data();
         assertNotNull(dto.feedbackId());
@@ -153,7 +153,7 @@ class FeedbackPublisherServiceTest {
 
         FeedbackResult result = publisher.publishFeedback(null, "elprat");
 
-        assertTrue(result instanceof FeedbackResult.Error);
+        assertInstanceOf(FeedbackResult.Error.class, result);
         FeedbackResult.Error error = (FeedbackResult.Error) result;
         assertEquals(FeedbackErrorCode.VALIDATION, error.errorCode());
     }
@@ -168,7 +168,7 @@ class FeedbackPublisherServiceTest {
 
         // Logging is implicitly tested by the implementation
         // We verify the error was caught with the right code
-        assertTrue(result instanceof FeedbackResult.Error);
+        assertInstanceOf(FeedbackResult.Error.class, result);
     }
 
     @Test
@@ -178,7 +178,7 @@ class FeedbackPublisherServiceTest {
         FeedbackRequest request = new FeedbackRequest("a".repeat(201), "12345678A", "message");
         FeedbackResult result = publisher.publishFeedback(request, "elprat");
 
-        assertTrue(result instanceof FeedbackResult.Error);
+        assertInstanceOf(FeedbackResult.Error.class, result);
         FeedbackResult.Error error = (FeedbackResult.Error) result;
         assertEquals(FeedbackErrorCode.VALIDATION, error.errorCode());
         assertTrue(error.message().contains("userName"));
@@ -191,7 +191,7 @@ class FeedbackPublisherServiceTest {
         FeedbackRequest request = new FeedbackRequest("Joan Garcia", "a".repeat(51), "message");
         FeedbackResult result = publisher.publishFeedback(request, "elprat");
 
-        assertTrue(result instanceof FeedbackResult.Error);
+        assertInstanceOf(FeedbackResult.Error.class, result);
         FeedbackResult.Error error = (FeedbackResult.Error) result;
         assertEquals(FeedbackErrorCode.VALIDATION, error.errorCode());
         assertTrue(error.message().contains("idUser"));
@@ -204,7 +204,7 @@ class FeedbackPublisherServiceTest {
         FeedbackRequest request = new FeedbackRequest("Joan Garcia", "12345678A", "a".repeat(5001));
         FeedbackResult result = publisher.publishFeedback(request, "elprat");
 
-        assertTrue(result instanceof FeedbackResult.Error);
+        assertInstanceOf(FeedbackResult.Error.class, result);
         FeedbackResult.Error error = (FeedbackResult.Error) result;
         assertEquals(FeedbackErrorCode.VALIDATION, error.errorCode());
         assertTrue(error.message().contains("message"));

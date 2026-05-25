@@ -293,7 +293,7 @@ class StadisticsServiceTest {
         void calculateComparison_previousAndCurrent_returnsCorrectDiff() {
             ComparisonData askComparison = new ComparisonData(
                 10 - 5,
-                ((double) (10 - 5) / 5) * 100.0
+                    100.0
             );
 
             assertEquals(5, askComparison.getAbsoluteDifference());

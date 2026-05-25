@@ -31,6 +31,6 @@ class DeterministicQueryExpansionTest {
 
         assertEquals(2, frequency.get("a"));
         assertEquals(1, frequency.get("b"));
-        assertTrue(frequency.size() == 2);
+        assertEquals(2, frequency.size());
     }
 }

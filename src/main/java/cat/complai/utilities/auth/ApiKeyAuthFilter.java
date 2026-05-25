@@ -103,7 +103,7 @@ public class ApiKeyAuthFilter {
         return null;
     }
 
-    private boolean isExcluded(HttpRequest<?> request) {
+    private static boolean isExcluded(HttpRequest<?> request) {
         String path = request.getPath();
         HttpMethod method = request.getMethod();
 

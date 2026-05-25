@@ -7,7 +7,6 @@ import com.amazonaws.services.lambda.runtime.events.SQSBatchResponse;
 import com.amazonaws.services.lambda.runtime.events.SQSEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.function.aws.MicronautRequestHandler;
-import jakarta.inject.Inject;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,23 +20,33 @@ import java.util.logging.Logger;
  * concerns itself with DI wiring and SQS batch-item-failure reporting. This separation also
  * makes the core logic unit-testable without starting a Micronaut application context.
  *
- * <p>Failures are reported as batch item failures so SQS retries only the failed records
- * (up to {@code maxReceiveCount} times before routing to the DLQ).
+ * <p>Beans are resolved lazily from {@link #getApplicationContext()} rather than via
+ * {@code @Inject} fields. Field-level injection uses {@code Class.getDeclaredField()}
+ * internally, which requires explicit GraalVM reflection registration and is fragile in
+ * native images. Looking beans up directly from the context is the safe equivalent.
  */
 public class AskWorkerHandler extends MicronautRequestHandler<SQSEvent, SQSBatchResponse> {
 
     private static final Logger logger = Logger.getLogger(AskWorkerHandler.class.getName());
 
-    @Inject
+    // Lazily initialised from getApplicationContext() — see ensureInitialized().
     private IOpenRouterService openRouterService;
-
-    @Inject
     private TelegramConfiguration telegramConfig;
+    private ObjectMapper mapper;
+    private boolean initialized = false;
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    private void ensureInitialized() {
+        if (initialized) return;
+        openRouterService = getApplicationContext().getBean(IOpenRouterService.class);
+        telegramConfig = getApplicationContext().getBean(TelegramConfiguration.class);
+        mapper = getApplicationContext().getBean(ObjectMapper.class);
+        initialized = true;
+    }
 
     @Override
     public SQSBatchResponse execute(SQSEvent event) {
+        ensureInitialized();
+
         int recordCount = event.getRecords() != null ? event.getRecords().size() : 0;
         logger.info(() -> "AskWorkerHandler — received SQS batch recordCount=" + recordCount);
 
@@ -58,7 +67,7 @@ public class AskWorkerHandler extends MicronautRequestHandler<SQSEvent, SQSBatch
                         + " chatId=" + message.chatId() + " cityId=" + message.cityId());
 
                 String token = telegramConfig.getToken(message.cityId());
-                AskProcessor processor = new AskProcessor(openRouterService, token);
+                AskProcessor processor = new AskProcessor(openRouterService, token, mapper);
                 processor.process(message);
 
                 logger.info(() -> "AskWorkerHandler — record completed successfully messageId=" + messageId

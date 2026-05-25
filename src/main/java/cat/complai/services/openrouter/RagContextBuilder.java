@@ -116,7 +116,7 @@ public class RagContextBuilder {
             }
 
             List<Source> sources = matches.stream()
-                    .map(p -> new Source(p.url, p.title))
+                    .map(p -> new Source(p.url(), p.title()))
                     .filter(source -> source.getUrl() != null && !source.getUrl().isBlank())
                     .toList();
             String contextBlock = promptBuilder.buildProcedureContextBlockFromMatches(matches, effectiveCityId);
@@ -132,14 +132,14 @@ public class RagContextBuilder {
         try {
             RagHelper.Procedure procedure = ragRegistry.getForCity(cityId).getAll()
                     .stream()
-                    .filter(p -> procedureId.equals(p.procedureId))
+                    .filter(p -> procedureId.equals(p.procedureId()))
                     .findFirst()
                     .orElse(null);
             if (procedure == null) {
                 return new ProcedureContextResult(null, List.of());
             }
             String contextBlock = promptBuilder.buildProcedureContextBlockFromMatches(List.of(procedure), cityId);
-            List<Source> sources = List.of(new Source(procedure.url, procedure.title));
+            List<Source> sources = List.of(new Source(procedure.url(), procedure.title()));
             return new ProcedureContextResult(contextBlock, sources);
         } catch (Exception e) {
             logger.log(Level.WARNING, "buildProcedureContextResultForId failed for procedureId=" + procedureId
@@ -160,7 +160,7 @@ public class RagContextBuilder {
                 return new EventContextResult(null, List.of());
             }
             List<Source> sources = matches.stream()
-                    .map(e -> new Source(e.url, e.title))
+                    .map(e -> new Source(e.url(), e.title()))
                     .filter(source -> source.getUrl() != null && !source.getUrl().isBlank())
                     .toList();
             String contextBlock = buildEventContextBlockFromMatches(matches, cityId);
@@ -184,7 +184,7 @@ public class RagContextBuilder {
                 return new NewsContextResult(null, List.of());
             }
             List<Source> sources = matches.stream()
-                    .map(item -> new Source(item.url, item.title))
+                    .map(item -> new Source(item.url(), item.title()))
                     .filter(source -> source.getUrl() != null && !source.getUrl().isBlank())
                     .toList();
             String contextBlock = buildNewsContextBlockFromMatches(matches, cityId);
@@ -208,7 +208,7 @@ public class RagContextBuilder {
                 return new CityInfoContextResult(null, List.of());
             }
             List<Source> sources = matches.stream()
-                    .map(item -> new Source(item.url, item.title))
+                    .map(item -> new Source(item.url(), item.title()))
                     .filter(source -> source.getUrl() != null && !source.getUrl().isBlank())
                     .toList();
             String contextBlock = buildCityInfoContextBlockFromMatches(matches, cityId);
@@ -308,21 +308,21 @@ public class RagContextBuilder {
         sb.append("CONTEXT FROM CITY NEWS IN ").append(cityId).append(":\n\n");
         for (int i = 0; i < matches.size(); i++) {
             RagHelper.News item = matches.get(i);
-            sb.append(i + 1).append(". ").append(item.title).append("\n");
-            if (item.publishedAt != null && !item.publishedAt.isBlank()) {
-                sb.append("   Published: ").append(item.publishedAt).append("\n");
+            sb.append(i + 1).append(". ").append(item.title()).append("\n");
+            if (item.publishedAt() != null && !item.publishedAt().isBlank()) {
+                sb.append("   Published: ").append(item.publishedAt()).append("\n");
             }
-            if (item.categories != null && !item.categories.isBlank()) {
-                sb.append("   Categories: ").append(item.categories).append("\n");
+            if (item.categories() != null && !item.categories().isBlank()) {
+                sb.append("   Categories: ").append(item.categories()).append("\n");
             }
-            if (item.summary != null && !item.summary.isBlank()) {
-                sb.append("   Summary: ").append(item.summary).append("\n");
+            if (item.summary() != null && !item.summary().isBlank()) {
+                sb.append("   Summary: ").append(item.summary()).append("\n");
             }
-            if (item.body != null && !item.body.isBlank()) {
-                sb.append("   Details: ").append(item.body).append("\n");
+            if (item.body() != null && !item.body().isBlank()) {
+                sb.append("   Details: ").append(item.body()).append("\n");
             }
-            if (item.url != null && !item.url.isBlank()) {
-                sb.append("   Source URL: ").append(item.url).append("\n");
+            if (item.url() != null && !item.url().isBlank()) {
+                sb.append("   Source URL: ").append(item.url()).append("\n");
             }
             sb.append("\n");
         }
@@ -340,30 +340,30 @@ public class RagContextBuilder {
         sb.append("Events in ").append(cityId).append(":\n\n");
         for (int i = 0; i < matches.size(); i++) {
             RagHelper.Event event = matches.get(i);
-            sb.append(i + 1).append(". ").append(event.title).append("\n");
-            if (event.date != null && !event.date.isBlank()) {
-                sb.append("   Date: ").append(event.date).append("\n");
+            sb.append(i + 1).append(". ").append(event.title()).append("\n");
+            if (event.date() != null && !event.date().isBlank()) {
+                sb.append("   Date: ").append(event.date()).append("\n");
             }
-            if (event.time != null && !event.time.isBlank()) {
-                sb.append("   Time: ").append(event.time).append("\n");
+            if (event.time() != null && !event.time().isBlank()) {
+                sb.append("   Time: ").append(event.time()).append("\n");
             }
-            if (event.location != null && !event.location.isBlank()) {
-                sb.append("   Location: ").append(event.location).append("\n");
+            if (event.location() != null && !event.location().isBlank()) {
+                sb.append("   Location: ").append(event.location()).append("\n");
             }
-            if (event.eventType != null && !event.eventType.isBlank()) {
-                sb.append("   Type: ").append(event.eventType).append("\n");
+            if (event.eventType() != null && !event.eventType().isBlank()) {
+                sb.append("   Type: ").append(event.eventType()).append("\n");
             }
-            if (event.targetAudience != null && !event.targetAudience.isBlank()) {
-                sb.append("   Audience: ").append(event.targetAudience).append("\n");
+            if (event.targetAudience() != null && !event.targetAudience().isBlank()) {
+                sb.append("   Audience: ").append(event.targetAudience()).append("\n");
             }
-            if (event.description != null && !event.description.isBlank()) {
-                sb.append("   Description: ").append(event.description).append("\n");
+            if (event.description() != null && !event.description().isBlank()) {
+                sb.append("   Description: ").append(event.description()).append("\n");
             }
-            if (event.theme != null && !event.theme.isBlank()) {
-                sb.append("   Theme: ").append(event.theme).append("\n");
+            if (event.theme() != null && !event.theme().isBlank()) {
+                sb.append("   Theme: ").append(event.theme()).append("\n");
             }
-            if (event.url != null && !event.url.isBlank()) {
-                sb.append("   Source URL: ").append(event.url).append("\n");
+            if (event.url() != null && !event.url().isBlank()) {
+                sb.append("   Source URL: ").append(event.url()).append("\n");
             }
             sb.append("\n");
         }
@@ -382,21 +382,21 @@ public class RagContextBuilder {
         sb.append("CITY INFORMATION IN ").append(cityId).append(":\n\n");
         for (int i = 0; i < matches.size(); i++) {
             RagHelper.CityInfo item = matches.get(i);
-            sb.append(i + 1).append(". ").append(item.title).append("\n");
-            if (item.theme != null && !item.theme.isBlank()) {
-                sb.append("   Theme: ").append(item.theme).append("\n");
+            sb.append(i + 1).append(". ").append(item.title()).append("\n");
+            if (item.theme() != null && !item.theme().isBlank()) {
+                sb.append("   Theme: ").append(item.theme()).append("\n");
             }
-            if (item.breadcrumbs != null && !item.breadcrumbs.isBlank()) {
-                sb.append("   Breadcrumbs: ").append(item.breadcrumbs).append("\n");
+            if (item.breadcrumbs() != null && !item.breadcrumbs().isBlank()) {
+                sb.append("   Breadcrumbs: ").append(item.breadcrumbs()).append("\n");
             }
-            if (item.summary != null && !item.summary.isBlank()) {
-                sb.append("   Summary: ").append(item.summary).append("\n");
+            if (item.summary() != null && !item.summary().isBlank()) {
+                sb.append("   Summary: ").append(item.summary()).append("\n");
             }
-            if (item.body != null && !item.body.isBlank()) {
-                sb.append("   Details: ").append(item.body).append("\n");
+            if (item.body() != null && !item.body().isBlank()) {
+                sb.append("   Details: ").append(item.body()).append("\n");
             }
-            if (item.url != null && !item.url.isBlank()) {
-                sb.append("   Source URL: ").append(item.url).append("\n");
+            if (item.url() != null && !item.url().isBlank()) {
+                sb.append("   Source URL: ").append(item.url()).append("\n");
             }
             sb.append("\n");
         }

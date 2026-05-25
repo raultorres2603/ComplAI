@@ -2,6 +2,7 @@ package cat.complai.helpers.openrouter.rag;
 
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LexicalScorerTest {
@@ -25,7 +26,7 @@ class LexicalScorerTest {
     @Test
     void bm25TermScore_returnsZeroForNonMatchingTerm() {
         double score = scorer.bm25TermScore(0, 1, 1, 10, 5, 5.0d, 1.0d);
-        assertTrue(score == 0.0d);
+        assertEquals(0.0d, score);
     }
 
     @Test

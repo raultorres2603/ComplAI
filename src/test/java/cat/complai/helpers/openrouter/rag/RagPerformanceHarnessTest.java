@@ -13,6 +13,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RagPerformanceHarnessTest {
@@ -128,13 +129,13 @@ class RagPerformanceHarnessTest {
         RagHelper<RagHelper.Event> evJava = RagHelper.forEvents("testcity");
 
         LabeledMetrics procLabeledTune = computeLabeledMetrics(procTune,
-                q -> procJava.search(q).stream().map(r -> r.procedureId).limit(3).toList());
+                q -> procJava.search(q).stream().map(r -> r.procedureId()).limit(3).toList());
         LabeledMetrics procLabeledHoldout = computeLabeledMetrics(procHoldout,
-                q -> procJava.search(q).stream().map(r -> r.procedureId).limit(3).toList());
+                q -> procJava.search(q).stream().map(r -> r.procedureId()).limit(3).toList());
         LabeledMetrics evLabeledTune = computeLabeledMetrics(evTune,
-                q -> evJava.search(q).stream().map(r -> r.eventId).limit(3).toList());
+                q -> evJava.search(q).stream().map(r -> r.eventId()).limit(3).toList());
         LabeledMetrics evLabeledHoldout = computeLabeledMetrics(evHoldout,
-                q -> evJava.search(q).stream().map(r -> r.eventId).limit(3).toList());
+                q -> evJava.search(q).stream().map(r -> r.eventId()).limit(3).toList());
 
         System.out.println("SCORECARD_LAYER_B procedure tune"
                 + " labeled_recall_at_3=" + procLabeledTune.recallAt3()
@@ -157,10 +158,10 @@ class RagPerformanceHarnessTest {
         assertTrue(procLabeledHoldout.recallAt3() >= 0.0 && procLabeledHoldout.recallAt3() <= 1.0);
         assertTrue(evLabeledTune.recallAt3() >= 0.0 && evLabeledTune.recallAt3() <= 1.0);
         assertTrue(evLabeledHoldout.recallAt3() >= 0.0 && evLabeledHoldout.recallAt3() <= 1.0);
-        assertTrue(procLabeledTune.queryCount() == 9, "Expected 9 procedure tune queries");
-        assertTrue(procLabeledHoldout.queryCount() == 3, "Expected 3 procedure holdout queries");
-        assertTrue(evLabeledTune.queryCount() == 9, "Expected 9 event tune queries");
-        assertTrue(evLabeledHoldout.queryCount() == 3, "Expected 3 event holdout queries");
+        assertEquals(9, procLabeledTune.queryCount(), "Expected 9 procedure tune queries");
+        assertEquals(3, procLabeledHoldout.queryCount(), "Expected 3 procedure holdout queries");
+        assertEquals(9, evLabeledTune.queryCount(), "Expected 9 event tune queries");
+        assertEquals(3, evLabeledHoldout.queryCount(), "Expected 3 event holdout queries");
         assertTrue(procLabeledHoldout.recallAt3() >= 0.75, "Procedure holdout recall@3 must be >= 0.75");
         assertTrue(evLabeledHoldout.recallAt3() >= 0.75, "Event holdout recall@3 must be >= 0.75");
         assertTrue(procLabeledHoldout.mrrAt3() >= 0.70, "Procedure holdout MRR@3 must be >= 0.70");

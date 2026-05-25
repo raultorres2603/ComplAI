@@ -42,8 +42,8 @@ class ProcedureContextServiceTest {
                                 .buildProcedureContextResult("recycling waste", "testcity");
 
                 assertNotNull(result);
-                assertNotNull(result.getSources());
-                assertTrue(result.getSources().size() <= 3);
+                assertNotNull(result.sources());
+                assertTrue(result.sources().size() <= 3);
         }
 
         @Test
@@ -52,8 +52,8 @@ class ProcedureContextServiceTest {
                                 .buildEventContextResult("festival concert", "testcity");
 
                 assertNotNull(result);
-                assertNotNull(result.getSources());
-                assertTrue(result.getSources().size() <= 3);
+                assertNotNull(result.sources());
+                assertTrue(result.sources().size() <= 3);
         }
 
         @Test
@@ -62,7 +62,7 @@ class ProcedureContextServiceTest {
                                 .buildProcedureContextResult("", "testcity");
 
                 assertNotNull(result);
-                assertTrue(result.getSources().isEmpty());
+                assertTrue(result.sources().isEmpty());
         }
 
         @Test
@@ -71,7 +71,7 @@ class ProcedureContextServiceTest {
                                 .buildEventContextResult("", "testcity");
 
                 assertNotNull(result);
-                assertTrue(result.getSources().isEmpty());
+                assertTrue(result.sources().isEmpty());
         }
 
         @Test
@@ -144,7 +144,7 @@ class ProcedureContextServiceTest {
                                 .buildNewsContextResult("martian taxation", "testcity");
 
                 assertNotNull(result);
-                assertTrue(result.getSources().isEmpty());
+                assertTrue(result.sources().isEmpty());
         }
 
         @Test

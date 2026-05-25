@@ -40,7 +40,7 @@ public class CityInfoScraper {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
-    public static void main(String[] args) throws IOException {
+    static void main(String[] args) throws IOException {
         if (args.length != 1 || args[0].isBlank()) {
             System.err.println("Usage: CityInfoScraper <cityId>");
             System.err.println("  cityId - must match a procedures-mapping-<cityId>.json in resources/scrapers");
@@ -274,7 +274,7 @@ public class CityInfoScraper {
 
         if (skipConfig != null && skipConfig.whenTitleEmptyOrEquals != null) {
             for (String forbidden : skipConfig.whenTitleEmptyOrEquals) {
-                if (forbidden != null && title.equalsIgnoreCase(forbidden)) {
+                if (title.equalsIgnoreCase(forbidden)) {
                     return true;
                 }
             }

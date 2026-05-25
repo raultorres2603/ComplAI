@@ -149,8 +149,8 @@ public class OpenRouterServices implements IOpenRouterService {
                     List<Map<String, Object>> resolvedMessages = new ArrayList<>();
                     resolvedMessages.add(Map.of("role", "system", "content",
                             promptBuilder.getSystemMessage(cityId, detectedLanguage)));
-                    if (resolvedCtx != null && resolvedCtx.getContextBlock() != null) {
-                        resolvedMessages.add(Map.of("role", "system", "content", resolvedCtx.getContextBlock()));
+                    if (resolvedCtx != null && resolvedCtx.contextBlock() != null) {
+                        resolvedMessages.add(Map.of("role", "system", "content", resolvedCtx.contextBlock()));
                     }
                     var resolvedHistory = conversationService.getConversationHistory(conversationId);
                     conversationService.addToMessages(resolvedMessages, resolvedHistory);
@@ -158,14 +158,14 @@ public class OpenRouterServices implements IOpenRouterService {
                             "content", question != null ? question.trim() : ""));
 
                     long resolvedProcHash = computeSourcesHash(
-                            resolvedCtx != null ? resolvedCtx.getSources() : List.of());
+                            resolvedCtx != null ? resolvedCtx.sources() : List.of());
                     OpenRouterResponseDto resolvedResponse =
                             aiResponseService.callOpenRouterAndExtract(
                                     resolvedMessages, cityId, resolvedProcHash, 0L);
 
                     List<Source> resolvedSources = new ArrayList<>();
                     ragContextBuilder.validateAndAddSources(resolvedSources,
-                            resolvedCtx != null ? resolvedCtx.getSources() : null, "procedure");
+                            resolvedCtx != null ? resolvedCtx.sources() : null, "procedure");
                     if (resolvedResponse.isSuccess() && !resolvedSources.isEmpty()) {
                         List<Source> finalSources =
                                 ragContextBuilder.deDuplicateAndOrderSources(resolvedSources);
@@ -214,7 +214,7 @@ public class OpenRouterServices implements IOpenRouterService {
         NewsContextResult newsCtx = ragContexts.newsContext();
         CityInfoContextResult cityInfoCtx = ragContexts.cityInfoContext();
 
-        if (ragContexts.newsIntent() && (newsCtx == null || newsCtx.getSources().isEmpty())) {
+        if (ragContexts.newsIntent() && (newsCtx == null || newsCtx.sources().isEmpty())) {
             String fallbackMessage = buildNoNewsFoundMessage(detectedLanguage, cityId);
             if (conversationId != null && !conversationId.isBlank()) {
                 conversationService.updateConversationHistory(conversationId, question, fallbackMessage);
@@ -224,17 +224,17 @@ public class OpenRouterServices implements IOpenRouterService {
                     List.of());
         }
 
-        if (procCtx != null && procCtx.getContextBlock() != null) {
-            messages.add(Map.of("role", "system", "content", procCtx.getContextBlock()));
+        if (procCtx != null && procCtx.contextBlock() != null) {
+            messages.add(Map.of("role", "system", "content", procCtx.contextBlock()));
         }
-        if (eventCtx != null && eventCtx.getContextBlock() != null) {
-            messages.add(Map.of("role", "system", "content", eventCtx.getContextBlock()));
+        if (eventCtx != null && eventCtx.contextBlock() != null) {
+            messages.add(Map.of("role", "system", "content", eventCtx.contextBlock()));
         }
-        if (newsCtx != null && newsCtx.getContextBlock() != null) {
-            messages.add(Map.of("role", "system", "content", newsCtx.getContextBlock()));
+        if (newsCtx != null && newsCtx.contextBlock() != null) {
+            messages.add(Map.of("role", "system", "content", newsCtx.contextBlock()));
         }
-        if (cityInfoCtx != null && cityInfoCtx.getContextBlock() != null) {
-            messages.add(Map.of("role", "system", "content", cityInfoCtx.getContextBlock()));
+        if (cityInfoCtx != null && cityInfoCtx.contextBlock() != null) {
+            messages.add(Map.of("role", "system", "content", cityInfoCtx.contextBlock()));
         }
 
         var history = conversationService.getConversationHistory(conversationId);
@@ -278,16 +278,16 @@ public class OpenRouterServices implements IOpenRouterService {
         log.debug("ask() messages prepared — messageCount={} conversationId={}", messages.size(), conversationId);
 
         // Calculate context hashes for caching
-        long procContextHash = computeSourcesHash(procCtx != null ? procCtx.getSources() : List.of());
+        long procContextHash = computeSourcesHash(procCtx != null ? procCtx.sources() : List.of());
         List<Source> eventAndNewsSourcesForHash = new ArrayList<>();
-        if (eventCtx != null && eventCtx.getSources() != null) {
-            eventAndNewsSourcesForHash.addAll(eventCtx.getSources());
+        if (eventCtx != null && eventCtx.sources() != null) {
+            eventAndNewsSourcesForHash.addAll(eventCtx.sources());
         }
-        if (newsCtx != null && newsCtx.getSources() != null) {
-            eventAndNewsSourcesForHash.addAll(newsCtx.getSources());
+        if (newsCtx != null && newsCtx.sources() != null) {
+            eventAndNewsSourcesForHash.addAll(newsCtx.sources());
         }
-        if (cityInfoCtx != null && cityInfoCtx.getSources() != null) {
-            eventAndNewsSourcesForHash.addAll(cityInfoCtx.getSources());
+        if (cityInfoCtx != null && cityInfoCtx.sources() != null) {
+            eventAndNewsSourcesForHash.addAll(cityInfoCtx.sources());
         }
         long eventContextHash = computeSourcesHash(eventAndNewsSourcesForHash);
 
@@ -297,13 +297,13 @@ public class OpenRouterServices implements IOpenRouterService {
         // Collect all sources
         List<Source> mergedSources = new ArrayList<>();
         ragContextBuilder.validateAndAddSources(mergedSources,
-                procCtx != null ? procCtx.getSources() : null, "procedure");
+                procCtx != null ? procCtx.sources() : null, "procedure");
         ragContextBuilder.validateAndAddSources(mergedSources,
-                eventCtx != null ? eventCtx.getSources() : null, "event");
+                eventCtx != null ? eventCtx.sources() : null, "event");
         ragContextBuilder.validateAndAddSources(mergedSources,
-                newsCtx != null ? newsCtx.getSources() : null, "news");
+                newsCtx != null ? newsCtx.sources() : null, "news");
         ragContextBuilder.validateAndAddSources(mergedSources,
-                cityInfoCtx != null ? cityInfoCtx.getSources() : null, "city_info");
+                cityInfoCtx != null ? cityInfoCtx.sources() : null, "city_info");
 
         if (response.isSuccess() && !mergedSources.isEmpty()) {
             List<Source> finalSources = ragContextBuilder.deDuplicateAndOrderSources(mergedSources);
@@ -369,8 +369,8 @@ public class OpenRouterServices implements IOpenRouterService {
             NewsContextResult newsContext = safelyBuildNewsContext(question, cityId, conversationId, operationName);
             log.debug("{} news retrieval completed — conversationId={} city={} hitCount={}",
                     operationName, conversationId, cityId,
-                    newsContext != null && newsContext.getSources() != null
-                            ? newsContext.getSources().size()
+                    newsContext != null && newsContext.sources() != null
+                            ? newsContext.sources().size()
                             : 0);
             return new RagContexts(null, null, newsContext, null, true);
         }
