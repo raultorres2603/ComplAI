@@ -329,7 +329,7 @@ Resources:
       CodeUri: ../build/libs/complai-all.jar
       Handler: io.micronaut.function.aws.proxy.payload2.APIGatewayV2HTTPEventFunction::handleRequest
       Runtime: java25
-      Architectures: [arm64]
+      Architectures: [x86_64]
       MemorySize: 1024
       Timeout: 60
       Role: !GetAtt ComplAILambdaRole.Arn
@@ -385,7 +385,7 @@ Resources:
       CodeUri: ../build/libs/complai-all.jar
       Handler: cat.complai.services.worker.RedactWorkerHandler::handleRequest
       Runtime: java25
-      Architectures: [arm64]
+      Architectures: [x86_64]
       MemorySize: 512
       Timeout: 60
       Role: !GetAtt ComplAIWorkerRole.Arn
@@ -428,7 +428,7 @@ Resources:
       CodeUri: ../build/libs/complai-all.jar
       Handler: cat.complai.services.worker.FeedbackWorkerHandler::handleRequest
       Runtime: java25
-      Architectures: [arm64]
+      Architectures: [x86_64]
       MemorySize: 256
       Timeout: 60
       Role: !GetAtt ComplAIWorkerRole.Arn
@@ -455,7 +455,7 @@ Resources:
       CodeUri: ../build/libs/complai-all.jar
       Handler: cat.complai.services.worker.AskWorkerHandler::handleRequest
       Runtime: java25
-      Architectures: [arm64]
+      Architectures: [x86_64]
       MemorySize: 256
       Timeout: 90
       Role: !GetAtt ComplAIWorkerRole.Arn
@@ -537,7 +537,7 @@ Resources:
       CodeUri: ../build/libs/complai-all.jar
       Handler: cat.complai.services.ses.SesScheduledReportHandler::handleRequest
       Runtime: java25
-      Architectures: [arm64]
+      Architectures: [x86_64]
       MemorySize: 256
       Timeout: 60
       Role: !GetAtt ComplAIScheduledReportRole.Arn
