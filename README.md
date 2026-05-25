@@ -2,33 +2,33 @@
 
 [![GitHub Release](https://img.shields.io/github/v/release/raultorres2603/ComplAI)](https://github.com/raultorres2603/ComplAI/releases/latest)
 
-> **ComplAI** — Serverless AI backend for municipal assistance in El Prat de Llobregat: citizen Q&A, complaint drafting, and asynchronous PDF generation.
+> **ComplAI** — Serverless AI backend for municipal assistance in El Prat de Llobregat: citizen Q&A, complaint drafting, PDF generation, and feedback processing.
 
 ---
 
-## 📑 Table of Contents
+## Table of Contents
 
-1. [💡 What Is This Project?](#-what-is-this-project)
-2. [🎯 Vision and Goals](#-vision-and-goals)
-3. [🏗️ Architecture Overview](#-architecture-overview)
-4. [🛠️ Tech Stack](#-tech-stack)
-5. [🚀 Getting Started](#-getting-started)
-6. [📡 API Reference](#-api-reference)
-7. [☁️ Infrastructure](#-infrastructure)
-8. [🔒 Security](#-security)
-9. [🧪 Testing](#-testing)
-10. [⚡ Performance Optimizations](#-performance-optimizations)
-11. [💬 Conversation History (Multi-turn)](#-conversation-history-multi-turn)
-12. [📄 PDF Complaint Generation](#-pdf-complaint-generation)
-13. [🆔 OIDC Identity Verification](#-oidc-identity-verification)
-14. [🤖 AI Identity and Behaviour](#-ai-identity-and-behaviour)
-15. [🤖 Telegram Bot](#-telegram-bot)
-16. [🤝 Contributing](#-contributing)
-17. [⚖️ License](#-license)
+1. [What Is This Project?](#what-is-this-project)
+2. [Vision and Goals](#vision-and-goals)
+3. [Architecture Overview](#architecture-overview)
+4. [Tech Stack](#tech-stack)
+5. [Getting Started](#getting-started)
+6. [API Reference](#api-reference)
+7. [Infrastructure](#infrastructure)
+8. [Security](#security)
+9. [Testing](#testing)
+10. [Performance Optimizations](#performance-optimizations)
+11. [Conversation History (Multi-turn)](#conversation-history-multi-turn)
+12. [PDF Complaint Generation](#pdf-complaint-generation)
+13. [OIDC Identity Verification](#oidc-identity-verification)
+14. [AI Identity and Behaviour](#ai-identity-and-behaviour)
+15. [Telegram Bot](#telegram-bot)
+16. [Contributing](#contributing)
+17. [License](#license)
 
 ---
 
-## 💡 What Is This Project?
+## What Is This Project?
 
 ComplAI is the backend of a public-service assistant for residents of El Prat de Llobregat. Citizens can ask municipal questions, get step-by-step procedure guidance, and draft formal complaints — all through a conversational AI interface.
 
@@ -40,37 +40,37 @@ Three main capabilities:
 - **Complaint drafting** — guide citizens through complaint creation and queue async PDF generation via SQS.
 - **Feedback ingestion** — collect and store user feedback asynchronously for quality monitoring.
 
-The backend is built with **Micronaut 4** and deployed on **AWS Lambda** (API Gateway HTTP API + worker functions). Infrastructure is managed with **AWS CDK (TypeScript)**.
+The backend is built with **Micronaut 4** and compiled to a **GraalVM native image** for production deployment on **AWS Lambda** (API Gateway HTTP API + worker functions). Infrastructure is managed with **AWS CDK (TypeScript)**.
 
 ---
 
-## 🎯 Vision and Goals
+## Vision and Goals
 
 | Goal | How ComplAI addresses it |
 |---|---|
 | Reduce friction when citizens interact with municipal procedures | Conversational AI guides users step by step; complaint drafting automates paperwork |
 | Provide multilingual assistance | Language detection + response in Catalan, Spanish, or English |
-| Keep operations cost-efficient | Serverless Lambda + SQS async workers — pay only for what you use |
+| Keep operations cost-efficient | Serverless Lambda + SQS async workers + GraalVM native image — pay only for what you use, cold starts under 100 ms |
 | Keep responses grounded with local context | In-memory BM25 lexical RAG indexes procedures, events, news, and city information |
 | Privacy-first design | Response cache keys contain no PII; feedback retention is short-lived |
 
 ---
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 Layering present in code:
 
 - **Controllers**: HTTP boundary and status mapping.
-- **Services**: orchestration, validation, AI calls, RAG composition, clarification, streaming, redact.
+- **Services**: orchestration, validation, AI calls, RAG composition, clarification, streaming, redact, Telegram bot.
 - **Helpers**: prompt building, language detection, HTML parsing, PDF rendering, RAG helpers.
-- **Infrastructure adapters**: SQS publishers/handlers, S3 upload/signing, SES email.
-- **Caches**: conversation state (Caffeine), response cache (Caffeine), circuit breaker state.
+- **Infrastructure adapters**: SQS publishers/handlers, S3 upload/signing, SES email, Telegram API calls.
+- **Caches**: conversation state (Caffeine), response cache (Caffeine), circuit breaker state, Telegram session state.
 
 ### Backend request and async-processing flow
 
 ```mermaid
 flowchart TD
-	C[Clients\nWeb and API consumers]
+	C[Clients\nWeb, Telegram and API consumers]
 
 	subgraph API[Micronaut API Lambda]
 		F[Filters and Middleware\nApiKeyAuthFilter\nRateLimitFilter\nCorsFilter\nCityIdLoggingFilter]
@@ -79,6 +79,7 @@ flowchart TD
 			HC[HealthController]
 			ORC[OpenRouterController]
 			FBC[FeedbackController]
+			TC[TelegramController]
 		end
 
 		subgraph SVC[Services]
@@ -92,12 +93,13 @@ flowchart TD
 			CMS[ConversationManagementService]
 			ARS[AiResponseProcessingService]
 			FPS[FeedbackPublisherService]
+			TBS[TelegramBotService]
 		end
 
 		subgraph HLP[Helpers]
 			RH[RAG helpers\nNewsRagHelper and others]
 			RGW[RagWarmupService]
-			PDFH[PdfGenerator]
+			PDFH[PdfGenerator\nOpenPDF]
 			HCH[HealthCheckService]
 		end
 
@@ -114,14 +116,17 @@ flowchart TD
 	end
 
 	ORAPI[OpenRouter API]
-	SQS[(AWS SQS queues)]
-	WL[Worker Lambda\nRedactWorkerHandler and FeedbackProcessor]
+	RQS[(Redact SQS queue)]
+	FQS[(Feedback SQS queue)]
+	AQS[(Ask SQS queue)]
+	WL[Worker Lambdas\nRedactWorker / FeedbackWorker / AskWorker]
 	S3[(AWS S3)]
 
 	C --> F
 	F --> HC
 	F --> ORC
 	F --> FBC
+	F --> TC
 
 	ORC --> IVS
 	ORC --> ORS
@@ -143,15 +148,19 @@ flowchart TD
 	HW --> CB
 	HW --> ORAPI
 
-	ORC --> SQS
+	ORC --> RQS
 	FBC --> FPS
-	FPS --> SQS
-	SQS --> WL
+	FPS --> FQS
+	ORS --> AQS
+	RQS --> WL
+	FQS --> WL
+	AQS --> WL
 	WL --> ORAPI
 	WL --> PDFH
 	WL --> S3
 	ORC --> S3
 	RGW --> ILI
+	TBS --> AQS
 ```
 
 ### Main E2E Flows
@@ -183,8 +192,6 @@ sequenceDiagram
 - RAG uses in-memory BM25 index (no external database)
 - Response via Server-Sent Events (SSE)
 
----
-
 #### 2. Redact Flow (PDF Complaint)
 
 ```mermaid
@@ -192,8 +199,8 @@ sequenceDiagram
     participant U as User
     participant C as API Gateway
     participant P as SqsComplaintPublisher
-    participant Q as SQS Queue
-    participant W as Redactor Worker Lambda
+    participant Q as SQS Redact Queue
+    participant W as Redact Worker Lambda
     participant O as OpenRouter AI
     participant B as S3 (PDF)
 
@@ -204,7 +211,7 @@ sequenceDiagram
     Q->>W: Trigger Lambda
     W->>O: Request redaction
     O-->>W: Redacted text
-    W->>B: Generate PDF + upload
+    W->>B: Generate PDF via OpenPDF + upload
     B-->>W: Return signed URL
     W-->>U: (via callback or polling)
 ```
@@ -212,10 +219,8 @@ sequenceDiagram
 **Key Points:**
 - Identity validated via OIDC (for OIDC-enabled cities)
 - Async via SQS — user gets immediate 202 response
-- Worker Lambda generates PDF with PDFBox
+- Worker Lambda generates PDF with **OpenPDF** (replaces PDFBox for GraalVM compatibility)
 - Signed S3 URL returned for download
-
----
 
 #### 3. Feedback Flow
 
@@ -234,8 +239,6 @@ sequenceDiagram
     Q->>W: Trigger Lambda
     W->>W: Process & store feedback
 ```
-
----
 
 #### 4. SES Statistics Report Flow (Scheduled)
 
@@ -272,19 +275,19 @@ sequenceDiagram
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Layer | Technology | Notes |
 |---|---|---|
-| Language / Runtime | Java 25 | Lambda runtime `java25` |
+| Language / Runtime | Java 25 | Production: GraalVM native image (`provided.al2023`). Local dev: JIT on `java25`. |
 | Framework | Micronaut 4.10.7 | `micronautVersion` from `gradle.properties` |
-| Build Tool | Gradle (Shadow JAR) | Shadow JAR output: `complai-all.jar` |
+| Build Tool | Gradle 9.5 (Shadow JAR) | Shadow JAR for local SAM: `complai-all.jar`. Production: GraalVM native ZIP. |
 | Cloud | AWS (Lambda, API Gateway HTTP API, SQS, S3, CloudWatch, SES, CloudFront, WAF) | |
-| IaC | AWS CDK (TypeScript) | 5 stacks per environment |
+| IaC | AWS CDK (TypeScript) aws-cdk-lib ^2.237.1 | 4 stacks per environment |
 | AI Integration | OpenRouter | Configurable model (default `openrouter/free`) with circuit breaker |
 | Search / RAG | In-memory lexical RAG (`InMemoryLexicalIndex`) | BM25 scoring, no external Lucene dependency |
-| Caching | Caffeine | Conversation state (30 min TTL), response cache (10 min TTL), rate limiter |
-| PDF Generation | Apache PDFBox 2.0.29 | Used by worker Lambda for complaint PDFs |
+| Caching | Caffeine | Conversation state (30 min TTL), response cache (10 min TTL), rate limiter, Telegram session state |
+| PDF Generation | OpenPDF 2.0.5 | Replaces Apache PDFBox — zero AWT dependency, works in GraalVM native image |
 | Auth / Identity | API key (`X-Api-Key`) + OIDC ID token (`X-Identity-Token`) | JJWT 0.12.6 for OIDC validation |
 | HTML Parsing | Jsoup 1.17.2 | |
 | Email | Amazon SES | Weekly statistics reports |
@@ -292,7 +295,7 @@ sequenceDiagram
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -323,11 +326,11 @@ cd sam
 This script:
 1. Builds the shadow JAR via `./gradlew clean shadowJar`
 2. Starts **LocalStack** (S3 + SQS) via Docker Compose
-3. Starts **SAM local API** on `http://127.0.0.1:3000`
+3. Starts **SAM local API** on `http://127.0.0.1:3000` (uses `x86_64` architecture for local Docker compatibility)
 4. Starts a Python-based **SQS worker poller** to process redact/feedback messages
 5. Starts a **scheduled report poller** for SES reports
 
-Alternative: Use the VS Code task (`Ctrl+Shift+B` → "Local SAM") which runs the same script.
+**Note:** Local SAM uses a fat JAR (JIT) on `x86_64` architecture. Production deploys a GraalVM native image on ARM64 Graviton2. The architecture difference is handled by the SAM emulation layer and has no functional impact.
 
 ### Environment Variables
 
@@ -341,12 +344,13 @@ Key environment variables (see `sam/env.json.example` for the full list):
 | `AWS_SES_TO_EMAIL_ELPRAT` | Report recipient for El Prat | `elprat@example.com` |
 | `OPENROUTER_MODEL` | OpenRouter model ID | `openrouter/free` |
 | `RESPONSE_CACHE_ENABLED` | Enable response caching | `true` |
-| `TOKEN_TELEGRAM_ELPRAT` | Telegram bot token for El Prat (see [Telegram Bot](#-telegram-bot)) | `123456:ABC-DEF1234...` |
+| `TOKEN_TELEGRAM_ELPRAT` | Telegram bot token for El Prat (see Telegram Bot section) | `123456:ABC-DEF1234...` |
 | `TELEGRAM_WEBHOOK_SECRET_ELPRAT` | Telegram webhook secret for El Prat | `your-secret-token` |
+| `AWS_ENDPOINT_URL` | LocalStack endpoint (local dev only) | `http://host.docker.internal:4566` |
 
 ---
 
-## 📡 API Reference
+## API Reference
 
 | Method | Path | Auth Required | Description | Request Body | Response |
 |---|---|---|---|---|---|
@@ -355,28 +359,43 @@ Key environment variables (see `sam/env.json.example` for the full list):
 | `POST` | `/complai/ask` | `X-Api-Key` | Ask municipal questions (SSE stream) | `AskRequest` | `Publisher<Event<String>>` (SSE) or `OpenRouterPublicDto` (error) |
 | `POST` | `/complai/redact` | `X-Api-Key` (+ `X-Identity-Token` for OIDC-enabled cities) | Complaint drafting and async PDF queueing | `RedactRequest` | `RedactAcceptedDto` (202) or `OpenRouterPublicDto` |
 | `POST` | `/complai/feedback` | `X-Api-Key` | Queue user feedback for async processing | `FeedbackRequest` | `FeedbackAcceptedDto` (202) |
-| `POST` | `/telegram/webhook/{cityId}` | `X-Telegram-Bot-Api-Secret-Token` (secret) | Telegram bot webhook callback | `TelegramUpdate` | `200 OK` |
+| `POST` | `/telegram/webhook/{cityId}` | `X-Telegram-Bot-Api-Secret-Token` | Telegram bot webhook callback | `TelegramUpdate` | `200 OK` |
+
+### Error Codes
+
+| HTTP Status | Meaning | Trigger |
+|---|---|---|
+| 200 | OK | Successful response (or synchronous redact with partial identity) |
+| 202 | Accepted | Request queued for async processing (redact, feedback) |
+| 400 | Bad Request | Validation error (missing fields, too long) |
+| 401 | Unauthorized | Missing or invalid `X-Api-Key` (or `X-Identity-Token` for OIDC-enabled cities) |
+| 422 | Unprocessable Entity | AI refusal (e.g., anonymous complaint not allowed) |
+| 429 | Too Many Requests | Rate limit exceeded |
+| 502 | Bad Gateway | Upstream AI API error |
+| 504 | Gateway Timeout | AI API timeout |
 
 ---
 
-## ☁️ Infrastructure
+## Infrastructure
 
-Five CDK stacks per environment (`development` / `production`):
+Four CDK stacks per environment (`development` / `production`):
 
 | Stack | Main resources |
 |---|---|
-| `ComplAIStorageStack-<env>` | S3 buckets: `complai-procedures`, `complai-events`, `complai-news`, `complai-cityinfo`, `complai-complaints`, `complai-feedback`, `complai-deployments` |
-| `ComplAIQueueStack-<env>` | SQS queues: `complai-redact`, `complai-redact-dlq`, `complai-feedback`, `complai-feedback-dlq` |
-| `ComplAILambdaStack-<env>` | Main API Lambda (`ComplAILambda`), Redact worker Lambda, Feedback worker Lambda, Scheduled report Lambda, HTTP API, metric filters, reserved concurrency |
-| `ComplAIEdgeStack-production` | CloudFront distribution with WAF, geo-restriction (Spain), rate limiting, 60s cache policy |
-| `ComplAIWafStack-production` | WAF web ACL for production API |
+| `ComplAIStorageStack-<env>` | S3 buckets: procedures, events, news, cityinfo, complaints, feedback, deployments |
+| `ComplAIQueueStack-<env>` | SQS queues: redact + DLQ, feedback + DLQ, ask + DLQ |
+| `ComplAILambdaStack-<env>` | API Lambda, Redact worker, Feedback worker, Ask worker, Scheduled report Lambda, HTTP API v2, CloudWatch metric filters |
+| `ComplAIEdgeStack-production` | CloudFront distribution with WAF, geo-restriction (Spain), rate limiting (100 req/5 min per IP), 60s cache policy |
 
-### Key infrastructure decisions
+### Lambda Functions
 
-- **Reserved concurrency**: API Lambda (50), redact worker (20), feedback worker (10), scheduled report (1) — prevents traffic spikes from starving other functions.
-- **CloudFront caching**: GET `/health`, `/health/startup` and OPTIONS preflight cached for 60s. POST requests bypass cache.
-- **Log retention**: all Lambda log groups retain logs for 1 year.
-- **JAR deployment**: CI uploads the fat JAR to the deployments S3 bucket with key `complai-all-<sha8>.jar`; CDK references it via `Code.fromBucket()` — no CDK bootstrap bucket staging.
+| Function | Memory | Timeout | Runtime | Trigger | Purpose |
+|---|---|---|---|---|---|
+| API Lambda | 1024 MB | 60 s | `provided.al2023` (native) | API Gateway HTTP API | Serves all HTTP endpoints |
+| Redact Worker | 512 MB | 60 s | `provided.al2023` (native) | SQS `complai-redact` | AI call + OpenPDF PDF generation |
+| Feedback Worker | 256 MB | 60 s | `provided.al2023` (native) | SQS `complai-feedback` | Store feedback to S3 |
+| Ask Worker | 256 MB | 90 s | `provided.al2023` (native) | SQS `complai-ask` | Telegram async AI responses |
+| Scheduled Report | 256 MB | 60 s | `provided.al2023` (native) | EventBridge (weekly) | CloudWatch stats + SES email report |
 
 ### Deployment
 
@@ -384,19 +403,20 @@ Five CDK stacks per environment (`development` / `production`):
 cd cdk
 npm install
 npm run build
-npx cdk synth
 npx cdk deploy 'ComplAI*Stack-development'
 ```
 
+CI auto-deploys to `development` on every PR. Production deploy requires a push to `master` and manual approval in GitHub Environments.
+
 ---
 
-## 🔒 Security
+## Security
 
 ### API Key Authentication
 
-All `POST` endpoints require an `X-Api-Key` header. The `ApiKeyAuthFilter` reads `API_KEY_<CITYID>` environment variables at startup to build an apiKey-to-cityId mapping. Requests are rejected with 401 if the key is missing or unknown.
+All API endpoints require an `X-Api-Key` header, except health and Telegram webhook routes. The `ApiKeyAuthFilter` reads `API_KEY_<CITYID>` environment variables at startup to build an apiKey-to-cityId mapping. Requests are rejected with 401 if the key is missing or unknown.
 
-- **Excluded routes** (no key required): `GET /health`, `GET /health/startup`, `OPTIONS` preflight, `POST /telegram/webhook/{cityId}`.
+- **Excluded routes**: `GET /health`, `GET /health/startup`, `POST /telegram/webhook/{cityId}`.
 - **Telegram webhook auth**: Uses `X-Telegram-Bot-Api-Secret-Token` header verification instead of API key.
 
 ### Rate Limiting
@@ -410,23 +430,26 @@ On `POST /complai/redact`, the `X-Identity-Token` header is validated for OIDC-e
 ### CORS
 
 - **Local mode**: `CorsFilter` (Micronaut filter at `HIGHEST_PRECEDENCE`) adds CORS headers and short-circuits `OPTIONS` preflight. Enabled when `complai.local-cors-enabled=true`.
-- **Production**: CORS is configured at the API Gateway HTTP API level (infrastructure). The application-level filter is disabled.
+- **Production**: CORS is configured at the API Gateway HTTP API level (infrastructure). The application-level filter is disabled. CloudFront adds an additional CORS layer in production.
 
 ---
 
-## 🧪 Testing
+## Testing
 
-Always run a clean build before tests to catch stale artifacts:
+Always run the full test suite before pushing:
 
 ```bash
 # Standard test run
-./gradlew clean build -x test test
+./gradlew test
 
 # CI-style run with verbose failure output (use before pushing)
-./gradlew clean build -x test ciTest
+./gradlew ciTest
 
-# Run a single test
+# Run a single test class
 ./gradlew test --tests 'cat.complai.SomeTest'
+
+# Run a single test method
+./gradlew test --tests 'cat.complai.SomeTest.testMethod'
 ```
 
 ### Test authentication
@@ -448,8 +471,9 @@ E2E tests live in `E2E-ComplAI/` (Bruno collection). Install the Bruno desktop a
 
 ---
 
-## ⚡ Performance Optimizations
+## Performance Optimizations
 
+- **GraalVM native image** — eliminates JIT warmup, reduces baseline memory by ~70% vs. JVM JIT. Cold starts under 100 ms at 1024 MB. Enables lower memory configurations for worker Lambdas (256 MB).
 - **Conversation cache** with 30-minute TTL and configurable max turns (default 5).
 - **Response cache** with privacy-preserving hash keys (cache keys contain only `cityId` + procedure/event hashes + question category — never user queries).
 - **In-memory lexical RAG index** (BM25) — no external database dependency.
@@ -458,9 +482,19 @@ E2E tests live in `E2E-ComplAI/` (Bruno collection). Install the Bruno desktop a
 - **CloudFront CDN caching** — GET/OPTIONS responses cached for 60 seconds in production.
 - **Circuit breaker** per-city/per-model to fail fast when OpenRouter error rate exceeds 50%, with automatic recovery after cooldown.
 
+### Lambda Memory Configuration
+
+| Function | Memory | Rationale |
+|---|---|---|
+| API Lambda | 1024 MB | Verified via AWS Lambda Power Tuning on native image. Handles SSE streaming + concurrent requests (burst up to 10). |
+| Redact Worker | 512 MB | OpenPDF has zero AWT dependency (unlike PDFBox). Font (615 KB) cached after first load. AI call dominates latency. |
+| Feedback Worker | 256 MB | I/O-bound JSON in/out + S3 upload. Further reduction offers no cost benefit (CPU proportionality floor). |
+| Ask Worker | 256 MB | I/O-bound: RAG context + AI network wait. Production log: 169 MB peak cold start with full RAG warmup. |
+| Scheduled Report | 256 MB | Weekly I/O-bound task. CloudWatch API calls dominate; memory for HTML generation is modest. |
+
 ---
 
-## 💬 Conversation History (Multi-turn)
+## Conversation History (Multi-turn)
 
 Conversation context is stored by `conversationId` in a Caffeine in-memory cache with:
 
@@ -472,17 +506,17 @@ The `ConversationManagementService` provides append/retrieve/clear operations. P
 
 ---
 
-## 📄 PDF Complaint Generation
+## PDF Complaint Generation
 
 When a citizen provides complete identity (`given_name`, `family_name`, `NIF`), the `POST /complai/redact` endpoint:
 
 1. Validates identity completeness.
 2. Queues the request to the SQS redact queue (`complai-redact-<env>`).
-3. Returns HTTP 202 with the `conversationId`.
+3. Returns HTTP 202 with the `conversationId` and a presigned S3 URL.
 
-The **Redact Worker Lambda** (`ComplAIRedactorLambda`) processes the message:
+The **Redact Worker Lambda** processes the message:
 1. Calls OpenRouter for complaint text generation.
-2. Generates a PDF via Apache PDFBox.
+2. Generates a PDF via **OpenPDF** (replaces Apache PDFBox — zero AWT dependency required by GraalVM native image).
 3. Uploads the PDF to the complaints S3 bucket (`complai-complaints-<env>`).
 4. Returns a signed S3 URL for download.
 
@@ -490,15 +524,15 @@ If identity is incomplete, the response includes a clarification request.
 
 ---
 
-## 🆔 OIDC Identity Verification
+## OIDC Identity Verification
 
 ComplAI supports **OpenID Connect (OIDC) ID token** verification for identity validation on the redact endpoint.
 
 | Provider | Status | Issuer |
 |---|---|---|
-| Cl@ve (via AOC) | Disabled (configurable) | `https://identitats.aoc.cat` |
-| VALId (via AOC) | Disabled (configurable) | `https://identitats.aoc.cat` |
-| idCat (via AOC) | Disabled (configurable) | `https://identitats.aoc.cat` |
+| Cl@ve (via AOC) | Disabled (configurable per city) | `https://identitats.aoc.cat` |
+| VALId (via AOC) | Disabled (configurable per city) | `https://identitats.aoc.cat` |
+| idCat (via AOC) | Disabled (configurable per city) | `https://identitats.aoc.cat` |
 
 **Validation flow**:
 1. Client sends `X-Identity-Token` header on `POST /complai/redact`.
@@ -510,7 +544,7 @@ City-specific OIDC configuration is bundled in `src/main/resources/oidc/oidc-map
 
 ---
 
-## 🤖 AI Identity and Behaviour
+## AI Identity and Behaviour
 
 - **Model**: Configurable via `OPENROUTER_MODEL` environment variable (default `openrouter/free`).
 - **Language detection**: Automatic detection of Catalan, Spanish, or English from user input. The AI responds in the detected language.
@@ -521,7 +555,7 @@ City-specific OIDC configuration is bundled in `src/main/resources/oidc/oidc-map
 
 ---
 
-## 🤖 Telegram Bot
+## Telegram Bot
 
 ComplAI includes a **Telegram Bot** integration that allows citizens to interact with the municipal AI assistant directly through Telegram. The bot supports multi-city deployments — each city has its own bot token and webhook secret.
 
@@ -539,6 +573,7 @@ Telegram → POST /telegram/webhook/{cityId} → TelegramController
 - **Auth**: Excluded from `X-Api-Key` filter; secured via `X-Telegram-Bot-Api-Secret-Token` header
 - **Bot token**: Resolved from `TOKEN_TELEGRAM_<cityId>` environment variable at startup
 - **Session state**: Per-chat mode/language stored in Caffeine cache (30 min TTL)
+- **Async AI**: For complaint drafting and feedback, the bot publishes messages to SQS queues. The **Ask Worker Lambda** processes Telegram ask jobs asynchronously — it calls the AI and sends the answer back via the Telegram Bot API.
 
 ### Setup
 
@@ -574,8 +609,8 @@ Telegram → POST /telegram/webhook/{cityId} → TelegramController
 
 | Mode | Flow |
 |---|---|
-| **Ask** | User types a question → AI responds via `OpenRouterServices.ask()` synchronously |
-| **Complaint** | Collect complaint text → collect identity (name, surname, NIF) → queue async PDF generation via SQS → return presigned URL |
+| **Ask** | User types a question → bot sends "typing" action → calls OpenRouter API → sends answer via Telegram synchronous API |
+| **Complaint** | Collect complaint text → collect identity (name, surname, NIF) → publish to SQS → worker Lambda calls AI → sends presigned PDF URL via Telegram |
 | **Feedback** | Collect suggestion text → publish to SQS feedback queue → confirmation message |
 
 ### Multi-city Support
@@ -598,7 +633,7 @@ The bot automatically discovers cities by scanning env vars at startup. To add a
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 - **Branch strategy**: feature branches off `master`.
 - **Code style**: constructor injection only, Micronaut conventions, Javadoc on all public methods.
@@ -610,7 +645,7 @@ The bot automatically discovers cities by scanning env vars at startup. To add a
 
 ---
 
-## ⚖️ License
+## License
 
 Copyright (c) 2026 Raul Torres Alarcon. All Rights Reserved.
 
