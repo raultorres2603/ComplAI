@@ -200,15 +200,10 @@ npm run cdk deploy -- --context environment=development
 - Bucket versioning, encryption, and lifecycle policies
 - Bucket policies and CORS configuration
 
-### WafStack
-- AWS WAF rules for API protection
-- Rate limiting rules
-- Geo-blocking configuration (optional)
-
 ### EdgeStack
-- CloudFront distribution for CDN
-- Origin configurations
-- Caching behaviors
+- CloudFront distribution for CDN (production only, us-east-1)
+- AWS WAF rules (geo-blocking to Spain, rate limiting)
+- Origin configurations and custom cache policies
 
 ## Monitoring & Debugging
 
@@ -298,8 +293,7 @@ cdk/
 ├── lambda-stack.ts              # Lambda, API Gateway, roles
 ├── queue-stack.ts               # SQS queues
 ├── storage-stack.ts             # S3 buckets
-├── waf-stack.ts                 # AWS WAF rules
-├── edge-stack.ts                # CloudFront distribution
+├── edge-stack.ts                # CloudFront distribution + WAF rules
 ├── deployment-environment.ts    # Environment type definition
 ├── cdk.json                     # CDK configuration
 ├── tsconfig.json                # TypeScript configuration
