@@ -4,7 +4,6 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 import io.micronaut.function.aws.MicronautRequestHandler;
-import jakarta.inject.Inject;
 
 /**
  * AWS Lambda handler for scheduled statistics report emails via SES.
@@ -22,20 +21,29 @@ import jakarta.inject.Inject;
  * </ul>
  *
  * <p>Local development: the handler is invoked via {@code sam local invoke} by
- * {@code ses_scheduled_poller.py}, which runs on a cron-like loop through SAM.
+ * {@code ses_scheduled_poller.py}, which runs on a cron-like schedule through SAM.
  */
 public class SesScheduledReportHandler extends MicronautRequestHandler<Map<String, Object>, String> {
 
     private static final Logger logger = Logger.getLogger(SesScheduledReportHandler.class.getName());
 
-    @Inject
-    private MultiCitySesService multiCityService;
+    // Package-private for testability. Resolved lazily via getApplicationContext()
+    // to avoid GraalVM native image reflection issues with @Inject field injection.
+    // Same pattern as RedactWorkerHandler.
+    MultiCitySesService multiCityService;
+
+    private MultiCitySesService getMultiCityService() {
+        if (multiCityService == null) {
+            multiCityService = getApplicationContext().getBean(MultiCitySesService.class);
+        }
+        return multiCityService;
+    }
 
     @Override
     public String execute(Map<String, Object> event) {
         logger.info("SesScheduledReportHandler — scheduled invocation received");
         logger.info(() -> "Event source: " + event.get("source")
                 + " | detail-type: " + event.get("detail-type"));
-        return multiCityService.runReportsForAllCities();
+        return getMultiCityService().runReportsForAllCities();
     }
 }
