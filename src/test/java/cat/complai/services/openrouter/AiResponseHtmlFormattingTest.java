@@ -121,10 +121,10 @@ public class AiResponseHtmlFormattingTest {
         String message = response.getMessage();
         assertTrue(message.contains("<h2>Response About Your Complaint</h2>"),
                 "Heading should be converted to h2 tag");
-        assertTrue(message.contains("<strong>potholes</strong>"),
-                "Bold text should be converted to strong tag");
-        assertTrue(message.contains("<em>Main Street</em>"),
-                "Italic text should be converted to em tag");
+        assertTrue(message.contains("<b>potholes</b>"),
+                "AI response should contain bold <b> tags");
+        assertTrue(message.contains("<i>Main Street</i>"),
+                "AI response should contain italic <i> tags");
         assertTrue(message.contains("<li>It affects road safety</li>"),
                 "List items should be converted to li tags");
         assertTrue(message.contains("<a href=\"https://example.com/procedures\">complaint procedures</a>"),
@@ -183,8 +183,8 @@ public class AiResponseHtmlFormattingTest {
         // Verify all elements converted
         assertTrue(message.contains("<h2>Main Heading</h2>"));
         assertTrue(message.contains("<h3>Sub Section</h3>"));
-        assertTrue(message.contains("<strong>bold</strong>"));
-        assertTrue(message.contains("<em>italic</em>"));
+        assertTrue(message.contains("<b>bold</b>"));
+        assertTrue(message.contains("<i>italic</i>"));
         assertTrue(message.contains("<li>First item with"));
         assertTrue(message.contains("<a href=\"https://example.com/1\">link</a>"));
         assertTrue(message.contains("<a href=\"https://example.com/2\">another link</a>"));

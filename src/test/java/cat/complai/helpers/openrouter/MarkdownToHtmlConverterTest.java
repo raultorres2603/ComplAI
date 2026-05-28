@@ -29,22 +29,22 @@ class MarkdownToHtmlConverterTest {
     void testBold_ConvertsSingleBoldMarks() {
         String input = "This is **bold** text.";
         String result = MarkdownToHtmlConverter.convertMarkdownToHtml(input);
-        assertTrue(result.contains("<strong>bold</strong>"));
+        assertTrue(result.contains("<b>bold</b>"));
     }
 
     @Test
     void testBold_ConvertsMulipleBoldMarks() {
         String input = "This is **bold** and **more bold** text.";
         String result = MarkdownToHtmlConverter.convertMarkdownToHtml(input);
-        assertTrue(result.contains("<strong>bold</strong>"));
-        assertTrue(result.contains("<strong>more bold</strong>"));
+        assertTrue(result.contains("<b>bold</b>"));
+        assertTrue(result.contains("<b>more bold</b>"));
     }
 
     @Test
     void testBold_WithSpaces() {
         String input = "**bold text with spaces**";
         String result = MarkdownToHtmlConverter.convertMarkdownToHtml(input);
-        assertTrue(result.contains("<strong>bold text with spaces</strong>"));
+        assertTrue(result.contains("<b>bold text with spaces</b>"));
     }
 
     // ===== ITALIC TESTS =====
@@ -53,22 +53,22 @@ class MarkdownToHtmlConverterTest {
     void testItalic_ConvertsSingleItalicMarks() {
         String input = "This is *italic* text.";
         String result = MarkdownToHtmlConverter.convertMarkdownToHtml(input);
-        assertTrue(result.contains("<em>italic</em>"));
+        assertTrue(result.contains("<i>italic</i>"));
     }
 
     @Test
     void testItalic_ConvertsMulitpleItalicMarks() {
         String input = "This is *italic* and *more italic* text.";
         String result = MarkdownToHtmlConverter.convertMarkdownToHtml(input);
-        assertTrue(result.contains("<em>italic</em>"));
-        assertTrue(result.contains("<em>more italic</em>"));
+        assertTrue(result.contains("<i>italic</i>"));
+        assertTrue(result.contains("<i>more italic</i>"));
     }
 
     @Test
     void testItalic_WithSpaces() {
         String input = "*italic text with spaces*";
         String result = MarkdownToHtmlConverter.convertMarkdownToHtml(input);
-        assertTrue(result.contains("<em>italic text with spaces</em>"));
+        assertTrue(result.contains("<i>italic text with spaces</i>"));
     }
 
     // ===== LINK TESTS =====
@@ -199,8 +199,8 @@ class MarkdownToHtmlConverterTest {
     void testCombined_BoldAndItalic() {
         String input = "This is **bold** and *italic* text.";
         String result = MarkdownToHtmlConverter.convertMarkdownToHtml(input);
-        assertTrue(result.contains("<strong>bold</strong>"));
-        assertTrue(result.contains("<em>italic</em>"));
+        assertTrue(result.contains("<b>bold</b>"));
+        assertTrue(result.contains("<i>italic</i>"));
     }
 
     @Test
@@ -216,7 +216,7 @@ class MarkdownToHtmlConverterTest {
         String input = "## Information\n\nThis is **important**.\n\n- Item 1\n- Item 2\n\nVisit [here](https://example.com) for more.";
         String result = MarkdownToHtmlConverter.convertMarkdownToHtml(input);
         assertTrue(result.contains("<h2>Information</h2>"));
-        assertTrue(result.contains("<strong>important</strong>"));
+        assertTrue(result.contains("<b>important</b>"));
         assertTrue(result.contains("<li>Item 1</li>"));
         assertTrue(result.contains("<a href=\"https://example.com\">here</a>"));
     }
@@ -227,8 +227,8 @@ class MarkdownToHtmlConverterTest {
         String result = MarkdownToHtmlConverter.convertMarkdownToHtml(input);
         assertNotNull(result);
         assertTrue(result.contains("<h2>Summary</h2>"));
-        assertTrue(result.contains("<strong>complaint</strong>"));
-        assertTrue(result.contains("<em>street condition</em>"));
+        assertTrue(result.contains("<b>complaint</b>"));
+        assertTrue(result.contains("<i>street condition</i>"));
         assertTrue(result.contains("<li>Broken pavement</li>"));
         assertTrue(result.contains("<a href="));
     }

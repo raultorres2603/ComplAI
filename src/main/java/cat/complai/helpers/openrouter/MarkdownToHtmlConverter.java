@@ -7,9 +7,14 @@ import java.util.regex.Pattern;
  * Enables AI responses with Markdown formatting to be delivered as HTML to clients.
  *
  * <p>
+ * Output uses Telegram-compatible HTML tags ({@code <b>} for bold, {@code <i>} for italic,
+ * {@code <a>} for links) because the Telegram Bot API only supports {@code <b>}, {@code <i>},
+ * {@code <u>}, {@code <s>}, {@code <code>}, {@code <pre>}, {@code <a>}, and {@code <tg-spoiler>}.
+ *
+ * <p>
  * Converts:
- * - **text** → <strong>text</strong> (emphasized text)
- * - *text* → <em>text</em> (italic text)
+ * - **text** → <b>text</b> (emphasized text)
+ * - *text* → <i>text</i> (italic text)
  * - [text](url) → <a href="url">text</a> (links)
  * - ## heading → <h2>heading</h2> (headings)
  * - - item → <ul><li>item</li></ul> (unordered lists)
@@ -172,19 +177,21 @@ public class MarkdownToHtmlConverter {
     }
 
     /**
-     * Converts Markdown bold text **text** to HTML <strong> tags.
+     * Converts Markdown bold text {@code **text**} to HTML {@code <b>} tags.
+     * Uses {@code <b>} (instead of {@code <strong>}) because Telegram only supports {@code <b>}.
      */
     private static String convertBold(String text) {
-        return BOLD_PATTERN.matcher(text).replaceAll("<strong>$1</strong>");
+        return BOLD_PATTERN.matcher(text).replaceAll("<b>$1</b>");
     }
 
     /**
-     * Converts Markdown italic text *text* to HTML <em> tags.
-     * Uses a cautious approach to avoid converting ** patterns.
+     * Converts Markdown italic text {@code *text*} to HTML {@code <i>} tags.
+     * Uses {@code <i>} (instead of {@code <em>}) because Telegram only supports {@code <i>}.
+     * Uses a cautious approach to avoid converting {@code **} patterns.
      */
     private static String convertItalic(String text) {
         // Only convert *text* if not preceded/followed by another *
         // This prevents converting ** which should already be handled by bold conversion
-        return ITALIC_PATTERN.matcher(text).replaceAll("<em>$1</em>");
+        return ITALIC_PATTERN.matcher(text).replaceAll("<i>$1</i>");
     }
 }

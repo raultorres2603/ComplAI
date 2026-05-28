@@ -231,6 +231,9 @@ public class RedactPromptBuilder {
                         • Si et demanen esdeveniments però no hi ha cap finestra temporal (data, setmana, mes o rang), demana primer aquest interval abans de donar resultats.
                         • Estructura la resposta de manera clara: explicació, passos si escau, i finalment enllaços útils.
                         • Sigues respectuós i proper, com un veí que vol ajudar de debò.
+                        • Utilitza emojis rellevants (✅, ⚠️, 📅, 💡, ℹ️, 📋, ➡️, 🏛️) per fer la resposta més visual i amigable. No n'abusis.
+                        • Escriu en paràgrafs curts, amb espais entre idees, per facilitar la lectura. No acumulis tot en un sol bloc.
+                        • Ressalta paraules clau amb <b>negreta</b> per guiar la mirada del lector.
                         • Si la consulta no és sobre %s, digues-ho educadament i suggereix preguntes sobre assumptes locals.
 
                         Pàgines oficials: %s. Font independent: %s.
@@ -258,6 +261,9 @@ public class RedactPromptBuilder {
                         • Si te preguntan por eventos pero no hay ventana temporal (fecha, semana, mes o rango), primero pide ese intervalo antes de dar resultados.
                         • Estructura la respuesta con claridad: explicación, pasos si procede, y finalmente enlaces útiles.
                         • Sé respetuoso y cercano.
+                        • Usa emojis relevantes (✅, ⚠️, 📅, 💡, ℹ️, 📋, ➡️, 🏛️) para hacer la respuesta más visual y amigable. Sin abusar.
+                        • Escribe en párrafos cortos, con espacios entre ideas, para facilitar la lectura. No acumules todo en un solo bloque.
+                        • Resalta palabras clave con <b>negrita</b> para guiar la mirada del lector.
                         • Si la consulta no trata sobre %s, dilo educadamente y sugiere preguntas sobre asuntos locales.
 
                         Páginas oficiales: %s. Fuente independiente: %s.
@@ -285,6 +291,9 @@ public class RedactPromptBuilder {
                         • If asked about events but no timeframe is provided (date, week, month, or range), ask for that date window before giving results.
                         • Structure your response clearly: explanation first, then steps if applicable, then useful links.
                         • Be respectful and approachable.
+                        • Use relevant emojis (✅, ⚠️, 📅, 💡, ℹ️, 📋, ➡️, 🏛️) to make the response more visual and friendly. Don't overdo it.
+                        • Write in short paragraphs with blank lines between ideas for easy reading. Don't cram everything into one block.
+                        • Highlight key words with <b>bold</b> to guide the reader's eye.
                         • If the request is not about %s, politely say you can't help with that and suggest they ask about local matters.
 
                         Official information: %s. Independent news: %s.
@@ -311,6 +320,9 @@ public class RedactPromptBuilder {
                         • Si on vous demande des événements mais aucune période n'est fournie (date, semaine, mois ou plage), demandez d'abord cette plage de dates avant de donner les résultats.
                         • Structurez votre réponse clairement: explication d'abord, puis étapes si applicable, puis liens utiles.
                         • Soyez respectueux et approchable.
+                        • Utilisez des emojis pertinents (✅, ⚠️, 📅, 💡, ℹ️, 📋, ➡️, 🏛️) pour rendre la réponse plus visuelle et conviviale. Sans en abuser.
+                        • Écrivez en paragraphes courts avec des lignes blanches entre les idées pour faciliter la lecture. N'entassez pas tout dans un seul bloc.
+                        • Mettez en avant les mots clés avec <b>gras</b> pour guider le regard du lecteur.
                         • Si la demande ne concerne pas %s, dites-le poliment et suggérez qu'ils posent des questions sur des sujets locaux.
 
                         Informations officielles: %s. Actualités indépendantes: %s.

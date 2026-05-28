@@ -106,16 +106,16 @@ class HtmlFormatterTest {
     @Test
     @DisplayName("Should handle strong and em tags")
     void testHandleStrongAndEmTags() {
-        String input = "Text with\n<strong>bold</strong>\nand\n<em>italic</em>\ntext";
+        String input = "Text with\n<b>bold</b>\nand\n<i>italic</i>\ntext";
         String result = HtmlFormatter.cleanHtml(input);
         // Newlines before tags should be removed
-        assertFalse(result.contains("\n<strong>"));
-        assertFalse(result.contains("\n<em>"));
+        assertFalse(result.contains("\n<b>"));
+        assertFalse(result.contains("\n<i>"));
         // Newlines before closing tags should be removed
-        assertFalse(result.contains("bold</strong>\nand\n<em>"));
+        assertFalse(result.contains("bold</b>\nand\n<i>"));
         // Newlines after closing tags but before text should be preserved
-        assertTrue(result.contains("</strong>\nand"));
-        assertTrue(result.contains("</em>\ntext"));
+        assertTrue(result.contains("</b>\nand"));
+        assertTrue(result.contains("</i>\ntext"));
     }
 
     @Test
@@ -132,10 +132,10 @@ class HtmlFormatterTest {
     @Test
     @DisplayName("Should handle nested tags")
     void testHandleNestedTags() {
-        String input = "<ul>\n<li>\n<strong>Bold item</strong>\n</li>\n</ul>";
+        String input = "<ul>\n<li>\n<b>Bold item</b>\n</li>\n</ul>";
         String result = HtmlFormatter.cleanHtml(input);
         // Should clean all newlines around tags
-        assertEquals("<ul><li><strong>Bold item</strong></li></ul>", result);
+        assertEquals("<ul><li><b>Bold item</b></li></ul>", result);
     }
 
     @Test

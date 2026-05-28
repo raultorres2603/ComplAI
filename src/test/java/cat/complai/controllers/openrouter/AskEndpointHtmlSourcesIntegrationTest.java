@@ -65,7 +65,7 @@ public class AskEndpointHtmlSourcesIntegrationTest {
         assertNotNull(result.getMessage(), "Message should not be null");
 
         String message = result.getMessage();
-        assertTrue(message.contains("<p>") || message.contains("<strong>") || message.contains("<h2>"),
+        assertTrue(message.contains("<p>") || message.contains("<b>") || message.contains("<h2>"),
                 "Message should contain HTML tags");
         assertFalse(message.isEmpty(), "Message should not be empty");
     }
@@ -263,7 +263,7 @@ public class AskEndpointHtmlSourcesIntegrationTest {
 
         assertNotNull(result.getMessage(), "Message should not be null");
         String message = result.getMessage();
-        assertTrue(message.contains("<p>") || message.contains("<strong>") || message.contains("<h2>"),
+        assertTrue(message.contains("<p>") || message.contains("<b>") || message.contains("<h2>"),
                 "Message should contain HTML formatting");
 
         assertNotNull(result.getSources(), "Sources should not be null");
