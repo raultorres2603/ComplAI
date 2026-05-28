@@ -28,7 +28,8 @@ import java.util.logging.Logger;
 public class SqsComplaintPublisher {
 
     /** Maximum number of visible messages on the queue before we reject new publishes. */
-    static final int MAX_QUEUE_DEPTH = 1000;
+    static final int MAX_QUEUE_DEPTH = Integer.parseInt(
+            System.getenv().getOrDefault("SQS_MAX_QUEUE_DEPTH", "1000"));
 
     // Cache queue depth checks for 1 second to avoid an SQS API call on every publish.
     private static final Cache<String, Integer> QUEUE_DEPTH_CACHE = Caffeine.newBuilder()

@@ -64,7 +64,8 @@ public class TelegramBotService {
             .build();
 
     /** Default maximum text messages per second from a single chat. */
-    static final int DEFAULT_RATE_LIMIT_PER_SECOND = 3;
+    static final int DEFAULT_RATE_LIMIT_PER_SECOND = Integer.parseInt(
+            System.getenv().getOrDefault("TELEGRAM_CHAT_RATE_LIMIT_PER_SECOND", "3"));
 
     // Global per-bot rate limiting: at most N text messages per second across all chats
     // for the same bot (city). Key = "cityId", value = request counter.
@@ -75,10 +76,12 @@ public class TelegramBotService {
             .build();
 
     /** Default maximum text messages per second from a single bot (across all chats). */
-    static final int DEFAULT_BOT_RATE_LIMIT_PER_SECOND = 10;
+    static final int DEFAULT_BOT_RATE_LIMIT_PER_SECOND = Integer.parseInt(
+            System.getenv().getOrDefault("TELEGRAM_BOT_RATE_LIMIT_PER_SECOND", "10"));
 
     /** Maximum allowed length for a non-command message (Telegram's own limit is 4096). */
-    static final int MAX_MESSAGE_LENGTH = 4096;
+    static final int MAX_MESSAGE_LENGTH = Integer.parseInt(
+            System.getenv().getOrDefault("TELEGRAM_MAX_MESSAGE_LENGTH", "4096"));
 
     private final TelegramConfiguration telegramConfig;
     private final TelegramSessionStore sessionStore;
