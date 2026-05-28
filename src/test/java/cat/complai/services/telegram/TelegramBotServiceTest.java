@@ -11,7 +11,6 @@ import cat.complai.services.telegram.TelegramSessionStore.TelegramMode;
 import cat.complai.utilities.s3.S3PdfUploader;
 import cat.complai.utilities.sqs.SqsAskPublisher;
 import cat.complai.utilities.sqs.SqsComplaintPublisher;
-import cat.complai.dto.sqs.AskSqsMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -79,6 +78,8 @@ class TelegramBotServiceTest {
         // which calls telegramConfig.getToken(). Use lenient since parseIdentity
         // tests never call getToken at all.
         lenient().when(telegramConfig.getToken(anyString())).thenReturn("mock-token");
+        // Clear the static rate-limit cache so tests don't interfere with each other
+        TelegramBotService.CHAT_RATE_LIMIT.invalidateAll();
     }
 
     /** Build a TelegramUpdate containing a text message. */
@@ -195,6 +196,110 @@ class TelegramBotServiceTest {
         service.processUpdate(callbackUpdate(chatId, "cb-lang", "lang_ca"), "testcity");
 
         verify(sessionStore).setLanguage(chatId, "CA");
+    }
+
+    // -------------------------------------------------------------------------
+    // Rate limiting
+    // -------------------------------------------------------------------------
+
+    @Test
+    void processUpdate_messagesUnderRateLimit_areProcessed() {
+        long chatId = 800L;
+        String query = "Quins són els horaris?";
+        String conversationId = "telegram:" + chatId;
+
+        when(sessionStore.getLanguage(chatId)).thenReturn("CA");
+        when(sessionStore.getMode(chatId)).thenReturn(TelegramMode.ASK);
+        when(sessionStore.getOrCreateConversationId(chatId)).thenReturn(conversationId);
+
+        // Send 3 rapid messages from the same chat — all should be processed
+        for (int i = 0; i < 3; i++) {
+            service.processUpdate(textUpdate(chatId, query + " " + i), "testcity");
+        }
+
+        verify(askPublisher, times(3)).publish(any(AskSqsMessage.class));
+    }
+
+    @Test
+    void processUpdate_messagesOverRateLimit_droppedSilently() {
+        long chatId = 801L;
+        String query = "Hola";
+        String conversationId = "telegram:" + chatId;
+
+        when(sessionStore.getLanguage(chatId)).thenReturn("CA");
+        when(sessionStore.getMode(chatId)).thenReturn(TelegramMode.ASK);
+        when(sessionStore.getOrCreateConversationId(chatId)).thenReturn(conversationId);
+
+        // Send 4 rapid messages — the 4th should be dropped (rate limit = 3/s)
+        for (int i = 0; i < 4; i++) {
+            service.processUpdate(textUpdate(chatId, query + " " + i), "testcity");
+        }
+
+        // Only 3 messages should have been processed
+        verify(askPublisher, times(3)).publish(any(AskSqsMessage.class));
+    }
+
+    @Test
+    void processUpdate_callbackQueries_notRateLimited() {
+        long chatId = 802L;
+        when(sessionStore.getLanguage(chatId)).thenReturn("EN");
+
+        // Send 10 callback queries from the same chat — none should be rate-limited
+        for (int i = 0; i < 10; i++) {
+            service.processUpdate(callbackUpdate(chatId, "cb-" + i, "mode_ask"), "testcity");
+        }
+
+        verify(sessionStore, times(10)).setMode(chatId, TelegramMode.ASK);
+    }
+
+    // -------------------------------------------------------------------------
+    // Length validation
+    // -------------------------------------------------------------------------
+
+    @Test
+    void processUpdate_messageWithinLengthLimit_processedNormally() {
+        long chatId = 900L;
+        String query = "Quins són els horaris de l'ajuntament?";
+        String conversationId = "telegram:" + chatId;
+
+        when(sessionStore.getLanguage(chatId)).thenReturn("CA");
+        when(sessionStore.getMode(chatId)).thenReturn(TelegramMode.ASK);
+        when(sessionStore.getOrCreateConversationId(chatId)).thenReturn(conversationId);
+
+        service.processUpdate(textUpdate(chatId, query), "testcity");
+
+        verify(askPublisher).publish(any(AskSqsMessage.class));
+    }
+
+    @Test
+    void processUpdate_messageExceedsMaxLength_sendsErrorReply() {
+        long chatId = 901L;
+        // Build a string longer than MAX_MESSAGE_LENGTH
+        String longText = "A".repeat(TelegramBotService.MAX_MESSAGE_LENGTH + 1);
+
+        when(sessionStore.getLanguage(chatId)).thenReturn("ES");
+
+        service.processUpdate(textUpdate(chatId, longText), "testcity");
+
+        // Should NOT have enqueued anything to SQS or processed the message further
+        verifyNoInteractions(askPublisher);
+        verify(sessionStore, never()).getMode(anyLong());
+    }
+
+    @Test
+    void processUpdate_commandExemptFromLengthValidation() {
+        long chatId = 902L;
+        // Build a very long string that starts with /start
+        String longCommand = "/start " + "x".repeat(TelegramBotService.MAX_MESSAGE_LENGTH + 1);
+
+        when(sessionStore.getLanguage(chatId)).thenReturn("CA");
+
+        service.processUpdate(textUpdate(chatId, longCommand), "testcity");
+
+        // Should be treated as a /start command regardless of length
+        verify(sessionStore).clearSession(chatId);
+        verify(sessionStore).getLanguage(chatId);
+        verifyNoMoreInteractions(sessionStore);
     }
 
     // -------------------------------------------------------------------------

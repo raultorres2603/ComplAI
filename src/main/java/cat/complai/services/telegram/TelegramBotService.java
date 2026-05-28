@@ -28,6 +28,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -54,10 +55,22 @@ public class TelegramBotService {
             .maximumSize(10_000)
             .build();
 
+    // Per-chat rate limiting: at most N text messages per second per chat.
+    // Key = "cityId:chatId", value = request counter in the current 1-second window.
+    // Callback queries are NOT rate-limited (they are user-initiated button presses).
+    static final Cache<String, AtomicInteger> CHAT_RATE_LIMIT = Caffeine.newBuilder()
+            .expireAfterWrite(1, TimeUnit.SECONDS)
+            .maximumSize(100_000)
+            .build();
+
+    /** Default maximum text messages per second from a single chat. */
+    static final int DEFAULT_RATE_LIMIT_PER_SECOND = 3;
+
+    /** Maximum allowed length for a non-command message (Telegram's own limit is 4096). */
+    static final int MAX_MESSAGE_LENGTH = 4096;
+
     private final TelegramConfiguration telegramConfig;
     private final TelegramSessionStore sessionStore;
-    private final IOpenRouterService openRouterService;
-    private final ConversationManagementService conversationService;
     private final SqsComplaintPublisher sqsPublisher;
     private final SqsAskPublisher askPublisher;
     private final S3PdfUploader s3PdfUploader;
@@ -78,8 +91,6 @@ public class TelegramBotService {
                               ObjectMapper mapper) {
         this.telegramConfig = telegramConfig;
         this.sessionStore = sessionStore;
-        this.openRouterService = openRouterService;
-        this.conversationService = conversationService;
         this.sqsPublisher = sqsPublisher;
         this.askPublisher = askPublisher;
         this.s3PdfUploader = s3PdfUploader;
@@ -113,13 +124,43 @@ public class TelegramBotService {
             logger.fine(() -> "Skipping duplicate updateId=" + updateId);
             return;
         }
-        PROCESSED_UPDATE_IDS.put(updateId, Boolean.TRUE);
+        PROCESSED_UPDATE_IDS.put(updateId, true);
 
         if (update.callbackQuery() != null) {
             handleCallbackQuery(update.callbackQuery(), cityId);
         } else if (update.message() != null && update.message().text() != null) {
+            // Per-chat rate limiting — silently drop if over the per-second limit
+            long chatId = update.message().chat().id();
+            if (isRateLimited(cityId, chatId)) {
+                return;
+            }
             handleMessage(update.message(), cityId);
         }
+    }
+
+    /**
+     * Checks whether the given chat has exceeded the per-second rate limit.
+     *
+     * <p>Uses a sliding 1-second window tracked by the static
+     * {@link #CHAT_RATE_LIMIT} cache. When the limit is exceeded the message
+     * is silently dropped and a warning is logged (no SQS enqueue, no Telegram
+     * error reply — returning 200 to Telegram is the fastest way to stop
+     * Telegram from retrying).
+     *
+     * @param cityId the city identifier
+     * @param chatId the Telegram chat ID
+     * @return {@code true} if the message should be dropped
+     */
+    private boolean isRateLimited(String cityId, long chatId) {
+        String key = cityId + ":" + chatId;
+        AtomicInteger counter = CHAT_RATE_LIMIT.get(key, k -> new AtomicInteger(0));
+        int count = counter.incrementAndGet();
+        if (count > DEFAULT_RATE_LIMIT_PER_SECOND) {
+            logger.warning(() -> "Rate limit exceeded — chatId=" + chatId
+                    + " city=" + cityId + " count=" + count);
+            return true;
+        }
+        return false;
     }
 
     // -------------------------------------------------------------------------
@@ -131,18 +172,40 @@ public class TelegramBotService {
         String text = message.text().trim();
         String lang = sessionStore.getLanguage(chatId);
 
+        // Commands are exempt from length validation
         if (text.startsWith("/start")) {
             sessionStore.clearSession(chatId);
             sendWelcome(chatId, cityId, lang);
-        } else if (text.startsWith("/mode")) {
-            sendModeSelection(chatId, cityId, lang);
-        } else if (text.startsWith("/help")) {
-            sendHelp(chatId, cityId, lang);
-        } else if (text.startsWith("/language")) {
-            sendLanguageSelection(chatId, cityId);
-        } else {
-            handleTextByMode(chatId, text, cityId, lang);
+            return;
         }
+        if (text.startsWith("/mode")) {
+            sendModeSelection(chatId, cityId, lang);
+            return;
+        }
+        if (text.startsWith("/help")) {
+            sendHelp(chatId, cityId, lang);
+            return;
+        }
+        if (text.startsWith("/language")) {
+            sendLanguageSelection(chatId, cityId);
+            return;
+        }
+
+        // Length validation for non-command messages
+        if (text.length() > MAX_MESSAGE_LENGTH) {
+            logger.warning(() -> "Message too long — chatId=" + chatId
+                    + " city=" + cityId + " length=" + text.length());
+            String errorMsg = switch (lang) {
+                case "CA" -> "El missatge \u00E9s massa llarg. Si us plau, envia'l en menys de 4000 car\u00E0cters.";
+                case "ES" -> "El mensaje es demasiado largo. Por favor, envíalo en menos de 4000 caracteres.";
+                case "FR" -> "Le message est trop long. Veuillez l'envoyer en moins de 4000 caractères.";
+                default -> "The message is too long. Please send it in under 4000 characters.";
+            };
+            sendMessage(chatId, errorMsg, null, cityId);
+            return;
+        }
+
+        handleTextByMode(chatId, text, cityId, lang);
     }
 
     private void handleCallbackQuery(TelegramCallbackQuery callback, String cityId) {
