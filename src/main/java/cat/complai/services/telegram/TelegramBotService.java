@@ -66,6 +66,17 @@ public class TelegramBotService {
     /** Default maximum text messages per second from a single chat. */
     static final int DEFAULT_RATE_LIMIT_PER_SECOND = 3;
 
+    // Global per-bot rate limiting: at most N text messages per second across all chats
+    // for the same bot (city). Key = "cityId", value = request counter.
+    // This is a second layer of defence on top of the per-chat limit.
+    static final Cache<String, AtomicInteger> BOT_RATE_LIMIT = Caffeine.newBuilder()
+            .expireAfterWrite(1, TimeUnit.SECONDS)
+            .maximumSize(100)
+            .build();
+
+    /** Default maximum text messages per second from a single bot (across all chats). */
+    static final int DEFAULT_BOT_RATE_LIMIT_PER_SECOND = 10;
+
     /** Maximum allowed length for a non-command message (Telegram's own limit is 4096). */
     static final int MAX_MESSAGE_LENGTH = 4096;
 
@@ -129,11 +140,18 @@ public class TelegramBotService {
         if (update.callbackQuery() != null) {
             handleCallbackQuery(update.callbackQuery(), cityId);
         } else if (update.message() != null && update.message().text() != null) {
-            // Per-chat rate limiting — silently drop if over the per-second limit
             long chatId = update.message().chat().id();
+
+            // Two layers of rate limiting before processing:
+            // 1. Bot-wide — protects the entire bot from coordinated floods
+            if (isBotRateLimited(cityId)) {
+                return;
+            }
+            // 2. Per-chat — protects individual chat fairness
             if (isRateLimited(cityId, chatId)) {
                 return;
             }
+
             handleMessage(update.message(), cityId);
         }
     }
@@ -156,8 +174,31 @@ public class TelegramBotService {
         AtomicInteger counter = CHAT_RATE_LIMIT.get(key, k -> new AtomicInteger(0));
         int count = counter.incrementAndGet();
         if (count > DEFAULT_RATE_LIMIT_PER_SECOND) {
-            logger.warning(() -> "Rate limit exceeded — chatId=" + chatId
+            logger.warning(() -> "Per-chat rate limit exceeded — chatId=" + chatId
                     + " city=" + cityId + " count=" + count);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Checks whether the total traffic for a bot (city) has exceeded the
+     * per-second global rate limit.
+     *
+     * <p>This is a second layer of defence on top of the per-chat limit.
+     * Even if individual chats stay under their limit, a coordinated flood
+     * across many chats would be caught here. The limit is tracked in the
+     * static {@link #BOT_RATE_LIMIT} cache.
+     *
+     * @param cityId the city identifier (one bot per city)
+     * @return {@code true} if the message should be dropped
+     */
+    private boolean isBotRateLimited(String cityId) {
+        AtomicInteger counter = BOT_RATE_LIMIT.get(cityId, k -> new AtomicInteger(0));
+        int count = counter.incrementAndGet();
+        if (count > DEFAULT_BOT_RATE_LIMIT_PER_SECOND) {
+            logger.warning(() -> "Bot-wide rate limit exceeded — city=" + cityId
+                    + " count=" + count);
             return true;
         }
         return false;

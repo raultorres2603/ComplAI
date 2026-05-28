@@ -78,8 +78,9 @@ class TelegramBotServiceTest {
         // which calls telegramConfig.getToken(). Use lenient since parseIdentity
         // tests never call getToken at all.
         lenient().when(telegramConfig.getToken(anyString())).thenReturn("mock-token");
-        // Clear the static rate-limit cache so tests don't interfere with each other
+        // Clear static rate-limit caches so tests don't interfere with each other
         TelegramBotService.CHAT_RATE_LIMIT.invalidateAll();
+        TelegramBotService.BOT_RATE_LIMIT.invalidateAll();
     }
 
     /** Build a TelegramUpdate containing a text message. */
@@ -250,6 +251,63 @@ class TelegramBotServiceTest {
         }
 
         verify(sessionStore, times(10)).setMode(chatId, TelegramMode.ASK);
+    }
+
+    // -------------------------------------------------------------------------
+    // Bot-wide rate limiting
+    // -------------------------------------------------------------------------
+
+    @Test
+    void processUpdate_botUnderRateLimit_allProcessed() {
+        // Send 8 messages from 8 different chats to the same city — bot limit is 10
+        for (int i = 0; i < 8; i++) {
+            long chatId = 810L + i;
+            String conversationId = "telegram:" + chatId;
+            when(sessionStore.getLanguage(chatId)).thenReturn("CA");
+            when(sessionStore.getMode(chatId)).thenReturn(TelegramMode.ASK);
+            when(sessionStore.getOrCreateConversationId(chatId)).thenReturn(conversationId);
+
+            service.processUpdate(textUpdate(chatId, "consulta " + i), "testcity");
+        }
+
+        verify(askPublisher, times(8)).publish(any(AskSqsMessage.class));
+    }
+
+    @Test
+    void processUpdate_botOverRateLimit_dropsExcess() {
+        // Send 12 messages from 12 different chats to the same city — bot limit is 10
+        // so the last 2 should be dropped. Use lenient stubbings because messages
+        // that are rate-limited never reach handleMessage or handleTextByMode.
+        for (int i = 0; i < 12; i++) {
+            long chatId = 830L + i;
+            String conversationId = "telegram:" + chatId;
+            lenient().when(sessionStore.getLanguage(chatId)).thenReturn("CA");
+            lenient().when(sessionStore.getMode(chatId)).thenReturn(TelegramMode.ASK);
+            lenient().when(sessionStore.getOrCreateConversationId(chatId)).thenReturn(conversationId);
+
+            service.processUpdate(textUpdate(chatId, "consulta " + i), "testcity");
+        }
+
+        verify(askPublisher, times(10)).publish(any(AskSqsMessage.class));
+    }
+
+    @Test
+    void processUpdate_botRateLimitIndependentPerCity() {
+        // Send 11 messages from 11 different chats to city "elprat".
+        // Bot limit counts per city, so city "testcity" is unaffected.
+        // Use lenient stubbings because messages that are rate-limited never
+        // reach handleMessage or handleTextByMode.
+        for (int i = 0; i < 11; i++) {
+            long chatId = 850L + i;
+            String conversationId = "telegram:" + chatId;
+            lenient().when(sessionStore.getLanguage(chatId)).thenReturn("CA");
+            lenient().when(sessionStore.getMode(chatId)).thenReturn(TelegramMode.ASK);
+            lenient().when(sessionStore.getOrCreateConversationId(chatId)).thenReturn(conversationId);
+
+            service.processUpdate(textUpdate(chatId, "consulta " + i), "elprat");
+        }
+        // Only 10 should go through for elprat
+        verify(askPublisher, times(10)).publish(any(AskSqsMessage.class));
     }
 
     // -------------------------------------------------------------------------
