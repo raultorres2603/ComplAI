@@ -62,6 +62,10 @@ public class TelegramConfiguration {
             logger.info("TelegramConfiguration initialized with " + tokens.size()
                     + " bot(s): " + String.join(", ", tokens.keySet()));
         }
+
+        // Warn if any city has a bot token but no webhook secret — those webhooks
+        // accept updates without authentication via X-Telegram-Bot-Api-Secret-Token.
+        logMissingWebhookSecrets(tokens, secrets);
     }
 
     /**
@@ -74,6 +78,26 @@ public class TelegramConfiguration {
     TelegramConfiguration(Map<String, String> tokens, Map<String, String> secrets) {
         this.cityIdToToken = Map.copyOf(tokens);
         this.cityIdToWebhookSecret = Map.copyOf(secrets);
+        logMissingWebhookSecrets(tokens, secrets);
+    }
+
+    /**
+     * Logs a {@link Level#SEVERE SEVERE} warning for every city that has a
+     * bot token configured but no webhook secret. Without a secret the
+     * webhook endpoint accepts unauthenticated requests.
+     */
+    private static void logMissingWebhookSecrets(Map<String, String> tokens,
+                                                  Map<String, String> secrets) {
+        for (String cityId : tokens.keySet()) {
+            String secret = secrets.get(cityId);
+            if (secret == null || secret.isBlank()) {
+                logger.severe("Telegram webhook secret is NOT configured for city='"
+                        + cityId + "'. The webhook endpoint will accept updates "
+                        + "without authentication. Set TELEGRAM_WEBHOOK_SECRET_"
+                        + cityId.toUpperCase()
+                        + " and configure it via Telegram's setWebhook call.");
+            }
+        }
     }
 
     /**

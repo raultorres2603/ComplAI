@@ -53,7 +53,7 @@ public class OpenRouterDtoConversionTest {
     @Test
     @DisplayName("from() preserves HTML content in message field")
     void testHtmlContentPreservation() {
-        String htmlMessage = "<h2>Response Title</h2><p>This is a <strong>test</strong> with <em>HTML</em>.</p>" +
+        String htmlMessage = "<h2>Response Title</h2><p>This is a <b>test</b> with <i>HTML</i>.</p>" +
                 "<ul><li>Item 1</li><li>Item 2</li></ul>";
 
         OpenRouterResponseDto internal = new OpenRouterResponseDto(
@@ -68,7 +68,7 @@ public class OpenRouterDtoConversionTest {
         assertNotNull(public_dto.getMessage());
         assertEquals(htmlMessage, public_dto.getMessage());
         assertTrue(public_dto.getMessage().contains("<h2>"));
-        assertTrue(public_dto.getMessage().contains("<strong>"));
+        assertTrue(public_dto.getMessage().contains("<b>"));
     }
 
     // ===== TEST 3: Error Responses =====
@@ -314,7 +314,7 @@ public class OpenRouterDtoConversionTest {
     @DisplayName("Full integration: HTML message with multiple sources serializes correctly")
     void testFullIntegration() throws Exception {
         String htmlMessage = "<h3>Event Information</h3>" +
-                "<p>The following <strong>events</strong> are happening:</p>" +
+                "<p>The following <b>events</b> are happening:</p>" +
                 "<ul><li>Festival on May 5</li><li>Market on Saturdays</li></ul>";
 
         Source source1 = new Source("https://cityevents.local/list", "Events Calendar");

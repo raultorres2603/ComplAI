@@ -1,9 +1,10 @@
 package cat.complai.utilities.sqs;
 
-import cat.complai.dto.sqs.RedactSqsMessage;
+import cat.complai.dto.sqs.AskSqsMessage;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.GetQueueAttributesRequest;
 import software.amazon.awssdk.services.sqs.model.GetQueueAttributesResponse;
@@ -18,25 +19,24 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * Unit tests for {@link SqsComplaintPublisher}.
+ * Unit tests for {@link SqsAskPublisher}.
  *
- * We subclass the protected no-arg constructor to intercept the serialised message body
+ * <p>We subclass the protected no-arg constructor to intercept the serialised message body
  * without wiring a real SQS client.
  */
-class SqsComplaintPublisherTest {
+class SqsAskPublisherTest {
 
     private final ObjectMapper mapper = new ObjectMapper();
 
     /**
      * Captures the last message body published without touching the AWS SDK.
      */
-    static class CapturingSqsPublisher extends SqsComplaintPublisher {
+    static class CapturingSqsPublisher extends SqsAskPublisher {
         final AtomicReference<String> captured = new AtomicReference<>();
 
         @Override
-        public void publish(RedactSqsMessage message) {
+        public void publish(AskSqsMessage message) {
             try {
-                // Serialise via the same ObjectMapper the real publisher uses.
                 captured.set(new ObjectMapper().writeValueAsString(message));
             } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -47,39 +47,33 @@ class SqsComplaintPublisherTest {
     @Test
     void publish_serialisesAllFieldsToJson() throws Exception {
         CapturingSqsPublisher publisher = new CapturingSqsPublisher();
-        RedactSqsMessage message = new RedactSqsMessage(
-                "Noise from the airport",
-                "Joan", "Garcia", "12345678A",
-                "complaints/abc/1700000000-complaint.pdf",
-                "conv-123", "elprat");
+        AskSqsMessage message = new AskSqsMessage(
+                12345L,
+                "Quins són els horaris?",
+                "elprat",
+                "CA",
+                "conv-telegram-12345");
 
         publisher.publish(message);
 
         assertNotNull(publisher.captured.get(), "Message body must have been captured");
         JsonNode root = mapper.readTree(publisher.captured.get());
-        assertEquals("Noise from the airport", root.path("complaintText").asText());
-        assertEquals("Joan",       root.path("requesterName").asText());
-        assertEquals("Garcia",     root.path("requesterSurname").asText());
-        assertEquals("12345678A",  root.path("requesterIdNumber").asText());
-        assertEquals("complaints/abc/1700000000-complaint.pdf", root.path("s3Key").asText());
-        assertEquals("conv-123",   root.path("conversationId").asText());
+        assertEquals(12345L, root.path("chatId").asLong());
+        assertEquals("Quins són els horaris?", root.path("question").asText());
+        assertEquals("elprat", root.path("cityId").asText());
+        assertEquals("CA", root.path("lang").asText());
+        assertEquals("conv-telegram-12345", root.path("conversationId").asText());
     }
 
     @Test
     void publish_withNullQueueUrl_throwsIllegalState() {
-        // The real publisher (prod) throws when REDACT_QUEUE_URL is not configured.
-        // We verify this contract by having a subclass that delegates to super.publish(),
-        // which checks the queueUrl field set in the @Inject constructor.
-        // Since we use the no-arg constructor here (queueUrl = null), the check triggers.
-        SqsComplaintPublisher publisher = new SqsComplaintPublisher() {
+        SqsAskPublisher publisher = new SqsAskPublisher() {
             @Override
-            public void publish(RedactSqsMessage message) {
-                // Call the check that the real implementation performs.
-                // The protected constructor leaves queueUrl as null, which is the scenario we test.
-                throw new IllegalStateException("REDACT_QUEUE_URL is not configured — cannot publish complaint message");
+            public void publish(AskSqsMessage message) {
+                throw new IllegalStateException("ASK_QUEUE_URL is not configured — cannot publish ask message");
             }
         };
-        RedactSqsMessage message = new RedactSqsMessage("text", "A", "B", "C", "key", null, "elprat");
+        AskSqsMessage message = new AskSqsMessage(1L, "text", "city", "CA", null);
 
         assertThrows(IllegalStateException.class, () -> publisher.publish(message),
                 "Publisher must throw when queueUrl is absent");
@@ -99,8 +93,8 @@ class SqsComplaintPublisherTest {
                         .build());
 
         // Use a unique queue URL to avoid the static cache from other tests
-        SqsComplaintPublisher publisher = new SqsComplaintPublisher(
-                "http://sqs.test/redact-queue-below", mockSqs, new ObjectMapper());
+        SqsAskPublisher publisher = new SqsAskPublisher("http://sqs.test/ask-queue-below",
+                mockSqs, new ObjectMapper());
 
         assertFalse(publisher.isQueueDepthExceeded(),
                 "Queue depth 50 should be below the limit");
@@ -116,11 +110,11 @@ class SqsComplaintPublisherTest {
                         .build());
 
         // Use a unique queue URL to avoid the static cache from other tests
-        SqsComplaintPublisher publisher = new SqsComplaintPublisher(
-                "http://sqs.test/redact-queue-exceeded", mockSqs, new ObjectMapper());
+        SqsAskPublisher publisher = new SqsAskPublisher("http://sqs.test/ask-queue-exceeded",
+                mockSqs, new ObjectMapper());
 
         assertTrue(publisher.isQueueDepthExceeded(),
-                "Queue depth 2000 should exceed the limit of " + SqsComplaintPublisher.MAX_QUEUE_DEPTH);
+                "Queue depth 2000 should exceed the limit of " + SqsAskPublisher.MAX_QUEUE_DEPTH);
     }
 
     @Test
@@ -130,11 +124,10 @@ class SqsComplaintPublisherTest {
                 .thenThrow(new RuntimeException("Network error"));
 
         // Use a unique queue URL to avoid the static cache from other tests
-        SqsComplaintPublisher publisher = new SqsComplaintPublisher(
-                "http://sqs.test/redact-queue-error", mockSqs, new ObjectMapper());
+        SqsAskPublisher publisher = new SqsAskPublisher("http://sqs.test/ask-queue-error",
+                mockSqs, new ObjectMapper());
 
         assertFalse(publisher.isQueueDepthExceeded(),
                 "Should fail open (return false) when the API call fails");
     }
 }
-

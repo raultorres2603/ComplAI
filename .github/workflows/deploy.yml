@@ -306,6 +306,12 @@ jobs:
           RESPONSE_CACHE_MAX_ENTRIES: ${{ vars.RESPONSE_CACHE_MAX_ENTRIES }}
           # In the "Deploy Lambda stack" section, add:
           RATE_LIMIT_REQUESTS_PER_MINUTE: ${{ vars.RATE_LIMIT_REQUESTS_PER_MINUTE }}
+          # Telegram spam protection (optional overrides — defaults apply if unset)
+          TELEGRAM_CHAT_RATE_LIMIT_PER_SECOND: ${{ vars.TELEGRAM_CHAT_RATE_LIMIT_PER_SECOND }}
+          TELEGRAM_BOT_RATE_LIMIT_PER_SECOND: ${{ vars.TELEGRAM_BOT_RATE_LIMIT_PER_SECOND }}
+          TELEGRAM_MAX_MESSAGE_LENGTH: ${{ vars.TELEGRAM_MAX_MESSAGE_LENGTH }}
+          # SQS queue depth cap (optional override — default applies if unset)
+          SQS_MAX_QUEUE_DEPTH: ${{ vars.SQS_MAX_QUEUE_DEPTH }}
           FEEDBACK_MAX_MESSAGE_LENGTH: ${{ vars.FEEDBACK_MAX_MESSAGE_LENGTH }}
           FEEDBACK_MAX_USERNAME_LENGTH: ${{ vars.FEEDBACK_MAX_USERNAME_LENGTH }}
         run: |

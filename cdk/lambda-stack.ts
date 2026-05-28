@@ -255,6 +255,12 @@ export class LambdaStack extends cdk.Stack {
         // The worker Lambda does not receive API_KEY_ENABLED and therefore never loads the
         // OidcIdentityTokenValidator bean.
         RATE_LIMIT_REQUESTS_PER_MINUTE: process.env.RATE_LIMIT_REQUESTS_PER_MINUTE || '20',
+        // Telegram spam protection thresholds (overridable per environment)
+        TELEGRAM_CHAT_RATE_LIMIT_PER_SECOND: process.env.TELEGRAM_CHAT_RATE_LIMIT_PER_SECOND || '3',
+        TELEGRAM_BOT_RATE_LIMIT_PER_SECOND: process.env.TELEGRAM_BOT_RATE_LIMIT_PER_SECOND || '10',
+        TELEGRAM_MAX_MESSAGE_LENGTH: process.env.TELEGRAM_MAX_MESSAGE_LENGTH || '4096',
+        // SQS queue depth cap — reject publishes when the queue is too deep
+        SQS_MAX_QUEUE_DEPTH: process.env.SQS_MAX_QUEUE_DEPTH || '1000',
         COMPLAI_DEFAULT_CITY_ID: process.env.COMPLAI_DEFAULT_CITY_ID || 'elprat',
         // SES Configuration — sender and recipient emails from GitHub Environment Variables
         // Email must be verified in SES before sending. See cdk/README.md for setup.
