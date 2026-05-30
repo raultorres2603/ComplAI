@@ -31,6 +31,20 @@
       ]
     },
     {
+      "Sid": "S3CDKBootstrapPermissions",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetBucketLocation",
+        "s3:ListBucket",
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::cdk-*"
+      ]
+    },
+    {
       "Sid": "SQSPermissions",
       "Effect": "Allow",
       "Action": [
@@ -41,7 +55,9 @@
         "sqs:DeleteMessage",
         "sqs:ChangeMessageVisibility",
         "sqs:DeleteQueue",
-        "sqs:PurgeQueue"
+        "sqs:PurgeQueue",
+        "sqs:ListQueues",
+        "sqs:CreateQueue"
       ],
       "Resource": [
         "arn:aws:sqs:eu-west-1:134267836527:complai-*"
@@ -83,7 +99,8 @@
         "lambda:DeleteEventSourceMapping",
         "lambda:TagResource",
         "lambda:UntagResource",
-        "lambda:ListTags"
+        "lambda:ListTags",
+        "lambda:ListFunctions"
       ],
       "Resource": [
         "arn:aws:lambda:eu-west-1:134267836527:function:ComplAI-*"
@@ -93,14 +110,28 @@
       "Sid": "IAMPassRolePermissions",
       "Effect": "Allow",
       "Action": [
-        "iam:PassRole"
+        "iam:PassRole",
+        "iam:GetRole",
+        "iam:GetRolePolicy",
+        "iam:ListRolePolicies",
+        "iam:ListAttachedRolePolicies",
+        "iam:CreateRole",
+        "iam:DeleteRole",
+        "iam:AttachRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:PutRolePolicy",
+        "iam:DeleteRolePolicy",
+        "iam:TagRole",
+        "iam:UntagRole",
+        "iam:ListTagsForRole"
       ],
       "Resource": [
-        "arn:aws:iam::134267836527:role/ComplAI-*"
+        "arn:aws:iam::134267836527:role/ComplAI-*",
+        "arn:aws:iam::134267836527:role/cdk-*"
       ]
     },
     {
-      "Sid": "CloudFormationPermissions",
+      "Sid": "CloudFormationPermissionsEuWest1",
       "Effect": "Allow",
       "Action": [
         "cloudformation:DescribeStacks",
@@ -116,11 +147,49 @@
         "cloudformation:DeleteChangeSet",
         "cloudformation:DescribeChangeSet",
         "cloudformation:ExecuteChangeSet",
-        "cloudformation:SetStackPolicy"
+        "cloudformation:SetStackPolicy",
+        "cloudformation:SignalResources",
+        "cloudformation:CancelUpdateStack",
+        "cloudformation:ContinueRollback",
+        "cloudformation:EstimateTemplateCost",
+        "cloudformation:ListImports",
+        "cloudformation:ListExports"
       ],
       "Resource": [
         "arn:aws:cloudformation:eu-west-1:134267836527:stack/ComplAI-*/*",
-        "arn:aws:cloudformation:eu-west-1:134267836527:stack/CDKToolkit/*"
+        "arn:aws:cloudformation:eu-west-1:134267836527:stack/CDKToolkit/*",
+        "arn:aws:cloudformation:eu-west-1:134267836527:stack/CDKBootstrap/*"
+      ]
+    },
+    {
+      "Sid": "CloudFormationPermissionsUsEast1",
+      "Effect": "Allow",
+      "Action": [
+        "cloudformation:DescribeStacks",
+        "cloudformation:DescribeStackEvents",
+        "cloudformation:DescribeStackResource",
+        "cloudformation:DescribeStackResources",
+        "cloudformation:GetTemplate",
+        "cloudformation:ListStackResources",
+        "cloudformation:CreateStack",
+        "cloudformation:DeleteStack",
+        "cloudformation:UpdateStack",
+        "cloudformation:CreateChangeSet",
+        "cloudformation:DeleteChangeSet",
+        "cloudformation:DescribeChangeSet",
+        "cloudformation:ExecuteChangeSet",
+        "cloudformation:SetStackPolicy",
+        "cloudformation:SignalResources",
+        "cloudformation:CancelUpdateStack",
+        "cloudformation:ContinueRollback",
+        "cloudformation:EstimateTemplateCost",
+        "cloudformation:ListImports",
+        "cloudformation:ListExports"
+      ],
+      "Resource": [
+        "arn:aws:cloudformation:us-east-1:134267836527:stack/ComplAI-*/*",
+        "arn:aws:cloudformation:us-east-1:134267836527:stack/CDKToolkit/*",
+        "arn:aws:cloudformation:us-east-1:134267836527:stack/CDKBootstrap/*"
       ]
     },
     {
@@ -128,16 +197,25 @@
       "Effect": "Allow",
       "Action": [
         "cloudfront:GetDistribution",
-        "cloudfront:CreateDistribution",
-        "cloudfront:UpdateDistribution",
-        "cloudfront:DeleteDistribution",
         "cloudfront:GetDistributionConfig",
+        "cloudfront:ListDistributions",
+        "cloudfront:CreateDistribution",
+        "cloudfront:CreateDistributionWithTags",
+        "cloudfront:UpdateDistribution",
+        "cloudfront:UpdateDistributionWithStagingConfig",
+        "cloudfront:DeleteDistribution",
         "cloudfront:TagResource",
         "cloudfront:UntagResource",
-        "cloudfront:ListTagsForResource"
+        "cloudfront:ListTagsForResource",
+        "cloudfront:ListCachePolicies",
+        "cloudfront:CreateCachePolicy",
+        "cloudfront:DeleteCachePolicy",
+        "cloudfront:GetCachePolicy",
+        "cloudfront:GetCachePolicyConfig"
       ],
       "Resource": [
-        "arn:aws:cloudfront::134267836527:distribution/*"
+        "arn:aws:cloudfront::134267836527:distribution/*",
+        "arn:aws:cloudfront::134267836527:cache-policy/*"
       ]
     },
     {
@@ -145,18 +223,23 @@
       "Effect": "Allow",
       "Action": [
         "wafv2:GetWebACL",
+        "wafv2:GetWebACLForResource",
+        "wafv2:ListWebACLs",
         "wafv2:CreateWebACL",
         "wafv2:UpdateWebACL",
         "wafv2:DeleteWebACL",
-        "wafv2:GetWebACLForResource",
         "wafv2:AssociateWebACL",
         "wafv2:DisassociateWebACL",
+        "wafv2:ListResourcesForWebACL",
         "wafv2:TagResource",
         "wafv2:UntagResource",
         "wafv2:ListTagsForResource"
       ],
       "Resource": [
-        "arn:aws:wafv2:us-east-1:134267836527:global/webacl/ComplAI-*/*"
+        "arn:aws:wafv2:us-east-1:134267836527:global/webacl/ComplAI-*/*",
+        "arn:aws:wafv2:us-east-1:134267836527:global/ipset/*",
+        "arn:aws:wafv2:us-east-1:134267836527:global/regexpatternset/*",
+        "arn:aws:wafv2:us-east-1:134267836527:global/rulegroup/*"
       ]
     },
     {
@@ -171,7 +254,9 @@
         "events:DisableRule",
         "events:RemoveTargets",
         "events:PutTargets",
-        "events:ListTargetsByRule"
+        "events:ListTargetsByRule",
+        "events:TagResource",
+        "events:UntagResource"
       ],
       "Resource": [
         "arn:aws:events:eu-west-1:134267836527:rule/ComplAI-*"
