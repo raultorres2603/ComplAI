@@ -133,13 +133,53 @@ jobs:
       # Resource cleanup: Delete resources with RETAIN removal policy.
       # CDK destroy does not remove these resources. We use AWS CLI to clean them up.
       # Error handling: continue cleanup even if individual deletions fail.
+      #
+      # IMPORTANT: The github-cdk-deploy-role IAM role must have the following
+      # permissions for complete cleanup:
+      #   - s3:DeleteObject, s3:DeleteBucket, s3:ListBucket, s3:GetBucketLocation
+      #   - sqs:DeleteQueue, sqs:GetQueueUrl, sqs:GetQueueAttributes
+      #   - logs:DeleteLogGroup, logs:DescribeLogGroups
+      # See cdk/iam/github-cdk-deploy-role-policy.json for the full policy.
       # ---------------------------------------------------------------------------
+
+      - name: Pre-flight permission check
+        env:
+          TARGET_ENV: ${{ inputs.environment }}
+        run: |
+          echo "Running pre-flight permission checks..."
+          
+          # Test S3 permissions
+          if ! aws s3api list-buckets --query "Buckets[?starts_with(Name, 'complai-')].Name" --output text > /dev/null 2>&1; then
+            echo "WARNING: Cannot list S3 buckets. Cleanup may fail."
+            echo "Ensure the IAM role has s3:ListBucket permission."
+          fi
+          
+          # Test SQS permissions (production only)
+          if [ "${TARGET_ENV}" = "production" ]; then
+            if ! aws sqs list-queues --queue-name-prefix "complai-" > /dev/null 2>&1; then
+              echo "WARNING: Cannot list SQS queues. Queue cleanup may fail."
+              echo "Ensure the IAM role has sqs:ListQueues permission."
+            fi
+          fi
+          
+          # Test CloudWatch Logs permissions
+          if ! aws logs describe-log-groups --log-group-name-prefix "/aws/lambda/ComplAI-" --query "logGroups[].logGroupName" --output text > /dev/null 2>&1; then
+            echo "WARNING: Cannot describe CloudWatch Log Groups. Log group cleanup may fail."
+            echo "Ensure the IAM role has logs:DescribeLogGroups permission."
+          fi
+          
+          echo "Pre-flight checks completed."
 
       - name: Delete retained S3 buckets
         env:
           TARGET_ENV: ${{ inputs.environment }}
         run: |
           echo "Deleting RETAIN'd S3 buckets for environment: ${TARGET_ENV}"
+          echo ""
+          echo "Note: If you see AccessDenied errors, ensure the IAM role has:"
+          echo "  - s3:DeleteObject on arn:aws:s3:::complai-*/*"
+          echo "  - s3:DeleteBucket on arn:aws:s3:::complai-*"
+          echo ""
           
           # List of all S3 buckets that have RETAIN removal policy
           BUCKETS=(
@@ -152,6 +192,8 @@ jobs:
             "complai-feedback-${TARGET_ENV}"
           )
           
+          PERMISSIONS_ISSUE=false
+          
           for BUCKET in "${BUCKETS[@]}"; do
             echo "Processing bucket: ${BUCKET}"
             
@@ -160,22 +202,44 @@ jobs:
               echo "  Bucket exists, emptying and deleting..."
               
               # Empty the bucket (required before deletion)
-              aws s3 rm "s3://${BUCKET}" --recursive || {
-                echo "  WARNING: Failed to empty bucket ${BUCKET}, skipping..."
+              if ! aws s3 rm "s3://${BUCKET}" --recursive 2>&1; then
+                echo "  WARNING: Failed to empty bucket ${BUCKET}"
+                if aws s3 rm "s3://${BUCKET}" --recursive 2>&1 | grep -q "AccessDenied"; then
+                  PERMISSIONS_ISSUE=true
+                fi
                 continue
-              }
+              fi
               
               # Delete the bucket
-              aws s3 rb "s3://${BUCKET}" || {
+              if ! aws s3 rb "s3://${BUCKET}" 2>&1; then
                 echo "  WARNING: Failed to delete bucket ${BUCKET}"
+                if aws s3 rb "s3://${BUCKET}" 2>&1 | grep -q "AccessDenied"; then
+                  PERMISSIONS_ISSUE=true
+                fi
                 continue
-              }
+              fi
               
               echo "  Successfully deleted bucket: ${BUCKET}"
             else
               echo "  Bucket ${BUCKET} does not exist, skipping..."
             fi
           done
+          
+          if [ "${PERMISSIONS_ISSUE}" = "true" ]; then
+            echo ""
+            echo "=========================================="
+            echo "PERMISSIONS ERROR DETECTED"
+            echo "=========================================="
+            echo "The IAM role 'github-cdk-deploy-role' is missing S3 permissions."
+            echo ""
+            echo "Required permissions:"
+            echo "  - s3:DeleteObject on arn:aws:s3:::complai-*/*"
+            echo "  - s3:DeleteBucket on arn:aws:s3:::complai-*"
+            echo ""
+            echo "See cdk/iam/github-cdk-deploy-role-policy.json for the full policy."
+            echo "=========================================="
+            exit 1
+          fi
 
       - name: Delete retained SQS queues (production only)
         if: inputs.environment == 'production'
@@ -183,6 +247,11 @@ jobs:
           TARGET_ENV: ${{ inputs.environment }}
         run: |
           echo "Deleting RETAIN'd SQS queues for environment: ${TARGET_ENV}"
+          echo ""
+          echo "Note: If you see AccessDenied errors, ensure the IAM role has:"
+          echo "  - sqs:DeleteQueue on arn:aws:sqs:eu-west-1:134267836527:complai-*"
+          echo "  - sqs:GetQueueUrl on arn:aws:sqs:eu-west-1:134267836527:complai-*"
+          echo ""
           
           # List of SQS queues that have RETAIN removal policy in production
           QUEUES=(
@@ -194,6 +263,8 @@ jobs:
             "complai-ask-dlq-${TARGET_ENV}"
           )
           
+          PERMISSIONS_ISSUE=false
+          
           for QUEUE in "${QUEUES[@]}"; do
             echo "Processing queue: ${QUEUE}"
             
@@ -204,19 +275,42 @@ jobs:
             }
             
             # Delete the queue
-            aws sqs delete-queue --queue-url "${QUEUE_URL}" || {
+            if ! aws sqs delete-queue --queue-url "${QUEUE_URL}" 2>&1; then
               echo "  WARNING: Failed to delete queue ${QUEUE}"
+              if aws sqs delete-queue --queue-url "${QUEUE_URL}" 2>&1 | grep -q "AccessDenied"; then
+                PERMISSIONS_ISSUE=true
+              fi
               continue
-            }
+            fi
             
             echo "  Successfully deleted queue: ${QUEUE}"
           done
+          
+          if [ "${PERMISSIONS_ISSUE}" = "true" ]; then
+            echo ""
+            echo "=========================================="
+            echo "PERMISSIONS ERROR DETECTED"
+            echo "=========================================="
+            echo "The IAM role 'github-cdk-deploy-role' is missing SQS permissions."
+            echo ""
+            echo "Required permissions:"
+            echo "  - sqs:DeleteQueue on arn:aws:sqs:eu-west-1:134267836527:complai-*"
+            echo "  - sqs:GetQueueUrl on arn:aws:sqs:eu-west-1:134267836527:complai-*"
+            echo ""
+            echo "See cdk/iam/github-cdk-deploy-role-policy.json for the full policy."
+            echo "=========================================="
+            exit 1
+          fi
 
       - name: Delete retained CloudWatch Log Groups
         env:
           TARGET_ENV: ${{ inputs.environment }}
         run: |
           echo "Deleting RETAIN'd CloudWatch Log Groups for environment: ${TARGET_ENV}"
+          echo ""
+          echo "Note: If you see AccessDenied errors, ensure the IAM role has:"
+          echo "  - logs:DeleteLogGroup on arn:aws:logs:eu-west-1:134267836527:log-group:/aws/lambda/ComplAI-*"
+          echo ""
           
           # List of CloudWatch Log Groups that have RETAIN removal policy
           LOG_GROUPS=(
@@ -227,6 +321,8 @@ jobs:
             "/aws/lambda/ComplAIScheduledReportLambda-${TARGET_ENV}"
           )
           
+          PERMISSIONS_ISSUE=false
+          
           for LOG_GROUP in "${LOG_GROUPS[@]}"; do
             echo "Processing log group: ${LOG_GROUP}"
             
@@ -235,16 +331,34 @@ jobs:
               echo "  Log group exists, deleting..."
               
               # Delete the log group
-              aws logs delete-log-group --log-group-name "${LOG_GROUP}" || {
+              if ! aws logs delete-log-group --log-group-name "${LOG_GROUP}" 2>&1; then
                 echo "  WARNING: Failed to delete log group ${LOG_GROUP}"
+                if aws logs delete-log-group --log-group-name "${LOG_GROUP}" 2>&1 | grep -q "AccessDenied"; then
+                  PERMISSIONS_ISSUE=true
+                fi
                 continue
-              }
+              fi
               
               echo "  Successfully deleted log group: ${LOG_GROUP}"
             else
               echo "  Log group ${LOG_GROUP} does not exist, skipping..."
             fi
           done
+          
+          if [ "${PERMISSIONS_ISSUE}" = "true" ]; then
+            echo ""
+            echo "=========================================="
+            echo "PERMISSIONS ERROR DETECTED"
+            echo "=========================================="
+            echo "The IAM role 'github-cdk-deploy-role' is missing CloudWatch Logs permissions."
+            echo ""
+            echo "Required permissions:"
+            echo "  - logs:DeleteLogGroup on arn:aws:logs:eu-west-1:134267836527:log-group:/aws/lambda/ComplAI-*"
+            echo ""
+            echo "See cdk/iam/github-cdk-deploy-role-policy.json for the full policy."
+            echo "=========================================="
+            exit 1
+          fi
 
       - name: Cleanup summary
         env:
