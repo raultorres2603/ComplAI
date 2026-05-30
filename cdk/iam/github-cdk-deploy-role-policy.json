@@ -27,9 +27,9 @@
         "cloudformation:*"
       ],
       "Resource": [
-        "arn:aws:cloudformation:eu-west-1:134267836527:stack/ComplAI-*/*",
+        "arn:aws:cloudformation:eu-west-1:134267836527:stack/ComplAI*/*",
         "arn:aws:cloudformation:eu-west-1:134267836527:stack/CDKToolkit/*",
-        "arn:aws:cloudformation:us-east-1:134267836527:stack/ComplAI-*/*",
+        "arn:aws:cloudformation:us-east-1:134267836527:stack/ComplAI*/*",
         "arn:aws:cloudformation:us-east-1:134267836527:stack/CDKToolkit/*"
       ]
     },
@@ -40,7 +40,7 @@
         "lambda:*"
       ],
       "Resource": [
-        "arn:aws:lambda:eu-west-1:134267836527:function:ComplAI-*"
+        "arn:aws:lambda:eu-west-1:134267836527:function:ComplAI*"
       ]
     },
     {
@@ -63,7 +63,7 @@
         "iam:ListRolePolicies"
       ],
       "Resource": [
-        "arn:aws:iam::134267836527:role/ComplAI-*",
+        "arn:aws:iam::134267836527:role/ComplAI*",
         "arn:aws:iam::134267836527:role/cdk-*"
       ],
       "Condition": {
@@ -95,7 +95,7 @@
         "logs:CreateLogStream"
       ],
       "Resource": [
-        "arn:aws:logs:eu-west-1:134267836527:log-group:/aws/lambda/ComplAI-*:*"
+        "arn:aws:logs:eu-west-1:134267836527:log-group:/aws/lambda/ComplAI*:*"
       ]
     },
     {
@@ -135,7 +135,7 @@
         "wafv2:UntagResource"
       ],
       "Resource": [
-        "arn:aws:wafv2:us-east-1:134267836527:global/webacl/ComplAI-*/*"
+        "arn:aws:wafv2:us-east-1:134267836527:global/webacl/ComplAI*/*"
       ]
     },
     {
@@ -145,7 +145,7 @@
         "events:*"
       ],
       "Resource": [
-        "arn:aws:events:eu-west-1:134267836527:rule/ComplAI-*"
+        "arn:aws:events:eu-west-1:134267836527:rule/ComplAI*"
       ]
     },
     {
