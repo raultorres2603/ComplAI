@@ -1,4 +1,4 @@
-# Workflow for destroying CDK stacks for a selected environment.
+# Workflow for destroying all AWS resources for a selected environment.
 #
 # Triggers:
 #   - Manual (workflow_dispatch) ONLY. Never triggered automatically.
@@ -13,7 +13,14 @@
 #   2. ComplAILambdaStack-<env>
 #   3. ComplAIQueueStack-<env>
 #   4. ComplAIStorageStack-<env>
-name: Destroy CDK Stacks
+#
+# Resource cleanup (after CDK destroy):
+#   CDK destroy leaves behind resources with RETAIN removal policy:
+#   - S3 buckets: procedures, events, news, cityinfo, deployments, complaints, feedback
+#   - CloudWatch Log Groups: All Lambda function log groups
+#   - SQS queues (production only): redact, redact-dlq, feedback, feedback-dlq, ask, ask-dlq
+#   These are explicitly deleted to ensure complete environment cleanup.
+name: Destroy All Environment Resources
 
 # Grant the workflow permission to request OIDC id-tokens and read repository contents.
 permissions:
@@ -121,3 +128,138 @@ jobs:
         run: |
           cd cdk
           npx cdk destroy "ComplAIStorageStack-${TARGET_ENV}" --force
+
+      # ---------------------------------------------------------------------------
+      # Resource cleanup: Delete resources with RETAIN removal policy.
+      # CDK destroy does not remove these resources. We use AWS CLI to clean them up.
+      # Error handling: continue cleanup even if individual deletions fail.
+      # ---------------------------------------------------------------------------
+
+      - name: Delete retained S3 buckets
+        env:
+          TARGET_ENV: ${{ inputs.environment }}
+        run: |
+          echo "Deleting RETAIN'd S3 buckets for environment: ${TARGET_ENV}"
+          
+          # List of all S3 buckets that have RETAIN removal policy
+          BUCKETS=(
+            "complai-procedures-${TARGET_ENV}"
+            "complai-events-${TARGET_ENV}"
+            "complai-news-${TARGET_ENV}"
+            "complai-cityinfo-${TARGET_ENV}"
+            "complai-deployments-${TARGET_ENV}"
+            "complai-complaints-${TARGET_ENV}"
+            "complai-feedback-${TARGET_ENV}"
+          )
+          
+          for BUCKET in "${BUCKETS[@]}"; do
+            echo "Processing bucket: ${BUCKET}"
+            
+            # Check if bucket exists
+            if aws s3api head-bucket --bucket "${BUCKET}" 2>/dev/null; then
+              echo "  Bucket exists, emptying and deleting..."
+              
+              # Empty the bucket (required before deletion)
+              aws s3 rm "s3://${BUCKET}" --recursive || {
+                echo "  WARNING: Failed to empty bucket ${BUCKET}, skipping..."
+                continue
+              }
+              
+              # Delete the bucket
+              aws s3 rb "s3://${BUCKET}" || {
+                echo "  WARNING: Failed to delete bucket ${BUCKET}"
+                continue
+              }
+              
+              echo "  Successfully deleted bucket: ${BUCKET}"
+            else
+              echo "  Bucket ${BUCKET} does not exist, skipping..."
+            fi
+          done
+
+      - name: Delete retained SQS queues (production only)
+        if: inputs.environment == 'production'
+        env:
+          TARGET_ENV: ${{ inputs.environment }}
+        run: |
+          echo "Deleting RETAIN'd SQS queues for environment: ${TARGET_ENV}"
+          
+          # List of SQS queues that have RETAIN removal policy in production
+          QUEUES=(
+            "complai-redact-${TARGET_ENV}"
+            "complai-redact-dlq-${TARGET_ENV}"
+            "complai-feedback-${TARGET_ENV}"
+            "complai-feedback-dlq-${TARGET_ENV}"
+            "complai-ask-${TARGET_ENV}"
+            "complai-ask-dlq-${TARGET_ENV}"
+          )
+          
+          for QUEUE in "${QUEUES[@]}"; do
+            echo "Processing queue: ${QUEUE}"
+            
+            # Get queue URL (will fail if queue doesn't exist)
+            QUEUE_URL=$(aws sqs get-queue-url --queue-name "${QUEUE}" --query QueueUrl --output text 2>/dev/null) || {
+              echo "  Queue ${QUEUE} does not exist, skipping..."
+              continue
+            }
+            
+            # Delete the queue
+            aws sqs delete-queue --queue-url "${QUEUE_URL}" || {
+              echo "  WARNING: Failed to delete queue ${QUEUE}"
+              continue
+            }
+            
+            echo "  Successfully deleted queue: ${QUEUE}"
+          done
+
+      - name: Delete retained CloudWatch Log Groups
+        env:
+          TARGET_ENV: ${{ inputs.environment }}
+        run: |
+          echo "Deleting RETAIN'd CloudWatch Log Groups for environment: ${TARGET_ENV}"
+          
+          # List of CloudWatch Log Groups that have RETAIN removal policy
+          LOG_GROUPS=(
+            "/aws/lambda/ComplAILambda-${TARGET_ENV}"
+            "/aws/lambda/ComplAIRedactorLambda-${TARGET_ENV}"
+            "/aws/lambda/ComplAIFeedbackWorkerLambda-${TARGET_ENV}"
+            "/aws/lambda/ComplAIAskWorkerLambda-${TARGET_ENV}"
+            "/aws/lambda/ComplAIScheduledReportLambda-${TARGET_ENV}"
+          )
+          
+          for LOG_GROUP in "${LOG_GROUPS[@]}"; do
+            echo "Processing log group: ${LOG_GROUP}"
+            
+            # Check if log group exists
+            if aws logs describe-log-groups --log-group-name-prefix "${LOG_GROUP}" --query "logGroups[?logGroupName=='${LOG_GROUP}']" --output text | grep -q "${LOG_GROUP}"; then
+              echo "  Log group exists, deleting..."
+              
+              # Delete the log group
+              aws logs delete-log-group --log-group-name "${LOG_GROUP}" || {
+                echo "  WARNING: Failed to delete log group ${LOG_GROUP}"
+                continue
+              }
+              
+              echo "  Successfully deleted log group: ${LOG_GROUP}"
+            else
+              echo "  Log group ${LOG_GROUP} does not exist, skipping..."
+            fi
+          done
+
+      - name: Cleanup summary
+        env:
+          TARGET_ENV: ${{ inputs.environment }}
+        run: |
+          echo "=========================================="
+          echo "Cleanup completed for environment: ${TARGET_ENV}"
+          echo "=========================================="
+          echo ""
+          echo "Resources cleaned up:"
+          echo "  - CDK stacks destroyed (Edge, Lambda, Queue, Storage)"
+          echo "  - S3 buckets emptied and deleted (7 buckets)"
+          if [ "${TARGET_ENV}" = "production" ]; then
+            echo "  - SQS queues deleted (6 queues)"
+          fi
+          echo "  - CloudWatch Log Groups deleted (5 log groups)"
+          echo ""
+          echo "Note: Some resources may not have existed if this was a new environment."
