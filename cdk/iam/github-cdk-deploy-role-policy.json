@@ -82,7 +82,8 @@
       "Condition": {
         "StringEquals": {
           "iam:PassedToService": [
-            "lambda.amazonaws.com"
+            "lambda.amazonaws.com",
+            "cloudformation.amazonaws.com"
           ]
         }
       }
