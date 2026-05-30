@@ -2,6 +2,19 @@
   "Version": "2012-10-17",
   "Statement": [
     {
+      "Sid": "ListPermissions",
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListAllMyBuckets",
+        "cloudformation:ListStacks",
+        "lambda:ListFunctions",
+        "cloudfront:ListDistributions"
+      ],
+      "Resource": [
+        "*"
+      ]
+    },
+    {
       "Sid": "S3Permissions",
       "Effect": "Allow",
       "Action": [
