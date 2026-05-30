@@ -85,16 +85,26 @@
       ]
     },
     {
-      "Sid": "LogsPermissions",
+      "Sid": "LogsDescribePermissions",
       "Effect": "Allow",
       "Action": [
-        "logs:DescribeLogGroups",
+        "logs:DescribeLogGroups"
+      ],
+      "Resource": [
+        "*"
+      ]
+    },
+    {
+      "Sid": "LogsWritePermissions",
+      "Effect": "Allow",
+      "Action": [
         "logs:DeleteLogGroup",
         "logs:CreateLogGroup",
         "logs:PutLogEvents",
         "logs:CreateLogStream"
       ],
       "Resource": [
+        "arn:aws:logs:eu-west-1:134267836527:log-group:/aws/lambda/ComplAI*",
         "arn:aws:logs:eu-west-1:134267836527:log-group:/aws/lambda/ComplAI*:*"
       ]
     },
