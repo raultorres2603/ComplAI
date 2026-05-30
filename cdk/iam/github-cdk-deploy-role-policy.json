@@ -194,7 +194,9 @@
         "ssm:GetParametersByPath"
       ],
       "Resource": [
-        "arn:aws:ssm:eu-west-1:134267836527:parameter/complai/*"
+        "arn:aws:ssm:eu-west-1:134267836527:parameter/complai/*",
+        "arn:aws:ssm:eu-west-1:134267836527:parameter/cdk-bootstrap/*",
+        "arn:aws:ssm:us-east-1:134267836527:parameter/cdk-bootstrap/*"
       ]
     }
   ]
