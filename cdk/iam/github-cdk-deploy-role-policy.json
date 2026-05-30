@@ -116,8 +116,7 @@
         "cloudformation:DeleteChangeSet",
         "cloudformation:DescribeChangeSet",
         "cloudformation:ExecuteChangeSet",
-        "cloudformation:SetStackPolicy",
-        "cloudformation:SignalResources"
+        "cloudformation:SetStackPolicy"
       ],
       "Resource": [
         "arn:aws:cloudformation:eu-west-1:134267836527:stack/ComplAI-*/*",
