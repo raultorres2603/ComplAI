@@ -56,7 +56,8 @@ import java.util.logging.Logger;
  * </ul>
  *
  * <p>
- * Authentication is enforced by {@link cat.complai.utilities.auth.ApiKeyAuthFilter}
+ * Authentication is enforced by
+ * {@link cat.complai.utilities.auth.ApiKeyAuthFilter}
  * before this
  * controller is reached. The city identifier is read from the {@code city}
  * request attribute
@@ -105,7 +106,7 @@ public class OpenRouterController {
 
                 AskStreamResult streamResult = service.streamAsk(questionText, conversationId, cityId);
                 if (streamResult instanceof AskStreamResult.Error(OpenRouterResponseDto dto)) {
-                    long latency = System.currentTimeMillis() - start;
+                        long latency = System.currentTimeMillis() - start;
                         OpenRouterErrorCode errorCode = dto != null ? dto.getErrorCode() : OpenRouterErrorCode.INTERNAL;
                         AuditLogger.log("/complai/ask",
                                         AuditLogger.hashText(questionText),
@@ -249,7 +250,8 @@ public class OpenRouterController {
                                 return handleAsyncRedact(text, resolvedFormat, conversationId, identity, cityId, start);
                         }
 
-                        OpenRouterResponseDto dto = service.redactComplaint(text, resolvedFormat, conversationId, identity,
+                        OpenRouterResponseDto dto = service.redactComplaint(text, resolvedFormat, conversationId,
+                                        identity,
                                         cityId);
                         long latency = System.currentTimeMillis() - start;
                         AuditLogger.log("/complai/redact", AuditLogger.hashText(text),
