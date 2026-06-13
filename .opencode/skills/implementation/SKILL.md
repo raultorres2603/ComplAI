@@ -12,7 +12,7 @@ compatibility: opencode
 Implement every step from the plan in session memory, following project conventions, writing tests, and verifying the result.
 
 <rules>
-- Read `/memories/session/plan.md` via #tool:vscode/memory before writing any code — a plan must exist
+- Read the plan from session memory before writing any code — a plan must exist
 - If no plan exists and the request is ambiguous, stop and trigger the planning skill first
 - Load `.github/copilot-instructions.md` before writing project-specific code
 - Load `references/conventions.md` and `references/package-map.md` if they exist in this skill's folder
@@ -20,13 +20,13 @@ Implement every step from the plan in session memory, following project conventi
 - Never invent abstractions not required by the current task
 - Never skip or comment out failing tests — fix them before moving on
 - Never deploy or push without explicit user confirmation
-- Update `/memories/session/plan.md` via #tool:vscode/memory when all steps are complete
+- Update session memory when all steps are complete
 </rules>
 
 <workflow>
 ## Phase 0 — Load the Plan
 
-1. Read `/memories/session/plan.md` via #tool:vscode/memory.
+1. Read the plan from session memory.
 2. If no plan is found and the request is not self-contained, stop: activate the **planning** skill first.
 3. Extract every `- [ ]` step into a todo list. Mark items **in-progress** one at a time.
 
@@ -99,7 +99,7 @@ Edit the appropriate infrastructure file for any new cloud resources required. *
 
 ## Phase 7 — Update Plan in Memory
 
-Update `/memories/session/plan.md` via #tool:vscode/memory:
+Update session memory:
 - Set `**Status**: ✅ Complete`
 - Mark all completed checkboxes
 

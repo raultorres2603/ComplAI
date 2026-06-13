@@ -1,6 +1,6 @@
 ---
 name: planning
-description: "Requirements analysis and planning workflow. Use when: the request is unclear, a new feature needs to be broken down, implementation steps need to be created, or acceptance criteria need to be defined. Produces a structured plan in session memory. Uses vscode/askQuestions to clarify ambiguities interactively."
+description: "Requirements analysis and planning workflow. Use when: the request is unclear, a new feature needs to be broken down, implementation steps need to be created, or acceptance criteria need to be defined. Produces a structured plan in session memory."
 argument-hint: "Describe the feature or requirement to plan"
 compatibility: opencode
 ---
@@ -12,9 +12,9 @@ compatibility: opencode
 Produce a structured, fully defined plan and save it to session memory. This skill drives everything that happens before a single line of code is written.
 
 <rules>
-- Use #tool:vscode/askQuestions freely — never assume scope, acceptance criteria, or affected files
-- The only write operation in this skill is saving to #tool:vscode/memory — do NOT edit source files
-- Group all clarifying questions into a single #tool:vscode/askQuestions call per ambiguity round
+- Ask clarifying questions freely — never assume scope, acceptance criteria, or affected files
+- The only write operation in this skill is saving to session memory — do NOT edit source files
+- Group all clarifying questions into a single question round per ambiguity
 - Do not proceed to Codebase Exploration until all blocking ambiguities from Requirements Analysis are resolved
 - Do not proceed to Write Plan until all phases above it are complete
 - Always show the plan to the user after saving — the memory file is not a substitute for displaying it
@@ -32,12 +32,12 @@ Produce a structured, fully defined plan and save it to session memory. This ski
    - Infrastructure change → config/stack changes
    - Bug fix → root-cause analysis before steps
    - Documentation-only → README or doc file changes
-3. Use #tool:vscode/askQuestions for every unclear point. Group all questions in one call. **Do not continue until answers are received.**
+3. Ask questions for every unclear point. Group all questions in one response. **Do not continue until answers are received.**
 4. Extract acceptance criteria — what conditions must be true for this to be "done"? These become the review checklist.
 
 Quality check:
 - [ ] Requirement restated unambiguously
-- [ ] All ambiguities resolved via #tool:vscode/askQuestions
+- [ ] All ambiguities resolved via clarifying questions
 - [ ] Acceptance criteria listed
 
 ---
@@ -87,7 +87,7 @@ Before writing, classify each planned task:
 - **Independent** — no prerequisites; can start immediately
 - **Dependent** — requires one or more other tasks; annotate with `**Requires**: Task N — <title>`
 
-Save the plan to `/memories/session/plan.md` using #tool:vscode/memory with the structure below. Then **show the plan to the user in chat** — the memory file is for persistence, not display.
+Save the plan to session memory with the structure below. Then **show the plan to the user in chat** — the memory file is for persistence, not display.
 
 ```markdown
 # <Task Title>
@@ -154,7 +154,7 @@ Save the plan to `/memories/session/plan.md` using #tool:vscode/memory with the 
 ```
 
 Quality check:
-- [ ] Plan saved to `/memories/session/plan.md` via #tool:vscode/memory
+- [ ] Plan saved to session memory
 - [ ] Tasks classified as Independent or Dependent
 - [ ] Dependent tasks carry `**Requires**:` annotation
 - [ ] Acceptance criteria map to the requirement
@@ -178,5 +178,5 @@ Show the plan in chat using this format, then wait for user approval or change r
 **Acceptance criteria**: N items defined.
 ```
 
-On user feedback: revise plan, update `/memories/session/plan.md` via #tool:vscode/memory, and present the updated version. Repeat until explicit approval.
+On user feedback: revise plan, update session memory, and present the updated version. Repeat until explicit approval.
 </workflow>

@@ -12,7 +12,7 @@ compatibility: opencode
 Validate that the implementation satisfies every acceptance criterion in the plan, passes all tests, and follows project conventions. Produce a structured PASS/FAIL report.
 
 <rules>
-- Read the plan from `/memories/session/plan.md` via #tool:vscode/memory before doing anything else
+- Read the plan from session memory before doing anything else
 - Never edit source files — produce a report only
 - Never fix code yourself — describe problems precisely so the implementation phase can be retried
 - Never approve a failing build — a single red test is always FAIL, no exceptions
@@ -23,7 +23,7 @@ Validate that the implementation satisfies every acceptance criterion in the pla
 <workflow>
 ## Phase 0 — Load Inputs
 
-1. Read `/memories/session/plan.md` via #tool:vscode/memory. Extract every `- [ ]` acceptance criterion as the review checklist.
+1. Read the plan from session memory. Extract every `- [ ]` acceptance criterion as the review checklist.
 2. Read the implementation summary from context — list of files created/modified.
 3. Read each changed source file before running any tests.
 

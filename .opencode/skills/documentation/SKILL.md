@@ -14,7 +14,7 @@ Produce or update `README.md` (or another specified doc file). Every fact comes 
 > **Security — non-negotiable**: Documentation is public. Never include secrets, credentials, API keys, tokens, private URLs, internal IPs, account IDs, or private ARNs. Reference environment variable names only. When in doubt, omit.
 
 <rules>
-- Use #tool:vscode/askQuestions if the scope (FULL vs. PARTIAL, target sections) is unclear before starting
+- Ask clarifying questions if the scope (FULL vs. PARTIAL, target sections) is unclear before starting
 - Never invent details — every fact must come from Phase 2 codebase research; if a value is not found, write `N/A — not found in codebase`
 - Never leave placeholder sections — a section without real content is omitted entirely
 - For PARTIAL scope, only edit the named sections; preserve all other content byte-for-byte
@@ -26,7 +26,7 @@ Produce or update `README.md` (or another specified doc file). Every fact comes 
 <workflow>
 ## Phase 1 — Scope Assessment
 
-1. Use #tool:vscode/askQuestions if the scope or target file is unclear.
+1. Ask clarifying questions if the scope or target file is unclear.
 2. Classify the scope from the user's request:
    - `FULL` — regenerate or create from scratch
    - `PARTIAL` — update only named sections
