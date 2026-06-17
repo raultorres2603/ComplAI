@@ -1,6 +1,6 @@
 ---
 description: Requirements analysis and structured planning. Use when you need to break down a feature, clarify scope, explore the codebase, and produce a plan with acceptance criteria saved to session memory.
-mode: subagent
+mode: primary
 permission:
   edit: deny
   bash: deny

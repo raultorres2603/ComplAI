@@ -1,6 +1,6 @@
 ---
 description: Read-only validation of implementation against a plan. Use when you need to verify code quality, confirm tests pass, check acceptance criteria, or get a PASS/FAIL verdict. Cannot edit files.
-mode: subagent
+mode: primary
 permission:
   edit: deny
   bash:

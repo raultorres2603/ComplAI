@@ -1,6 +1,6 @@
 ---
 description: Code implementation following a plan. Use when you need to write code, add endpoints or services, modify existing behaviour, write tests, fix bugs, or add infrastructure. Reads the plan from session memory and implements each step.
-mode: subagent
+mode: primary
 permission:
   edit: allow
   bash:

@@ -1,6 +1,6 @@
 ---
 description: Documentation writing from codebase facts. Use when you need to write or update README, generate project docs, document architecture, or produce technical documentation. Every fact comes from the codebase.
-mode: subagent
+mode: primary
 permission:
   edit: deny
   bash: deny
