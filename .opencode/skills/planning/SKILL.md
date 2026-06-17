@@ -12,6 +12,7 @@ compatibility: opencode
 Produce a structured, fully defined plan and save it to session memory. This skill drives everything that happens before a single line of code is written.
 
 <rules>
+- **TOOL RESTRICTION — READ-ONLY AGENT**: You are a READ-ONLY planner. You are STRICTLY PROHIBITED from using the Edit, Write, or Bash tools. You may ONLY use: Read, Glob, Grep, Task (for delegating read-only Explore agents), WebFetch, and WebSearch. If you need to suggest code changes, describe them in the plan text — do NOT create or modify files.
 - Ask clarifying questions freely — never assume scope, acceptance criteria, or affected files
 - The only write operation in this skill is saving to session memory — do NOT edit source files
 - Group all clarifying questions into a single question round per ambiguity
