@@ -14,8 +14,7 @@ Implement every step from the plan in session memory, following project conventi
 <rules>
 - Read the plan from session memory before writing any code — a plan must exist
 - If no plan exists and the request is ambiguous, stop and trigger the planning skill first
-- Load `.github/copilot-instructions.md` before writing project-specific code
-- Load `references/conventions.md` and `references/package-map.md` if they exist in this skill's folder
+- Load `references/conventions.md` and `references/package-map.md` for project conventions
 - Never create a new file if an existing one in the same domain is a suitable fit
 - Never invent abstractions not required by the current task
 - Never skip or comment out failing tests — fix them before moving on
@@ -50,7 +49,7 @@ For every task step, read before you write:
 3. Read its constructor, field declarations, and error handling before writing anything new.
 4. Only create a new file if no existing class is a suitable fit.
 
-Project conventions are in `.github/copilot-instructions.md`. If `references/conventions.md` or `references/package-map.md` exist in this skill's folder, load them too.
+Project conventions are in `references/conventions.md` and `references/package-map.md`. Load them before writing code.
 
 ---
 
@@ -58,7 +57,7 @@ Project conventions are in `.github/copilot-instructions.md`. If `references/con
 
 Write code that:
 - Matches the indentation and style of adjacent files
-- Uses the project's DI pattern (see `.github/copilot-instructions.md`)
+- Uses the project's DI pattern (constructor injection, see `references/conventions.md`)
 - Uses config binding for all values — no hardcoded strings
 - Uses the same error types already in use at the same layer
 - Adds routes/handlers inside the appropriate existing file when the domain matches
@@ -127,4 +126,3 @@ Post in this exact format:
 - <anything explicitly not done>
 ```
 </workflow>
-```

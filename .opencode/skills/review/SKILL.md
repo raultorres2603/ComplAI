@@ -51,7 +51,7 @@ Record findings as a gap list. A gap is any criterion with no corresponding impl
 
 ## Phase 2 — Code Quality Check
 
-For each file the implementation created or modified, verify against project conventions from `.github/copilot-instructions.md`:
+For each file the implementation created or modified, verify against project conventions from `references/conventions.md`:
 
 | Rule | What to check |
 |------|--------------|

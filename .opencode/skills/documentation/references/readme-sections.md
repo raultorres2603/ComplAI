@@ -40,7 +40,7 @@ Auto-linked anchors to every section heading. Update every time a section is add
 ## 4. 🎯 Vision and Goals
 
 A Markdown table with two columns: **Goal** and **How ComplAI addresses it**.  
-Derive goals from the README, `task.md`, or `.github/copilot-instructions.md`.
+Derive goals from the README, `AGENTS.md`, or existing documentation.
 
 ---
 
