@@ -405,24 +405,11 @@ public class StreamingOrchestrator {
     }
 
     private String buildNoNewsFoundMessage(String detectedLanguage, String cityId) {
-        String cityDisplayName = RedactPromptBuilder.resolveCityDisplayName(cityId);
-        if ("CA".equals(detectedLanguage)) {
-            return "No he trobat noticies recents relacionades amb aquesta consulta a " + cityDisplayName + ".";
-        }
-        if ("ES".equals(detectedLanguage)) {
-            return "No he encontrado noticias recientes relacionadas con esa consulta en " + cityDisplayName + ".";
-        }
-        return "I could not find related recent news about that in " + cityDisplayName + ".";
+        return RedactPromptBuilder.buildNoNewsFoundMessage(detectedLanguage, cityId);
     }
 
     private String buildEventDateWindowClarificationMessage(String detectedLanguage) {
-        if ("CA".equals(detectedLanguage)) {
-            return "Per ajudar-te amb esdeveniments, indica un interval de dates (per exemple: aquesta setmana, abril, o del 10/04 al 15/04).";
-        }
-        if ("ES".equals(detectedLanguage)) {
-            return "Para ayudarte con eventos, indícame un rango de fechas (por ejemplo: esta semana, abril, o del 10/04 al 15/04).";
-        }
-        return "To help with events, please provide a date window (for example: this week, April, or from 10/04 to 15/04).";
+        return RedactPromptBuilder.buildEventDateWindowClarificationMessage(detectedLanguage);
     }
 
     // -----------------------------------------------------------------------

@@ -19,24 +19,4 @@ public record CityInfoContextResult(String contextBlock, List<Source> sources) {
         this.contextBlock = contextBlock;
         this.sources = sources == null ? List.of() : Collections.unmodifiableList(new ArrayList<>(sources));
     }
-
-    /**
-     * Returns the RAG context text snippet for the AI prompt.
-     *
-     * @return context block text
-     */
-    @Override
-    public String contextBlock() {
-        return contextBlock;
-    }
-
-    /**
-     * Returns the unmodifiable list of source documents.
-     *
-     * @return list of sources
-     */
-    @Override
-    public List<Source> sources() {
-        return sources;
-    }
 }

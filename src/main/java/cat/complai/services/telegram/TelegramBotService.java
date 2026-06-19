@@ -8,8 +8,6 @@ import cat.complai.dto.openrouter.ComplainantIdentity;
 import cat.complai.dto.sqs.AskSqsMessage;
 import cat.complai.dto.sqs.RedactSqsMessage;
 import cat.complai.services.feedback.FeedbackPublisherService;
-import cat.complai.services.openrouter.IAskService;
-import cat.complai.services.openrouter.conversation.ConversationManagementService;
 import cat.complai.services.telegram.TelegramSessionStore.TelegramMode;
 import cat.complai.utilities.s3.IS3PdfUploader;
 import cat.complai.utilities.sqs.ISqsAskPublisher;
@@ -96,8 +94,6 @@ public class TelegramBotService {
     @Inject
     public TelegramBotService(TelegramConfiguration telegramConfig,
                               TelegramSessionStore sessionStore,
-                               IAskService openRouterService,
-                              ConversationManagementService conversationService,
                               ISqsComplaintPublisher sqsPublisher,
                               ISqsAskPublisher askPublisher,
                               IS3PdfUploader s3PdfUploader,

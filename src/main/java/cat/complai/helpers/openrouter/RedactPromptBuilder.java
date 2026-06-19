@@ -565,6 +565,46 @@ public class RedactPromptBuilder {
     }
 
     // -------------------------------------------------------------------------
+    // Shared i18n message builders (extracted from OpenRouterServices and
+    // StreamingOrchestrator to eliminate DRY violation)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Returns a "no news found" message in the user's detected language.
+     *
+     * @param detectedLanguage language code (CA, ES, FR, or default English)
+     * @param cityId           city identifier for display name resolution
+     * @return localized message
+     */
+    public static String buildNoNewsFoundMessage(String detectedLanguage, String cityId) {
+        String cityDisplayName = resolveCityDisplayName(cityId);
+        if ("CA".equals(detectedLanguage)) {
+            return "No he trobat noticies recents relacionades amb aquesta consulta a " + cityDisplayName + ".";
+        }
+        if ("ES".equals(detectedLanguage)) {
+            return "No he encontrado noticias recientes relacionadas con esa consulta en " + cityDisplayName + ".";
+        }
+        return "I could not find related recent news about that in " + cityDisplayName + ".";
+    }
+
+    /**
+     * Returns a "please provide a date window" clarification message in the
+     * user's detected language.
+     *
+     * @param detectedLanguage language code (CA, ES, FR, or default English)
+     * @return localized message
+     */
+    public static String buildEventDateWindowClarificationMessage(String detectedLanguage) {
+        if ("CA".equals(detectedLanguage)) {
+            return "Per ajudar-te amb esdeveniments, indica un interval de dates (per exemple: aquesta setmana, abril, o del 10/04 al 15/04).";
+        }
+        if ("ES".equals(detectedLanguage)) {
+            return "Para ayudarte con eventos, indícame un rango de fechas (por ejemplo: esta semana, abril, o del 10/04 al 15/04).";
+        }
+        return "To help with events, please provide a date window (for example: this week, April, or from 10/04 to 15/04).";
+    }
+
+    // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
 

@@ -118,8 +118,7 @@ public class RedactOrchestrator {
 
         // Choose the prompt based on whether we have a complete identity.
         String userPrompt = "";
-        final boolean identityComplete = identity != null && identity.isComplete();
-        if (identityComplete) {
+        if (hasCompleteIdentity) {
             String originalComplaint = conversationService.getPendingComplaint(conversationId);
             if (originalComplaint != null) {
                 conversationService.clearPendingComplaint(conversationId);
@@ -144,13 +143,13 @@ public class RedactOrchestrator {
         messages.add(Map.of("role", "user", "content", userPrompt));
 
         log.debug("redactComplaint() messages prepared — messageCount={} identityComplete={} conversationId={}",
-                messages.size(), identityComplete, conversationId);
+                messages.size(), hasCompleteIdentity, conversationId);
 
         // No procedure/event context for complaints, use default cache key
         OpenRouterResponseDto aiDto = aiResponseService.callOpenRouterAndExtract(messages, cityId, 0, 0);
 
         // Process the AI response
-        OpenRouterResponseDto processedResponse = aiResponseService.processComplaintResponse(aiDto, identityComplete);
+        OpenRouterResponseDto processedResponse = aiResponseService.processComplaintResponse(aiDto, hasCompleteIdentity);
 
         // Update conversation history if we have a valid response
         if (conversationId != null && !conversationId.isBlank() && processedResponse.getMessage() != null) {

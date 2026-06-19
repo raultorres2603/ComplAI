@@ -304,9 +304,22 @@ public class OpenRouterController {
                                 s3Key, conversationId, cityId);
                 try {
                         sqsPublisher.publish(sqsMessage);
+                } catch (IllegalStateException e) {
+                        long latency = System.currentTimeMillis() - requestStart;
+                        logger.log(Level.SEVERE, "POST /complai/redact — httpStatus=503 reason=sqsQueueUnavailable"
+                                        + " (" + e.getClass().getSimpleName() + ")"
+                                        + " s3Key=" + s3Key + " conversationId=" + conversationId, e);
+                        metricsPublisher.publishInteraction("REDACT", cityId,
+                                        false, latency);
+                        OpenRouterPublicDto err = new OpenRouterPublicDto(false, null,
+                                        "Complaint generation queue is unavailable. Please try again later.",
+                                        OpenRouterErrorCode.UPSTREAM.getCode(), List.of());
+                        return HttpResponse.status(HttpStatus.SERVICE_UNAVAILABLE).body(err)
+                                        .contentType(MediaType.APPLICATION_JSON);
                 } catch (Exception e) {
                         long latency = System.currentTimeMillis() - requestStart;
                         logger.log(Level.SEVERE, "POST /complai/redact — httpStatus=500 reason=sqsPublishFailed"
+                                        + " (" + e.getClass().getSimpleName() + ")"
                                         + " s3Key=" + s3Key + " conversationId=" + conversationId, e);
                         metricsPublisher.publishInteraction("REDACT", cityId,
                                         false, latency);

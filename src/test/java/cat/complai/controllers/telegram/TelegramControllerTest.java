@@ -66,7 +66,7 @@ public class TelegramControllerTest {
         final List<String> receivedCities = new ArrayList<>();
 
         FakeBotService() {
-            super(null, null, null, null, null, null, null, null, null);
+            super(null, null, null, null, null, null, null);
         }
 
         @Override
