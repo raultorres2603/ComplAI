@@ -3,7 +3,7 @@ package cat.complai.services.worker;
 import cat.complai.dto.openrouter.OpenRouterErrorCode;
 import cat.complai.dto.openrouter.OpenRouterResponseDto;
 import cat.complai.dto.sqs.AskSqsMessage;
-import cat.complai.services.openrouter.IOpenRouterService;
+import cat.complai.services.openrouter.IAskService;
 import cat.complai.services.worker.AskProcessor.TelegramSender;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,7 +26,7 @@ import static org.mockito.Mockito.*;
 class AskProcessorTest {
 
     @Mock
-    private IOpenRouterService openRouterService;
+    private IAskService openRouterService;
 
     private static final long CHAT_ID = 12345L;
     private static final String CITY_ID = "elprat";

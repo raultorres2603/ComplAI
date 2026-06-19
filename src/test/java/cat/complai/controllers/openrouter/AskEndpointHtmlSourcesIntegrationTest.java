@@ -8,7 +8,7 @@ import cat.complai.dto.openrouter.OpenRouterErrorCode;
 import cat.complai.dto.openrouter.OpenRouterPublicDto;
 import cat.complai.dto.openrouter.OpenRouterResponseDto;
 import cat.complai.dto.openrouter.Source;
-import cat.complai.services.openrouter.IOpenRouterService;
+import cat.complai.services.openrouter.IAskService;
 import cat.complai.services.openrouter.cache.ResponseCacheService;
 import cat.complai.utilities.s3.S3PdfUploader;
 import cat.complai.utilities.sqs.SqsComplaintPublisher;
@@ -45,7 +45,7 @@ public class AskEndpointHtmlSourcesIntegrationTest {
     HttpClient client;
 
     @Inject
-    IOpenRouterService openRouterService;
+    IAskService openRouterService;
 
     @Inject
     ResponseCacheService cacheService;

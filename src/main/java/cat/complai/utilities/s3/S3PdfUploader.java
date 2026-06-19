@@ -24,7 +24,7 @@ import java.util.logging.Logger;
  * Lambda invocation lifecycle.
  */
 @Singleton
-public class S3PdfUploader {
+public class S3PdfUploader implements IS3PdfUploader {
 
     private static final Duration PRESIGN_EXPIRY = Duration.ofHours(24);
 
@@ -59,6 +59,7 @@ public class S3PdfUploader {
      * The URL is valid for {@value #PRESIGN_EXPIRY} hours regardless of whether the
      * object exists at the time of signing.
      */
+    @Override
     public String generatePresignedGetUrl(String key) {
         GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
                 .signatureDuration(PRESIGN_EXPIRY)
@@ -72,6 +73,7 @@ public class S3PdfUploader {
      * Throws {@link RuntimeException} on failure so the SQS handler can return the
      * message to the queue for a retry.
      */
+    @Override
     public void upload(String key, byte[] pdfBytes) {
         logger.info(() -> "S3 upload starting — bucket=" + bucketName + " key=" + key + " sizeBytes=" + pdfBytes.length);
         PutObjectRequest request = PutObjectRequest.builder()

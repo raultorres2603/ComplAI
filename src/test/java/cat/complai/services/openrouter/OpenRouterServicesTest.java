@@ -25,6 +25,7 @@ import cat.complai.helpers.openrouter.CivicVocabularyService;
 import cat.complai.config.CivicVocabularyConfig;
 import cat.complai.helpers.openrouter.NewsRagHelperRegistry;
 import cat.complai.helpers.openrouter.CityInfoRagHelperRegistry;
+import cat.complai.helpers.openrouter.SseChunkParser;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -45,16 +46,17 @@ public class OpenRouterServicesTest {
                 new NewsRagHelperRegistry(), new CityInfoRagHelperRegistry());
         RagContextBuilder ragContextBuilder = new RagContextBuilder(wrapper.ragRegistry, new EventRagHelperRegistry(),
                 new NewsRagHelperRegistry(), new CityInfoRagHelperRegistry(), promptBuilder);
+        RagContextHelper ragContextHelper = new RagContextHelper(ragContextBuilder, intentDetector);
         ClarificationService clarificationService = new ClarificationService(wrapper.ragRegistry, intentDetector);
         com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
         StreamingOrchestrator streamingOrchestrator = new StreamingOrchestrator(validationService,
-                conversationService, ragContextBuilder, clarificationService, intentDetector,
-                promptBuilder, wrapper, objectMapper);
+                conversationService, ragContextBuilder, ragContextHelper, clarificationService, intentDetector,
+                promptBuilder, wrapper, objectMapper, new SseChunkParser(new com.fasterxml.jackson.databind.ObjectMapper()));
         RedactOrchestrator redactOrchestrator = new RedactOrchestrator(validationService,
                 conversationService, aiResponseService, promptBuilder,
                 new CivicVocabularyService(), new CivicVocabularyConfig());
         return new OpenRouterServices(validationService, conversationService, aiResponseService,
-                intentDetector, ragContextBuilder, clarificationService,
+                intentDetector, ragContextBuilder, ragContextHelper, clarificationService,
                 streamingOrchestrator, redactOrchestrator, promptBuilder);
     }
 
@@ -264,16 +266,17 @@ public class OpenRouterServicesTest {
                 new NewsRagHelperRegistry(), new CityInfoRagHelperRegistry());
         RagContextBuilder ragContextBuilder = new RagContextBuilder(wrapper.ragRegistry, new EventRagHelperRegistry(),
                 new NewsRagHelperRegistry(), new CityInfoRagHelperRegistry(), promptBuilder);
+        RagContextHelper ragContextHelper = new RagContextHelper(ragContextBuilder, intentDetector);
         ClarificationService clarificationService = new ClarificationService(wrapper.ragRegistry, intentDetector);
         com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
         StreamingOrchestrator streamingOrchestrator = new StreamingOrchestrator(validationService,
-                conversationService, ragContextBuilder, clarificationService, intentDetector,
-                promptBuilder, wrapper, objectMapper);
+                conversationService, ragContextBuilder, ragContextHelper, clarificationService, intentDetector,
+                promptBuilder, wrapper, objectMapper, new SseChunkParser(new com.fasterxml.jackson.databind.ObjectMapper()));
         RedactOrchestrator redactOrchestrator = new RedactOrchestrator(validationService,
                 conversationService, aiResponseService, promptBuilder,
                 new CivicVocabularyService(), new CivicVocabularyConfig());
         OpenRouterServices svc = new OpenRouterServices(validationService, conversationService, aiResponseService,
-                intentDetector, ragContextBuilder, clarificationService,
+                intentDetector, ragContextBuilder, ragContextHelper, clarificationService,
                 streamingOrchestrator, redactOrchestrator, promptBuilder);
 
         OpenRouterResponseDto out = svc.redactComplaint("   ", OutputFormat.JSON, null, null, "testcity");

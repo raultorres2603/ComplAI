@@ -229,35 +229,19 @@ public class RagContextBuilder {
         return CompletableFuture.supplyAsync(() -> buildProcedureContextResult(query, cityId), executor);
     }
 
-    public CompletableFuture<ProcedureContextResult> buildProcedureContextResultAsync(String query, String cityId) {
-        return CompletableFuture.completedFuture(buildProcedureContextResult(query, cityId));
-    }
-
     public CompletableFuture<EventContextResult> buildEventContextResultAsync(String query, String cityId,
-                                                                               Executor executor) {
+                                                                                Executor executor) {
         return CompletableFuture.supplyAsync(() -> buildEventContextResult(query, cityId), executor);
     }
 
-    public CompletableFuture<EventContextResult> buildEventContextResultAsync(String query, String cityId) {
-        return CompletableFuture.completedFuture(buildEventContextResult(query, cityId));
-    }
-
     public CompletableFuture<NewsContextResult> buildNewsContextResultAsync(String query, String cityId,
-                                                                             Executor executor) {
+                                                                              Executor executor) {
         return CompletableFuture.supplyAsync(() -> buildNewsContextResult(query, cityId), executor);
     }
 
-    public CompletableFuture<NewsContextResult> buildNewsContextResultAsync(String query, String cityId) {
-        return CompletableFuture.completedFuture(buildNewsContextResult(query, cityId));
-    }
-
     public CompletableFuture<CityInfoContextResult> buildCityInfoContextResultAsync(String query, String cityId,
-                                                                                     Executor executor) {
+                                                                                      Executor executor) {
         return CompletableFuture.supplyAsync(() -> buildCityInfoContextResult(query, cityId), executor);
-    }
-
-    public CompletableFuture<CityInfoContextResult> buildCityInfoContextResultAsync(String query, String cityId) {
-        return CompletableFuture.completedFuture(buildCityInfoContextResult(query, cityId));
     }
 
     // -----------------------------------------------------------------------

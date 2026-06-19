@@ -2,7 +2,7 @@ package cat.complai.services.worker;
 
 import cat.complai.dto.openrouter.OpenRouterResponseDto;
 import cat.complai.dto.sqs.AskSqsMessage;
-import cat.complai.services.openrouter.IOpenRouterService;
+import cat.complai.services.openrouter.IAskService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.net.URI;
@@ -32,7 +32,7 @@ class AskProcessor {
     private static final String TELEGRAM_API_BASE = "https://api.telegram.org";
     private static final Duration HTTP_TIMEOUT = Duration.ofSeconds(30);
 
-    private final IOpenRouterService openRouterService;
+    private final IAskService openRouterService;
     private final String telegramToken;
     private final TelegramSender telegramSender;
     private final ObjectMapper mapper;
@@ -40,14 +40,14 @@ class AskProcessor {
     /**
      * Production constructor — uses a real {@link HttpClient} for Telegram API calls.
      */
-    AskProcessor(IOpenRouterService openRouterService, String telegramToken, ObjectMapper mapper) {
+    AskProcessor(IAskService openRouterService, String telegramToken, ObjectMapper mapper) {
         this(openRouterService, telegramToken, new RealTelegramSender(mapper), mapper);
     }
 
     /**
      * Test constructor — accepts a custom {@link TelegramSender} for mocking.
      */
-    AskProcessor(IOpenRouterService openRouterService, String telegramToken, TelegramSender telegramSender,
+    AskProcessor(IAskService openRouterService, String telegramToken, TelegramSender telegramSender,
             ObjectMapper mapper) {
         this.openRouterService = openRouterService;
         this.telegramToken = telegramToken;
@@ -59,7 +59,7 @@ class AskProcessor {
      * Backward-compatible constructor for tests. Uses a standalone mapper
      * (safe because tests run in JIT mode, not native image).
      */
-    AskProcessor(IOpenRouterService openRouterService, String telegramToken, TelegramSender telegramSender) {
+    AskProcessor(IAskService openRouterService, String telegramToken, TelegramSender telegramSender) {
         this(openRouterService, telegramToken, telegramSender, new ObjectMapper());
     }
 

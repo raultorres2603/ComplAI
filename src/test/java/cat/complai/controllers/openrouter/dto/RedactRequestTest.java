@@ -6,78 +6,58 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Unit tests for {@link RedactRequest#getComplainantIdentity()}.
+ * Unit tests for the blank-to-null identity normalization contract.
  *
- * The method is the single point responsible for normalising raw HTTP input into
- * the domain's {@link ComplainantIdentity} record. These tests verify that blank
- * and whitespace-only values are treated as absent, and that all returned values
- * are trimmed before crossing the service boundary.
+ * <p>The normalization is now performed by the controller boundary
+ * ({@code OpenRouterController.safeIdentity()}) rather than the DTO, but the
+ * behavioral contract on {@link ComplainantIdentity} remains unchanged.
+ * These tests validate how identity data behaves when constructed with
+ * null or blank fields, mirroring the controller's normalization.
  */
 class RedactRequestTest {
 
-    // -------------------------------------------------------------------------
-    // Returns null — all fields absent
-    // -------------------------------------------------------------------------
-
     @Test
-    void getComplainantIdentity_allNull_returnsNull() {
-        RedactRequest request = new RedactRequest("complaint", null, null, null, null, null);
-        assertNull(request.getComplainantIdentity());
+    void allFieldsNull_identityIsAbsent() {
+        ComplainantIdentity id = new ComplainantIdentity(null, null, null);
+        assertNull(id.name());
+        assertNull(id.surname());
+        assertNull(id.idNumber());
+        assertFalse(id.isComplete());
+        assertFalse(id.isPartiallyProvided());
     }
 
     @Test
-    void getComplainantIdentity_allBlank_returnsNull() {
-        RedactRequest request = new RedactRequest("complaint", null, null, " ", "  ", "\t");
-        assertNull(request.getComplainantIdentity(),
-                "Whitespace-only fields must be treated as absent, not as provided values");
+    void allFieldsBlank_isCompleteReturnsFalse() {
+        ComplainantIdentity id = new ComplainantIdentity(" ", "  ", "\t");
+        assertFalse(id.isComplete(),
+                "Whitespace-only fields must not be considered complete");
+        assertFalse(id.isPartiallyProvided(),
+                "Whitespace-only values should not count as partially provided");
     }
 
     @Test
-    void getComplainantIdentity_mixOfNullAndBlank_returnsNull() {
-        RedactRequest request = new RedactRequest("complaint", null, null, null, "  ", null);
-        assertNull(request.getComplainantIdentity(),
-                "A single blank field must not cause a partial identity to be returned");
-    }
-
-    // -------------------------------------------------------------------------
-    // Returns identity — at least one real field present
-    // -------------------------------------------------------------------------
-
-    @Test
-    void getComplainantIdentity_allFieldsPresent_returnsCompleteIdentity() {
-        RedactRequest request = new RedactRequest("complaint", null, null, "Joan", "Torres", "12345678A");
-        ComplainantIdentity identity = request.getComplainantIdentity();
-
-        assertNotNull(identity);
-        assertEquals("Joan", identity.name());
-        assertEquals("Torres", identity.surname());
-        assertEquals("12345678A", identity.idNumber());
-        assertTrue(identity.isComplete());
+    void mixOfNullAndBlank_isCompleteReturnsFalse() {
+        ComplainantIdentity id = new ComplainantIdentity(null, "  ", null);
+        assertFalse(id.isComplete());
+        assertNull(id.name());
+        assertNotNull(id.surname());
     }
 
     @Test
-    void getComplainantIdentity_fieldsWithSurroundingWhitespace_areTrimmed() {
-        RedactRequest request = new RedactRequest("complaint", null, null, "  Joan  ", " Torres ", "  12345678A  ");
-        ComplainantIdentity identity = request.getComplainantIdentity();
-
-        assertNotNull(identity);
-        assertEquals("Joan", identity.name(), "name must be trimmed");
-        assertEquals("Torres", identity.surname(), "surname must be trimmed");
-        assertEquals("12345678A", identity.idNumber(), "idNumber must be trimmed");
+    void allFieldsPresent_isCompleteReturnsTrue() {
+        ComplainantIdentity id = new ComplainantIdentity("Joan", "Torres", "12345678A");
+        assertTrue(id.isComplete());
+        assertTrue(id.isPartiallyProvided());
+        assertEquals("Joan", id.name());
+        assertEquals("Torres", id.surname());
+        assertEquals("12345678A", id.idNumber());
     }
 
     @Test
-    void getComplainantIdentity_partialIdentity_blankFieldsBecomNull() {
-        // Only name is real; surname is blank, id is null.
-        RedactRequest request = new RedactRequest("complaint", null, null, "Joan", "  ", null);
-        ComplainantIdentity identity = request.getComplainantIdentity();
-
-        assertNotNull(identity, "At least one real field means identity is not null");
-        assertEquals("Joan", identity.name());
-        assertNull(identity.surname(), "Blank surname must be normalised to null");
-        assertNull(identity.idNumber());
-        assertFalse(identity.isComplete(), "Partial identity must not be considered complete");
-        assertTrue(identity.isPartiallyProvided());
+    void partialIdentity_isNotComplete() {
+        ComplainantIdentity id = new ComplainantIdentity("Joan", "  ", null);
+        assertFalse(id.isComplete(), "Partial identity must not be considered complete");
+        assertTrue(id.isPartiallyProvided(), "At least one real field qualifies as partially provided");
     }
 }
 

@@ -100,6 +100,15 @@ public class OidcIdentityTokenValidator {
     }
 
     /**
+     * Protected no-arg constructor for subclasses that want an empty (disabled) validation
+     * context. Used by {@link DisabledIdentityTokenValidator} to implement the Null Object
+     * pattern: {@link #isEnabledForCity(String)} returns {@code false} for all cities.
+     */
+    protected OidcIdentityTokenValidator() {
+        this.cityContexts = Map.of();
+    }
+
+    /**
      * Protected constructor for unit tests. Bypasses classpath loading and JWKS fetch by
      * accepting a pre-built {@link JwtParser} wired to a specific test city identifier.
      *

@@ -8,12 +8,12 @@ import cat.complai.dto.openrouter.ComplainantIdentity;
 import cat.complai.dto.sqs.AskSqsMessage;
 import cat.complai.dto.sqs.RedactSqsMessage;
 import cat.complai.services.feedback.FeedbackPublisherService;
-import cat.complai.services.openrouter.IOpenRouterService;
+import cat.complai.services.openrouter.IAskService;
 import cat.complai.services.openrouter.conversation.ConversationManagementService;
 import cat.complai.services.telegram.TelegramSessionStore.TelegramMode;
-import cat.complai.utilities.s3.S3PdfUploader;
-import cat.complai.utilities.sqs.SqsAskPublisher;
-import cat.complai.utilities.sqs.SqsComplaintPublisher;
+import cat.complai.utilities.s3.IS3PdfUploader;
+import cat.complai.utilities.sqs.ISqsAskPublisher;
+import cat.complai.utilities.sqs.ISqsComplaintPublisher;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -85,9 +85,9 @@ public class TelegramBotService {
 
     private final TelegramConfiguration telegramConfig;
     private final TelegramSessionStore sessionStore;
-    private final SqsComplaintPublisher sqsPublisher;
-    private final SqsAskPublisher askPublisher;
-    private final S3PdfUploader s3PdfUploader;
+    private final ISqsComplaintPublisher sqsPublisher;
+    private final ISqsAskPublisher askPublisher;
+    private final IS3PdfUploader s3PdfUploader;
     private final FeedbackPublisherService feedbackPublisher;
     private final HttpClient httpClient;
     private final ObjectMapper mapper;
@@ -96,11 +96,11 @@ public class TelegramBotService {
     @Inject
     public TelegramBotService(TelegramConfiguration telegramConfig,
                               TelegramSessionStore sessionStore,
-                              IOpenRouterService openRouterService,
+                               IAskService openRouterService,
                               ConversationManagementService conversationService,
-                              SqsComplaintPublisher sqsPublisher,
-                              SqsAskPublisher askPublisher,
-                              S3PdfUploader s3PdfUploader,
+                              ISqsComplaintPublisher sqsPublisher,
+                              ISqsAskPublisher askPublisher,
+                              IS3PdfUploader s3PdfUploader,
                               FeedbackPublisherService feedbackPublisher,
                               ObjectMapper mapper) {
         this.telegramConfig = telegramConfig;

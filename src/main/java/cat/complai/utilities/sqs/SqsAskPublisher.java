@@ -27,7 +27,7 @@ import java.util.logging.Logger;
  * surface an appropriate error to the user.
  */
 @Singleton
-public class SqsAskPublisher {
+public class SqsAskPublisher implements ISqsAskPublisher {
 
     /** Maximum number of visible messages on the queue before we reject new publishes. */
     static final int MAX_QUEUE_DEPTH = Integer.parseInt(
@@ -71,6 +71,7 @@ public class SqsAskPublisher {
      * @throws RuntimeException if the queue depth is exceeded, serialisation fails,
      *                          or the SQS call is unsuccessful
      */
+    @Override
     public void publish(AskSqsMessage message) {
         if (queueUrl == null || queueUrl.isBlank()) {
             throw new IllegalStateException("ASK_QUEUE_URL is not configured — cannot publish ask message");

@@ -1,12 +1,14 @@
 package cat.complai.controllers.openrouter.dto;
 
 import io.micronaut.core.annotation.Introspected;
+import jakarta.validation.constraints.NotBlank;
 
 /**
  * Request DTO for the {@code POST /complai/ask} endpoint.
  */
 @Introspected
 public class AskRequest {
+    @NotBlank(message = "text must not be blank")
     private final String text;
     private final String conversationId;
 

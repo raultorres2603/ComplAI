@@ -6,7 +6,7 @@ import cat.complai.dto.openrouter.OpenRouterErrorCode;
 import cat.complai.dto.openrouter.OpenRouterResponseDto;
 import cat.complai.dto.openrouter.OutputFormat;
 import cat.complai.dto.sqs.AskSqsMessage;
-import cat.complai.services.openrouter.IOpenRouterService;
+import cat.complai.services.openrouter.IAskService;
 import cat.complai.services.worker.AskProcessor.TelegramSender;
 import com.amazonaws.services.lambda.runtime.events.SQSBatchResponse;
 import org.junit.jupiter.api.Test;
@@ -60,7 +60,7 @@ class AskWorkerHandlerTest {
     @Test
     void process_successfulAiResponse_sendsAnswer() throws Exception {
         CapturingTelegramSender sender = new CapturingTelegramSender();
-        IOpenRouterService aiService = new FakeAiService(successResponse("L'horari és de 9 a 14h."));
+        IAskService aiService = new FakeAiService(successResponse("L'horari és de 9 a 14h."));
 
         AskProcessor processor = new AskProcessor(aiService, TOKEN, sender);
         AskSqsMessage message = new AskSqsMessage(
@@ -75,7 +75,7 @@ class AskWorkerHandlerTest {
     @Test
     void process_aiReturnsNull_sendsFallbackError() throws Exception {
         CapturingTelegramSender sender = new CapturingTelegramSender();
-        IOpenRouterService aiService = new FakeAiService(null);
+        IAskService aiService = new FakeAiService(null);
 
         AskProcessor processor = new AskProcessor(aiService, TOKEN, sender);
         AskSqsMessage message = new AskSqsMessage(
@@ -90,7 +90,7 @@ class AskWorkerHandlerTest {
     @Test
     void process_aiReturnsError_sendsFallbackError() throws Exception {
         CapturingTelegramSender sender = new CapturingTelegramSender();
-        IOpenRouterService aiService = new FakeAiService(
+        IAskService aiService = new FakeAiService(
                 new OpenRouterResponseDto(false, null, "API error", 500, OpenRouterErrorCode.UPSTREAM));
 
         AskProcessor processor = new AskProcessor(aiService, TOKEN, sender);
@@ -106,7 +106,7 @@ class AskWorkerHandlerTest {
     @Test
     void process_missingCityId_throwsException() {
         CapturingTelegramSender sender = new CapturingTelegramSender();
-        IOpenRouterService aiService = new FakeAiService(successResponse("Answer"));
+        IAskService aiService = new FakeAiService(successResponse("Answer"));
 
         AskProcessor processor = new AskProcessor(aiService, TOKEN, sender);
         AskSqsMessage message = new AskSqsMessage(
@@ -119,7 +119,7 @@ class AskWorkerHandlerTest {
     @Test
     void process_missingToken_throwsException() {
         CapturingTelegramSender sender = new CapturingTelegramSender();
-        IOpenRouterService aiService = new FakeAiService(successResponse("Answer"));
+        IAskService aiService = new FakeAiService(successResponse("Answer"));
 
         AskProcessor processor = new AskProcessor(aiService, null, sender);
         AskSqsMessage message = new AskSqsMessage(
@@ -134,7 +134,7 @@ class AskWorkerHandlerTest {
         TelegramSender failingSender = (chatId, text, token) -> {
             throw new RuntimeException("Telegram API failed");
         };
-        IOpenRouterService aiService = new FakeAiService(successResponse("Answer"));
+        IAskService aiService = new FakeAiService(successResponse("Answer"));
 
         AskProcessor processor = new AskProcessor(aiService, TOKEN, failingSender);
         AskSqsMessage message = new AskSqsMessage(
@@ -156,7 +156,7 @@ class AskWorkerHandlerTest {
         AtomicInteger callCount = new AtomicInteger(0);
 
         // First call succeeds, second call throws
-        IOpenRouterService aiService = new IOpenRouterService() {
+        IAskService aiService = new IAskService() {
             @Override
             public OpenRouterResponseDto ask(String question, String conversationId, String cityId) {
                 if (callCount.incrementAndGet() == 2) {
@@ -171,22 +171,6 @@ class AskWorkerHandlerTest {
                     throw new RuntimeException("AI service unavailable");
                 }
                 return successResponse("Answer");
-            }
-
-            @Override
-            public AskStreamResult streamAsk(String question, String conversationId, String cityId) {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public Optional<OpenRouterResponseDto> validateRedactInput(String complaint) {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format,
-                    String conversationId, ComplainantIdentity identity, String cityId) {
-                throw new UnsupportedOperationException();
             }
         };
 
@@ -228,7 +212,7 @@ class AskWorkerHandlerTest {
 
     @Test
     void execute_allSucceed_noFailures() throws Exception {
-        IOpenRouterService aiService = new FakeAiService(successResponse("Answer"));
+        IAskService aiService = new FakeAiService(successResponse("Answer"));
         CapturingTelegramSender sender = new CapturingTelegramSender();
 
         List<SQSBatchResponse.BatchItemFailure> failures = new ArrayList<>();
@@ -250,35 +234,18 @@ class AskWorkerHandlerTest {
     }
 
     // -------------------------------------------------------------------------
-    // Helper: minimal fake IOpenRouterService that only implements ask()
+    // Helper: minimal fake IAskService that only implements ask()
     // -------------------------------------------------------------------------
 
-    private record FakeAiService(OpenRouterResponseDto response) implements IOpenRouterService {
+    private record FakeAiService(OpenRouterResponseDto response) implements IAskService {
+        @Override
+        public OpenRouterResponseDto ask(String question, String conversationId, String cityId) {
+            return response;
+        }
 
         @Override
-            public OpenRouterResponseDto ask(String question, String conversationId, String cityId) {
-                return response;
-            }
-
-            @Override
-            public OpenRouterResponseDto ask(String question, String conversationId, String cityId, String preferredLang) {
-                return response;
-            }
-
-            @Override
-            public AskStreamResult streamAsk(String question, String conversationId, String cityId) {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public Optional<OpenRouterResponseDto> validateRedactInput(String complaint) {
-                throw new UnsupportedOperationException();
-            }
-
-            @Override
-            public OpenRouterResponseDto redactComplaint(String complaint, OutputFormat format,
-                                                         String conversationId, ComplainantIdentity identity, String cityId) {
-                throw new UnsupportedOperationException();
-            }
+        public OpenRouterResponseDto ask(String question, String conversationId, String cityId, String preferredLang) {
+            return response;
         }
+    }
 }

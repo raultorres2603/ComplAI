@@ -11,7 +11,7 @@ import org.slf4j.LoggerFactory;
 
 import cat.complai.dto.openrouter.OpenRouterResponseDto;
 import cat.complai.exceptions.ses.CloudWatchLogsException;
-import cat.complai.services.openrouter.IOpenRouterService;
+import cat.complai.services.openrouter.IAskService;
 import cat.complai.services.stadistics.models.ComplaintFile;
 import cat.complai.services.stadistics.models.FeedbackFile;
 import cat.complai.services.stadistics.models.StadisticsModel;
@@ -35,12 +35,12 @@ public class StadisticsService implements IStadisticsService {
 
     private final S3ComplaintLister s3ComplaintLister;
     private final S3FeedbackLister s3FeedbackLister;
-    private final IOpenRouterService openRouterService;
+    private final IAskService openRouterService;
     private final CloudWatchClient cloudWatchClient;
 
     @Inject
     public StadisticsService(S3ComplaintLister s3ComplaintLister, S3FeedbackLister s3FeedbackLister,
-            IOpenRouterService openRouterService, CloudWatchClient cloudWatchClient) {
+            IAskService openRouterService, CloudWatchClient cloudWatchClient) {
         this.s3ComplaintLister = s3ComplaintLister;
         this.s3FeedbackLister = s3FeedbackLister;
         this.openRouterService = openRouterService;

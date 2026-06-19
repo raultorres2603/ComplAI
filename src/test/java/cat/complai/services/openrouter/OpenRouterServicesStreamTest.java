@@ -55,6 +55,9 @@ class OpenRouterServicesStreamTest {
         private RedactOrchestrator redactOrchestrator;
 
         @Mock
+        private RagContextHelper ragContextHelper;
+
+        @Mock
         private RedactPromptBuilder promptBuilder;
 
         private ObjectMapper objectMapper;
@@ -69,6 +72,7 @@ class OpenRouterServicesStreamTest {
                                 aiResponseService,
                                 intentDetector,
                                 ragContextBuilder,
+                                ragContextHelper,
                                 clarificationService,
                                 streamingOrchestrator,
                                 redactOrchestrator,

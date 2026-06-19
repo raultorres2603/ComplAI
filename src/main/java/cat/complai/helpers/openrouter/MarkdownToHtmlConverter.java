@@ -82,9 +82,6 @@ public class MarkdownToHtmlConverter {
         html = convertBold(html);
         html = convertItalic(html);
 
-        // Step 6: Clean up excessive HTML formatting
-        html = HtmlFormatter.cleanHtml(html);
-
         return html;
     }
 

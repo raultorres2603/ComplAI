@@ -1,6 +1,7 @@
 package cat.complai.controllers.feedback.dto;
 
 import io.micronaut.core.annotation.Introspected;
+import jakarta.validation.constraints.NotBlank;
 
 /**
  * Request DTO for the POST /complai/feedback endpoint.
@@ -10,7 +11,7 @@ import io.micronaut.core.annotation.Introspected;
  */
 @Introspected
 public record FeedbackRequest(
-        String userName,
-        String idUser,
-        String message
+        @NotBlank(message = "userName must not be blank") String userName,
+        @NotBlank(message = "idUser must not be blank") String idUser,
+        @NotBlank(message = "message must not be blank") String message
 ) {}

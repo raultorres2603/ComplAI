@@ -1,12 +1,12 @@
 package cat.complai.services.worker;
 
-import cat.complai.utilities.http.HttpWrapper;
+import cat.complai.utilities.http.IHttpWrapper;
 import cat.complai.dto.http.HttpDto;
 import cat.complai.dto.openrouter.ComplainantIdentity;
 import cat.complai.helpers.openrouter.AiParsed;
 import cat.complai.helpers.openrouter.PdfGenerator;
 import cat.complai.helpers.openrouter.RedactPromptBuilder;
-import cat.complai.utilities.s3.S3PdfUploader;
+import cat.complai.utilities.s3.IS3PdfUploader;
 import cat.complai.dto.sqs.RedactSqsMessage;
 
 import java.util.ArrayList;
@@ -31,13 +31,13 @@ class ComplaintLetterGenerator {
     private static final Logger logger = Logger.getLogger(ComplaintLetterGenerator.class.getName());
 
     private final RedactPromptBuilder promptBuilder;
-    private final HttpWrapper httpWrapper;
-    private final S3PdfUploader s3PdfUploader;
+    private final IHttpWrapper httpWrapper;
+    private final IS3PdfUploader s3PdfUploader;
     private final int overallTimeoutSeconds;
 
     ComplaintLetterGenerator(RedactPromptBuilder promptBuilder,
-                              HttpWrapper httpWrapper,
-                              S3PdfUploader s3PdfUploader,
+                              IHttpWrapper httpWrapper,
+                              IS3PdfUploader s3PdfUploader,
                               int overallTimeoutSeconds) {
         this.promptBuilder        = promptBuilder;
         this.httpWrapper          = httpWrapper;

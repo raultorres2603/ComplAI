@@ -1,6 +1,6 @@
 package cat.complai.services.openrouter;
 
-import cat.complai.utilities.http.HttpWrapper;
+import cat.complai.utilities.http.IHttpWrapper;
 import cat.complai.dto.http.OpenRouterStreamStartResult;
 import cat.complai.services.openrouter.conversation.ConversationManagementService;
 import cat.complai.services.openrouter.validation.InputValidationService;
@@ -28,12 +28,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.OptionalInt;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -52,30 +48,36 @@ public class StreamingOrchestrator {
     private final InputValidationService validationService;
     private final ConversationManagementService conversationService;
     private final RagContextBuilder ragContextBuilder;
+    private final RagContextHelper ragContextHelper;
     private final ClarificationService clarificationService;
     private final IntentDetector intentDetector;
     private final RedactPromptBuilder promptBuilder;
-    private final HttpWrapper httpWrapper;
+    private final IHttpWrapper httpWrapper;
     private final ObjectMapper objectMapper;
+    private final SseChunkParser sseChunkParser;
     private final ExecutorService ragExecutor;
 
     @Inject
     public StreamingOrchestrator(InputValidationService validationService,
                                   ConversationManagementService conversationService,
                                   RagContextBuilder ragContextBuilder,
+                                  RagContextHelper ragContextHelper,
                                   ClarificationService clarificationService,
                                   IntentDetector intentDetector,
                                   RedactPromptBuilder promptBuilder,
-                                  HttpWrapper httpWrapper,
-                                  ObjectMapper objectMapper) {
+                                  IHttpWrapper httpWrapper,
+                                  ObjectMapper objectMapper,
+                                  SseChunkParser sseChunkParser) {
         this.validationService = validationService;
         this.conversationService = conversationService;
         this.ragContextBuilder = ragContextBuilder;
+        this.ragContextHelper = ragContextHelper;
         this.clarificationService = clarificationService;
         this.intentDetector = intentDetector;
         this.promptBuilder = promptBuilder;
         this.httpWrapper = httpWrapper;
         this.objectMapper = objectMapper;
+        this.sseChunkParser = sseChunkParser;
         this.ragExecutor = createRagExecutor();
     }
 
@@ -138,7 +140,7 @@ public class StreamingOrchestrator {
         List<Map<String, Object>> messages = new ArrayList<>();
         messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage(cityId, detectedLanguage)));
 
-        RagContexts ragContexts = buildRagContexts(question, cityId, conversationId, "streamAsk()");
+        RagContextHelper.RagContexts ragContexts = ragContextHelper.buildRagContexts(question, cityId, conversationId, "streamAsk()", ragExecutor);
         ProcedureContextResult procCtx = ragContexts.procedureContext();
         EventContextResult eventCtx = ragContexts.eventContext();
         NewsContextResult newsCtx = ragContexts.newsContext();
@@ -199,7 +201,7 @@ public class StreamingOrchestrator {
 
         return new AskStreamResult.Success(Flux.from(stream)
                 .handle((raw, sink) -> {
-                    SseChunkParser.ParseResult parsed = SseChunkParser.parseLine(raw);
+                    SseChunkParser.ParseResult parsed = sseChunkParser.parseLine(raw);
                     if (parsed.state() == SseChunkParser.ParseState.MALFORMED) {
                         sink.error(new IllegalStateException("Malformed upstream stream chunk"));
                         return;
@@ -311,7 +313,7 @@ public class StreamingOrchestrator {
 
         return new AskStreamResult.Success(Flux.from(srStream)
                 .handle((raw, sink) -> {
-                    SseChunkParser.ParseResult parsed = SseChunkParser.parseLine(raw);
+                    SseChunkParser.ParseResult parsed = sseChunkParser.parseLine(raw);
                     if (parsed.state() == SseChunkParser.ParseState.MALFORMED) {
                         sink.error(new IllegalStateException("Malformed upstream stream chunk"));
                         return;
@@ -360,150 +362,6 @@ public class StreamingOrchestrator {
                         return Flux.empty();
                     }
                 }));
-    }
-
-    // -----------------------------------------------------------------------
-    // RAG context building
-    // -----------------------------------------------------------------------
-
-    private RagContexts buildRagContexts(String question, String cityId, String conversationId, String operationName) {
-        long detectionStart = System.nanoTime();
-        ContextRequirements requirements = intentDetector.detectContextRequirements(question, cityId);
-        long detectionDurationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - detectionStart);
-
-        log.debug("{} context detection — conversationId={} procedure={} event={} news={} cityInfo={} durationMs={}",
-                operationName, conversationId,
-                requirements.needsProcedureContext(),
-                requirements.needsEventContext(),
-                requirements.needsNewsContext(),
-                requirements.needsCityInfoContext(),
-                detectionDurationMs);
-
-        if (!requirements.needsProcedureContext() && !requirements.needsEventContext()
-                && !requirements.needsNewsContext() && !requirements.needsCityInfoContext()) {
-            return new RagContexts(null, null, null, null, false);
-        }
-
-        if (requirements.needsNewsContext()) {
-            NewsContextResult newsContext = safelyBuildNewsContext(question, cityId, conversationId, operationName);
-            return new RagContexts(null, null, newsContext, null, true);
-        }
-
-        if (requirements.needsProcedureContext() && requirements.needsEventContext()) {
-            long ragStart = System.nanoTime();
-            CompletableFuture<ProcedureContextResult> procedureFuture = ragContextBuilder
-                    .buildProcedureContextResultAsync(question, cityId, ragExecutor)
-                    .exceptionally(ex -> {
-                        logRagFailure(operationName, conversationId, cityId, "procedure", ex);
-                        return null;
-                    });
-            CompletableFuture<EventContextResult> eventFuture = ragContextBuilder
-                    .buildEventContextResultAsync(question, cityId, ragExecutor)
-                    .exceptionally(ex -> {
-                        logRagFailure(operationName, conversationId, cityId, "event", ex);
-                        return null;
-                    });
-            ProcedureContextResult procedureContext = procedureFuture.join();
-            EventContextResult eventContext = eventFuture.join();
-
-            long ragDurationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - ragStart);
-            log.debug("{} RAG build completed — conversationId={} mode=bounded-parallel durationMs={}",
-                    operationName, conversationId, ragDurationMs);
-            return new RagContexts(procedureContext, eventContext, null, null, false);
-        }
-
-        if (requirements.needsProcedureContext()) {
-            ProcedureContextResult procedureContext = safelyBuildProcedureContext(
-                    question, cityId, conversationId, operationName);
-            return new RagContexts(procedureContext, null, null, null, false);
-        }
-
-        if (requirements.needsEventContext()) {
-            EventContextResult eventContext = safelyBuildEventContext(
-                    question, cityId, conversationId, operationName);
-            return new RagContexts(null, eventContext, null, null, false);
-        }
-
-        if (requirements.needsCityInfoContext()) {
-            CityInfoContextResult cityInfoContext = safelyBuildCityInfoContext(
-                    question, cityId, conversationId, operationName);
-            return new RagContexts(null, null, null, cityInfoContext, false);
-        }
-
-        return new RagContexts(null, null, null, null, false);
-    }
-
-    @Nullable
-    private NewsContextResult safelyBuildNewsContext(String question, String cityId,
-                                                      String conversationId, String operationName) {
-        long start = System.nanoTime();
-        try {
-            NewsContextResult result = ragContextBuilder.buildNewsContextResult(question, cityId);
-            long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
-            log.debug("{} RAG build completed — conversationId={} mode=news-only durationMs={}",
-                    operationName, conversationId, durationMs);
-            return result;
-        } catch (Exception e) {
-            logRagFailure(operationName, conversationId, cityId, "news", e);
-            return null;
-        }
-    }
-
-    @Nullable
-    private ProcedureContextResult safelyBuildProcedureContext(String question, String cityId,
-                                                                String conversationId, String operationName) {
-        long start = System.nanoTime();
-        try {
-            ProcedureContextResult result = ragContextBuilder.buildProcedureContextResult(question, cityId);
-            long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
-            log.debug("{} RAG build completed — conversationId={} mode=procedure-only durationMs={}",
-                    operationName, conversationId, durationMs);
-            return result;
-        } catch (Exception e) {
-            logRagFailure(operationName, conversationId, cityId, "procedure", e);
-            return null;
-        }
-    }
-
-    @Nullable
-    private EventContextResult safelyBuildEventContext(String question, String cityId,
-                                                        String conversationId, String operationName) {
-        long start = System.nanoTime();
-        try {
-            EventContextResult result = ragContextBuilder.buildEventContextResult(question, cityId);
-            long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
-            log.debug("{} RAG build completed — conversationId={} mode=event-only durationMs={}",
-                    operationName, conversationId, durationMs);
-            return result;
-        } catch (Exception e) {
-            logRagFailure(operationName, conversationId, cityId, "event", e);
-            return null;
-        }
-    }
-
-    @Nullable
-    private CityInfoContextResult safelyBuildCityInfoContext(String question, String cityId,
-                                                              String conversationId, String operationName) {
-        long start = System.nanoTime();
-        try {
-            CityInfoContextResult result = ragContextBuilder.buildCityInfoContextResult(question, cityId);
-            long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
-            log.debug("{} RAG build completed — conversationId={} mode=cityinfo-only durationMs={}",
-                    operationName, conversationId, durationMs);
-            return result;
-        } catch (Exception e) {
-            logRagFailure(operationName, conversationId, cityId, "cityinfo", e);
-            return null;
-        }
-    }
-
-    private void logRagFailure(String operationName, String conversationId, String cityId,
-                                String contextType, Throwable failure) {
-        Throwable rootCause = failure instanceof CompletionException && failure.getCause() != null
-                ? failure.getCause()
-                : failure;
-        log.warn("{} RAG build failed — conversationId={} city={} contextType={} error={}",
-                operationName, conversationId, cityId, contextType, rootCause.getMessage(), rootCause);
     }
 
     // -----------------------------------------------------------------------
@@ -579,10 +437,4 @@ public class StreamingOrchestrator {
         });
     }
 
-    private record RagContexts(ProcedureContextResult procedureContext,
-                               EventContextResult eventContext,
-                               NewsContextResult newsContext,
-                               CityInfoContextResult cityInfoContext,
-                               boolean newsIntent) {
-    }
 }

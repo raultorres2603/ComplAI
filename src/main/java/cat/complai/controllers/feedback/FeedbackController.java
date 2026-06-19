@@ -1,6 +1,7 @@
 package cat.complai.controllers.feedback;
 
 import cat.complai.controllers.feedback.dto.FeedbackAcceptedDto;
+import cat.complai.controllers.feedback.dto.FeedbackErrorDto;
 import cat.complai.controllers.feedback.dto.FeedbackRequest;
 import cat.complai.dto.feedback.FeedbackErrorCode;
 import cat.complai.dto.feedback.FeedbackResult;
@@ -16,7 +17,6 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import jakarta.inject.Inject;
 
-import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -107,10 +107,8 @@ public class FeedbackController {
                     logger.info(() -> "POST /complai/feedback — httpStatus=" + httpStatus
                             + " errorCode=" + code.getCode() + " latencyMs=" + latency + " city=" + city);
 
-                    var errorResponse = new HashMap<>();
-                    errorResponse.put("success", false);
-                    errorResponse.put("errorCode", code.getCode());
-                    errorResponse.put("message", error.message());
+                    var errorResponse = new FeedbackErrorDto(
+                            false, code.getCode(), error.message());
 
                     if (code == FeedbackErrorCode.VALIDATION) {
                         yield HttpResponse.badRequest(errorResponse);
@@ -127,10 +125,9 @@ public class FeedbackController {
             logger.log(Level.SEVERE, "POST /complai/feedback failed — httpStatus=500"
                     + " latencyMs=" + latency + " city=" + city, e);
 
-            var errorResponse = new java.util.HashMap<String, Object>();
-            errorResponse.put("success", false);
-            errorResponse.put("errorCode", FeedbackErrorCode.INTERNAL.getCode());
-            errorResponse.put("message", "Internal server error: " + e.getMessage());
+            var errorResponse = new FeedbackErrorDto(
+                    false, FeedbackErrorCode.INTERNAL.getCode(),
+                    "Internal server error: " + e.getMessage());
 
             return HttpResponse.serverError(errorResponse);
         }

@@ -7,21 +7,21 @@ import cat.complai.dto.openrouter.AskStreamResult;
 import cat.complai.dto.openrouter.RedactAcceptedDto;
 import cat.complai.helpers.openrouter.AskStreamErrorMapper;
 import cat.complai.helpers.openrouter.LanguageDetector;
-import cat.complai.services.openrouter.IOpenRouterService;
+import cat.complai.services.openrouter.IRedactService;
+import cat.complai.services.openrouter.IStreamingService;
 import cat.complai.controllers.openrouter.dto.AskRequest;
 import cat.complai.controllers.openrouter.dto.RedactRequest;
 import cat.complai.dto.openrouter.ComplainantIdentity;
 import cat.complai.dto.openrouter.OutputFormat;
 import cat.complai.helpers.openrouter.AuditLogger;
 import cat.complai.utilities.metrics.InteractionMetricsPublisher;
-import cat.complai.utilities.s3.S3PdfUploader;
-import cat.complai.utilities.sqs.SqsComplaintPublisher;
+import cat.complai.utilities.s3.IS3PdfUploader;
+import cat.complai.utilities.sqs.ISqsComplaintPublisher;
 import cat.complai.dto.sqs.RedactSqsMessage;
 import cat.complai.exceptions.IdentityTokenValidationException;
 import cat.complai.utilities.auth.ApiKeyAuthFilter;
 import cat.complai.utilities.auth.OidcIdentityTokenValidator;
 import cat.complai.utilities.auth.VerifiedCitizenIdentity;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -66,9 +66,10 @@ import java.util.logging.Logger;
 @Controller("/complai")
 public class OpenRouterController {
 
-        private final IOpenRouterService service;
-        private final SqsComplaintPublisher sqsPublisher;
-        private final S3PdfUploader s3PdfUploader;
+        private final IRedactService redactService;
+        private final IStreamingService streamingService;
+        private final ISqsComplaintPublisher sqsPublisher;
+        private final IS3PdfUploader s3PdfUploader;
         private final InteractionMetricsPublisher metricsPublisher;
         // Null when jwt.secret is not configured (worker Lambda). When non-null,
         // individual
@@ -78,12 +79,14 @@ public class OpenRouterController {
         private final Logger logger = Logger.getLogger(OpenRouterController.class.getName());
 
         @Inject
-        public OpenRouterController(IOpenRouterService service,
-                        SqsComplaintPublisher sqsPublisher,
-                        S3PdfUploader s3PdfUploader,
+        public OpenRouterController(IStreamingService streamingService,
+                        IRedactService redactService,
+                        ISqsComplaintPublisher sqsPublisher,
+                        IS3PdfUploader s3PdfUploader,
                         InteractionMetricsPublisher metricsPublisher,
-                        @Nullable OidcIdentityTokenValidator identityTokenValidator) {
-                this.service = service;
+                        OidcIdentityTokenValidator identityTokenValidator) {
+                this.streamingService = streamingService;
+                this.redactService = redactService;
                 this.sqsPublisher = sqsPublisher;
                 this.s3PdfUploader = s3PdfUploader;
                 this.metricsPublisher = metricsPublisher;
@@ -104,7 +107,7 @@ public class OpenRouterController {
 
                 String questionText = request != null ? request.getText() : null;
 
-                AskStreamResult streamResult = service.streamAsk(questionText, conversationId, cityId);
+                AskStreamResult streamResult = streamingService.streamAsk(questionText, conversationId, cityId);
                 if (streamResult instanceof AskStreamResult.Error(OpenRouterResponseDto dto)) {
                         long latency = System.currentTimeMillis() - start;
                         OpenRouterErrorCode errorCode = dto != null ? dto.getErrorCode() : OpenRouterErrorCode.INTERNAL;
@@ -174,7 +177,10 @@ public class OpenRouterController {
                         // can capture it. AUTO is allowed through isSupportedClientFormat and then
                         // resolved to PDF via a separate variable.
                         OutputFormat format = request == null ? OutputFormat.PDF : request.getFormat();
-                        ComplainantIdentity identity = request != null ? request.getComplainantIdentity() : null;
+                        ComplainantIdentity identity = request != null
+                                ? safeIdentity(request.getRequesterName(), request.getRequesterSurname(),
+                                        request.getRequesterIdNumber())
+                                : null;
 
                         if (!OutputFormat.isSupportedClientFormat(format)) {
                                 long latency = System.currentTimeMillis() - start;
@@ -200,49 +206,12 @@ public class OpenRouterController {
                         // X-Identity-Token header is mandatory. The verified IdP identity overrides
                         // any self-reported body fields, ensuring the PDF carries a cryptographically
                         // verified NIF/NIE rather than user-supplied data.
-                        //
-                        // If the header is absent or blank, we return 401 Unauthorized.
-                        // If the header is present but invalid, we also return 401.
-                        if (identityTokenValidator != null && identityTokenValidator.isEnabledForCity(cityId)) {
-                                String rawIdentityToken = httpRequest.getHeaders().get("X-Identity-Token");
-                                if (rawIdentityToken == null || rawIdentityToken.isBlank()) {
-                                        long latency = System.currentTimeMillis() - start;
-                                        AuditLogger.log("/complai/redact", AuditLogger.hashText(text),
-                                                        OpenRouterErrorCode.UNAUTHORIZED.getCode(), latency,
-                                                        resolvedFormat != null ? resolvedFormat.name() : null, null);
-                                        metricsPublisher.publishInteraction("REDACT", cityId,
-                                                        false, latency);
-                                        logger.warning(() -> "POST /complai/redact rejected — httpStatus=401"
-                                                        + " reason=missingIdentityToken"
-                                                        + " conversationId=" + conversationId);
-                                        OpenRouterPublicDto err = new OpenRouterPublicDto(false, null,
-                                                        "Identity verification is required. Please authenticate via your city's identity provider.",
-                                                        OpenRouterErrorCode.UNAUTHORIZED.getCode(), List.of());
-                                        return HttpResponse.unauthorized().body(err)
-                                                        .contentType(MediaType.APPLICATION_JSON);
-                                }
-                                try {
-                                        VerifiedCitizenIdentity verified = identityTokenValidator
-                                                        .validate(rawIdentityToken, cityId);
-                                        identity = new ComplainantIdentity(
-                                                        verified.name(), verified.surname(), verified.nif());
-                                } catch (IdentityTokenValidationException e) {
-                                        long latency = System.currentTimeMillis() - start;
-                                        AuditLogger.log("/complai/redact", AuditLogger.hashText(text),
-                                                        OpenRouterErrorCode.UNAUTHORIZED.getCode(), latency,
-                                                        resolvedFormat != null ? resolvedFormat.name() : null, null);
-                                        metricsPublisher.publishInteraction("REDACT", cityId,
-                                                        false, latency);
-                                        logger.warning(() -> "POST /complai/redact rejected — httpStatus=401"
-                                                        + " reason=invalidIdentityToken: " + e.getMessage()
-                                                        + " conversationId=" + conversationId);
-                                        OpenRouterPublicDto err = new OpenRouterPublicDto(false, null,
-                                                        "Identity token is invalid. Please re-authenticate.",
-                                                        OpenRouterErrorCode.UNAUTHORIZED.getCode(), List.of());
-                                        return HttpResponse.unauthorized().body(err)
-                                                        .contentType(MediaType.APPLICATION_JSON);
-                                }
+                        OidcValidationResult oidcResult = validateOidcIdentity(cityId, httpRequest,
+                                        identity, text, resolvedFormat, conversationId, start);
+                        if (oidcResult.errorResponse() != null) {
+                                return oidcResult.errorResponse();
                         }
+                        identity = oidcResult.identity();
 
                         boolean identityComplete = identity != null && identity.isComplete();
 
@@ -250,7 +219,7 @@ public class OpenRouterController {
                                 return handleAsyncRedact(text, resolvedFormat, conversationId, identity, cityId, start);
                         }
 
-                        OpenRouterResponseDto dto = service.redactComplaint(text, resolvedFormat, conversationId,
+                        OpenRouterResponseDto dto = redactService.redactComplaint(text, resolvedFormat, conversationId,
                                         identity,
                                         cityId);
                         long latency = System.currentTimeMillis() - start;
@@ -302,7 +271,7 @@ public class OpenRouterController {
                         String conversationId, ComplainantIdentity identity,
                         String cityId, long requestStart) {
                 // Run the same validation the sync path does (input length, anonymity).
-                Optional<OpenRouterResponseDto> validationError = service.validateRedactInput(text);
+                Optional<OpenRouterResponseDto> validationError = redactService.validateRedactInput(text);
                 if (validationError.isPresent()) {
                         OpenRouterResponseDto err = validationError.get();
                         long latency = System.currentTimeMillis() - requestStart;
@@ -377,6 +346,27 @@ public class OpenRouterController {
         }
 
         /**
+         * Builds a {@link ComplainantIdentity} from raw fields, normalizing blank or
+         * whitespace-only values to {@code null}. Returns {@code null} when all three
+         * fields are absent or blank.
+         * <p>
+         * Normalization lives in the controller boundary layer rather than in the
+         * request DTO, keeping the DTO as a pure data carrier (SoC).
+         */
+        private static ComplainantIdentity safeIdentity(String name, String surname, String idNumber) {
+                String n = normalizeIdentityField(name);
+                String s = normalizeIdentityField(surname);
+                String id = normalizeIdentityField(idNumber);
+                if (n == null && s == null && id == null) return null;
+                return new ComplainantIdentity(n, s, id);
+        }
+
+        private static String normalizeIdentityField(String value) {
+                if (value == null || value.isBlank()) return null;
+                return value.trim();
+        }
+
+        /**
          * Generates the S3 object key for a complaint PDF.
          * Format: {@code complaints/<id>/<epoch-seconds>-complaint.pdf}
          *
@@ -442,4 +432,68 @@ public class OpenRouterController {
 
                 return response.contentType(MediaType.APPLICATION_JSON);
         }
+
+    // -------------------------------------------------------------------------
+    // OIDC validation
+    // -------------------------------------------------------------------------
+
+    /**
+     * Result of OIDC identity validation. Exactly one of {@code identity} or
+     * {@code errorResponse} is non-null.
+     */
+    private record OidcValidationResult(ComplainantIdentity identity, HttpResponse<?> errorResponse) {
+        OidcValidationResult(ComplainantIdentity identity) {
+            this(identity, null);
+        }
+        OidcValidationResult(HttpResponse<?> errorResponse) {
+            this(null, errorResponse);
+        }
+    }
+
+    /**
+     * When OIDC is enabled for the city, validates the {@code X-Identity-Token}
+     * header and returns a verified identity. Returns an error response (401)
+     * when the token is missing or invalid.
+     */
+    private OidcValidationResult validateOidcIdentity(String cityId, HttpRequest<?> httpRequest,
+                    ComplainantIdentity fallbackIdentity, String text, OutputFormat format,
+                    String conversationId, long start) {
+        if (!identityTokenValidator.isEnabledForCity(cityId)) {
+            return new OidcValidationResult(fallbackIdentity);
+        }
+        String rawIdentityToken = httpRequest.getHeaders().get("X-Identity-Token");
+        if (rawIdentityToken == null || rawIdentityToken.isBlank()) {
+            return new OidcValidationResult(
+                    unauthorizedResponse(cityId, text, format, conversationId, start,
+                            "missingIdentityToken",
+                            "Identity verification is required. Please authenticate via your city's identity provider."));
+        }
+        try {
+            VerifiedCitizenIdentity verified = identityTokenValidator.validate(rawIdentityToken, cityId);
+            return new OidcValidationResult(new ComplainantIdentity(
+                    verified.name(), verified.surname(), verified.nif()));
+        } catch (IdentityTokenValidationException e) {
+            return new OidcValidationResult(
+                    unauthorizedResponse(cityId, text, format, conversationId, start,
+                            "invalidIdentityToken: " + e.getMessage(),
+                            "Identity token is invalid. Please re-authenticate."));
+        }
+    }
+
+    /**
+     * Builds a 401 Unauthorized response with audit logging and metrics.
+     */
+    private HttpResponse<?> unauthorizedResponse(String cityId, String text, OutputFormat format,
+                    String conversationId, long start, String reason, String userMessage) {
+        long latency = System.currentTimeMillis() - start;
+        AuditLogger.log("/complai/redact", AuditLogger.hashText(text),
+                OpenRouterErrorCode.UNAUTHORIZED.getCode(), latency,
+                format != null ? format.name() : null, null);
+        metricsPublisher.publishInteraction("REDACT", cityId, false, latency);
+        logger.warning(() -> "POST /complai/redact rejected — httpStatus=401"
+                + " reason=" + reason + " conversationId=" + conversationId);
+        OpenRouterPublicDto err = new OpenRouterPublicDto(false, null,
+                userMessage, OpenRouterErrorCode.UNAUTHORIZED.getCode(), List.of());
+        return HttpResponse.unauthorized().body(err).contentType(MediaType.APPLICATION_JSON);
+    }
 }

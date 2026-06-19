@@ -65,15 +65,19 @@ class OpenRouterServicesOrchestrationTest {
         @Mock
         private HttpWrapper httpWrapper;
 
+        private RagContextHelper ragContextHelper;
+
         @BeforeEach
         void setUp() {
                 MockitoAnnotations.openMocks(this);
+                ragContextHelper = new RagContextHelper(ragContextBuilder, intentDetector);
                 service = new OpenRouterServices(
                                 validationService,
                                 conversationService,
                                 aiResponseService,
                                 intentDetector,
                                 ragContextBuilder,
+                                ragContextHelper,
                                 clarificationService,
                                 streamingOrchestrator,
                                 redactOrchestrator,

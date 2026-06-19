@@ -25,7 +25,7 @@ import java.util.logging.Logger;
  * surface it as {@code 500 INTERNAL} — the user then knows the request was not queued.
  */
 @Singleton
-public class SqsComplaintPublisher {
+public class SqsComplaintPublisher implements ISqsComplaintPublisher {
 
     /** Maximum number of visible messages on the queue before we reject new publishes. */
     static final int MAX_QUEUE_DEPTH = Integer.parseInt(
@@ -69,6 +69,7 @@ public class SqsComplaintPublisher {
      * @throws RuntimeException if the queue depth is exceeded, serialisation fails,
      *                          or the SQS call is unsuccessful
      */
+    @Override
     public void publish(RedactSqsMessage message) {
         if (queueUrl == null || queueUrl.isBlank()) {
             throw new IllegalStateException("REDACT_QUEUE_URL is not configured — cannot publish complaint message");

@@ -5,7 +5,7 @@ import cat.complai.controllers.telegram.dto.*;
 import cat.complai.dto.openrouter.ComplainantIdentity;
 import cat.complai.dto.sqs.AskSqsMessage;
 import cat.complai.services.feedback.FeedbackPublisherService;
-import cat.complai.services.openrouter.IOpenRouterService;
+import cat.complai.services.openrouter.IAskService;
 import cat.complai.services.openrouter.conversation.ConversationManagementService;
 import cat.complai.services.telegram.TelegramSessionStore.TelegramMode;
 import cat.complai.utilities.s3.S3PdfUploader;
@@ -41,7 +41,7 @@ class TelegramBotServiceTest {
     private TelegramSessionStore sessionStore;
 
     @Mock
-    private IOpenRouterService openRouterService;
+    private IAskService openRouterService;
 
     @Mock
     private ConversationManagementService conversationService;

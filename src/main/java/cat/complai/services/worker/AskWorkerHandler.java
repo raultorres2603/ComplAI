@@ -2,7 +2,7 @@ package cat.complai.services.worker;
 
 import cat.complai.config.TelegramConfiguration;
 import cat.complai.dto.sqs.AskSqsMessage;
-import cat.complai.services.openrouter.IOpenRouterService;
+import cat.complai.services.openrouter.IAskService;
 import com.amazonaws.services.lambda.runtime.events.SQSBatchResponse;
 import com.amazonaws.services.lambda.runtime.events.SQSEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -30,14 +30,14 @@ public class AskWorkerHandler extends MicronautRequestHandler<SQSEvent, SQSBatch
     private static final Logger logger = Logger.getLogger(AskWorkerHandler.class.getName());
 
     // Lazily initialised from getApplicationContext() — see ensureInitialized().
-    private IOpenRouterService openRouterService;
+    private IAskService openRouterService;
     private TelegramConfiguration telegramConfig;
     private ObjectMapper mapper;
     private boolean initialized = false;
 
     private void ensureInitialized() {
         if (initialized) return;
-        openRouterService = getApplicationContext().getBean(IOpenRouterService.class);
+        openRouterService = getApplicationContext().getBean(IAskService.class);
         telegramConfig = getApplicationContext().getBean(TelegramConfiguration.class);
         mapper = getApplicationContext().getBean(ObjectMapper.class);
         initialized = true;

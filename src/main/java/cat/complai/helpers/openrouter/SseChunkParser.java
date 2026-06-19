@@ -3,12 +3,19 @@ package cat.complai.helpers.openrouter;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.core.annotation.Nullable;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 
 /**
  * Parses a single raw SSE line from an OpenRouter streaming response.
  * Returns the incremental text delta, or null if the line is a control
  * event (heartbeat, [DONE], empty line) or cannot be parsed.
+ *
+ * <p>Receives the Micronaut-configured {@link ObjectMapper} via constructor
+ * injection so that custom modules and configuration (e.g. date formats)
+ * are applied consistently across the application.
  */
+@Singleton
 public final class SseChunkParser {
 
     public enum ParseState {
@@ -36,13 +43,17 @@ public final class SseChunkParser {
         }
     }
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String DONE_SENTINEL = "[DONE]";
     private static final String DATA_PREFIX = "data:";
 
-    private SseChunkParser() {}
+    private final ObjectMapper mapper;
 
-    public static ParseResult parseLine(String rawLine) {
+    @Inject
+    public SseChunkParser(ObjectMapper mapper) {
+        this.mapper = mapper;
+    }
+
+    public ParseResult parseLine(String rawLine) {
         if (rawLine == null || rawLine.isBlank()) {
             return ParseResult.ignore();
         }
@@ -64,7 +75,7 @@ public final class SseChunkParser {
         }
 
         try {
-            JsonNode root = MAPPER.readTree(json);
+            JsonNode root = mapper.readTree(json);
             JsonNode content = root.path("choices").path(0).path("delta").path("content");
             if (content.isTextual()) {
                 return ParseResult.delta(content.asText());
@@ -85,7 +96,7 @@ public final class SseChunkParser {
      *         or null for the terminal [DONE] event or unparseable input
      */
     @Nullable
-    public static String parseDelta(String rawLine) {
+    public String parseDelta(String rawLine) {
         ParseResult parsed = parseLine(rawLine);
         if (parsed.state() == ParseState.DONE) {
             return null;

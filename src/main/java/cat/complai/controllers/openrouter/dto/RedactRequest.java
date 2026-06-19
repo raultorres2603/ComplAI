@@ -3,7 +3,7 @@ package cat.complai.controllers.openrouter.dto;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.core.annotation.Introspected;
-import cat.complai.dto.openrouter.ComplainantIdentity;
+import jakarta.validation.constraints.NotBlank;
 import cat.complai.dto.openrouter.OutputFormat;
 
 /**
@@ -17,6 +17,7 @@ import cat.complai.dto.openrouter.OutputFormat;
  */
 @Introspected
 public class RedactRequest {
+    @NotBlank(message = "text must not be blank")
     private final String text;
     private final OutputFormat format;
     private final String conversationId;
@@ -95,31 +96,5 @@ public class RedactRequest {
 
     public String getRequesterIdNumber() {
         return requesterIdNumber;
-    }
-
-    /**
-     * Assembles the identity record from the individual fields.
-     * Blank or whitespace-only strings are treated as absent (normalized to null) so that
-     * the rest of the system never has to defend against blank field values.
-     * Returns null when all three fields are absent or blank.
-     */
-    public ComplainantIdentity getComplainantIdentity() {
-        String normalizedName     = normalize(requesterName);
-        String normalizedSurname  = normalize(requesterSurname);
-        String normalizedId       = normalize(requesterIdNumber);
-
-        if (normalizedName == null && normalizedSurname == null && normalizedId == null) {
-            return null;
-        }
-        return new ComplainantIdentity(normalizedName, normalizedSurname, normalizedId);
-    }
-
-    /**
-     * Returns the trimmed value, or null if the value is null or blank.
-     * Centralises the blank-to-null normalisation for all identity fields.
-     */
-    private static String normalize(String value) {
-        if (value == null || value.isBlank()) return null;
-        return value.trim();
     }
 }

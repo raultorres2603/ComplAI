@@ -23,7 +23,7 @@ import cat.complai.services.stadistics.models.FeedbackFile;
 import cat.complai.services.stadistics.models.StadisticsModel;
 import cat.complai.services.stadistics.models.StadisticsModel.MonthlyData;
 import cat.complai.services.stadistics.models.StadisticsModel.ComparisonData;
-import cat.complai.services.openrouter.IOpenRouterService;
+import cat.complai.services.openrouter.IAskService;
 import cat.complai.utilities.metrics.InteractionMetricsPublisher;
 import cat.complai.utilities.s3.S3ComplaintLister;
 import cat.complai.utilities.s3.S3FeedbackLister;
@@ -51,7 +51,7 @@ class StadisticsServiceTest {
     private S3FeedbackLister s3FeedbackLister;
 
     @Mock
-    private IOpenRouterService openRouterService;
+    private IAskService openRouterService;
 
     @Mock
     private CloudWatchClient cloudWatchClient;

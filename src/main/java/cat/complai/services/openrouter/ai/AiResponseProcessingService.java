@@ -1,6 +1,7 @@
 package cat.complai.services.openrouter.ai;
 
-import cat.complai.utilities.http.HttpWrapper;
+import cat.complai.config.RefusalPhrasesConfig;
+import cat.complai.utilities.http.IHttpWrapper;
 import cat.complai.dto.http.HttpDto;
 import cat.complai.utilities.cache.QuestionCategory;
 import cat.complai.utilities.cache.QuestionCategoryDetector;
@@ -12,6 +13,7 @@ import cat.complai.helpers.openrouter.AiParsed;
 import cat.complai.helpers.openrouter.HtmlFormatter;
 import cat.complai.helpers.openrouter.MarkdownToHtmlConverter;
 import cat.complai.helpers.openrouter.RedactPromptBuilder;
+import cat.complai.helpers.openrouter.TokenEstimator;
 import cat.complai.services.openrouter.cache.ResponseCacheService;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -40,26 +42,47 @@ import java.util.logging.Logger;
 @Singleton
 public class AiResponseProcessingService {
 
-    private final HttpWrapper httpWrapper;
+    private final IHttpWrapper httpWrapper;
     private final ResponseCacheService responseCacheService;
     private final Logger logger = Logger.getLogger(AiResponseProcessingService.class.getName());
     private final int overallTimeoutSeconds;
+    private final List<String> refusalPhrases;
 
     /**
-     * Constructs the service with configurable timeout and cache dependencies.
+     * Primary constructor used by Micronaut DI. Loads refusal phrases from
+     * config and applies overall timeout from config.
      *
      * @param httpWrapper           HTTP wrapper for OpenRouter calls
      * @param responseCacheService  Caffeine response cache
      * @param overallTimeoutSeconds maximum seconds to wait for the AI response;
      *                              defaults to 60
+     * @param refusalPhrasesConfig  configuration for refusal phrase detection
      */
     @Inject
-    public AiResponseProcessingService(HttpWrapper httpWrapper,
+    public AiResponseProcessingService(IHttpWrapper httpWrapper,
             ResponseCacheService responseCacheService,
-            @Value("${OPENROUTER_OVERALL_TIMEOUT_SECONDS:60}") int overallTimeoutSeconds) {
+            @Value("${OPENROUTER_OVERALL_TIMEOUT_SECONDS:60}") int overallTimeoutSeconds,
+            RefusalPhrasesConfig refusalPhrasesConfig) {
         this.httpWrapper = httpWrapper;
         this.responseCacheService = responseCacheService;
         this.overallTimeoutSeconds = (overallTimeoutSeconds > 0) ? overallTimeoutSeconds : 30;
+        this.refusalPhrases = (refusalPhrasesConfig != null && refusalPhrasesConfig.getPhrases() != null)
+                ? refusalPhrasesConfig.getPhrases()
+                : RefusalPhrasesConfig.DEFAULT_PHRASES;
+    }
+
+    /**
+     * Convenience constructor for tests and direct instantiation.
+     * Uses the default set of refusal phrases.
+     *
+     * @param httpWrapper           HTTP wrapper for OpenRouter calls
+     * @param responseCacheService  Caffeine response cache
+     * @param overallTimeoutSeconds maximum seconds to wait for the AI response
+     */
+    public AiResponseProcessingService(IHttpWrapper httpWrapper,
+            ResponseCacheService responseCacheService,
+            int overallTimeoutSeconds) {
+        this(httpWrapper, responseCacheService, overallTimeoutSeconds, null);
     }
 
     /**
@@ -158,7 +181,7 @@ public class AiResponseProcessingService {
         int inputTokens = messages.stream()
                 .mapToInt(msg -> {
                     if (msg.get("content") instanceof String s) {
-                        return Math.max(1, s.length() / 4);
+                        return TokenEstimator.estimateTokenCount(s);
                     }
                     return 0;
                 })
@@ -189,7 +212,7 @@ public class AiResponseProcessingService {
             }
             if (dto.message() != null && !dto.message().isBlank()) {
                 // Log output token count
-                int outputTokens = Math.max(1, dto.message().length() / 4);
+                int outputTokens = TokenEstimator.estimateTokenCount(dto.message());
                 logger.fine(() -> "callOpenRouterAndExtract — outputTokenCount=" + outputTokens);
 
                 if (aiRefusedAsOffTopic(dto.message(), cityId)) {
@@ -269,7 +292,7 @@ public class AiResponseProcessingService {
      * <li>Converts Markdown formatting to HTML using
      * {@link MarkdownToHtmlConverter#convertMarkdownToHtml(String)}</li>
      * <li>Applies HTML cleaning using {@link HtmlFormatter#cleanHtml(String)} to
-     * remove excessive formatting</li>
+     * remove excessive formatting (the converter itself only converts, it does not clean)</li>
      * </ul>
      * 
      * @param message The message text to format (may be null or empty)
@@ -299,36 +322,6 @@ public class AiResponseProcessingService {
                 .replace('\u201c', '"').replace('\u201d', '"');
         String lower = normalized.toLowerCase(Locale.ROOT).trim();
         String lowerNoPunct = lower.replaceAll("[.,;:!?()\\[\\]{}-]", " ").replaceAll("\\s+", " ").trim();
-
-        // Generic refusal patterns (city-agnostic).
-        String[] refusalPhrases = {
-                "can't help with",
-                "cannot help with",
-                "can't help",
-                "cannot help",
-                "can't assist",
-                "cannot assist",
-                "i'm sorry, i can't",
-                "i'm sorry i can't",
-                "i'm sorry, i cannot",
-                "i'm sorry i cannot",
-                "i cannot",
-                "i can't",
-                "i am unable to",
-                "i'm unable to",
-                "i cannot help",
-                "i can't help",
-                "cannot provide",
-                "can't provide",
-                "no puc ajudar",
-                "no puc ajudar amb",
-                "no puedo ayudar",
-                "no puedo ayudar con",
-                "lo siento, no puedo ayudar",
-                "lo siento, no puedo",
-                "no puedo",
-                "no puc",
-        };
 
         for (String p : refusalPhrases) {
             String pNoPunct = p.replaceAll("[.,;:!?()\\[\\]{}-]", " ").trim();

@@ -1,12 +1,12 @@
 package cat.complai.utilities.http;
 
-import io.micronaut.http.HttpMethod;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 class CorsFilterTest {
 
@@ -14,8 +14,7 @@ class CorsFilterTest {
 
     @Test
     void handlePreflight_returnsResponseWithCorsHeadersForOptionsRequest() {
-        MutableHttpRequest<?> request = mock(MutableHttpRequest.class);
-        when(request.getMethod()).thenReturn(HttpMethod.OPTIONS);
+        MutableHttpRequest<?> request = HttpRequest.OPTIONS("/").header("Origin", TEST_ORIGIN);
 
         CorsFilter filter = new CorsFilter(TEST_ORIGIN);
 
@@ -34,8 +33,7 @@ class CorsFilterTest {
 
     @Test
     void handlePreflight_returnsNullForNonOptionsRequest() {
-        MutableHttpRequest<?> request = mock(MutableHttpRequest.class);
-        when(request.getMethod()).thenReturn(HttpMethod.GET);
+        MutableHttpRequest<?> request = HttpRequest.GET("/");
 
         CorsFilter filter = new CorsFilter(TEST_ORIGIN);
 
@@ -45,8 +43,7 @@ class CorsFilterTest {
     @Test
     void handlePreflight_usesCustomAllowedOrigin() {
         String customOrigin = "https://example.com";
-        MutableHttpRequest<?> request = mock(MutableHttpRequest.class);
-        when(request.getMethod()).thenReturn(HttpMethod.OPTIONS);
+        MutableHttpRequest<?> request = HttpRequest.OPTIONS("/").header("Origin", customOrigin);
 
         CorsFilter filter = new CorsFilter(customOrigin);
 
@@ -59,11 +56,13 @@ class CorsFilterTest {
 
     @Test
     void addOriginHeader_addsAccessControlAllowOriginHeader() {
-        MutableHttpResponse<?> response = mock(MutableHttpResponse.class);
+        MutableHttpResponse<?> response = HttpResponse.ok();
         CorsFilter filter = new CorsFilter(TEST_ORIGIN);
 
         filter.addOriginHeader(response);
 
-        verify(response).header("Access-Control-Allow-Origin", TEST_ORIGIN);
+        String header = response.getHeaders().findFirst("Access-Control-Allow-Origin").orElse(null);
+        assertNotNull(header);
+        assertEquals(TEST_ORIGIN, header);
     }
 }

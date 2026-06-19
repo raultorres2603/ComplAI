@@ -15,6 +15,7 @@ import cat.complai.controllers.openrouter.dto.RedactRequest;
 import cat.complai.services.openrouter.OpenRouterServices;
 import cat.complai.services.openrouter.IntentDetector;
 import cat.complai.services.openrouter.RagContextBuilder;
+import cat.complai.services.openrouter.RagContextHelper;
 import cat.complai.services.openrouter.ClarificationService;
 import cat.complai.services.openrouter.StreamingOrchestrator;
 import cat.complai.services.openrouter.RedactOrchestrator;
@@ -47,6 +48,7 @@ import cat.complai.helpers.openrouter.EventRagHelperRegistry;
 import cat.complai.helpers.openrouter.NewsRagHelperRegistry;
 import cat.complai.helpers.openrouter.ProcedureRagHelperRegistry;
 import cat.complai.helpers.openrouter.RedactPromptBuilder;
+import cat.complai.helpers.openrouter.SseChunkParser;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -80,6 +82,7 @@ public class OpenRouterControllerIntegrationTest {
     // Micronaut's embedded Netty server closes the connection for binary responses,
     // so PDF correctness must be verified at the service level, not via HTTP.
     @Inject
+    @SuppressWarnings("deprecation")
     IOpenRouterService openRouterService;
 
     // Injected to clear cache between tests and prevent test pollution
@@ -1062,6 +1065,7 @@ public class OpenRouterControllerIntegrationTest {
     static class TestBeans {
         @Singleton
         @Replaces(OpenRouterServices.class)
+        @SuppressWarnings("deprecation")
         IOpenRouterService openRouterService(HttpWrapper httpWrapper,
                 ResponseCacheService cacheService,
                 ObjectMapper objectMapper) {
@@ -1078,14 +1082,15 @@ public class OpenRouterControllerIntegrationTest {
                     cityInfoRegistry);
             RagContextBuilder ragContextBuilder = new RagContextBuilder(procedureRegistry, eventRegistry, newsRegistry,
                     cityInfoRegistry, redactPromptBuilder);
+            RagContextHelper ragContextHelper = new RagContextHelper(ragContextBuilder, intentDetector);
             ClarificationService clarificationService = new ClarificationService(procedureRegistry, intentDetector);
             RedactOrchestrator redactOrchestrator = new RedactOrchestrator(validationService, conversationService,
                     aiResponseService, redactPromptBuilder, null, null);
             StreamingOrchestrator streamingOrchestrator = new StreamingOrchestrator(validationService,
-                    conversationService, ragContextBuilder, clarificationService, intentDetector,
-                    redactPromptBuilder, httpWrapper, objectMapper);
+                    conversationService, ragContextBuilder, ragContextHelper, clarificationService, intentDetector,
+                    redactPromptBuilder, httpWrapper, objectMapper, new SseChunkParser(new com.fasterxml.jackson.databind.ObjectMapper()));
             return new OpenRouterServices(validationService, conversationService, aiResponseService,
-                    intentDetector, ragContextBuilder, clarificationService,
+                    intentDetector, ragContextBuilder, ragContextHelper, clarificationService,
                     streamingOrchestrator, redactOrchestrator, redactPromptBuilder);
         }
 

@@ -8,10 +8,10 @@ import cat.complai.dto.openrouter.OutputFormat;
 import cat.complai.dto.openrouter.Source;
 import cat.complai.helpers.openrouter.LanguageDetector;
 import cat.complai.helpers.openrouter.RedactPromptBuilder;
+import cat.complai.helpers.openrouter.TokenEstimator;
 import cat.complai.services.openrouter.ai.AiResponseProcessingService;
 import cat.complai.services.openrouter.conversation.ConversationManagementService;
 import cat.complai.services.openrouter.validation.InputValidationService;
-import io.micronaut.core.annotation.Nullable;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -23,11 +23,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Primary implementation of {@link IOpenRouterService}.
@@ -49,6 +46,7 @@ public class OpenRouterServices implements IOpenRouterService {
     private final AiResponseProcessingService aiResponseService;
     private final IntentDetector intentDetector;
     private final RagContextBuilder ragContextBuilder;
+    private final RagContextHelper ragContextHelper;
     private final ClarificationService clarificationService;
     private final StreamingOrchestrator streamingOrchestrator;
     private final RedactOrchestrator redactOrchestrator;
@@ -61,6 +59,7 @@ public class OpenRouterServices implements IOpenRouterService {
                               AiResponseProcessingService aiResponseService,
                               IntentDetector intentDetector,
                               RagContextBuilder ragContextBuilder,
+                              RagContextHelper ragContextHelper,
                               ClarificationService clarificationService,
                               StreamingOrchestrator streamingOrchestrator,
                               RedactOrchestrator redactOrchestrator,
@@ -70,6 +69,7 @@ public class OpenRouterServices implements IOpenRouterService {
         this.aiResponseService = aiResponseService;
         this.intentDetector = intentDetector;
         this.ragContextBuilder = ragContextBuilder;
+        this.ragContextHelper = ragContextHelper;
         this.clarificationService = clarificationService;
         this.streamingOrchestrator = streamingOrchestrator;
         this.redactOrchestrator = redactOrchestrator;
@@ -208,7 +208,7 @@ public class OpenRouterServices implements IOpenRouterService {
 
         messages.add(Map.of("role", "system", "content", promptBuilder.getSystemMessage(cityId, detectedLanguage)));
 
-        RagContexts ragContexts = buildRagContexts(question, cityId, conversationId, "ask()");
+        RagContextHelper.RagContexts ragContexts = ragContextHelper.buildRagContexts(question, cityId, conversationId, "ask()", ragExecutor);
         ProcedureContextResult procCtx = ragContexts.procedureContext();
         EventContextResult eventCtx = ragContexts.eventContext();
         NewsContextResult newsCtx = ragContexts.newsContext();
@@ -247,28 +247,21 @@ public class OpenRouterServices implements IOpenRouterService {
         }
 
         // Calculate and log context metrics
-        final int systemTokens;
-        final int historyTokens;
-        final int userTokens;
-        int tmpSystemTokens = 0;
-        int tmpHistoryTokens = 0;
-        int tmpUserTokens = 0;
+        int systemTokens = 0;
+        int historyTokens = 0;
         for (Map<String, Object> msg : messages) {
             if (!(msg.get("content") instanceof String content))
                 continue;
             String role = msg.get("role") instanceof String s ? s : "";
-            int tokens = estimateTokenCount(content);
+            int tokens = TokenEstimator.estimateTokenCount(content);
 
             if ("system".equals(role)) {
-                tmpSystemTokens += tokens;
+                systemTokens += tokens;
             } else if (!"user".equals(role)) {
-                tmpHistoryTokens += tokens;
+                historyTokens += tokens;
             }
         }
-        tmpUserTokens = estimateTokenCount(question);
-        systemTokens = tmpSystemTokens;
-        historyTokens = tmpHistoryTokens;
-        userTokens = tmpUserTokens;
+        int userTokens = TokenEstimator.estimateTokenCount(question);
         final int totalTokens = systemTokens + historyTokens + userTokens;
         final int historyTurns = history != null ? (history.size() / 2) : 0;
 
@@ -343,157 +336,6 @@ public class OpenRouterServices implements IOpenRouterService {
     }
 
     // -----------------------------------------------------------------------
-    // Private helpers — RAG context building
-    // -----------------------------------------------------------------------
-
-    private RagContexts buildRagContexts(String question, String cityId, String conversationId, String operationName) {
-        long detectionStart = System.nanoTime();
-        ContextRequirements requirements = intentDetector.detectContextRequirements(question, cityId);
-        long detectionDurationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - detectionStart);
-
-        log.debug(
-                "{} context detection — conversationId={} procedure={} event={} news={} cityInfo={} durationMs={}",
-                operationName, conversationId,
-                requirements.needsProcedureContext(),
-                requirements.needsEventContext(),
-                requirements.needsNewsContext(),
-                requirements.needsCityInfoContext(),
-                detectionDurationMs);
-
-        if (!requirements.needsProcedureContext() && !requirements.needsEventContext()
-                && !requirements.needsNewsContext() && !requirements.needsCityInfoContext()) {
-            return new RagContexts(null, null, null, null, false);
-        }
-
-        if (requirements.needsNewsContext()) {
-            NewsContextResult newsContext = safelyBuildNewsContext(question, cityId, conversationId, operationName);
-            log.debug("{} news retrieval completed — conversationId={} city={} hitCount={}",
-                    operationName, conversationId, cityId,
-                    newsContext != null && newsContext.sources() != null
-                            ? newsContext.sources().size()
-                            : 0);
-            return new RagContexts(null, null, newsContext, null, true);
-        }
-
-        if (requirements.needsProcedureContext() && requirements.needsEventContext()) {
-            long ragStart = System.nanoTime();
-            CompletableFuture<ProcedureContextResult> procedureFuture = ragContextBuilder
-                    .buildProcedureContextResultAsync(question, cityId, ragExecutor)
-                    .exceptionally(ex -> {
-                        logRagFailure(operationName, conversationId, cityId, "procedure", ex);
-                        return null;
-                    });
-            CompletableFuture<EventContextResult> eventFuture = ragContextBuilder
-                    .buildEventContextResultAsync(question, cityId, ragExecutor)
-                    .exceptionally(ex -> {
-                        logRagFailure(operationName, conversationId, cityId, "event", ex);
-                        return null;
-                    });
-
-            ProcedureContextResult procedureContext = procedureFuture.join();
-            EventContextResult eventContext = eventFuture.join();
-
-            long ragDurationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - ragStart);
-            log.debug("{} RAG build completed — conversationId={} mode=bounded-parallel durationMs={}",
-                    operationName, conversationId, ragDurationMs);
-            return new RagContexts(procedureContext, eventContext, null, null, false);
-        }
-
-        if (requirements.needsProcedureContext()) {
-            ProcedureContextResult procedureContext = safelyBuildProcedureContext(
-                    question, cityId, conversationId, operationName);
-            return new RagContexts(procedureContext, null, null, null, false);
-        }
-
-        if (requirements.needsEventContext()) {
-            EventContextResult eventContext = safelyBuildEventContext(
-                    question, cityId, conversationId, operationName);
-            return new RagContexts(null, eventContext, null, null, false);
-        }
-
-        if (requirements.needsCityInfoContext()) {
-            CityInfoContextResult cityInfoContext = safelyBuildCityInfoContext(
-                    question, cityId, conversationId, operationName);
-            return new RagContexts(null, null, null, cityInfoContext, false);
-        }
-
-        return new RagContexts(null, null, null, null, false);
-    }
-
-    @Nullable
-    private NewsContextResult safelyBuildNewsContext(String question, String cityId,
-                                                      String conversationId, String operationName) {
-        long start = System.nanoTime();
-        try {
-            NewsContextResult result = ragContextBuilder.buildNewsContextResult(question, cityId);
-            long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
-            log.debug("{} RAG build completed — conversationId={} mode=news-only durationMs={}",
-                    operationName, conversationId, durationMs);
-            return result;
-        } catch (Exception e) {
-            logRagFailure(operationName, conversationId, cityId, "news", e);
-            return null;
-        }
-    }
-
-    @Nullable
-    private ProcedureContextResult safelyBuildProcedureContext(String question, String cityId,
-                                                                String conversationId, String operationName) {
-        long start = System.nanoTime();
-        try {
-            ProcedureContextResult result = ragContextBuilder.buildProcedureContextResult(question, cityId);
-            long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
-            log.debug("{} RAG build completed — conversationId={} mode=procedure-only durationMs={}",
-                    operationName, conversationId, durationMs);
-            return result;
-        } catch (Exception e) {
-            logRagFailure(operationName, conversationId, cityId, "procedure", e);
-            return null;
-        }
-    }
-
-    @Nullable
-    private EventContextResult safelyBuildEventContext(String question, String cityId,
-                                                        String conversationId, String operationName) {
-        long start = System.nanoTime();
-        try {
-            EventContextResult result = ragContextBuilder.buildEventContextResult(question, cityId);
-            long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
-            log.debug("{} RAG build completed — conversationId={} mode=event-only durationMs={}",
-                    operationName, conversationId, durationMs);
-            return result;
-        } catch (Exception e) {
-            logRagFailure(operationName, conversationId, cityId, "event", e);
-            return null;
-        }
-    }
-
-    @Nullable
-    private CityInfoContextResult safelyBuildCityInfoContext(String question, String cityId,
-                                                              String conversationId, String operationName) {
-        long start = System.nanoTime();
-        try {
-            CityInfoContextResult result = ragContextBuilder.buildCityInfoContextResult(question, cityId);
-            long durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
-            log.debug("{} RAG build completed — conversationId={} mode=cityinfo-only durationMs={}",
-                    operationName, conversationId, durationMs);
-            return result;
-        } catch (Exception e) {
-            logRagFailure(operationName, conversationId, cityId, "cityinfo", e);
-            return null;
-        }
-    }
-
-    private void logRagFailure(String operationName, String conversationId, String cityId,
-                                String contextType, Throwable failure) {
-        Throwable rootCause = failure instanceof CompletionException && failure.getCause() != null
-                ? failure.getCause()
-                : failure;
-        log.warn("{} RAG build failed — conversationId={} city={} contextType={} error={}",
-                operationName, conversationId, cityId, contextType, rootCause.getMessage(), rootCause);
-    }
-
-    // -----------------------------------------------------------------------
     // Private helpers — utilities
     // -----------------------------------------------------------------------
 
@@ -503,13 +345,6 @@ public class OpenRouterServices implements IOpenRouterService {
             thread.setDaemon(true);
             return thread;
         });
-    }
-
-    private static int estimateTokenCount(String text) {
-        if (text == null || text.isEmpty()) {
-            return 0;
-        }
-        return Math.max(1, text.length() / 4);
     }
 
     private static long computeSourcesHash(List<Source> sources) {
@@ -547,12 +382,5 @@ public class OpenRouterServices implements IOpenRouterService {
             return "Para ayudarte con eventos, indícame un rango de fechas (por ejemplo: esta semana, abril, o del 10/04 al 15/04).";
         }
         return "To help with events, please provide a date window (for example: this week, April, or from 10/04 to 15/04).";
-    }
-
-    private record RagContexts(ProcedureContextResult procedureContext,
-                               EventContextResult eventContext,
-                               NewsContextResult newsContext,
-                               CityInfoContextResult cityInfoContext,
-                               boolean newsIntent) {
     }
 }

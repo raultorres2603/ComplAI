@@ -1,5 +1,7 @@
 package cat.complai.config;
 
+import java.util.List;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -125,6 +127,55 @@ class ConfigBeansTest {
         @DisplayName("Interface loads successfully")
         void interfaceLoads() {
             assertDoesNotThrow(() -> Class.forName("cat.complai.config.ISesSenderConfig"));
+        }
+    }
+
+    @Nested
+    @DisplayName("RefusalPhrasesConfig Tests")
+    class RefusalPhrasesConfigTests {
+
+        @Test
+        @DisplayName("Default constructor uses DEFAULT_PHRASES")
+        void defaultConstructor_usesDefaultPhrases() {
+            RefusalPhrasesConfig config = new RefusalPhrasesConfig();
+            assertEquals(RefusalPhrasesConfig.DEFAULT_PHRASES, config.getPhrases());
+        }
+
+        @Test
+        @DisplayName("DEFAULT_PHRASES contains English, Catalan, and Spanish phrases")
+        void defaultPhrases_containsAllLanguages() {
+            List<String> phrases = RefusalPhrasesConfig.DEFAULT_PHRASES;
+            assertFalse(phrases.isEmpty());
+            assertTrue(phrases.stream().anyMatch(p -> p.contains("can't")),
+                    "Should contain English phrases");
+            assertTrue(phrases.stream().anyMatch(p -> p.contains("no puc")),
+                    "Should contain Catalan phrases");
+            assertTrue(phrases.stream().anyMatch(p -> p.contains("no puedo")),
+                    "Should contain Spanish phrases");
+        }
+
+        @Test
+        @DisplayName("DEFAULT_PHRASES is unmodifiable")
+        void defaultPhrases_isUnmodifiable() {
+            assertThrows(UnsupportedOperationException.class,
+                    () -> RefusalPhrasesConfig.DEFAULT_PHRASES.add("extra"));
+        }
+
+        @Test
+        @DisplayName("setPhrases replaces the phrase list")
+        void setPhrases_replacesList() {
+            RefusalPhrasesConfig config = new RefusalPhrasesConfig();
+            List<String> custom = List.of("custom refusal");
+            config.setPhrases(custom);
+            assertSame(custom, config.getPhrases());
+        }
+
+        @Test
+        @DisplayName("setPhrases null is accepted (defensive)")
+        void setPhrases_nullAccepted() {
+            RefusalPhrasesConfig config = new RefusalPhrasesConfig();
+            config.setPhrases(null);
+            assertNull(config.getPhrases());
         }
     }
 }

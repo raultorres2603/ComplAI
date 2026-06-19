@@ -52,7 +52,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
  * </p>
  */
 @Singleton
-public class HttpWrapper {
+public class HttpWrapper implements IHttpWrapper {
     // Endpoint and configuration - overridable for testing
     private static final String DEFAULT_OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
     private final String openRouterUrl;
@@ -140,6 +140,7 @@ public class HttpWrapper {
         this.circuitBreaker = new CircuitBreaker(cbFailureThreshold, cbWindowSize, cbCooldownSeconds);
     }
 
+    @Override
     public CompletableFuture<HttpDto> postToOpenRouterAsync(String userPrompt) {
         int promptLength = userPrompt == null ? 0 : userPrompt.length();
         logger.fine(() -> "postToOpenRouterAsync (single-turn) — promptLength=" + promptLength + " model="
@@ -187,6 +188,7 @@ public class HttpWrapper {
         }
     }
 
+    @Override
     public CompletableFuture<HttpDto> postToOpenRouterAsync(List<Map<String, Object>> messages) {
         int messageCount = messages == null ? 0 : messages.size();
         logger.fine(() -> "postToOpenRouterAsync (multi-turn) — messageCount=" + messageCount + " model="
@@ -406,6 +408,7 @@ return CompletableFuture.completedFuture(finalResult);
      * @param messages the full messages list (system + history + user)
      * @return typed stream-start result containing either a ready publisher or a typed startup failure
      */
+    @Override
     public OpenRouterStreamStartResult streamFromOpenRouter(List<Map<String, Object>> messages) {
         // --- Circuit breaker guard: fail fast when circuit is OPEN ---
         if (!circuitBreaker.isCallPermitted()) {

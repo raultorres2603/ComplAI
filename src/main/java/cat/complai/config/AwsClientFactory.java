@@ -7,6 +7,8 @@ import io.micronaut.context.annotation.Value;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
+import software.amazon.awssdk.awscore.client.builder.AwsClientBuilder;
+import software.amazon.awssdk.http.SdkHttpClient;
 import software.amazon.awssdk.http.urlconnection.UrlConnectionHttpClient;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.cloudwatch.CloudWatchClient;
@@ -41,9 +43,9 @@ public class AwsClientFactory {
     public S3Client s3Client() {
         var builder = S3Client.builder()
                 .region(region)
-                .httpClient(UrlConnectionHttpClient.builder().build())
-                .credentialsProvider(DefaultCredentialsProvider.builder().build());
-        if (endpointUrl != null && !endpointUrl.isBlank()) {
+                .httpClient(httpClient())
+                .credentialsProvider(credentials());
+        if (hasEndpointOverride()) {
             LOGGER.fine(() -> "Overriding S3 endpoint to " + endpointUrl);
             builder.endpointOverride(URI.create(endpointUrl));
             builder.serviceConfiguration(S3Configuration.builder()
@@ -59,8 +61,8 @@ public class AwsClientFactory {
     public S3Presigner s3Presigner() {
         var builder = S3Presigner.builder()
                 .region(region)
-                .credentialsProvider(DefaultCredentialsProvider.builder().build());
-        if (endpointUrl != null && !endpointUrl.isBlank()) {
+                .credentialsProvider(credentials());
+        if (hasEndpointOverride()) {
             LOGGER.fine(() -> "Overriding S3 Presigner endpoint to " + endpointUrl);
             builder.endpointOverride(URI.create(endpointUrl));
         }
@@ -73,12 +75,9 @@ public class AwsClientFactory {
     public SqsClient sqsClient() {
         var builder = SqsClient.builder()
                 .region(region)
-                .httpClient(UrlConnectionHttpClient.builder().build())
-                .credentialsProvider(DefaultCredentialsProvider.builder().build());
-        if (endpointUrl != null && !endpointUrl.isBlank()) {
-            LOGGER.fine(() -> "Overriding SQS endpoint to " + endpointUrl);
-            builder.endpointOverride(URI.create(endpointUrl));
-        }
+                .httpClient(httpClient())
+                .credentialsProvider(credentials());
+        maybeOverrideEndpoint(builder, "SQS");
         return builder.build();
     }
 
@@ -88,12 +87,9 @@ public class AwsClientFactory {
     public CloudWatchClient cloudWatchClient() {
         var builder = CloudWatchClient.builder()
                 .region(region)
-                .httpClient(UrlConnectionHttpClient.builder().build())
-                .credentialsProvider(DefaultCredentialsProvider.builder().build());
-        if (endpointUrl != null && !endpointUrl.isBlank()) {
-            LOGGER.fine(() -> "Overriding CloudWatch endpoint to " + endpointUrl);
-            builder.endpointOverride(URI.create(endpointUrl));
-        }
+                .httpClient(httpClient())
+                .credentialsProvider(credentials());
+        maybeOverrideEndpoint(builder, "CloudWatch");
         return builder.build();
     }
 
@@ -103,12 +99,36 @@ public class AwsClientFactory {
     public SesClient sesClient() {
         var builder = SesClient.builder()
                 .region(region)
-                .httpClient(UrlConnectionHttpClient.builder().build())
-                .credentialsProvider(DefaultCredentialsProvider.builder().build());
-        if (endpointUrl != null && !endpointUrl.isBlank()) {
-            LOGGER.fine(() -> "Overriding SES endpoint to " + endpointUrl);
+                .httpClient(httpClient())
+                .credentialsProvider(credentials());
+        maybeOverrideEndpoint(builder, "SES");
+        return builder.build();
+    }
+
+    // -------------------------------------------------------------------------
+    // Shared helpers (DRY)
+    // -------------------------------------------------------------------------
+
+    private boolean hasEndpointOverride() {
+        return endpointUrl != null && !endpointUrl.isBlank();
+    }
+
+    /**
+     * Applies endpoint override when configured. Works with any AWS SDK v2
+     * builder that extends {@link AwsClientBuilder} (SQS, CloudWatch, SES, etc.).
+     */
+    private void maybeOverrideEndpoint(AwsClientBuilder<?, ?> builder, String serviceName) {
+        if (hasEndpointOverride()) {
+            LOGGER.fine(() -> "Overriding " + serviceName + " endpoint to " + endpointUrl);
             builder.endpointOverride(URI.create(endpointUrl));
         }
-        return builder.build();
+    }
+
+    private static DefaultCredentialsProvider credentials() {
+        return DefaultCredentialsProvider.builder().build();
+    }
+
+    private static SdkHttpClient httpClient() {
+        return UrlConnectionHttpClient.builder().build();
     }
 }

@@ -1,8 +1,8 @@
 package cat.complai.services.worker;
 
-import cat.complai.utilities.http.HttpWrapper;
+import cat.complai.utilities.http.IHttpWrapper;
 import cat.complai.helpers.openrouter.RedactPromptBuilder;
-import cat.complai.utilities.s3.S3PdfUploader;
+import cat.complai.utilities.s3.IS3PdfUploader;
 import cat.complai.dto.sqs.RedactSqsMessage;
 import com.amazonaws.services.lambda.runtime.events.SQSBatchResponse;
 import com.amazonaws.services.lambda.runtime.events.SQSEvent;
@@ -34,8 +34,8 @@ public class RedactWorkerHandler extends MicronautRequestHandler<SQSEvent, SQSBa
 
     // Lazily initialised from getApplicationContext() — see ensureInitialized().
     private RedactPromptBuilder promptBuilder;
-    private HttpWrapper httpWrapper;
-    private S3PdfUploader s3PdfUploader;
+    private IHttpWrapper httpWrapper;
+    private IS3PdfUploader s3PdfUploader;
     private ObjectMapper mapper;
     private int overallTimeoutSeconds;
     private boolean initialized = false;
@@ -43,8 +43,8 @@ public class RedactWorkerHandler extends MicronautRequestHandler<SQSEvent, SQSBa
     private void ensureInitialized() {
         if (initialized) return;
         promptBuilder = getApplicationContext().getBean(RedactPromptBuilder.class);
-        httpWrapper = getApplicationContext().getBean(HttpWrapper.class);
-        s3PdfUploader = getApplicationContext().getBean(S3PdfUploader.class);
+        httpWrapper = getApplicationContext().getBean(IHttpWrapper.class);
+        s3PdfUploader = getApplicationContext().getBean(IS3PdfUploader.class);
         mapper = getApplicationContext().getBean(ObjectMapper.class);
         overallTimeoutSeconds = Integer.parseInt(
                 getApplicationContext().getEnvironment()
