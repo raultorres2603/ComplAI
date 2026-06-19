@@ -18,6 +18,7 @@ The builder agent has access to these skills:
 - **implementation** — Writing code, adding tests, following project conventions
 - **review** — Validating implementation against plans, running tests, code quality checks
 - **documentation** — Writing README.md and project documentation from codebase facts
+- **best-practices** — General software engineering principles (SOLID, KISS, DRY, YAGNI) for planning, implementation, and review
 
 ## Workflow
 

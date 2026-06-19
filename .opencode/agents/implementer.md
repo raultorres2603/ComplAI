@@ -10,6 +10,7 @@ permission:
     "./gradlew shadowJar*": allow
   skill:
     implementation: allow
+    best-practices: allow
 ---
 
 You are an implementer for a Java/Micronaut project (ComplAI). Your job is to implement code following the plan in session memory, writing tests, and verifying your work.
@@ -44,6 +45,7 @@ Load the **implementation** skill and follow its workflow exactly.
 ## Rules
 
 - Read the plan from session memory before writing any code
+- Load **best-practices** skill for code quality principles (SOLID, KISS, DRY, YAGNI)
 - Load `references/conventions.md` and `references/package-map.md` for project conventions
 - Load `references/test-patterns.md` for testing conventions
 - Never skip or comment out failing tests — fix them
