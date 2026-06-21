@@ -1,5 +1,6 @@
 package cat.complai.services.worker;
 
+import cat.complai.config.CityFeatureFlagService;
 import cat.complai.utilities.http.IHttpWrapper;
 import cat.complai.helpers.openrouter.RedactPromptBuilder;
 import cat.complai.utilities.s3.IS3PdfUploader;
@@ -37,6 +38,7 @@ public class RedactWorkerHandler extends MicronautRequestHandler<SQSEvent, SQSBa
     private IHttpWrapper httpWrapper;
     private IS3PdfUploader s3PdfUploader;
     private ObjectMapper mapper;
+    private CityFeatureFlagService featureFlagService;
     private int overallTimeoutSeconds;
     private boolean initialized = false;
 
@@ -46,6 +48,7 @@ public class RedactWorkerHandler extends MicronautRequestHandler<SQSEvent, SQSBa
         httpWrapper = getApplicationContext().getBean(IHttpWrapper.class);
         s3PdfUploader = getApplicationContext().getBean(IS3PdfUploader.class);
         mapper = getApplicationContext().getBean(ObjectMapper.class);
+        featureFlagService = getApplicationContext().getBean(CityFeatureFlagService.class);
         overallTimeoutSeconds = Integer.parseInt(
                 getApplicationContext().getEnvironment()
                         .getProperty(TIMEOUT_PROP, String.class)
@@ -76,6 +79,16 @@ public class RedactWorkerHandler extends MicronautRequestHandler<SQSEvent, SQSBa
             String messageId = record.getMessageId();
             try {
                 RedactSqsMessage message = mapper.readValue(record.getBody(), RedactSqsMessage.class);
+
+                // Skip processing if the city is disabled via the ENABLE_CITY_<cityId> feature flag.
+                // The message is treated as successfully processed (not added to failures), so SQS
+                // deletes it. This prevents queues from filling up with messages for disabled cities.
+                if (!featureFlagService.isCityEnabled(message.cityId())) {
+                    logger.info(() -> "RedactWorkerHandler — skipping disabled city messageId=" + messageId
+                            + " cityId=" + message.cityId());
+                    continue;
+                }
+
                 logger.info(() -> "RedactWorkerHandler — processing record messageId=" + messageId
                         + " s3Key=" + message.s3Key() + " conversationId=" + message.conversationId());
                 generator.generate(message);

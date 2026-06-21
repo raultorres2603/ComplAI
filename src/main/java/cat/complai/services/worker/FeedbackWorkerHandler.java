@@ -1,5 +1,6 @@
 package cat.complai.services.worker;
 
+import cat.complai.config.CityFeatureFlagService;
 import cat.complai.dto.feedback.FeedbackSqsMessage;
 import cat.complai.utilities.s3.S3FeedbackUploader;
 import com.amazonaws.services.lambda.runtime.events.SQSBatchResponse;
@@ -39,12 +40,14 @@ public class FeedbackWorkerHandler extends MicronautRequestHandler<SQSEvent, SQS
     // Lazily initialised from getApplicationContext() — see ensureInitialized().
     private S3FeedbackUploader s3Uploader;
     private ObjectMapper mapper;
+    private CityFeatureFlagService featureFlagService;
     private boolean initialized = false;
 
     private void ensureInitialized() {
         if (initialized) return;
         s3Uploader = getApplicationContext().getBean(S3FeedbackUploader.class);
         mapper = getApplicationContext().getBean(ObjectMapper.class);
+        featureFlagService = getApplicationContext().getBean(CityFeatureFlagService.class);
         initialized = true;
     }
 
@@ -91,6 +94,13 @@ public class FeedbackWorkerHandler extends MicronautRequestHandler<SQSEvent, SQS
 
                 // Deserialize the JSON body
                 FeedbackSqsMessage feedbackMessage = mapper.readValue(body, FeedbackSqsMessage.class);
+
+                // Skip processing if the city is disabled via the ENABLE_CITY_<cityId> feature flag.
+                if (!featureFlagService.isCityEnabled(feedbackMessage.city())) {
+                    logger.info(() -> "FeedbackWorkerHandler — skipping disabled city messageId=" + messageId
+                            + " city=" + feedbackMessage.city());
+                    continue;
+                }
 
                 // Process (serialize to JSON and upload to S3)
                 processor.process(feedbackMessage);

@@ -1,5 +1,6 @@
 package cat.complai.controllers.telegram;
 
+import cat.complai.config.CityFeatureFlagService;
 import cat.complai.config.TelegramConfiguration;
 import cat.complai.controllers.telegram.dto.TelegramUpdate;
 import cat.complai.services.telegram.TelegramBotService;
@@ -26,26 +27,35 @@ import java.util.logging.Logger;
  * ({@link cat.complai.utilities.auth.ApiKeyAuthFilter}) since Telegram cannot send
  * custom headers. Security is provided via the {@code X-Telegram-Bot-Api-Secret-Token}
  * header validation.
+ *
+ * <p>After webhook secret verification, checks the per-city feature flag
+ * ({@code ENABLE_CITY_<cityId>}) via
+ * {@link CityFeatureFlagService#isCityEnabled(String)}. If the city is disabled,
+ * returns HTTP 503 Service Unavailable.
  */
 @Controller("/telegram")
 public class TelegramController {
 
     private final TelegramConfiguration telegramConfig;
     private final TelegramBotService botService;
+    private final CityFeatureFlagService featureFlagService;
     private final Logger logger = Logger.getLogger(TelegramController.class.getName());
 
     @Inject
     public TelegramController(TelegramConfiguration telegramConfig,
-                              TelegramBotService botService) {
+                              TelegramBotService botService,
+                              CityFeatureFlagService featureFlagService) {
         this.telegramConfig = telegramConfig;
         this.botService = botService;
+        this.featureFlagService = featureFlagService;
     }
 
     /**
      * Handles an incoming Telegram webhook update.
      *
      * <p>Verifies the webhook secret token from the
-     * {@code X-Telegram-Bot-Api-Secret-Token} header, then delegates to
+     * {@code X-Telegram-Bot-Api-Secret-Token} header, checks the city feature
+     * flag, then delegates to
      * {@link TelegramBotService#processUpdate(TelegramUpdate, String)}.
      *
      * @param update  the deserialized Telegram update
@@ -68,6 +78,12 @@ public class TelegramController {
         if (!verifyWebhookSecret(request, cityId)) {
             logger.warning(() -> "Telegram webhook secret mismatch — cityId=" + cityId);
             return HttpResponse.unauthorized();
+        }
+
+        // Check if the city is enabled via the ENABLE_CITY_<cityId> feature flag.
+        if (!featureFlagService.isCityEnabled(cityId)) {
+            logger.warning(() -> "Telegram webhook rejected — city disabled: cityId=" + cityId);
+            return HttpResponse.status(HttpStatus.SERVICE_UNAVAILABLE);
         }
 
         logger.fine(() -> "Telegram webhook received — cityId=" + cityId

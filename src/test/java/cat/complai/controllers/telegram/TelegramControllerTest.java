@@ -1,7 +1,9 @@
 package cat.complai.controllers.telegram;
 
+import cat.complai.config.CityFeatureFlagService;
 import cat.complai.config.TelegramConfiguration;
 import cat.complai.controllers.telegram.dto.TelegramCallbackQuery;
+import java.util.Map;
 import cat.complai.controllers.telegram.dto.TelegramChat;
 import cat.complai.controllers.telegram.dto.TelegramMessage;
 import cat.complai.controllers.telegram.dto.TelegramUpdate;
@@ -76,6 +78,15 @@ public class TelegramControllerTest {
         }
     }
 
+    /**
+     * A {@link CityFeatureFlagService} that enables all cities for testing.
+     */
+    static class FakeCityFeatureFlagService extends CityFeatureFlagService {
+        FakeCityFeatureFlagService() {
+            super(Map.of("elprat", true, "testcity", true));
+        }
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
@@ -94,7 +105,8 @@ public class TelegramControllerTest {
     void webhook_validUpdate_returns200() {
         var config = new FakeTelegramConfig();
         var botService = new FakeBotService();
-        var controller = new TelegramController(config, botService);
+        var flagService = new FakeCityFeatureFlagService();
+        var controller = new TelegramController(config, botService, flagService);
 
         var chat = new TelegramChat(12345L, "private", "Test");
         var user = new TelegramUser(67890L, false, "TestUser", "en");
@@ -114,7 +126,8 @@ public class TelegramControllerTest {
     void webhook_missingCityId_returns400() {
         var config = new FakeTelegramConfig();
         var botService = new FakeBotService();
-        var controller = new TelegramController(config, botService);
+        var flagService = new FakeCityFeatureFlagService();
+        var controller = new TelegramController(config, botService, flagService);
 
         var update = new TelegramUpdate(42L, null, null);
 
@@ -130,7 +143,8 @@ public class TelegramControllerTest {
     void webhook_wrongSecret_returns401() {
         var config = new FakeTelegramConfig();
         var botService = new FakeBotService();
-        var controller = new TelegramController(config, botService);
+        var flagService = new FakeCityFeatureFlagService();
+        var controller = new TelegramController(config, botService, flagService);
 
         var update = new TelegramUpdate(42L, null, null);
 
@@ -146,7 +160,8 @@ public class TelegramControllerTest {
     void webhook_validSecret_passesVerification() {
         var config = new FakeTelegramConfig();
         var botService = new FakeBotService();
-        var controller = new TelegramController(config, botService);
+        var flagService = new FakeCityFeatureFlagService();
+        var controller = new TelegramController(config, botService, flagService);
 
         var chat = new TelegramChat(12345L, "private", "Test");
         var user = new TelegramUser(67890L, false, "TestUser", "en");

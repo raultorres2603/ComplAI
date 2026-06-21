@@ -1,15 +1,18 @@
 package cat.complai.utilities.auth;
 
+import cat.complai.config.CityFeatureFlagService;
 import cat.complai.dto.openrouter.OpenRouterErrorCode;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ServerFilter;
+import jakarta.inject.Inject;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -18,18 +21,29 @@ import java.util.logging.Logger;
 /**
  * Enforces API key authentication on all requests.
  *
+ * <p>
  * At startup, scans all JVM environment variables for the prefix
  * {@code API_KEY_}
  * and builds a reverse lookup map {@code apiKey → cityId}. The cityId is the
  * lowercased suffix (e.g. {@code API_KEY_ELPRAT} → {@code "elprat"}).
  *
+ * <p>
+ * After resolving the cityId, also checks the per-city feature flag
+ * ({@code ENABLE_CITY_<cityId>}) via
+ * {@link CityFeatureFlagService#isCityEnabled(String)}. If the city is
+ * disabled, returns HTTP 503 Service Unavailable.
+ *
+ * <p>
  * On each request, reads the {@code X-Api-Key} header, looks up the value in
- * the
- * map, and sets the {@code "city"} and {@code "user"} request attributes for
+ * the map, and sets the {@code "city"} and {@code "user"} request attributes
+ * for
  * downstream controllers.
  *
- * Excluded paths (no key required): GET /, GET /health, GET /health/startup, /telegram/**.
+ * <p>
+ * Excluded paths (no key required): GET /, GET /health, GET /health/startup,
+ * /telegram/**.
  *
+ * <p>
  * Returning null from a {@code @RequestFilter} method tells Micronaut to
  * continue
  * the filter chain. Returning a response short-circuits immediately.
@@ -44,8 +58,15 @@ public class ApiKeyAuthFilter {
     public static final String USER_ATTRIBUTE = "user";
 
     private final Map<String, String> apiKeyToCityId;
+    private final CityFeatureFlagService featureFlagService;
 
-    public ApiKeyAuthFilter() {
+    /**
+     * Production constructor — scans {@link System#getenv()} for API keys and
+     * accepts the feature flag service via DI.
+     */
+    @Inject
+    public ApiKeyAuthFilter(CityFeatureFlagService featureFlagService) {
+        this.featureFlagService = featureFlagService;
         Map<String, String> map = new HashMap<>();
         for (Map.Entry<String, String> entry : System.getenv().entrySet()) {
             if (entry.getKey().startsWith("API_KEY_")) {
@@ -61,14 +82,38 @@ public class ApiKeyAuthFilter {
         logger.info(() -> "ApiKeyAuthFilter initialized with " + apiKeyToCityId.size() + " API key(s).");
     }
 
-    // Visible for unit tests — accepts a pre-built map instead of scanning System.getenv()
+    /**
+     * Visible for unit tests — accepts a pre-built key map instead of scanning
+     * {@link System#getenv()}. All cities in the provided map are automatically
+     * enabled so existing tests pass unchanged.
+     */
     public ApiKeyAuthFilter(Map<String, String> apiKeyToCityId) {
         if (apiKeyToCityId.isEmpty()) {
             throw new IllegalStateException("No API keys configured.");
         }
         this.apiKeyToCityId = Map.copyOf(apiKeyToCityId);
+        // Enable all cities from the key map so existing unit tests pass unchanged.
+        Map<String, Boolean> enabled = new HashMap<>();
+        for (String cityId : apiKeyToCityId.values()) {
+            enabled.put(cityId, true);
+        }
+        this.featureFlagService = new CityFeatureFlagService(enabled);
         logger.info(
                 () -> "ApiKeyAuthFilter initialized with " + this.apiKeyToCityId.size() + " API key(s) (test).");
+    }
+
+    /**
+     * Visible for unit tests — accepts a pre-built feature flag service and a
+     * pre-built key map. Allows tests to verify behaviour with disabled cities.
+     */
+    public ApiKeyAuthFilter(CityFeatureFlagService featureFlagService, Map<String, String> apiKeyToCityId) {
+        if (apiKeyToCityId.isEmpty()) {
+            throw new IllegalStateException("No API keys configured.");
+        }
+        this.featureFlagService = featureFlagService;
+        this.apiKeyToCityId = Map.copyOf(apiKeyToCityId);
+        logger.info(
+                () -> "ApiKeyAuthFilter initialized with " + this.apiKeyToCityId.size() + " API key(s) and custom feature flags (test).");
     }
 
     @RequestFilter
@@ -97,6 +142,13 @@ public class ApiKeyAuthFilter {
             return unauthorizedResponse("Invalid API key");
         }
 
+        // Check if the city is enabled via the ENABLE_CITY_<cityId> feature flag.
+        if (!featureFlagService.isCityEnabled(cityId)) {
+            logger.warning(() -> "City disabled — httpStatus=503 cityId=" + cityId
+                    + " method=" + request.getMethod() + " path=" + request.getPath());
+            return cityDisabledResponse(cityId);
+        }
+
         request.setAttribute(CITY_ATTRIBUTE, cityId);
         request.setAttribute(USER_ATTRIBUTE, "api-key-client");
 
@@ -122,5 +174,13 @@ public class ApiKeyAuthFilter {
                 "message", reason == null ? "Unauthorized" : reason,
                 "errorCode", OpenRouterErrorCode.UNAUTHORIZED.getCode());
         return HttpResponse.unauthorized().body(body);
+    }
+
+    private MutableHttpResponse<?> cityDisabledResponse(String cityId) {
+        Map<String, Object> body = Map.of(
+                "success", false,
+                "error", "This city is currently disabled. Please try again later.",
+                "errorCode", OpenRouterErrorCode.CITY_DISABLED.getCode());
+        return HttpResponse.status(HttpStatus.SERVICE_UNAVAILABLE).body(body);
     }
 }

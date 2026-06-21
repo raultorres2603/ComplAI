@@ -1,6 +1,9 @@
 package cat.complai.utilities.auth;
 
+import cat.complai.config.CityFeatureFlagService;
+import cat.complai.dto.openrouter.OpenRouterErrorCode;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import org.junit.jupiter.api.BeforeEach;
@@ -105,5 +108,55 @@ class ApiKeyAuthFilterTest {
     @Test
     void constructorWithEmptyMap_throwsIllegalState() {
         assertThrows(IllegalStateException.class, () -> new ApiKeyAuthFilter(Map.of()));
+    }
+
+    // --- Disabled city ---
+
+    @Test
+    void disabledCity_returns503() {
+        CityFeatureFlagService disabledService = new CityFeatureFlagService(Map.of("elprat", false));
+        ApiKeyAuthFilter disabledFilter = new ApiKeyAuthFilter(disabledService, Map.of("test-key-elprat", "elprat"));
+
+        MutableHttpRequest<?> request = HttpRequest.POST("/complai/ask", "{}")
+                .header("X-Api-Key", "test-key-elprat");
+        MutableHttpResponse<?> response = disabledFilter.filter(request);
+        assertNotNull(response);
+        assertEquals(HttpStatus.SERVICE_UNAVAILABLE.getCode(), response.getStatus().getCode());
+    }
+
+    @Test
+    void disabledCity_returnsCorrectErrorCode() {
+        CityFeatureFlagService disabledService = new CityFeatureFlagService(Map.of("elprat", false));
+        ApiKeyAuthFilter disabledFilter = new ApiKeyAuthFilter(disabledService, Map.of("test-key-elprat", "elprat"));
+
+        MutableHttpRequest<?> request = HttpRequest.POST("/complai/ask", "{}")
+                .header("X-Api-Key", "test-key-elprat");
+        MutableHttpResponse<?> response = disabledFilter.filter(request);
+        assertNotNull(response);
+        assertEquals(OpenRouterErrorCode.CITY_DISABLED.getCode(),
+                ((Map<String, Object>) response.body()).get("errorCode"));
+    }
+
+    @Test
+    void enabledCity_passesThrough() {
+        CityFeatureFlagService enabledService = new CityFeatureFlagService(Map.of("elprat", true));
+        ApiKeyAuthFilter enabledFilter = new ApiKeyAuthFilter(enabledService, Map.of("test-key-elprat", "elprat"));
+
+        MutableHttpRequest<?> request = HttpRequest.POST("/complai/ask", "{}")
+                .header("X-Api-Key", "test-key-elprat");
+        assertNull(enabledFilter.filter(request));
+    }
+
+    @Test
+    void invalidKey_stillReturns401_evenWhenCityDisabled() {
+        // Auth check (401) happens before the feature flag check (503)
+        CityFeatureFlagService disabledService = new CityFeatureFlagService(Map.of("elprat", false));
+        ApiKeyAuthFilter disabledFilter = new ApiKeyAuthFilter(disabledService, Map.of("test-key-elprat", "elprat"));
+
+        MutableHttpRequest<?> request = HttpRequest.POST("/complai/ask", "{}")
+                .header("X-Api-Key", "this-key-does-not-exist");
+        MutableHttpResponse<?> response = disabledFilter.filter(request);
+        assertNotNull(response);
+        assertEquals(HttpStatus.UNAUTHORIZED.getCode(), response.getStatus().getCode());
     }
 }

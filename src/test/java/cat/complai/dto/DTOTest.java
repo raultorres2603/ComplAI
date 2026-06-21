@@ -548,7 +548,7 @@ class DTOTest {
         @Test
         @DisplayName("Should have expected enum constants")
         void shouldHaveExpectedConstants() {
-            assertEquals(9, OpenRouterErrorCode.values().length);
+            assertEquals(10, OpenRouterErrorCode.values().length);
         }
 
         @Test
@@ -562,6 +562,8 @@ class DTOTest {
             assertEquals(5, OpenRouterErrorCode.INTERNAL.getCode());
             assertEquals(6, OpenRouterErrorCode.UNAUTHORIZED.getCode());
             assertEquals(7, OpenRouterErrorCode.RATE_LIMITED.getCode());
+            assertEquals(8, OpenRouterErrorCode.CIRCUIT_OPEN.getCode());
+            assertEquals(9, OpenRouterErrorCode.CITY_DISABLED.getCode());
         }
 
         @Test

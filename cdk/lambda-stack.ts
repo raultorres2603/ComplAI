@@ -224,6 +224,9 @@ export class LambdaStack extends cdk.Stack {
         // GitHub Environment secret (API_KEY_<CITYID_UPPER>) for both development and production.
         API_KEY_ENABLED: 'true',
         API_KEY_ELPRAT: process.env.API_KEY_ELPRAT || '',
+        // Per-city enable/disable feature flags. Set ENABLE_CITY_<CITYID_UPPER>=true in the
+        // GitHub Environment to enable a city; absent/unset defaults to disabled (safe default).
+        ENABLE_CITY_ELPRAT: process.env.ENABLE_CITY_ELPRAT || '',
         // Telegram Bot configuration — per-city token and webhook secret.
         // To add a new city: add TOKEN_TELEGRAM_<CITYID_UPPER> and
         // TELEGRAM_WEBHOOK_SECRET_<CITYID_UPPER> here and set the corresponding
@@ -462,6 +465,8 @@ export class LambdaStack extends cdk.Stack {
         AWS_SES_REGION: process.env.AWS_SES_REGION || 'eu-west-1',
         // Per-city API keys for MultiCitySesService discovery (city must have BOTH API_KEY_* and AWS_SES_TO_EMAIL_*)
         API_KEY_ELPRAT: process.env.API_KEY_ELPRAT || '',
+        // Per-city enable/disable feature flags
+        ENABLE_CITY_ELPRAT: process.env.ENABLE_CITY_ELPRAT || '',
         // Telegram Bot — per-city token and webhook secret
         TOKEN_TELEGRAM_ELPRAT: process.env.TOKEN_TELEGRAM_ELPRAT || '',
         TELEGRAM_WEBHOOK_SECRET_ELPRAT: process.env.TELEGRAM_WEBHOOK_SECRET_ELPRAT || '',
@@ -513,6 +518,8 @@ export class LambdaStack extends cdk.Stack {
         AWS_SES_FROM_EMAIL: process.env.SES_FROM_EMAIL || '',
         AWS_SES_TO_EMAIL: process.env.SES_TO_EMAIL || '',
         AWS_SES_REGION: process.env.AWS_SES_REGION || 'eu-west-1',
+        // Per-city enable/disable feature flags
+        ENABLE_CITY_ELPRAT: process.env.ENABLE_CITY_ELPRAT || '',
         ...(process.env.AWS_ENDPOINT_URL ? { AWS_ENDPOINT_URL: process.env.AWS_ENDPOINT_URL } : {})
       },
       role: feedbackWorkerRole,
@@ -627,6 +634,8 @@ export class LambdaStack extends cdk.Stack {
         COMPLAI_DEFAULT_CITY_ID: process.env.COMPLAI_DEFAULT_CITY_ID || 'elprat',
         // Per-city Telegram bot tokens for sending answers back
         TOKEN_TELEGRAM_ELPRAT: process.env.TOKEN_TELEGRAM_ELPRAT || '',
+        // Per-city enable/disable feature flags
+        ENABLE_CITY_ELPRAT: process.env.ENABLE_CITY_ELPRAT || '',
         // Allow LocalStack endpoint for local development
         ...(process.env.AWS_ENDPOINT_URL ? { AWS_ENDPOINT_URL: process.env.AWS_ENDPOINT_URL } : {}),
       },

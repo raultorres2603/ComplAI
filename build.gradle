@@ -125,6 +125,13 @@ tasks.withType(Test).configureEach {
     )
     useJUnitPlatform()
 
+    // Enable test cities by default so integration tests can authenticate
+    // without needing the production ENABLE_CITY_* env vars. Individual tests
+    // that need to simulate a disabled city override the CityFeatureFlagService
+    // bean via @Replaces(CityFeatureFlagService.class) in a @Factory.
+    environment "ENABLE_CITY_ELPRAT", "true"
+    environment "ENABLE_CITY_TESTCITY", "true"
+
     testLogging {
         events TestLogEvent.FAILED, TestLogEvent.SKIPPED, TestLogEvent.PASSED
         exceptionFormat = TestExceptionFormat.SHORT

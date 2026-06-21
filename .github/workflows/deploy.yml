@@ -387,6 +387,8 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL }}
           API_KEY_ELPRAT: ${{ secrets.API_KEY_ELPRAT }}
+          # Per-city enable/disable feature flags — set to "true" in GitHub Environment Variables to enable a city
+          ENABLE_CITY_ELPRAT: ${{ vars.ENABLE_CITY_ELPRAT }}
           # Telegram Bot — per-city token and webhook secret
           TOKEN_TELEGRAM_ELPRAT: ${{ secrets.TOKEN_TELEGRAM_ELPRAT }}
           TELEGRAM_WEBHOOK_SECRET_ELPRAT: ${{ secrets.TELEGRAM_WEBHOOK_SECRET_ELPRAT }}

@@ -1,5 +1,6 @@
 package cat.complai.services.worker;
 
+import cat.complai.config.CityFeatureFlagService;
 import cat.complai.config.TelegramConfiguration;
 import cat.complai.dto.sqs.AskSqsMessage;
 import cat.complai.services.openrouter.IAskService;
@@ -33,6 +34,7 @@ public class AskWorkerHandler extends MicronautRequestHandler<SQSEvent, SQSBatch
     private IAskService openRouterService;
     private TelegramConfiguration telegramConfig;
     private ObjectMapper mapper;
+    private CityFeatureFlagService featureFlagService;
     private boolean initialized = false;
 
     private void ensureInitialized() {
@@ -40,6 +42,7 @@ public class AskWorkerHandler extends MicronautRequestHandler<SQSEvent, SQSBatch
         openRouterService = getApplicationContext().getBean(IAskService.class);
         telegramConfig = getApplicationContext().getBean(TelegramConfiguration.class);
         mapper = getApplicationContext().getBean(ObjectMapper.class);
+        featureFlagService = getApplicationContext().getBean(CityFeatureFlagService.class);
         initialized = true;
     }
 
@@ -63,6 +66,14 @@ public class AskWorkerHandler extends MicronautRequestHandler<SQSEvent, SQSBatch
             String messageId = record.getMessageId();
             try {
                 AskSqsMessage message = mapper.readValue(record.getBody(), AskSqsMessage.class);
+
+                // Skip processing if the city is disabled via the ENABLE_CITY_<cityId> feature flag.
+                if (!featureFlagService.isCityEnabled(message.cityId())) {
+                    logger.info(() -> "AskWorkerHandler — skipping disabled city messageId=" + messageId
+                            + " cityId=" + message.cityId());
+                    continue;
+                }
+
                 logger.info(() -> "AskWorkerHandler — processing record messageId=" + messageId
                         + " chatId=" + message.chatId() + " cityId=" + message.cityId());
 
