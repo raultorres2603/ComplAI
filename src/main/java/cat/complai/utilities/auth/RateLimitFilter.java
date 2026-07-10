@@ -36,7 +36,7 @@ import java.util.logging.Logger;
  *
  * <p>
  * Excluded paths (same as JwtAuthFilter): GET /, GET /health,
- * GET /health/startup — pass through immediately without incrementing.
+ * GET /health/startup, GET /privacy — pass through immediately without incrementing.
  */
 @Requires(property = "api.key.enabled")
 @ServerFilter("/**")
@@ -89,6 +89,7 @@ public class RateLimitFilter implements Ordered {
         String path = request.getPath();
         HttpMethod method = request.getMethod();
         return HttpMethod.GET.equals(method)
-                && (path.equals("/") || path.equals("/health") || path.equals("/health/startup"));
+                && (path.equals("/") || path.equals("/health") || path.equals("/health/startup")
+                        || path.equals("/privacy"));
     }
 }
