@@ -224,6 +224,9 @@ export class LambdaStack extends cdk.Stack {
         // GitHub Environment secret (API_KEY_<CITYID_UPPER>) for both development and production.
         API_KEY_ENABLED: 'true',
         API_KEY_ELPRAT: process.env.API_KEY_ELPRAT || '',
+        // City enable/disable — must be explicitly set to "true" for each city.
+        // Missing or "false" = city returns HTTP 503 CITY_DISABLED.
+        ENABLE_CITY_ELPRAT: 'true',
         // Telegram Bot configuration — per-city token and webhook secret.
         // To add a new city: add TOKEN_TELEGRAM_<CITYID_UPPER> and
         // TELEGRAM_WEBHOOK_SECRET_<CITYID_UPPER> here and set the corresponding
@@ -462,6 +465,8 @@ export class LambdaStack extends cdk.Stack {
         AWS_SES_REGION: process.env.AWS_SES_REGION || 'eu-west-1',
         // Per-city API keys for MultiCitySesService discovery (city must have BOTH API_KEY_* and AWS_SES_TO_EMAIL_*)
         API_KEY_ELPRAT: process.env.API_KEY_ELPRAT || '',
+        // City enable/disable — must be explicitly set to "true" for each city.
+        ENABLE_CITY_ELPRAT: 'true',
         // Telegram Bot — per-city token and webhook secret
         TOKEN_TELEGRAM_ELPRAT: process.env.TOKEN_TELEGRAM_ELPRAT || '',
         TELEGRAM_WEBHOOK_SECRET_ELPRAT: process.env.TELEGRAM_WEBHOOK_SECRET_ELPRAT || '',
@@ -627,6 +632,8 @@ export class LambdaStack extends cdk.Stack {
         COMPLAI_DEFAULT_CITY_ID: process.env.COMPLAI_DEFAULT_CITY_ID || 'elprat',
         // Per-city Telegram bot tokens for sending answers back
         TOKEN_TELEGRAM_ELPRAT: process.env.TOKEN_TELEGRAM_ELPRAT || '',
+        // City enable/disable — must be explicitly set to "true" for each city.
+        ENABLE_CITY_ELPRAT: 'true',
         // Allow LocalStack endpoint for local development
         ...(process.env.AWS_ENDPOINT_URL ? { AWS_ENDPOINT_URL: process.env.AWS_ENDPOINT_URL } : {}),
       },
@@ -735,6 +742,8 @@ export class LambdaStack extends cdk.Stack {
         FEEDBACK_BUCKET_NAME: feedbackBucket.bucketName,
         // Per-city API keys for MultiCitySesService discovery (city must have BOTH API_KEY_* and AWS_SES_TO_EMAIL_*)
         API_KEY_ELPRAT: process.env.API_KEY_ELPRAT || '',
+        // City enable/disable — must be explicitly set to "true" for each city.
+        ENABLE_CITY_ELPRAT: 'true',
         // Allow LocalStack endpoint for local development
         ...(process.env.AWS_ENDPOINT_URL ? { AWS_ENDPOINT_URL: process.env.AWS_ENDPOINT_URL } : {}),
       },

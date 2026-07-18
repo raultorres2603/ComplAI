@@ -6,6 +6,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.RequestFilter;
@@ -13,6 +14,7 @@ import io.micronaut.http.annotation.ServerFilter;
 import jakarta.inject.Singleton;
 
 import java.util.Map;
+import java.util.Set;
 
 @Singleton
 @ServerFilter("/**")
@@ -24,6 +26,26 @@ public class TestApiKeyFilter {
             "test-integration-key-testcity", "testcity",
             "test-api-key-feedback", "elprat",
             "test-integration-key-elprat-htmlsources", "testcity");
+
+    /** Cities that should return 503 CITY_DISABLED in tests. */
+    private final Set<String> disabledCities;
+
+    public TestApiKeyFilter() {
+        // Discover disabled cities from ENABLE_CITY_<CITYID> env vars.
+        // In tests, cities are enabled by default unless ENABLE_CITY_X=false is set.
+        this.disabledCities = apiKeyToCityId.values().stream()
+                .distinct()
+                .filter(cityId -> {
+                    String enabled = System.getenv().getOrDefault("ENABLE_CITY_" + cityId.toUpperCase(), "true");
+                    return "false".equalsIgnoreCase(enabled);
+                })
+                .collect(java.util.stream.Collectors.toSet());
+    }
+
+    // Visible for tests — accepts a custom disabled cities set
+    public TestApiKeyFilter(Set<String> disabledCities) {
+        this.disabledCities = Set.copyOf(disabledCities);
+    }
 
     @RequestFilter
     @Nullable
@@ -44,6 +66,10 @@ public class TestApiKeyFilter {
         String cityId = apiKeyToCityId.get(apiKey);
         if (cityId == null) {
             return unauthorizedResponse("Invalid API key");
+        }
+
+        if (disabledCities.contains(cityId)) {
+            return cityDisabledResponse(cityId);
         }
 
         request.setAttribute(ApiKeyAuthFilter.CITY_ATTRIBUTE, cityId);
@@ -70,5 +96,13 @@ public class TestApiKeyFilter {
                 "message", reason == null ? "Unauthorized" : reason,
                 "errorCode", OpenRouterErrorCode.UNAUTHORIZED.getCode());
         return HttpResponse.unauthorized().body(body);
+    }
+
+    private MutableHttpResponse<?> cityDisabledResponse(String cityId) {
+        Map<String, Object> body = Map.of(
+                "success", false,
+                "message", "City '" + cityId + "' is currently unavailable",
+                "errorCode", OpenRouterErrorCode.CITY_DISABLED.getCode());
+        return HttpResponse.status(HttpStatus.SERVICE_UNAVAILABLE).body(body);
     }
 }

@@ -6,13 +6,16 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ServerFilter;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.logging.Logger;
 
 /**
@@ -45,9 +48,11 @@ public class ApiKeyAuthFilter {
     public static final String USER_ATTRIBUTE = "user";
 
     private final Map<String, String> apiKeyToCityId;
+    private final Set<String> disabledCities;
 
     public ApiKeyAuthFilter() {
         Map<String, String> map = new HashMap<>();
+        Set<String> disabled = new HashSet<>();
         for (Map.Entry<String, String> entry : System.getenv().entrySet()) {
             if (entry.getKey().startsWith("API_KEY_")) {
                 String cityId = entry.getKey().substring("API_KEY_".length()).toLowerCase();
@@ -58,16 +63,32 @@ public class ApiKeyAuthFilter {
             throw new IllegalStateException(
                     "No API keys configured. Set at least one API_KEY_<CITYID> environment variable.");
         }
+        // Discover disabled cities: ENABLE_CITY_<CITYID> must be "true" to enable.
+        // Missing or any other value = disabled.
+        for (String cityId : new HashSet<>(map.values())) {
+            String enabled = System.getenv().getOrDefault("ENABLE_CITY_" + cityId.toUpperCase(), "false");
+            if (!"true".equalsIgnoreCase(enabled)) {
+                disabled.add(cityId);
+            }
+        }
         this.apiKeyToCityId = Map.copyOf(map);
-        logger.info(() -> "ApiKeyAuthFilter initialized with " + apiKeyToCityId.size() + " API key(s).");
+        this.disabledCities = Set.copyOf(disabled);
+        logger.info(() -> "ApiKeyAuthFilter initialized with " + apiKeyToCityId.size() + " API key(s), "
+                + disabledCities.size() + " disabled.");
     }
 
     // Visible for unit tests — accepts a pre-built map instead of scanning System.getenv()
     public ApiKeyAuthFilter(Map<String, String> apiKeyToCityId) {
+        this(apiKeyToCityId, Set.of());
+    }
+
+    // Visible for unit tests — accepts both API key map and disabled cities set
+    public ApiKeyAuthFilter(Map<String, String> apiKeyToCityId, Set<String> disabledCities) {
         if (apiKeyToCityId.isEmpty()) {
             throw new IllegalStateException("No API keys configured.");
         }
         this.apiKeyToCityId = Map.copyOf(apiKeyToCityId);
+        this.disabledCities = Set.copyOf(disabledCities);
         logger.info(
                 () -> "ApiKeyAuthFilter initialized with " + this.apiKeyToCityId.size() + " API key(s) (test).");
     }
@@ -98,6 +119,12 @@ public class ApiKeyAuthFilter {
             return unauthorizedResponse("Invalid API key");
         }
 
+        if (disabledCities.contains(cityId)) {
+            logger.info(() -> "City disabled — cityId=" + cityId + " httpStatus=503 method=" + request.getMethod()
+                    + " path=" + request.getPath());
+            return cityDisabledResponse(cityId);
+        }
+
         request.setAttribute(CITY_ATTRIBUTE, cityId);
         request.setAttribute(USER_ATTRIBUTE, "api-key-client");
 
@@ -124,5 +151,23 @@ public class ApiKeyAuthFilter {
                 "message", reason == null ? "Unauthorized" : reason,
                 "errorCode", OpenRouterErrorCode.UNAUTHORIZED.getCode());
         return HttpResponse.unauthorized().body(body);
+    }
+
+    private MutableHttpResponse<?> cityDisabledResponse(String cityId) {
+        Map<String, Object> body = Map.of(
+                "success", false,
+                "message", "City '" + cityId + "' is currently unavailable",
+                "errorCode", OpenRouterErrorCode.CITY_DISABLED.getCode());
+        return HttpResponse.status(HttpStatus.SERVICE_UNAVAILABLE).body(body);
+    }
+
+    /**
+     * Returns true if the given city is enabled via the
+     * {@code ENABLE_CITY_<CITYID>} environment variable.
+     * Defaults to disabled (false) when the variable is absent.
+     */
+    public static boolean isCityEnabled(String cityId) {
+        String enabled = System.getenv().getOrDefault("ENABLE_CITY_" + cityId.toUpperCase(), "false");
+        return "true".equalsIgnoreCase(enabled);
     }
 }
