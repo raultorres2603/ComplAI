@@ -55,8 +55,13 @@ public class TestApiKeyFilter {
     private static boolean isExcluded(HttpRequest<?> request) {
         String path = request.getPath();
         HttpMethod method = request.getMethod();
+        // Exclude Telegram webhook paths from auth (Telegram cannot send X-Api-Key)
+        if (path != null && path.startsWith("/telegram/")) {
+            return true;
+        }
         return HttpMethod.GET.equals(method)
-                && (path.equals("/") || path.equals("/health") || path.equals("/health/startup"));
+                && (path.equals("/") || path.equals("/health") || path.equals("/health/startup")
+                        || path.equals("/privacy"));
     }
 
     private MutableHttpResponse<?> unauthorizedResponse(String reason) {

@@ -3,6 +3,7 @@ package cat.complai.utilities.http;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.MutableHttpHeaders;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -12,10 +13,21 @@ class CorsFilterTest {
 
     private static final String TEST_ORIGIN = "http://localhost:3000";
 
+    /**
+     * Creates a mock request with the given method and an empty (but non-null)
+     * {@link HttpHeaders} so that {@code request.getHeaders().get("Origin")}
+     * returns {@code null} instead of throwing {@link NullPointerException}.
+     */
+    private static MutableHttpRequest<?> mockRequest(HttpMethod method) {
+        MutableHttpRequest<?> request = mock(MutableHttpRequest.class);
+        when(request.getMethod()).thenReturn(method);
+        when(request.getHeaders()).thenReturn(mock(MutableHttpHeaders.class));
+        return request;
+    }
+
     @Test
     void handlePreflight_returnsResponseWithCorsHeadersForOptionsRequest() {
-        MutableHttpRequest<?> request = mock(MutableHttpRequest.class);
-        when(request.getMethod()).thenReturn(HttpMethod.OPTIONS);
+        MutableHttpRequest<?> request = mockRequest(HttpMethod.OPTIONS);
 
         CorsFilter filter = new CorsFilter(TEST_ORIGIN);
 
@@ -34,8 +46,7 @@ class CorsFilterTest {
 
     @Test
     void handlePreflight_returnsNullForNonOptionsRequest() {
-        MutableHttpRequest<?> request = mock(MutableHttpRequest.class);
-        when(request.getMethod()).thenReturn(HttpMethod.GET);
+        MutableHttpRequest<?> request = mockRequest(HttpMethod.GET);
 
         CorsFilter filter = new CorsFilter(TEST_ORIGIN);
 
@@ -45,8 +56,7 @@ class CorsFilterTest {
     @Test
     void handlePreflight_usesCustomAllowedOrigin() {
         String customOrigin = "https://example.com";
-        MutableHttpRequest<?> request = mock(MutableHttpRequest.class);
-        when(request.getMethod()).thenReturn(HttpMethod.OPTIONS);
+        MutableHttpRequest<?> request = mockRequest(HttpMethod.OPTIONS);
 
         CorsFilter filter = new CorsFilter(customOrigin);
 

@@ -28,7 +28,8 @@ import java.util.logging.Logger;
  * map, and sets the {@code "city"} and {@code "user"} request attributes for
  * downstream controllers.
  *
- * Excluded paths (no key required): GET /, GET /health, GET /health/startup, /telegram/**.
+ * Excluded paths (no key required): GET /, GET /health, GET /health/startup,
+ * GET /privacy, /telegram/**.
  *
  * Returning null from a {@code @RequestFilter} method tells Micronaut to
  * continue
@@ -113,7 +114,8 @@ public class ApiKeyAuthFilter {
         }
 
         return HttpMethod.GET.equals(method)
-                && (path.equals("/") || path.equals("/health") || path.equals("/health/startup"));
+                && (path.equals("/") || path.equals("/health") || path.equals("/health/startup")
+                        || path.equals("/privacy"));
     }
 
     private MutableHttpResponse<?> unauthorizedResponse(String reason) {
