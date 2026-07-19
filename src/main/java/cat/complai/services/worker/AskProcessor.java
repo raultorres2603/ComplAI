@@ -11,7 +11,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Map;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
@@ -35,8 +34,6 @@ class AskProcessor {
     private final IOpenRouterService openRouterService;
     private final String telegramToken;
     private final TelegramSender telegramSender;
-    private final ObjectMapper mapper;
-
     /**
      * Production constructor — uses a real {@link HttpClient} for Telegram API calls.
      */
@@ -52,7 +49,6 @@ class AskProcessor {
         this.openRouterService = openRouterService;
         this.telegramToken = telegramToken;
         this.telegramSender = telegramSender;
-        this.mapper = mapper;
     }
 
     /**

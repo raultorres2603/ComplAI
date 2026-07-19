@@ -4,8 +4,6 @@ import cat.complai.config.TelegramConfiguration;
 import cat.complai.controllers.telegram.dto.TelegramUpdate;
 import cat.complai.services.telegram.TelegramBotService;
 import cat.complai.utilities.auth.ApiKeyAuthFilter;
-import io.micronaut.context.annotation.Parameter;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -15,9 +13,6 @@ import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Status;
 import jakarta.inject.Inject;
-import jakarta.inject.Named;
-import jakarta.inject.Singleton;
-
 import java.util.function.Predicate;
 import java.util.logging.Logger;
 

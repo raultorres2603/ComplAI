@@ -10,7 +10,6 @@ import cat.complai.services.openrouter.conversation.ConversationManagementServic
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import java.text.Normalizer;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;

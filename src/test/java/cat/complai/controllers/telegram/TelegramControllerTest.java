@@ -151,7 +151,6 @@ public class TelegramControllerTest {
         var botService = new FakeBotService();
         var controller = new TelegramController(config, botService, ALLOW_ALL);
 
-        var chat = new TelegramChat(12345L, "private", "Test");
         var user = new TelegramUser(67890L, false, "TestUser", "en");
         var callback = new TelegramCallbackQuery("cb-1", user, null, "mode_ask");
         var update = new TelegramUpdate(100L, null, callback);

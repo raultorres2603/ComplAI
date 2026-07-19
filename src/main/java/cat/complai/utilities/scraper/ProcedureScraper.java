@@ -6,6 +6,8 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.jspecify.annotations.NonNull;
+
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -134,11 +136,8 @@ public class ProcedureScraper {
     // Crawl
     // -------------------------------------------------------------------------
 
-    private static Document fetchDocument(String url) throws IOException {
+    private static Document fetchDocument(@NonNull String url) throws IOException {
         Document doc = Jsoup.connect(url).get();
-        if (doc == null) {
-            throw new IOException("Jsoup returned null document for: " + url);
-        }
         return doc;
     }
 
