@@ -19,7 +19,7 @@ public enum OpenRouterErrorCode {
     UPSTREAM(3),
     TIMEOUT(4),
     INTERNAL(5),
-    // Emitted by JwtAuthFilter before the controller is reached.
+    // Emitted by JwtSessionAuthFilter before the controller is reached.
     // The controller switch does not need a case for this — the filter
     // short-circuits the request.
     UNAUTHORIZED(6),

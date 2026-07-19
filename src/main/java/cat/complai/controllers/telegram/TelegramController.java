@@ -3,7 +3,7 @@ package cat.complai.controllers.telegram;
 import cat.complai.config.TelegramConfiguration;
 import cat.complai.controllers.telegram.dto.TelegramUpdate;
 import cat.complai.services.telegram.TelegramBotService;
-import cat.complai.utilities.auth.ApiKeyAuthFilter;
+import cat.complai.utilities.auth.CityUtil;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -24,7 +24,7 @@ import java.util.logging.Logger;
  * identifies which bot token to use from {@code TOKEN_TELEGRAM_<cityId>} env vars.
  *
  * <p>This controller is excluded from the {@code X-Api-Key} authentication filter
- * ({@link cat.complai.utilities.auth.ApiKeyAuthFilter}) since Telegram cannot send
+ * ({@link cat.complai.utilities.auth.JwtSessionAuthFilter}) since Telegram cannot send
  * custom headers. Security is provided via the {@code X-Telegram-Bot-Api-Secret-Token}
  * header validation.
  */
@@ -39,7 +39,7 @@ public class TelegramController {
     @Inject
     public TelegramController(TelegramConfiguration telegramConfig,
                               TelegramBotService botService) {
-        this(telegramConfig, botService, ApiKeyAuthFilter::isCityEnabled);
+        this(telegramConfig, botService, CityUtil::isCityEnabled);
     }
 
     // Visible for testing — accepts a custom city-enabled checker

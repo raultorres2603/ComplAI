@@ -17,16 +17,11 @@ Micronaut 4 (Java 25) → AWS Lambda, deployed via CDK. Municipal AI assistant b
 
 ## Test auth
 
-`api.key.enabled=false` in `src/test/resources/application.properties` disables the production `ApiKeyAuthFilter`. It is replaced by `TestApiKeyFilter` which accepts these test keys:
+HTTP integration tests rely on `TestJwtSessionFilter` — a `@Replaces(JwtSessionAuthFilter.class)` bean that is active for all `@MicronautTest` classes. It validates an `Authorization: Bearer <JWT>` header using a hardcoded test signing key and reads `ENABLE_CITY_<CITYID>` from system properties/env vars to determine disabled cities.
 
-| Key | City |
-|---|---|
-| `test-integration-key-elprat` | elprat |
-| `test-integration-key-testcity` | testcity |
-| `test-api-key-feedback` | elprat |
-| `test-integration-key-elprat-htmlsources` | testcity |
+Tests obtain a valid token with `TestJwtSessionFilter.createTestToken(cityId)` (expired tokens via `createExpiredTestToken(cityId)`) and send it as `Authorization: Bearer <token>`.
 
-**Gotcha:** Every `@MicronautTest` HTTP integration test must include an `X-Api-Key` header with one of these keys — otherwise the request returns 401. `GET /health`, `GET /health/startup` are excluded.
+**Gotcha:** Every `@MicronautTest` HTTP integration test must send a Bearer token from `createTestToken(...)` — otherwise the request returns 401. `GET /health`, `GET /health/startup` are excluded. The token endpoint `POST /complai/auth/token` is also excluded from the filter and authenticated via the client secret instead.
 
 ## Controller endpoint prefixes
 
@@ -38,6 +33,7 @@ Every controller is mounted under its `@Controller` base path — the full URL i
 | `OpenRouterController` | `/complai` | `POST /complai/ask`, `POST /complai/redact` |
 | `FeedbackController` | `/complai` | `POST /complai/feedback` |
 | `TelegramController` | `/telegram` | `POST /telegram/webhook/{cityId}` |
+| `TokenController` | `/complai` | `POST /complai/auth/token` |
 
 **Common pitfall:** Do not omit the `/complai` prefix when writing or calling endpoints in tests.
 

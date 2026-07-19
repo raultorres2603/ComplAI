@@ -5,7 +5,7 @@ import cat.complai.controllers.feedback.dto.FeedbackRequest;
 import cat.complai.dto.feedback.FeedbackErrorCode;
 import cat.complai.dto.feedback.FeedbackResult;
 import cat.complai.services.feedback.FeedbackPublisherService;
-import cat.complai.utilities.auth.ApiKeyAuthFilter;
+import cat.complai.utilities.auth.AuthConstants;
 import cat.complai.utilities.metrics.InteractionMetricsPublisher;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -29,7 +29,7 @@ import java.util.logging.Logger;
  *
  * <p>Security:
  * <ul>
- *   <li>API key authentication is enforced by ApiKeyAuthFilter before the controller is reached</li>
+ *   <li>JWT session-token authentication is enforced by JwtSessionAuthFilter before the controller is reached</li>
  *   <li>City context is extracted from the API key and stored in request attributes</li>
  *   <li>No OIDC identity validation is required; users self-identify via userName and idUser</li>
  * </ul>
@@ -74,8 +74,8 @@ public class FeedbackController {
      */
     @Post("/feedback")
     public HttpResponse<?> feedback(@Body FeedbackRequest request, HttpRequest<?> httpRequest) {
-        // Extract city from the API key claim (set by ApiKeyAuthFilter)
-        String city = httpRequest.getAttribute(ApiKeyAuthFilter.CITY_ATTRIBUTE, String.class)
+        // Extract city from the JWT session token (set by JwtSessionAuthFilter)
+        String city = httpRequest.getAttribute(AuthConstants.CITY_ATTRIBUTE, String.class)
                 .orElseThrow(() -> new IllegalStateException(
                         "city attribute missing from request — API key filter should have set it"));
 
