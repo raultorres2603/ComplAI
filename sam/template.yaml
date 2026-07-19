@@ -48,6 +48,10 @@ Parameters:
     Type: String
     Default: ''
     Description: Webhook secret token for Telegram bot (city 'elprat').
+  EnableCityElprat:
+    Type: String
+    Default: 'true'
+    Description: Enable/disable city 'elprat' (true/false). City returns HTTP 503 when disabled.
 Conditions:
   IsProduction: !Equals [!Ref Environment, production]
 
@@ -348,6 +352,8 @@ Resources:
           OPENROUTER_MODEL: openrouter/free
           API_KEY_ENABLED: 'true'
           API_KEY_ELPRAT: !Ref ApiKeyElprat
+          # City enable/disable — must be explicitly set to "true" to enable a city.
+          ENABLE_CITY_ELPRAT: !Ref EnableCityElprat
           # Telegram Bot — per-city token and webhook secret
           TOKEN_TELEGRAM_ELPRAT: !Ref TokenTelegramElprat
           TELEGRAM_WEBHOOK_SECRET_ELPRAT: !Ref TelegramWebhookSecretElprat
@@ -413,6 +419,8 @@ Resources:
           API_KEY_ELPRAT: !Ref ApiKeyElprat
           TOKEN_TELEGRAM_ELPRAT: !Ref TokenTelegramElprat
           TELEGRAM_WEBHOOK_SECRET_ELPRAT: !Ref TelegramWebhookSecretElprat
+          # City enable/disable
+          ENABLE_CITY_ELPRAT: !Ref EnableCityElprat
       Events:
         SQSTrigger:
           Type: SQS
@@ -480,6 +488,8 @@ Resources:
           COMPLAI_DEFAULT_CITY_ID: elprat
           # Per-city Telegram bot tokens for sending answers back
           TOKEN_TELEGRAM_ELPRAT: !Ref TokenTelegramElprat
+          # City enable/disable
+          ENABLE_CITY_ELPRAT: !Ref EnableCityElprat
       Events:
         SQSTrigger:
           Type: SQS
@@ -554,6 +564,8 @@ Resources:
           ENVIRONMENT: !Ref Environment
           API_KEY_ELPRAT: !Ref ApiKeyElprat
           AWS_SES_TO_EMAIL_ELPRAT: !Ref SesToEmailElprat
+          # City enable/disable
+          ENABLE_CITY_ELPRAT: !Ref EnableCityElprat
           NEWS_BUCKET: !Ref NewsBucket
           NEWS_REGION: !Ref LambdaRegion
           CITYINFO_BUCKET: !Ref CityInfoBucket

@@ -28,7 +28,10 @@ public enum OpenRouterErrorCode {
     // Emitted when the circuit breaker protecting OpenRouter calls is open.
     // The upstream provider is degraded and the request was rejected without
     // attempting the HTTP call.
-    CIRCUIT_OPEN(8);
+    CIRCUIT_OPEN(8),
+    // Emitted when a city is disabled via ENABLE_CITY_<CITYID> environment variable.
+    // The request is rejected with HTTP 503 Service Unavailable.
+    CITY_DISABLED(9);
 
     private final int code;
 

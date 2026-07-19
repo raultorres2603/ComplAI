@@ -3,16 +3,22 @@ package cat.complai.controllers.telegram;
 import cat.complai.config.TelegramConfiguration;
 import cat.complai.controllers.telegram.dto.TelegramUpdate;
 import cat.complai.services.telegram.TelegramBotService;
+import cat.complai.utilities.auth.ApiKeyAuthFilter;
+import io.micronaut.context.annotation.Parameter;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Status;
-import io.micronaut.http.HttpStatus;
 import jakarta.inject.Inject;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
 
+import java.util.function.Predicate;
 import java.util.logging.Logger;
 
 /**
@@ -32,13 +38,22 @@ public class TelegramController {
 
     private final TelegramConfiguration telegramConfig;
     private final TelegramBotService botService;
+    private final Predicate<String> cityEnabledChecker;
     private final Logger logger = Logger.getLogger(TelegramController.class.getName());
 
     @Inject
     public TelegramController(TelegramConfiguration telegramConfig,
                               TelegramBotService botService) {
+        this(telegramConfig, botService, ApiKeyAuthFilter::isCityEnabled);
+    }
+
+    // Visible for testing — accepts a custom city-enabled checker
+    public TelegramController(TelegramConfiguration telegramConfig,
+                              TelegramBotService botService,
+                              Predicate<String> cityEnabledChecker) {
         this.telegramConfig = telegramConfig;
         this.botService = botService;
+        this.cityEnabledChecker = cityEnabledChecker;
     }
 
     /**
@@ -62,6 +77,13 @@ public class TelegramController {
         if (cityId == null || cityId.isBlank()) {
             logger.warning("Telegram webhook called with missing cityId");
             return HttpResponse.badRequest();
+        }
+
+        // Check if city is enabled via ENABLE_CITY_<CITYID> environment variable.
+        // Defaults to disabled when the variable is absent.
+        if (!cityEnabledChecker.test(cityId)) {
+            logger.info(() -> "City disabled for Telegram — cityId=" + cityId);
+            return HttpResponse.status(HttpStatus.SERVICE_UNAVAILABLE);
         }
 
         // Verify webhook secret token if configured
