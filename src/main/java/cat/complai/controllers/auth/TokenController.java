@@ -6,6 +6,7 @@ import cat.complai.utilities.auth.SessionTokenConfig;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import io.jsonwebtoken.Jwts;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -42,6 +43,7 @@ import java.util.logging.Logger;
  *   <li>503 Service Unavailable: City is disabled</li>
  * </ul>
  */
+@Requires(property = "api.key.enabled")
 @Controller("/complai")
 public class TokenController {
 

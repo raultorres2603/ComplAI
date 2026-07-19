@@ -1,6 +1,7 @@
 package cat.complai.utilities.auth;
 
 import io.jsonwebtoken.security.Keys;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 import jakarta.inject.Singleton;
 
@@ -19,6 +20,7 @@ import java.util.logging.Logger;
  *
  * <p>Fails fast at startup if any required value is missing or invalid.
  */
+@Requires(property = "api.key.enabled")
 @Singleton
 public class SessionTokenConfig {
 
