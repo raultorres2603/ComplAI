@@ -21,7 +21,23 @@ Parameters:
   ApiKeyElprat:
     Type: String
     Default: ''
-    Description: API key for city 'elprat'. Generate with ApiKeyGenerator CLI.
+    Description: API key for city 'elprat' — used for SES city discovery only (not for auth).
+  JwtSecret:
+    Type: String
+    Default: ''
+    Description: Base64-encoded HMAC-SHA256 key (>= 256 bits) for signing session tokens.
+  ClientSecretHash:
+    Type: String
+    Default: ''
+    Description: SHA-256 hex hash of the mobile client secret.
+  TokenRateLimitRpm:
+    Type: String
+    Default: '10'
+    Description: Per-IP rate limit on the token endpoint (requests per minute).
+  SessionTokenLifetimeSeconds:
+    Type: String
+    Default: '900'
+    Description: Session token lifetime in seconds (default 15 min).
   SesFromEmail:
     Type: String
     Default: ''
@@ -351,9 +367,13 @@ Resources:
           OPENROUTER_MAX_RETRIES: "3"
           OPENROUTER_MODEL: openrouter/free
           API_KEY_ENABLED: 'true'
-          API_KEY_ELPRAT: !Ref ApiKeyElprat
           # City enable/disable — must be explicitly set to "true" to enable a city.
           ENABLE_CITY_ELPRAT: !Ref EnableCityElprat
+          # Session token JWT auth
+          JWT_SECRET: !Ref JwtSecret
+          CLIENT_SECRET_HASH: !Ref ClientSecretHash
+          TOKEN_RATE_LIMIT_REQUESTS_PER_MINUTE: !Ref TokenRateLimitRpm
+          SESSION_TOKEN_LIFETIME_SECONDS: !Ref SessionTokenLifetimeSeconds
           # Telegram Bot — per-city token and webhook secret
           TOKEN_TELEGRAM_ELPRAT: !Ref TokenTelegramElprat
           TELEGRAM_WEBHOOK_SECRET_ELPRAT: !Ref TelegramWebhookSecretElprat

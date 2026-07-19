@@ -41,10 +41,10 @@ public class SessionTokenConfig {
 
         byte[] keyBytes;
         try {
-            keyBytes = java.util.Base64.getDecoder().decode(jwtSecret);
+            keyBytes = java.util.Base64.getUrlDecoder().decode(jwtSecret);
         } catch (IllegalArgumentException e) {
             throw new IllegalStateException(
-                    "jwt.secret is not valid base64. Set JWT_SECRET to a base64-encoded key.", e);
+                    "jwt.secret is not valid base64url. Set JWT_SECRET to a base64 or base64url-encoded key.", e);
         }
 
         if (keyBytes.length < 32) {

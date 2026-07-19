@@ -1,0 +1,48 @@
+meta {
+  name: Get Session Token
+  type: http
+  seq: 1
+  tags: [
+    auth
+  ]
+}
+
+post {
+  url: {{complaiPath}}/auth/token
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "clientSecret": "{{clientSecret}}",
+    "cityId": "{{cityId}}"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 200 && res.getBody().token) {
+    bru.setVar("jwtToken", res.getBody().token);
+    console.log("Token acquired — expires in " + res.getBody().expiresIn + "s");
+  }
+}
+
+tests {
+  test("HTTP status == 200", () => {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("Response contains token", () => {
+    expect(res.getBody().token).to.not.be.empty;
+  });
+  test("Response contains expiresIn", () => {
+    expect(res.getBody().expiresIn).to.be.greaterThan(0);
+  });
+  test("Response contains cityId", () => {
+    expect(res.getBody().cityId).to.equal("{{cityId}}");
+  });
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

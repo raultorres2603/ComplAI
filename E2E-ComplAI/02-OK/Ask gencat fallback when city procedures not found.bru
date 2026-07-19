@@ -54,27 +54,21 @@ script:post-response {
   bru.setVar("parsedResponse", parsed);
 }
 
-settings {
-  encodeUrl: true
-  timeout: 0
-  stream: true
-}
-
 tests {
   test("HTTP 200 when city procedures return empty", () => {
     expect(res.getStatus()).to.equal(200);
   });
-
+  
   test("Response is successful", () => {
     const parsed = bru.getVar("parsedResponse");
     expect(parsed.success).to.equal(true);
   });
-
+  
   test("Response contains message text", () => {
     const parsed = bru.getVar("parsedResponse");
     expect(parsed.message).to.not.be.empty;
   });
-
+  
   test("Should return gencat procedures as fallback", () => {
     const parsed = bru.getVar("parsedResponse");
     // Either has a message or should have gencat source
@@ -85,4 +79,9 @@ tests {
       console.log("Fallback to gencat source: " + hasGencatSource);
     }
   });
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
 }

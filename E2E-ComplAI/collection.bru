@@ -2,6 +2,50 @@ auth {
   mode: none
 }
 
-headers {
-  X-Api-Key: {{apiKey}}
+script:pre-request {
+  // Skip token acquisition for the /auth/token endpoint itself (it's excluded from JwtSessionAuthFilter).
+  if (req.getUrl().includes("/auth/token")) {
+    return;
+  }
+
+  // Auto-acquire JWT session token and attach it to every other request.
+  let jwtToken = bru.getVar("jwtToken");
+
+  if (!jwtToken) {
+    const clientSecret = bru.getEnvVar("clientSecret");
+    const cityId = bru.getEnvVar("cityId");
+    const tokenUrl = bru.getEnvVar("path") + "/complai/auth/token";
+
+    const response = await bru.sendRequest({
+      method: 'post',
+      url: tokenUrl,
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        clientSecret: clientSecret,
+        cityId: cityId
+      })
+    });
+
+    if (response.status === 200 && response.body.token) {
+      jwtToken = response.body.token;
+      bru.setVar("jwtToken", jwtToken);
+      console.log("Token acquired — expires in " + response.body.expiresIn + "s");
+    } else {
+      console.error("Token acquisition failed — status: " + response.status);
+      throw new Error("Failed to acquire JWT token");
+    }
+  }
+
+  // Attach the Bearer token to the outgoing request
+  req.headers['Authorization'] = 'Bearer ' + jwtToken;
+}
+
+script:post-response {
+  // Clear cached token on 401 so next request auto-refreshes.
+  if (res.getStatus() === 401) {
+    bru.setVar("jwtToken", null);
+    console.log("401 received — token cleared for refresh.");
+  }
 }
