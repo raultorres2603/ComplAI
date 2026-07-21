@@ -38,7 +38,7 @@ tests {
     expect(res.getBody().expiresIn).to.be.greaterThan(0);
   });
   test("Response contains cityId", () => {
-    expect(res.getBody().cityId).to.equal("{{cityId}}");
+    expect(res.getBody().cityId).to.equal(bru.getEnvVar("cityId"));
   });
 }
 
