@@ -4,7 +4,8 @@ auth {
 
 script:pre-request {
   // Skip token acquisition for the /auth/token endpoint itself (it's excluded from JwtSessionAuthFilter).
-  if (req.getUrl().includes("/auth/token")) {
+  const url = req.getUrl();
+  if (url.includes("/auth/token")) {
     return;
   }
 
@@ -14,32 +15,36 @@ script:pre-request {
   if (!jwtToken) {
     const clientSecret = bru.getEnvVar("clientSecret");
     const cityId = bru.getEnvVar("cityId");
-    const tokenUrl = bru.getEnvVar("path") + "/complai/auth/token";
+    const path = bru.getEnvVar("path");
+    const tokenUrl = path + "/complai/auth/token";
+
+    console.log("Acquiring token from: " + tokenUrl);
 
     const response = await bru.sendRequest({
-      method: 'post',
+      method: "POST",
       url: tokenUrl,
       headers: {
-        'Content-Type': 'application/json'
+        "Content-Type": "application/json"
       },
-      body: JSON.stringify({
+      data: {
         clientSecret: clientSecret,
         cityId: cityId
-      })
+      }
     });
 
-    if (response.status === 200 && response.body.token) {
-      jwtToken = response.body.token;
+    const body = response.data;
+    if (response.status === 200 && body && body.token) {
+      jwtToken = body.token;
       bru.setVar("jwtToken", jwtToken);
-      console.log("Token acquired — expires in " + response.body.expiresIn + "s");
+      console.log("Token acquired — expires in " + body.expiresIn + "s");
     } else {
-      console.error("Token acquisition failed — status: " + response.status);
-      throw new Error("Failed to acquire JWT token");
+      console.error("Token acquisition failed — status: " + response.status + " body: " + JSON.stringify(body));
+      throw new Error("Failed to acquire JWT token: " + (body && body.message ? body.message : "unknown error"));
     }
   }
 
   // Attach the Bearer token to the outgoing request
-  req.headers['Authorization'] = 'Bearer ' + jwtToken;
+  req.setHeader("Authorization", "Bearer " + jwtToken);
 }
 
 script:post-response {
