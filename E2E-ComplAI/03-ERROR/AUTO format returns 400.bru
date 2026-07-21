@@ -1,5 +1,5 @@
 meta {
-  name: AUTO format returns 400
+  name: AUTO format returns 202 (resolved to PDF)
   type: http
   seq: 7
   tags: [
@@ -22,14 +22,18 @@ body:json {
 }
 
 tests {
-  test("HTTP status is 400", () => {
-    expect(res.getStatus()).to.equal(400);
+  test("HTTP status is 202 Accepted (AUTO resolved to PDF)", () => {
+    expect(res.getStatus()).to.equal(202);
   });
-  test("Error code is VALIDATION", () => {
-    expect(res.getBody().errorCode).to.equal(5);
+  test("Response body has success: true", () => {
+    expect(res.getBody().success).to.equal(true);
   });
-  test("Success is false", () => {
-    expect(res.getBody().success).to.equal(false);
+  test("Response body contains a pdfUrl", () => {
+    expect(res.getBody().pdfUrl).to.not.be.empty;
+    expect(res.getBody().pdfUrl).to.include("complaint.pdf");
+  });
+  test("errorCode is 0 (NONE)", () => {
+    expect(res.getBody().errorCode).to.equal(0);
   });
 }
 
