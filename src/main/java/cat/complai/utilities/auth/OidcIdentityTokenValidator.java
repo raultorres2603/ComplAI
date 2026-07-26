@@ -38,9 +38,10 @@ import java.util.logging.Logger;
  * variable is required. Cities with {@code "enabled": false} are skipped at startup: their
  * JWKS endpoint is never fetched and {@link #isEnabledForCity(String)} returns {@code false}.
  *
- * <p>The city identifier is taken from the already-validated ComplAI Bearer JWT
- * ({@code city} claim), which {@link JwtAuthFilter} sets as a request attribute before the
- * controller is reached. This keeps the OIDC config lookup independent of the unverified
+ * <p>The city identifier is taken from the request attribute set by
+ * {@link JwtSessionAuthFilter} ({@code city} attribute), which the filter
+ * resolves from the validated session JWT before the controller is reached.
+ * This keeps the OIDC config lookup independent of the unverified
  * OIDC token itself.
  *
  * <p>This bean only loads when {@code jwt.secret} is configured — i.e. only on the API
@@ -59,7 +60,7 @@ import java.util.logging.Logger;
  *
  * <p>All failures are wrapped in {@link IdentityTokenValidationException}.
  */
-// Guard mirrors ApiKeyAuthFilter: only load on the API Lambda (API_KEY_ENABLED present).
+// Guard mirrors JwtSessionAuthFilter: only load on the API Lambda (API_KEY_ENABLED present).
 // The worker Lambda has no API_KEY_ENABLED and must never attempt a JWKS fetch at startup.
 @Requires(property = "api.key.enabled")
 @Singleton
@@ -127,11 +128,11 @@ public class OidcIdentityTokenValidator {
      * Validates the OIDC ID token using the OIDC configuration for {@code cityId} and
      * extracts the citizen's verified identity.
      *
-     * <p>The {@code cityId} must be the value from the validated ComplAI Bearer JWT
-     * ({@code city} claim) — not from the OIDC token itself.
+     * <p>The {@code cityId} must be the value from the request attribute set by
+     * {@link JwtSessionAuthFilter} — not from the OIDC token itself.
      *
      * @param token  the raw JWT string from the {@code X-Identity-Token} header
-     * @param cityId the city from the validated ComplAI Bearer JWT {@code city} claim
+     * @param cityId the city from the request attribute set by {@link JwtSessionAuthFilter}
      * @return a fully-populated {@link VerifiedCitizenIdentity} on success
      * @throws IdentityTokenValidationException on any validation failure
      */

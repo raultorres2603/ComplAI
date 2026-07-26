@@ -53,12 +53,6 @@ script:post-response {
   console.log("Ask SSE parsed — message length:", parsed.message.length, "success:", parsed.success);
 }
 
-settings {
-  encodeUrl: true
-  timeout: 0
-  stream: true
-}
-
 tests {
   test("HTTP status != 500", () => {
     expect(res.getStatus()).to.be.lessThan(500);
@@ -75,4 +69,9 @@ tests {
     const parsed = bru.getVar("parsedResponse");
     expect(parsed.errorCode).to.equal(0);
   });
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
 }

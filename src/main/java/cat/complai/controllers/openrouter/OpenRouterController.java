@@ -18,7 +18,7 @@ import cat.complai.utilities.s3.S3PdfUploader;
 import cat.complai.utilities.sqs.SqsComplaintPublisher;
 import cat.complai.dto.sqs.RedactSqsMessage;
 import cat.complai.exceptions.IdentityTokenValidationException;
-import cat.complai.utilities.auth.ApiKeyAuthFilter;
+import cat.complai.utilities.auth.AuthConstants;
 import cat.complai.utilities.auth.OidcIdentityTokenValidator;
 import cat.complai.utilities.auth.VerifiedCitizenIdentity;
 import io.micronaut.core.annotation.Nullable;
@@ -57,7 +57,7 @@ import java.util.logging.Logger;
  *
  * <p>
  * Authentication is enforced by
- * {@link cat.complai.utilities.auth.ApiKeyAuthFilter}
+ * {@link cat.complai.utilities.auth.JwtSessionAuthFilter}
  * before this
  * controller is reached. The city identifier is read from the {@code city}
  * request attribute
@@ -70,7 +70,7 @@ public class OpenRouterController {
         private final SqsComplaintPublisher sqsPublisher;
         private final S3PdfUploader s3PdfUploader;
         private final InteractionMetricsPublisher metricsPublisher;
-        // Null when jwt.secret is not configured (worker Lambda). When non-null,
+        // Null when api.key.enabled is not set (worker Lambda). When non-null,
         // individual
         // cities may still have verification disabled — check isEnabledForCity() before
         // use.
@@ -93,7 +93,7 @@ public class OpenRouterController {
         @Post("/ask")
         @Produces({ MediaType.TEXT_EVENT_STREAM, MediaType.APPLICATION_JSON })
         public HttpResponse<?> ask(@Body AskRequest request, HttpRequest<?> httpRequest) {
-                String cityId = httpRequest.getAttribute(ApiKeyAuthFilter.CITY_ATTRIBUTE, String.class)
+                String cityId = httpRequest.getAttribute(AuthConstants.CITY_ATTRIBUTE, String.class)
                                 .orElseThrow(() -> new IllegalStateException(
                                                 "city attribute missing from request — API key filter should have set it"));
                 String conversationId = request != null ? request.getConversationId() : null;
@@ -159,7 +159,7 @@ public class OpenRouterController {
         @Post("/redact")
         @Produces({ MediaType.APPLICATION_JSON })
         public HttpResponse<?> redact(@Body RedactRequest request, HttpRequest<?> httpRequest) {
-                String cityId = httpRequest.getAttribute(ApiKeyAuthFilter.CITY_ATTRIBUTE, String.class)
+                String cityId = httpRequest.getAttribute(AuthConstants.CITY_ATTRIBUTE, String.class)
                                 .orElseThrow(() -> new IllegalStateException(
                                                 "city attribute missing from request — API key filter should have set it"));
                 String conversationId = request != null ? request.getConversationId() : null;

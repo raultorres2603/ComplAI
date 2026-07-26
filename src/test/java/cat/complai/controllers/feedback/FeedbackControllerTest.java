@@ -5,6 +5,7 @@ import cat.complai.controllers.feedback.dto.FeedbackRequest;
 import cat.complai.dto.feedback.FeedbackErrorCode;
 import cat.complai.dto.feedback.FeedbackResult;
 import cat.complai.services.feedback.FeedbackPublisherService;
+import cat.complai.utilities.auth.TestJwtSessionFilter;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -27,12 +28,10 @@ import static org.junit.jupiter.api.Assertions.*;
  * <p>
  * Tests the HTTP endpoint using @MicronautTest with a mocked
  * FeedbackPublisherService.
- * Validates request/response handling, error codes, and API key enforcement.
+ * Validates request/response handling, error codes, and JWT session-token enforcement.
  */
 @MicronautTest(environments = { "test", "feedback-test" })
 public class FeedbackControllerTest {
-
-    private static final String TEST_API_KEY = "test-api-key-feedback";
 
     @Inject
     @Client("/")
@@ -42,7 +41,7 @@ public class FeedbackControllerTest {
     void feedback_validRequest_returns202Accepted() {
         FeedbackRequest req = new FeedbackRequest("Joan Garcia", "12345678A", "Noise from airport");
         HttpRequest<FeedbackRequest> httpReq = HttpRequest.POST("/complai/feedback", req)
-                .header("X-Api-Key", TEST_API_KEY);
+                .header("Authorization", "Bearer " + TestJwtSessionFilter.createTestToken("elprat"));
 
         HttpResponse<FeedbackAcceptedDto> resp = client.toBlocking().exchange(httpReq, FeedbackAcceptedDto.class);
 
@@ -54,10 +53,10 @@ public class FeedbackControllerTest {
     }
 
     @Test
-    void feedback_missingApiKey_returns401Unauthorized() {
+    void feedback_missingToken_returns401Unauthorized() {
         FeedbackRequest req = new FeedbackRequest("Joan Garcia", "12345678A", "Message");
         HttpRequest<FeedbackRequest> httpReq = HttpRequest.POST("/complai/feedback", req);
-        // No X-Api-Key header
+        // No Authorization header
 
         try {
             client.toBlocking().exchange(httpReq, FeedbackAcceptedDto.class);
@@ -68,10 +67,10 @@ public class FeedbackControllerTest {
     }
 
     @Test
-    void feedback_invalidApiKey_returns401Unauthorized() {
+    void feedback_invalidToken_returns401Unauthorized() {
         FeedbackRequest req = new FeedbackRequest("Joan Garcia", "12345678A", "Message");
         HttpRequest<FeedbackRequest> httpReq = HttpRequest.POST("/complai/feedback", req)
-                .header("X-Api-Key", "invalid-api-key");
+                .header("Authorization", "Bearer invalid-token");
 
         try {
             client.toBlocking().exchange(httpReq, FeedbackAcceptedDto.class);
@@ -85,7 +84,7 @@ public class FeedbackControllerTest {
     void feedback_missingUserName_returns400ValidationError() {
         FeedbackRequest req = new FeedbackRequest(null, "12345678A", "Message");
         HttpRequest<FeedbackRequest> httpReq = HttpRequest.POST("/complai/feedback", req)
-                .header("X-Api-Key", TEST_API_KEY);
+                .header("Authorization", "Bearer " + TestJwtSessionFilter.createTestToken("elprat"));
 
         try {
             client.toBlocking().exchange(httpReq, FeedbackAcceptedDto.class);
@@ -103,7 +102,7 @@ public class FeedbackControllerTest {
     void feedback_missingIdUser_returns400ValidationError() {
         FeedbackRequest req = new FeedbackRequest("Joan Garcia", null, "Message");
         HttpRequest<FeedbackRequest> httpReq = HttpRequest.POST("/complai/feedback", req)
-                .header("X-Api-Key", TEST_API_KEY);
+                .header("Authorization", "Bearer " + TestJwtSessionFilter.createTestToken("elprat"));
 
         try {
             client.toBlocking().exchange(httpReq, FeedbackAcceptedDto.class);
@@ -117,7 +116,7 @@ public class FeedbackControllerTest {
     void feedback_missingMessage_returns400ValidationError() {
         FeedbackRequest req = new FeedbackRequest("Joan Garcia", "12345678A", null);
         HttpRequest<FeedbackRequest> httpReq = HttpRequest.POST("/complai/feedback", req)
-                .header("X-Api-Key", TEST_API_KEY);
+                .header("Authorization", "Bearer " + TestJwtSessionFilter.createTestToken("elprat"));
 
         try {
             client.toBlocking().exchange(httpReq, FeedbackAcceptedDto.class);
@@ -132,7 +131,7 @@ public class FeedbackControllerTest {
         // This test requires the mock to return an error result
         FeedbackRequest req = new FeedbackRequest("Joan Garcia", "12345678A", "Message");
         HttpRequest<FeedbackRequest> httpReq = HttpRequest.POST("/complai/feedback", req)
-                .header("X-Api-Key", TEST_API_KEY);
+                .header("Authorization", "Bearer " + TestJwtSessionFilter.createTestToken("elprat"));
 
         // The mock FeedbackPublisherService is configured below to simulate this
         // scenario
@@ -152,11 +151,11 @@ public class FeedbackControllerTest {
     }
 
     @Test
-    void feedback_cityIsProvidedByApiKey() {
-        // Verify that the city resolved from the API key is passed to the service
+    void feedback_cityIsProvidedByJwt() {
+        // Verify that the city resolved from the JWT is passed to the service
         FeedbackRequest req = new FeedbackRequest("Joan", "123", "Message");
         HttpRequest<FeedbackRequest> httpReq = HttpRequest.POST("/complai/feedback", req)
-                .header("X-Api-Key", TEST_API_KEY);
+                .header("Authorization", "Bearer " + TestJwtSessionFilter.createTestToken("elprat"));
 
         HttpResponse<FeedbackAcceptedDto> resp = client.toBlocking().exchange(httpReq, FeedbackAcceptedDto.class);
 
@@ -168,7 +167,7 @@ public class FeedbackControllerTest {
     void feedback_responseDtoStructure() {
         FeedbackRequest req = new FeedbackRequest("Test User", "87654321B", "Test feedback");
         HttpRequest<FeedbackRequest> httpReq = HttpRequest.POST("/complai/feedback", req)
-                .header("X-Api-Key", TEST_API_KEY);
+                .header("Authorization", "Bearer " + TestJwtSessionFilter.createTestToken("elprat"));
 
         HttpResponse<FeedbackAcceptedDto> resp = client.toBlocking().exchange(httpReq, FeedbackAcceptedDto.class);
 
@@ -183,7 +182,7 @@ public class FeedbackControllerTest {
     void feedback_blankFields_returns400ValidationError() {
         FeedbackRequest req = new FeedbackRequest("  ", "12345678A", "Message");
         HttpRequest<FeedbackRequest> httpReq = HttpRequest.POST("/complai/feedback", req)
-                .header("X-Api-Key", TEST_API_KEY);
+                .header("Authorization", "Bearer " + TestJwtSessionFilter.createTestToken("elprat"));
 
         try {
             client.toBlocking().exchange(httpReq, FeedbackAcceptedDto.class);

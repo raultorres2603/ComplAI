@@ -1,6 +1,6 @@
 package cat.complai.utilities.logging;
 
-import cat.complai.utilities.auth.ApiKeyAuthFilter;
+import cat.complai.utilities.auth.AuthConstants;
 import io.micronaut.http.MutableHttpRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -29,14 +29,14 @@ class CityIdLoggingFilterTest {
 
     @Test
     void filterReturnsNull() {
-        when(request.getAttribute(ApiKeyAuthFilter.CITY_ATTRIBUTE, String.class))
+        when(request.getAttribute(AuthConstants.CITY_ATTRIBUTE, String.class))
                 .thenReturn(Optional.empty());
         assertNull(filter.filter(request));
     }
 
     @Test
     void filterWithCityId_setsMdc() {
-        when(request.getAttribute(ApiKeyAuthFilter.CITY_ATTRIBUTE, String.class))
+        when(request.getAttribute(AuthConstants.CITY_ATTRIBUTE, String.class))
                 .thenReturn(Optional.of("elprat"));
 
         assertNull(filter.filter(request));
@@ -45,7 +45,7 @@ class CityIdLoggingFilterTest {
 
     @Test
     void filterWithoutCityId_mdcIsEmpty() {
-        when(request.getAttribute(ApiKeyAuthFilter.CITY_ATTRIBUTE, String.class))
+        when(request.getAttribute(AuthConstants.CITY_ATTRIBUTE, String.class))
                 .thenReturn(Optional.empty());
 
         filter.filter(request);
@@ -56,7 +56,7 @@ class CityIdLoggingFilterTest {
     void filterClearsPreviousMdcBeforeSettingNewValue() {
         MDC.put("cityId", "oldcity");
 
-        when(request.getAttribute(ApiKeyAuthFilter.CITY_ATTRIBUTE, String.class))
+        when(request.getAttribute(AuthConstants.CITY_ATTRIBUTE, String.class))
                 .thenReturn(Optional.of("newcity"));
 
         filter.filter(request);
@@ -67,7 +67,7 @@ class CityIdLoggingFilterTest {
     void filterWithCityIdClearsPreviousMdcWhenNewCityIsBlank() {
         MDC.put("cityId", "oldcity");
 
-        when(request.getAttribute(ApiKeyAuthFilter.CITY_ATTRIBUTE, String.class))
+        when(request.getAttribute(AuthConstants.CITY_ATTRIBUTE, String.class))
                 .thenReturn(Optional.of("   "));
 
         filter.filter(request);

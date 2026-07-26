@@ -38,7 +38,7 @@ class CorsFilterTest {
                 response.getHeaders().findFirst("Access-Control-Allow-Origin").orElse(null));
         assertEquals("GET, POST, PUT, DELETE, OPTIONS",
                 response.getHeaders().findFirst("Access-Control-Allow-Methods").orElse(null));
-        assertEquals("Content-Type, Authorization, X-Api-Key",
+        assertEquals("Content-Type, Authorization",
                 response.getHeaders().findFirst("Access-Control-Allow-Headers").orElse(null));
         assertEquals("3600",
                 response.getHeaders().findFirst("Access-Control-Max-Age").orElse(null));

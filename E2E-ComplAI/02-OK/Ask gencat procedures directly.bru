@@ -53,27 +53,21 @@ script:post-response {
   bru.setVar("parsedResponse", parsed);
 }
 
-settings {
-  encodeUrl: true
-  timeout: 0
-  stream: true
-}
-
 tests {
   test("HTTP 200 on gencat query", () => {
     expect(res.getStatus()).to.equal(200);
   });
-
+  
   test("Response is successful", () => {
     const parsed = bru.getVar("parsedResponse");
     expect(parsed.success).to.equal(true);
   });
-
+  
   test("Response contains message text", () => {
     const parsed = bru.getVar("parsedResponse");
     expect(parsed.message).to.not.be.empty;
   });
-
+  
   test("Sources include gencat URL when gencat is used", () => {
     const parsed = bru.getVar("parsedResponse");
     if (parsed.sources && parsed.sources.length > 0) {
@@ -84,4 +78,9 @@ tests {
       console.log("Has gencat source: " + hasGencatSource);
     }
   });
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
 }
