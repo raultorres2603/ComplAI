@@ -1,5 +1,9 @@
 package cat.complai.utilities.s3;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -14,10 +18,6 @@ import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequ
 
 import java.lang.reflect.Field;
 import java.net.URL;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class S3PdfUploaderTest {

@@ -1,18 +1,19 @@
 package cat.complai.services.stadistics;
-import java.net.URI;
-
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import java.net.MalformedURLException;
-import java.time.Instant;
-import java.util.ArrayList;
+
+import cat.complai.services.stadistics.models.ComplaintFile;
+import cat.complai.services.stadistics.models.FeedbackFile;
+import cat.complai.services.stadistics.models.StadisticsModel.MonthlyData;
+import cat.complai.services.stadistics.models.StadisticsModel;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import cat.complai.services.stadistics.models.ComplaintFile;
-import cat.complai.services.stadistics.models.FeedbackFile;
-import cat.complai.services.stadistics.models.StadisticsModel;
-import cat.complai.services.stadistics.models.StadisticsModel.MonthlyData;
+
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.time.Instant;
+import java.util.ArrayList;
 
 @DisplayName("StadisticsHtmlRenderer Tests")
 class StadisticsHtmlRendererTest {

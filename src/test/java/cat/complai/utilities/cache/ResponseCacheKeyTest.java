@@ -1,9 +1,9 @@
 package cat.complai.utilities.cache;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 @DisplayName("ResponseCacheKey Tests")
 class ResponseCacheKeyTest {

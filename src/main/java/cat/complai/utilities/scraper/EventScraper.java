@@ -6,7 +6,6 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.jspecify.annotations.NonNull;
-
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -41,7 +40,7 @@ import java.util.logging.Logger;
  *
  * <p>
  * Usage:
- * 
+ *
  * <pre>
  *   EVENTS_BUCKET=complai-events-development \
  *   java -cp complai-all.jar cat.complai.utilities.scraper.EventScraper elprat
@@ -110,11 +109,13 @@ public class EventScraper {
                 var eventLinks = doc.select(mapping.events.crawl.eventLinkSelector);
                 for (Element link : eventLinks) {
                     String href = link.absUrl("href");
-                    if (href.isBlank())
+                    if (href.isBlank()) {
                         continue;
+                    }
                     if (mapping.events.crawl.eventDetailExcludePattern != null
-                            && href.contains(mapping.events.crawl.eventDetailExcludePattern))
+                            && href.contains(mapping.events.crawl.eventDetailExcludePattern)) {
                         continue;
+                    }
                     if (detailUrls.add(href)) {
                         eventsOnPage++;
                     }
@@ -134,10 +135,12 @@ public class EventScraper {
         // Crawl external event venue seed sites (single-page, no pagination)
         if (mapping.events.seedSites != null) {
             for (ProcedureScraper.EventSeedSite seed : mapping.events.seedSites) {
-                if (seed.baseUrl == null || seed.baseUrl.isBlank())
+                if (seed.baseUrl == null || seed.baseUrl.isBlank()) {
                     continue;
-                if (seed.eventLinkSelector == null || seed.eventLinkSelector.isBlank())
+                }
+                if (seed.eventLinkSelector == null || seed.eventLinkSelector.isBlank()) {
                     continue;
+                }
                 try {
                     Document doc = fetchDocument(seed.baseUrl);
                     var seedLinks = doc.select(seed.eventLinkSelector);
@@ -218,8 +221,9 @@ public class EventScraper {
             String url, ProcedureScraper.ScraperMapping mapping) {
         if (mapping.events.seedSites != null) {
             for (ProcedureScraper.EventSeedSite seed : mapping.events.seedSites) {
-                if (seed.fields == null || seed.fields.isEmpty())
+                if (seed.fields == null || seed.fields.isEmpty()) {
                     continue;
+                }
                 try {
                     String seedHost = new java.net.URI(seed.baseUrl).getHost();
                     String urlHost = new java.net.URI(url).getHost();
@@ -274,8 +278,9 @@ public class EventScraper {
             for (Element el : elements) {
                 String text = el.text().trim();
                 if (!text.isEmpty()) {
-                    if (!sb.isEmpty())
+                    if (!sb.isEmpty()) {
                         sb.append("\n");
+                    }
                     sb.append(text);
                 }
             }
@@ -288,13 +293,16 @@ public class EventScraper {
 
     // Package-private for unit testing.
     static boolean shouldSkip(String title, ProcedureScraper.SkipConfig skip) {
-        if (title == null || title.isBlank())
+        if (title == null || title.isBlank()) {
             return true;
-        if (skip == null || skip.whenTitleEmptyOrEquals == null)
+        }
+        if (skip == null || skip.whenTitleEmptyOrEquals == null) {
             return false;
+        }
         for (String forbidden : skip.whenTitleEmptyOrEquals) {
-            if (title.equalsIgnoreCase(forbidden))
+            if (title.equalsIgnoreCase(forbidden)) {
                 return true;
+            }
         }
         return false;
     }

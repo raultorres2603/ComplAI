@@ -1,24 +1,25 @@
 package cat.complai.controllers.openrouter;
 
-import cat.complai.utilities.http.HttpWrapper;
-import cat.complai.exceptions.OpenRouterStreamingException;
+import static org.junit.jupiter.api.Assertions.*;
+
 import cat.complai.dto.http.HttpDto;
 import cat.complai.dto.http.OpenRouterStreamStartResult;
 import cat.complai.dto.openrouter.OpenRouterErrorCode;
 import cat.complai.dto.openrouter.OpenRouterPublicDto;
 import cat.complai.dto.openrouter.OpenRouterResponseDto;
 import cat.complai.dto.openrouter.Source;
+import cat.complai.dto.sqs.RedactSqsMessage;
+import cat.complai.exceptions.OpenRouterStreamingException;
 import cat.complai.services.openrouter.IOpenRouterService;
 import cat.complai.services.openrouter.cache.ResponseCacheService;
+import cat.complai.utilities.http.HttpWrapper;
 import cat.complai.utilities.s3.S3PdfUploader;
 import cat.complai.utilities.sqs.SqsComplaintPublisher;
-import cat.complai.dto.sqs.RedactSqsMessage;
-
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.annotation.Client;
-import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import io.micronaut.test.annotation.MockBean;
+import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -31,8 +32,6 @@ import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 @MicronautTest(environments = { "test", "openrouter-test" })
 @DisplayName("ask() Endpoint HTML Formatting and Sources Integration Tests")

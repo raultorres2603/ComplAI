@@ -1,5 +1,8 @@
 package cat.complai.controllers.home;
 
+import static org.junit.jupiter.api.Assertions.*;
+
+import cat.complai.dto.home.HealthDto;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.annotation.Client;
@@ -8,10 +11,6 @@ import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-
-import cat.complai.dto.home.HealthDto;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Integration tests measuring cold-start latency improvements from lazy RAG

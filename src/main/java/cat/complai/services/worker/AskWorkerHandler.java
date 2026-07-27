@@ -36,7 +36,9 @@ public class AskWorkerHandler extends MicronautRequestHandler<SQSEvent, SQSBatch
     private boolean initialized = false;
 
     private void ensureInitialized() {
-        if (initialized) return;
+        if (initialized) {
+            return;
+        }
         openRouterService = getApplicationContext().getBean(IOpenRouterService.class);
         telegramConfig = getApplicationContext().getBean(TelegramConfiguration.class);
         mapper = getApplicationContext().getBean(ObjectMapper.class);

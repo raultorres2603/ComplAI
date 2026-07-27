@@ -1,9 +1,8 @@
 package cat.complai.utilities.auth;
 
+import cat.complai.exceptions.IdentityTokenValidationException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-
-import cat.complai.exceptions.IdentityTokenValidationException;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;

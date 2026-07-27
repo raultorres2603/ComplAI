@@ -1,32 +1,32 @@
 package cat.complai.services.stadistics;
 
-import java.time.Duration;
-import java.time.Instant;
-import java.time.YearMonth;
-import java.time.ZoneId;
-import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import cat.complai.dto.openrouter.OpenRouterResponseDto;
 import cat.complai.exceptions.ses.CloudWatchLogsException;
 import cat.complai.services.openrouter.IOpenRouterService;
 import cat.complai.services.stadistics.models.ComplaintFile;
 import cat.complai.services.stadistics.models.FeedbackFile;
 import cat.complai.services.stadistics.models.StadisticsModel;
-import cat.complai.services.stadistics.models.StadisticsModel.MonthlyData;
 import cat.complai.services.stadistics.models.StadisticsModel.ComparisonData;
+import cat.complai.services.stadistics.models.StadisticsModel.MonthlyData;
 import cat.complai.utilities.metrics.InteractionMetricsPublisher;
 import cat.complai.utilities.s3.S3ComplaintLister;
 import cat.complai.utilities.s3.S3FeedbackLister;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.services.cloudwatch.CloudWatchClient;
 import software.amazon.awssdk.services.cloudwatch.model.Dimension;
 import software.amazon.awssdk.services.cloudwatch.model.GetMetricStatisticsRequest;
 import software.amazon.awssdk.services.cloudwatch.model.GetMetricStatisticsResponse;
 import software.amazon.awssdk.services.cloudwatch.model.Statistic;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.time.YearMonth;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 
 @Singleton
 public class StadisticsService implements IStadisticsService {
@@ -272,7 +272,7 @@ public class StadisticsService implements IStadisticsService {
 
     /**
      * Calculates comparison between previous and current values.
-     * 
+     *
      * @param previousValue the previous week's value
      * @param currentValue  the current week's value
      * @return ComparisonData with absolute difference and percentage change

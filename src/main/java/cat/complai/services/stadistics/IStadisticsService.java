@@ -1,7 +1,7 @@
 package cat.complai.services.stadistics;
 
-import cat.complai.services.stadistics.models.StadisticsModel;
 import cat.complai.exceptions.ses.CloudWatchLogsException;
+import cat.complai.services.stadistics.models.StadisticsModel;
 
 public interface IStadisticsService {
 

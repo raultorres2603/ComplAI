@@ -1,10 +1,10 @@
 package cat.complai.services.stadistics.models;
 
+import io.micronaut.core.annotation.Introspected;
+
 import java.time.Instant;
 import java.time.YearMonth;
 import java.util.ArrayList;
-
-import io.micronaut.core.annotation.Introspected;
 
 @Introspected
 public class StadisticsModel {

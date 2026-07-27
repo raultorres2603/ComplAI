@@ -1,13 +1,13 @@
 package cat.complai.helpers.openrouter;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.mockito.Mockito.*;
+
 import cat.complai.config.TelegramConfiguration;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import java.util.Set;
-
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.mockito.Mockito.*;
 
 class RagWarmupServiceTest {
 

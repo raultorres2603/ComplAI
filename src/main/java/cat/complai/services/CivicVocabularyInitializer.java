@@ -3,8 +3,9 @@ package cat.complai.services;
 import cat.complai.config.CivicVocabularyConfig;
 import cat.complai.helpers.openrouter.CivicVocabularyService;
 import cat.complai.helpers.openrouter.RagHelper;
-import jakarta.inject.Singleton;
 import jakarta.annotation.PostConstruct;
+import jakarta.inject.Singleton;
+
 import java.util.logging.Logger;
 
 /**

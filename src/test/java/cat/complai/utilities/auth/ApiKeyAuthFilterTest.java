@@ -1,5 +1,7 @@
 package cat.complai.utilities.auth;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
@@ -8,8 +10,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 import java.util.Set;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests ApiKeyAuthFilter in isolation by calling filter() directly and inspecting

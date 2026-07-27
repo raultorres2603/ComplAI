@@ -2,10 +2,10 @@ package cat.complai.utilities.cache;
 
 /**
  * Utility class for keyword-based question categorization.
- * 
+ *
  * This is a simple, fast approach to categorize questions without ML.
  * Uses keyword matching (case-insensitive) to assign question categories.
- * 
+ *
  * Privacy note: This operates on static keywords, not user-specific data.
  * It produces a deterministic category output suitable for cache key
  * generation.
@@ -14,7 +14,7 @@ public class QuestionCategoryDetector {
 
     /**
      * Detect the question category based on keyword matching.
-     * 
+     *
      * @param question The user's question text
      * @return The detected QuestionCategory, or QuestionCategory.OTHER if no match
      */
@@ -84,7 +84,7 @@ public class QuestionCategoryDetector {
     /**
      * Helper method to check if a string contains any of the given keywords.
      * Uses simple substring matching (case-insensitive).
-     * 
+     *
      * @param text     The text to search in (assumed already lowercase)
      * @param keywords The keywords to search for
      * @return true if any keyword is found as a substring

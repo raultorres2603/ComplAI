@@ -1,16 +1,15 @@
 package cat.complai.services.ses;
 
+import cat.complai.services.stadistics.IStadisticsService;
+import jakarta.inject.Singleton;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import cat.complai.services.stadistics.IStadisticsService;
-import jakarta.inject.Singleton;
 
 /**
  * Service that discovers configured cities and sends per-city statistics reports via SES.

@@ -10,8 +10,8 @@ import cat.complai.helpers.openrouter.RedactPromptBuilder;
 import cat.complai.services.openrouter.ai.AiResponseProcessingService;
 import cat.complai.services.openrouter.conversation.ConversationManagementService;
 import cat.complai.services.openrouter.validation.InputValidationService;
-import jakarta.inject.Singleton;
 import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

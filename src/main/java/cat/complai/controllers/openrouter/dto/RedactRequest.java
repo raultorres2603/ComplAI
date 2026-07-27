@@ -1,10 +1,10 @@
 package cat.complai.controllers.openrouter.dto;
 
+import cat.complai.dto.openrouter.ComplainantIdentity;
+import cat.complai.dto.openrouter.OutputFormat;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.core.annotation.Introspected;
-import cat.complai.dto.openrouter.ComplainantIdentity;
-import cat.complai.dto.openrouter.OutputFormat;
 
 /**
  * Inbound DTO for POST /complai/redact.
@@ -119,7 +119,9 @@ public class RedactRequest {
      * Centralises the blank-to-null normalisation for all identity fields.
      */
     private static String normalize(String value) {
-        if (value == null || value.isBlank()) return null;
+        if (value == null || value.isBlank()) {
+            return null;
+        }
         return value.trim();
     }
 }

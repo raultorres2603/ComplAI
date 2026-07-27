@@ -14,6 +14,7 @@ import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
+
 import java.time.Instant;
 import java.util.UUID;
 import java.util.logging.Level;

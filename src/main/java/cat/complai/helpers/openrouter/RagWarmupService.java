@@ -4,6 +4,7 @@ import cat.complai.config.TelegramConfiguration;
 import io.micronaut.context.annotation.Value;
 import jakarta.annotation.PostConstruct;
 import jakarta.inject.Singleton;
+
 import java.util.HashSet;
 import java.util.Set;
 import java.util.logging.Level;

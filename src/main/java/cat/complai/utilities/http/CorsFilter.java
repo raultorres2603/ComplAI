@@ -12,9 +12,10 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.annotation.ServerFilter;
+
 import java.util.Arrays;
-import java.util.Set;
 import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Adds CORS headers to every response and short-circuits OPTIONS preflight

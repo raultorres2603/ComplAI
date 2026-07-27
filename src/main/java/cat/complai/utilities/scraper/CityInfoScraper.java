@@ -142,7 +142,9 @@ public class CityInfoScraper {
         // Merge explicit seed theme URLs (external sites not discoverable from #prat-temes)
         if (cityInfoConfig.seedThemeUrls != null) {
             for (String seed : cityInfoConfig.seedThemeUrls) {
-                if (seed == null || seed.isBlank()) continue;
+                if (seed == null || seed.isBlank()) {
+                    continue;
+                }
                 String canonical = canonicalizeUrl(seed);
                 if (canonical != null) {
                     themeUrls.putIfAbsent(canonical, "");

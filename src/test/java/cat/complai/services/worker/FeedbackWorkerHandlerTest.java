@@ -1,5 +1,7 @@
 package cat.complai.services.worker;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import cat.complai.dto.feedback.FeedbackSqsMessage;
 import cat.complai.utilities.s3.S3FeedbackUploader;
 import com.amazonaws.services.lambda.runtime.events.SQSBatchResponse;
@@ -11,8 +13,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for the feedback message processing pipeline.

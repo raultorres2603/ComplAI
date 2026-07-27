@@ -7,7 +7,6 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.jspecify.annotations.NonNull;
-
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -111,7 +110,7 @@ public class GencatProcedureScraper {
         Set<String> detailUrls = new LinkedHashSet<>();
 
         pendingCategoryUrls.add(mapping.baseUrl);
-        
+
         // Add seed URLs that directly show procedure lists (avoiding AJAX)
         if (mapping.crawl.additionalSeeds != null) {
             pendingCategoryUrls.addAll(mapping.crawl.additionalSeeds);
@@ -121,8 +120,9 @@ public class GencatProcedureScraper {
             String currentUrl = pendingCategoryUrls.iterator().next();
             pendingCategoryUrls.remove(currentUrl);
 
-            if (!visitedCategoryUrls.add(currentUrl))
+            if (!visitedCategoryUrls.add(currentUrl)) {
                 continue;
+            }
 
             // Stop crawling if we've visited too many category pages
             if (visitedCategoryUrls.size() > MAX_CATEGORY_PAGES) {
@@ -147,11 +147,13 @@ public class GencatProcedureScraper {
                 var detailLinks = doc.select(mapping.crawl.detailLinkSelector);
                 for (Element link : detailLinks) {
                     String href = link.absUrl("href");
-                    if (href.isBlank())
+                    if (href.isBlank()) {
                         continue;
+                    }
                     if (mapping.crawl.detailLinkExcludePattern != null
-                            && href.contains(mapping.crawl.detailLinkExcludePattern))
+                            && href.contains(mapping.crawl.detailLinkExcludePattern)) {
                         continue;
+                    }
                     detailUrls.add(href);
                 }
             } catch (Exception e) {
@@ -212,8 +214,9 @@ public class GencatProcedureScraper {
             for (Element el : elements) {
                 String text = el.text().trim();
                 if (!text.isEmpty()) {
-                    if (!sb.isEmpty())
+                    if (!sb.isEmpty()) {
                         sb.append("\n");
+                    }
                     sb.append(text);
                 }
             }
@@ -225,13 +228,16 @@ public class GencatProcedureScraper {
     }
 
     static boolean shouldSkip(String title, SkipConfig skip) {
-        if (title == null || title.isBlank())
+        if (title == null || title.isBlank()) {
             return true;
-        if (skip == null || skip.whenTitleEmptyOrEquals == null)
+        }
+        if (skip == null || skip.whenTitleEmptyOrEquals == null) {
             return false;
+        }
         for (String forbidden : skip.whenTitleEmptyOrEquals) {
-            if (title.equalsIgnoreCase(forbidden))
+            if (title.equalsIgnoreCase(forbidden)) {
                 return true;
+            }
         }
         return false;
     }

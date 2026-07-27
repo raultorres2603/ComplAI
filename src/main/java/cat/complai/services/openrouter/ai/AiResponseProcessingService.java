@@ -1,23 +1,24 @@
 package cat.complai.services.openrouter.ai;
 
-import cat.complai.utilities.http.HttpWrapper;
 import cat.complai.dto.http.HttpDto;
-import cat.complai.utilities.cache.QuestionCategory;
-import cat.complai.utilities.cache.QuestionCategoryDetector;
-import cat.complai.utilities.cache.ResponseCacheKey;
-import cat.complai.dto.openrouter.OpenRouterResponseDto;
 import cat.complai.dto.openrouter.OpenRouterErrorCode;
+import cat.complai.dto.openrouter.OpenRouterResponseDto;
 import cat.complai.dto.openrouter.OutputFormat;
 import cat.complai.helpers.openrouter.AiParsed;
 import cat.complai.helpers.openrouter.HtmlFormatter;
 import cat.complai.helpers.openrouter.MarkdownToHtmlConverter;
 import cat.complai.helpers.openrouter.RedactPromptBuilder;
 import cat.complai.services.openrouter.cache.ResponseCacheService;
+import cat.complai.utilities.cache.QuestionCategory;
+import cat.complai.utilities.cache.QuestionCategoryDetector;
+import cat.complai.utilities.cache.ResponseCacheKey;
+import cat.complai.utilities.http.HttpWrapper;
+import io.micronaut.context.annotation.Value;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
-import io.micronaut.context.annotation.Value;
-import java.util.Locale;
+
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -65,7 +66,7 @@ public class AiResponseProcessingService {
     /**
      * Call OpenRouter with smart caching.
      * Checks cache before calling OpenRouter, caches success responses only.
-     * 
+     *
      * @param messages         The messages to send to OpenRouter
      * @param cityId           The city context
      * @param procContextHash  Hash of procedure context (0 if none)
@@ -108,12 +109,25 @@ public class AiResponseProcessingService {
     }
 
     /**
+     * Legacy method for backward compatibility.
+     * Calls OpenRouter without caching (context hashes default to 0).
+     *
+     * @deprecated Use {@link #callOpenRouterAndExtract(List, String, long, long)}
+     *             instead
+     */
+    @Deprecated
+    public OpenRouterResponseDto callOpenRouterAndExtract(List<Map<String, Object>> messages, String cityId) {
+        return callOpenRouterAndExtract(messages, cityId, 0, 0);
+    }
+
+    /**
      * Normalizes and hashes a question for use in the cache key.
      * One-way hash: the raw question text is never stored in the cache key.
      */
     private static int hashQuestion(String question) {
-        if (question == null || question.isBlank())
+        if (question == null || question.isBlank()) {
             return 0;
+        }
         return question.strip().toLowerCase(java.util.Locale.ROOT).hashCode();
     }
 
@@ -134,18 +148,6 @@ public class AiResponseProcessingService {
             }
         }
         return "";
-    }
-
-    /**
-     * Legacy method for backward compatibility.
-     * Calls OpenRouter without caching (context hashes default to 0).
-     * 
-     * @deprecated Use {@link #callOpenRouterAndExtract(List, String, long, long)}
-     *             instead
-     */
-    @Deprecated
-    public OpenRouterResponseDto callOpenRouterAndExtract(List<Map<String, Object>> messages, String cityId) {
-        return callOpenRouterAndExtract(messages, cityId, 0, 0);
     }
 
     /**
@@ -260,7 +262,7 @@ public class AiResponseProcessingService {
     /**
      * Ensures a message is HTML-formatted by converting Markdown syntax to HTML
      * and applying HTML cleaning.
-     * 
+     *
      * <p>
      * Process:
      * </p>
@@ -271,7 +273,7 @@ public class AiResponseProcessingService {
      * <li>Applies HTML cleaning using {@link HtmlFormatter#cleanHtml(String)} to
      * remove excessive formatting</li>
      * </ul>
-     * 
+     *
      * @param message The message text to format (may be null or empty)
      * @return The HTML-formatted message, or null/empty if input was null/empty
      */
@@ -291,8 +293,9 @@ public class AiResponseProcessingService {
      * check looks for the city name paired with scope-limiting words.
      */
     private boolean aiRefusedAsOffTopic(String aiMessage, String cityId) {
-        if (aiMessage == null)
+        if (aiMessage == null) {
             return false;
+        }
         // Normalize typographic quotes/apostrophes for reliable matching.
         String normalized = aiMessage
                 .replace('\u2018', '\'').replace('\u2019', '\'')
@@ -302,37 +305,37 @@ public class AiResponseProcessingService {
 
         // Generic refusal patterns (city-agnostic).
         String[] refusalPhrases = {
-                "can't help with",
-                "cannot help with",
-                "can't help",
-                "cannot help",
-                "can't assist",
-                "cannot assist",
-                "i'm sorry, i can't",
-                "i'm sorry i can't",
-                "i'm sorry, i cannot",
-                "i'm sorry i cannot",
-                "i cannot",
-                "i can't",
-                "i am unable to",
-                "i'm unable to",
-                "i cannot help",
-                "i can't help",
-                "cannot provide",
-                "can't provide",
-                "no puc ajudar",
-                "no puc ajudar amb",
-                "no puedo ayudar",
-                "no puedo ayudar con",
-                "lo siento, no puedo ayudar",
-                "lo siento, no puedo",
-                "no puedo",
-                "no puc",
+            "can't help with",
+            "cannot help with",
+            "can't help",
+            "cannot help",
+            "can't assist",
+            "cannot assist",
+            "i'm sorry, i can't",
+            "i'm sorry i can't",
+            "i'm sorry, i cannot",
+            "i'm sorry i cannot",
+            "i cannot",
+            "i can't",
+            "i am unable to",
+            "i'm unable to",
+            "i cannot help",
+            "i can't help",
+            "cannot provide",
+            "can't provide",
+            "no puc ajudar",
+            "no puc ajudar amb",
+            "no puedo ayudar",
+            "no puedo ayudar con",
+            "lo siento, no puedo ayudar",
+            "lo siento, no puedo",
+            "no puedo",
+            "no puc",
         };
 
         for (String p : refusalPhrases) {
-            String pNoPunct = p.replaceAll("[.,;:!?()\\[\\]{}-]", " ").trim();
-            if (lower.contains(p) || lowerNoPunct.contains(pNoPunct)) {
+            String cleanedPhrase = p.replaceAll("[.,;:!?()\\[\\]{}-]", " ").trim();
+            if (lower.contains(p) || lowerNoPunct.contains(cleanedPhrase)) {
                 logger.fine("Refusal detected by phrase: '" + p + "' in: " + lower);
                 return true;
             }

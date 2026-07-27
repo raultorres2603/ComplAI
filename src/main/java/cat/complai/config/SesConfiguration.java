@@ -144,7 +144,7 @@ public class SesConfiguration implements ISesRecipientProvider, ISesSenderConfig
 
     /**
      * Masks email for safe logging (hides most of local part).
-     * 
+     *
      * @param email The email address to mask
      * @return Masked email (e.g., n***@example.com)
      */

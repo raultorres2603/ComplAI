@@ -1,10 +1,6 @@
 package cat.complai.dto;
 
-import java.util.List;
-
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 import cat.complai.controllers.feedback.dto.FeedbackAcceptedDto;
 import cat.complai.controllers.feedback.dto.FeedbackRequest;
@@ -33,9 +29,12 @@ import cat.complai.exceptions.OpenRouterStreamingException;
 import cat.complai.utilities.auth.OidcConfig;
 import cat.complai.utilities.auth.VerifiedCitizenIdentity;
 import cat.complai.utilities.cache.QuestionCategory;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
 
-import static org.junit.jupiter.api.Assertions.*;
+import java.util.List;
 
 @DisplayName("DTO Tests")
 class DTOTest {

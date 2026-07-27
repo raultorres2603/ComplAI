@@ -96,8 +96,9 @@ public class OpenRouterPublicDto {
      */
     @Nullable
     public static OpenRouterPublicDto from(OpenRouterResponseDto dto) {
-        if (dto == null)
+        if (dto == null) {
             return null;
+        }
         int code = dto.getErrorCode() == null ? 0 : dto.getErrorCode().getCode();
         return new OpenRouterPublicDto(dto.isSuccess(), dto.getMessage(), dto.getError(), code, dto.getSources());
     }

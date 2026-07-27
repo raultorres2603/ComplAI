@@ -2,18 +2,17 @@ package cat.complai.utilities.metrics;
 
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
+import software.amazon.awssdk.services.cloudwatch.CloudWatchClient;
+import software.amazon.awssdk.services.cloudwatch.model.Dimension;
+import software.amazon.awssdk.services.cloudwatch.model.MetricDatum;
+import software.amazon.awssdk.services.cloudwatch.model.PutMetricDataRequest;
+import software.amazon.awssdk.services.cloudwatch.model.StandardUnit;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import software.amazon.awssdk.services.cloudwatch.CloudWatchClient;
-import software.amazon.awssdk.services.cloudwatch.model.Dimension;
-import software.amazon.awssdk.services.cloudwatch.model.MetricDatum;
-import software.amazon.awssdk.services.cloudwatch.model.PutMetricDataRequest;
-import software.amazon.awssdk.services.cloudwatch.model.StandardUnit;
 
 /**
  * Publishes interaction metrics to CloudWatch Metrics for every ask, redact,

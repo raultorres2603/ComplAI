@@ -1,10 +1,10 @@
 package cat.complai.utilities.s3;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.atomic.AtomicReference;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for {@link S3FeedbackUploader}.

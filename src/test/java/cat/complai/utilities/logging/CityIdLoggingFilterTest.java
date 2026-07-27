@@ -1,5 +1,8 @@
 package cat.complai.utilities.logging;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
 import cat.complai.utilities.auth.ApiKeyAuthFilter;
 import io.micronaut.http.MutableHttpRequest;
 import org.junit.jupiter.api.AfterEach;
@@ -10,9 +13,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.MDC;
 
 import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class CityIdLoggingFilterTest {

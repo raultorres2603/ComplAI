@@ -7,7 +7,6 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.jspecify.annotations.NonNull;
-
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -43,7 +42,7 @@ import java.util.logging.Logger;
  *
  * <p>
  * Usage:
- * 
+ *
  * <pre>
  *   PROCEDURES_BUCKET=complai-procedures-development \
  *   java -cp complai-all.jar cat.complai.pratespais.ProcedureScraper elprat
@@ -155,8 +154,9 @@ public class ProcedureScraper {
             String currentUrl = pendingCategoryUrls.iterator().next();
             pendingCategoryUrls.remove(currentUrl);
 
-            if (!visitedCategoryUrls.add(currentUrl))
+            if (!visitedCategoryUrls.add(currentUrl)) {
                 continue;
+            }
 
             try {
                 Document doc = fetchDocument(currentUrl);
@@ -174,11 +174,13 @@ public class ProcedureScraper {
                 var detailLinks = doc.select(mapping.crawl.detailLinkSelector);
                 for (Element link : detailLinks) {
                     String href = link.absUrl("href");
-                    if (href.isBlank())
+                    if (href.isBlank()) {
                         continue;
+                    }
                     if (mapping.crawl.detailLinkExcludePattern != null
-                            && href.contains(mapping.crawl.detailLinkExcludePattern))
+                            && href.contains(mapping.crawl.detailLinkExcludePattern)) {
                         continue;
+                    }
                     detailUrls.add(href);
                 }
             } catch (Exception e) {
@@ -236,13 +238,16 @@ public class ProcedureScraper {
     private static String extractFieldValue(Document doc, FieldExtractionRule rule) {
         if (rule.multiple) {
             Elements elements = doc.select(rule.selector);
-            if (elements == null) elements = new Elements();
+            if (elements == null) {
+                elements = new Elements();
+            }
             StringBuilder sb = new StringBuilder();
             for (Element el : elements) {
                 String text = el.text().trim();
                 if (!text.isEmpty()) {
-                    if (!sb.isEmpty())
+                    if (!sb.isEmpty()) {
                         sb.append("\n");
+                    }
                     sb.append(text);
                 }
             }
@@ -254,13 +259,16 @@ public class ProcedureScraper {
 
     // Package-private for unit testing.
     static boolean shouldSkip(String title, SkipConfig skip) {
-        if (title == null || title.isBlank())
+        if (title == null || title.isBlank()) {
             return true;
-        if (skip == null || skip.whenTitleEmptyOrEquals == null)
+        }
+        if (skip == null || skip.whenTitleEmptyOrEquals == null) {
             return false;
+        }
         for (String forbidden : skip.whenTitleEmptyOrEquals) {
-            if (title.equalsIgnoreCase(forbidden))
+            if (title.equalsIgnoreCase(forbidden)) {
                 return true;
+            }
         }
         return false;
     }

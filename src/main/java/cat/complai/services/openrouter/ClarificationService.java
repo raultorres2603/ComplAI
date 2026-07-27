@@ -9,6 +9,7 @@ import cat.complai.helpers.openrouter.rag.TokenNormalizer;
 import cat.complai.services.openrouter.conversation.ConversationManagementService;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+
 import java.text.Normalizer;
 import java.util.HashMap;
 import java.util.LinkedHashSet;

@@ -1,9 +1,9 @@
 package cat.complai.services.worker;
 
-import cat.complai.utilities.http.HttpWrapper;
-import cat.complai.helpers.openrouter.RedactPromptBuilder;
-import cat.complai.utilities.s3.S3PdfUploader;
 import cat.complai.dto.sqs.RedactSqsMessage;
+import cat.complai.helpers.openrouter.RedactPromptBuilder;
+import cat.complai.utilities.http.HttpWrapper;
+import cat.complai.utilities.s3.S3PdfUploader;
 import com.amazonaws.services.lambda.runtime.events.SQSBatchResponse;
 import com.amazonaws.services.lambda.runtime.events.SQSEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -41,7 +41,9 @@ public class RedactWorkerHandler extends MicronautRequestHandler<SQSEvent, SQSBa
     private boolean initialized = false;
 
     private void ensureInitialized() {
-        if (initialized) return;
+        if (initialized) {
+            return;
+        }
         promptBuilder = getApplicationContext().getBean(RedactPromptBuilder.class);
         httpWrapper = getApplicationContext().getBean(HttpWrapper.class);
         s3PdfUploader = getApplicationContext().getBean(S3PdfUploader.class);

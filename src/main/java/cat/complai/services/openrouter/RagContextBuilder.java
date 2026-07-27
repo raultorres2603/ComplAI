@@ -10,6 +10,7 @@ import cat.complai.helpers.openrouter.RagHelper;
 import cat.complai.helpers.openrouter.RedactPromptBuilder;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -334,8 +335,9 @@ public class RagContextBuilder {
     }
 
     private String buildEventContextBlockFromMatches(List<RagHelper.Event> matches, String cityId) {
-        if (matches.isEmpty())
+        if (matches.isEmpty()) {
             return "";
+        }
         StringBuilder sb = new StringBuilder();
         sb.append("Events in ").append(cityId).append(":\n\n");
         for (int i = 0; i < matches.size(); i++) {

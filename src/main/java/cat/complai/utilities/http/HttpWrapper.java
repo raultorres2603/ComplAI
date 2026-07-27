@@ -4,35 +4,33 @@ import cat.complai.dto.http.HttpDto;
 import cat.complai.dto.http.OpenRouterStreamStartResult;
 import cat.complai.dto.openrouter.OpenRouterErrorCode;
 import cat.complai.exceptions.OpenRouterStreamingException;
-import io.micronaut.core.annotation.Nullable;
-import jakarta.inject.Inject;
-import jakarta.inject.Singleton;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.context.annotation.Value;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpResponse;
 import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
-import java.util.Map;
 import java.util.HashMap;
 import java.util.List;
-import java.util.stream.Stream;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
-import reactor.core.scheduler.Scheduler;
-import reactor.core.scheduler.Schedulers;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.stream.Stream;
 
 /**
  * HTTP wrapper for calling OpenRouter (or compatible) endpoints.
@@ -118,7 +116,7 @@ public class HttpWrapper {
         }
         this.openRouterUrl = normalizeOpenRouterBaseUrl(resolvedUrl);
         this.requestTimeoutSeconds = (requestTimeoutSeconds > 0) ? requestTimeoutSeconds : 20; // fallback to 20s if
-                                                                                                   // invalid
+        // invalid
         this.rawStreamingHttpClient = HttpClient.newBuilder()
                 .connectTimeout(java.time.Duration.ofSeconds(this.requestTimeoutSeconds))
                 .build();
@@ -215,7 +213,7 @@ public class HttpWrapper {
         }
     }
 
-/**
+    /**
      * Sends request with manual retry logic.
      * Note: @Retryable doesn't work for internal method calls, so we implement retry manually.
      *
@@ -301,7 +299,7 @@ public class HttpWrapper {
             circuitBreaker.recordFailure();
         }
 
-return CompletableFuture.completedFuture(finalResult);
+        return CompletableFuture.completedFuture(finalResult);
     }
 
     /**

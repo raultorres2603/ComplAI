@@ -1,12 +1,12 @@
 package cat.complai.utilities.auth;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.security.SecureRandom;
 import java.util.Base64;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 @DisplayName("ApiKeyGenerator Unit Tests")
 class ApiKeyGeneratorTest {

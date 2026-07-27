@@ -1,10 +1,15 @@
 package cat.complai.services.openrouter;
 
-import cat.complai.utilities.http.HttpWrapper;
+import static org.junit.jupiter.api.Assertions.*;
+
+import cat.complai.config.CivicVocabularyConfig;
 import cat.complai.dto.http.HttpDto;
 import cat.complai.dto.openrouter.OpenRouterResponseDto;
 import cat.complai.dto.openrouter.Source;
+import cat.complai.helpers.openrouter.CityInfoRagHelperRegistry;
+import cat.complai.helpers.openrouter.CivicVocabularyService;
 import cat.complai.helpers.openrouter.EventRagHelperRegistry;
+import cat.complai.helpers.openrouter.NewsRagHelperRegistry;
 import cat.complai.helpers.openrouter.ProcedureRagHelperRegistry;
 import cat.complai.helpers.openrouter.RagHelper;
 import cat.complai.helpers.openrouter.RedactPromptBuilder;
@@ -12,10 +17,7 @@ import cat.complai.services.openrouter.ai.AiResponseProcessingService;
 import cat.complai.services.openrouter.cache.ResponseCacheService;
 import cat.complai.services.openrouter.conversation.ConversationManagementService;
 import cat.complai.services.openrouter.validation.InputValidationService;
-import cat.complai.helpers.openrouter.CivicVocabularyService;
-import cat.complai.config.CivicVocabularyConfig;
-import cat.complai.helpers.openrouter.NewsRagHelperRegistry;
-import cat.complai.helpers.openrouter.CityInfoRagHelperRegistry;
+import cat.complai.utilities.http.HttpWrapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -24,21 +26,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
-import static org.junit.jupiter.api.Assertions.*;
-
 /**
  * Unit tests for source isolation in OpenRouterServices.ask()
- * 
+ *
  * These tests verify that the fix for symmetric, single-pass deduplication
  * prevents source leakage between requests.
- * 
+ *
  * ROOT CAUSE FIXED:
  * - Asymmetric deduplication: procedures were deduped at add-time, events were
  * not
  * - Double deduplication: sources were deduped both at collection and at
  * response creation
  * - This caused sources from request X to leak into request Y
- * 
+ *
  * FIX IMPLEMENTED:
  * - Symmetric collection: both procedures and events added without initial
  * deduplication

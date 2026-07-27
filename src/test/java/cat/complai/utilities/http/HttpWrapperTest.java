@@ -1,10 +1,11 @@
 package cat.complai.utilities.http;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import cat.complai.dto.http.HttpDto;
 import cat.complai.dto.http.OpenRouterStreamStartResult;
 import cat.complai.dto.openrouter.OpenRouterErrorCode;
 import cat.complai.exceptions.OpenRouterStreamingException;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpServer;
@@ -21,8 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 public class HttpWrapperTest {
 

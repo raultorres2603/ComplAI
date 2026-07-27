@@ -13,13 +13,13 @@ public class HtmlFormatter {
 
     /**
      * Cleans HTML by removing excessive newlines around tag boundaries.
-     * 
+     *
      * Strategy:
      * 1. Remove newlines immediately before any tag
      * 2. Remove newlines between closing and opening tags
      * 3. Collapse multiple consecutive newlines to double newlines
      * 4. Strip leading/trailing whitespace
-     * 
+     *
      * @param html The HTML string to clean (can be null or empty)
      * @return Cleaned HTML string, or the original if null/empty
      */

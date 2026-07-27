@@ -10,8 +10,10 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.lang.reflect.Field;
-
+import cat.complai.config.SesConfiguration;
+import cat.complai.services.stadistics.StadisticsHtmlRenderer;
+import cat.complai.services.stadistics.StadisticsService;
+import cat.complai.services.stadistics.models.StadisticsModel;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -21,17 +23,14 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import cat.complai.config.SesConfiguration;
-import cat.complai.services.stadistics.StadisticsHtmlRenderer;
-import cat.complai.services.stadistics.StadisticsService;
-import cat.complai.services.stadistics.models.StadisticsModel;
 import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
 import software.amazon.awssdk.services.ses.SesClient;
 import software.amazon.awssdk.services.ses.model.MailFromDomainNotVerifiedException;
 import software.amazon.awssdk.services.ses.model.MessageRejectedException;
 import software.amazon.awssdk.services.ses.model.SendEmailRequest;
 import software.amazon.awssdk.services.ses.model.SendEmailResponse;
+
+import java.lang.reflect.Field;
 
 /**
  * Unit tests for {@link EmailService}.
@@ -41,7 +40,7 @@ import software.amazon.awssdk.services.ses.model.SendEmailResponse;
  * integration.
  * Uses Mockito to mock SES client dependencies and verify email sending
  * behavior.
- * 
+ *
  * @author ComplAI Team
  */
 @ExtendWith(MockitoExtension.class)

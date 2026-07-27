@@ -1,9 +1,9 @@
 package cat.complai.helpers.openrouter;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import cat.complai.dto.openrouter.OutputFormat;
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 class AiParsedTest {
 

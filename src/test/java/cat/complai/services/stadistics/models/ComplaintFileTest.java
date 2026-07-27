@@ -1,14 +1,13 @@
 package cat.complai.services.stadistics.models;
-import java.net.URI;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import java.net.MalformedURLException;
-import java.net.URL;
-
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URL;
 
 @DisplayName("ComplaintFile Tests")
 class ComplaintFileTest {

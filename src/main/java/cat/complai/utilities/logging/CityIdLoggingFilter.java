@@ -1,13 +1,13 @@
 package cat.complai.utilities.logging;
 
-import org.slf4j.MDC;
+import cat.complai.utilities.auth.ApiKeyAuthFilter;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ServerFilter;
-import cat.complai.utilities.auth.ApiKeyAuthFilter;
+import org.slf4j.MDC;
 
 /**
  * Filter that extracts cityId from request attributes and injects it into MDC

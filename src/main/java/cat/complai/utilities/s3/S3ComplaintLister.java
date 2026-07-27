@@ -136,8 +136,8 @@ public class S3ComplaintLister {
     }
 
     /**
-         * Simple data class for complaint file entries returned by listComplaintFiles.
-         */
-        public record ComplaintFileEntry(String fileName, String url) {
+     * Simple data class for complaint file entries returned by listComplaintFiles.
+     */
+    public record ComplaintFileEntry(String fileName, String url) {
     }
 }

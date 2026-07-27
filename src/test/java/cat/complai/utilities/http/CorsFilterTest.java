@@ -1,13 +1,13 @@
 package cat.complai.utilities.http;
 
-import io.micronaut.http.HttpMethod;
-import io.micronaut.http.MutableHttpRequest;
-import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.MutableHttpHeaders;
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
+
+import io.micronaut.http.HttpMethod;
+import io.micronaut.http.MutableHttpHeaders;
+import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.MutableHttpResponse;
+import org.junit.jupiter.api.Test;
 
 class CorsFilterTest {
 

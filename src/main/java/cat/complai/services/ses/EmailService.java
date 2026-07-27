@@ -1,8 +1,5 @@
 package cat.complai.services.ses;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import cat.complai.config.ISesSenderConfig;
 import cat.complai.exceptions.ses.CloudWatchLogsException;
 import cat.complai.services.stadistics.StadisticsHtmlRenderer;
@@ -11,6 +8,8 @@ import cat.complai.services.stadistics.models.StadisticsModel;
 import io.micronaut.context.annotation.Bean;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.services.ses.SesClient;
 import software.amazon.awssdk.services.ses.model.MailFromDomainNotVerifiedException;
 import software.amazon.awssdk.services.ses.model.MessageRejectedException;
@@ -161,7 +160,7 @@ public class EmailService implements IEmailService {
 
     /**
      * Masks email for safe logging (hides most of local part).
-     * 
+     *
      * @param email The email address to mask
      * @return Masked email (e.g., n***@example.com)
      */

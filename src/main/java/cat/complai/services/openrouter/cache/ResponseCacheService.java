@@ -6,6 +6,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.stats.CacheStats;
 import io.micronaut.context.annotation.Value;
 import jakarta.inject.Singleton;
+
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.LongAdder;
@@ -13,24 +14,24 @@ import java.util.logging.Logger;
 
 /**
  * Tier 1 in-memory response cache using Caffeine.
- * 
+ *
  * This service provides fast, thread-safe caching of OpenRouter AI responses
  * based on hash keys (no user query text, no conversation history).
- * 
+ *
  * PRIVACY GUARANTEES:
  * - Cache key contains ONLY: cityId + procedure context hash + event context
  * hash + category
  * - Cache value contains ONLY: AI response text (success case)
  * - NO user queries, conversation history, or PII in cache
- * 
+ *
  * TTL and size are configurable:
  * - Default TTL: 10 minutes (balance between freshness and API reduction)
  * - Default max entries: 500 (lightweight for Lambda warm instances)
  * - Eviction: LRU (least recently used)
- * 
+ *
  * Thread safety: Caffeine handles all synchronization internally.
  * No manual locking needed for concurrent access.
- * 
+ *
  * Feature flag: Can be disabled via response.cache.enabled property (default:
  * true).
  */
@@ -81,7 +82,7 @@ public class ResponseCacheService {
 
     /**
      * Attempt to retrieve a cached response.
-     * 
+     *
      * @param key The cache key (city + context hashes + category)
      * @return Optional containing cached response if present, empty() otherwise
      */
@@ -102,7 +103,7 @@ public class ResponseCacheService {
 
     /**
      * Cache an AI response for future reuse.
-     * 
+     *
      * @param key        The cache key (city + context hashes + category)
      * @param aiResponse The AI response text to cache
      */
@@ -124,7 +125,7 @@ public class ResponseCacheService {
     /**
      * Invalidate all cached responses for a specific city.
      * Useful when city-level data (procedures, events) is updated.
-     * 
+     *
      * @param cityId The city to invalidate
      */
     public void invalidateCity(String cityId) {
@@ -162,13 +163,13 @@ public class ResponseCacheService {
     /**
      * Get cache statistics for observability and performance monitoring.
      * Returns null if caching is disabled.
-     * 
+     *
      * Statistics include:
      * - hitCount: Total cache hits
      * - missCount: Total cache misses
      * - loadSuccessCount: Entries successfully cached
      * - evictionCount: Entries evicted due to size/TTL
-     * 
+     *
      * @return Cache stats object, or null if disabled
      */
     public CacheStatsSnapshot getStats() {
@@ -189,7 +190,7 @@ public class ResponseCacheService {
 
     /**
      * Get current cache size.
-     * 
+     *
      * @return Number of entries currently in cache
      */
     public long getSize() {

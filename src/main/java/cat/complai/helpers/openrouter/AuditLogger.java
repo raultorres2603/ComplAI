@@ -27,8 +27,9 @@ public class AuditLogger {
      * avoid logging PII.
      */
     public static String hashText(String text) {
-        if (text == null)
+        if (text == null) {
             return "null";
+        }
         return Integer.toHexString(text.hashCode());
     }
 }

@@ -1,9 +1,9 @@
 package cat.complai.controllers.openrouter.dto;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import cat.complai.dto.openrouter.ComplainantIdentity;
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for {@link RedactRequest#getComplainantIdentity()}.

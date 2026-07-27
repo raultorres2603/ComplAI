@@ -59,7 +59,7 @@ public class RagHelper<T> {
      * @param theme          Event theme or category.
      * @param url            Canonical URL of the event page.
      */
-        public record Event(String eventId, String title, String description, String eventType, String targetAudience,
+    public record Event(String eventId, String title, String description, String eventType, String targetAudience,
                             String date, String time, String location, String theme, String url) {
         /**
          * Constructs an {@code Event} entry.
@@ -77,7 +77,7 @@ public class RagHelper<T> {
          */
         public Event {
         }
-        }
+    }
 
     /**
      * A single news article loaded from the JSON knowledge base.
@@ -91,7 +91,7 @@ public class RagHelper<T> {
      * @param author      Author name, if available.
      * @param url         Canonical URL of the article.
      */
-        public record News(String newsId, String title, String summary, String body, String publishedAt, String categories,
+    public record News(String newsId, String title, String summary, String body, String publishedAt, String categories,
                            String author, String url) {
         /**
          * Constructs a {@code News} article entry.
@@ -107,7 +107,7 @@ public class RagHelper<T> {
          */
         public News {
         }
-        }
+    }
 
     /**
      * A single city-information document loaded from the JSON knowledge base.
@@ -120,7 +120,7 @@ public class RagHelper<T> {
      * @param breadcrumbs Breadcrumb navigation path.
      * @param url         Canonical URL of the source page.
      */
-        public record CityInfo(String cityInfoId, String theme, String title, String summary, String body,
+    public record CityInfo(String cityInfoId, String theme, String title, String summary, String body,
                                String breadcrumbs, String url) {
         /**
          * Constructs a {@code CityInfo} entry.
@@ -135,7 +135,7 @@ public class RagHelper<T> {
          */
         public CityInfo {
         }
-        }
+    }
 
     /**
      * A single municipal procedure loaded from the JSON knowledge base.
@@ -147,7 +147,7 @@ public class RagHelper<T> {
      * @param steps        Step-by-step instructions.
      * @param url          Canonical URL of the procedure page.
      */
-        public record Procedure(String procedureId, String title, String description, String requirements, String steps,
+    public record Procedure(String procedureId, String title, String description, String requirements, String steps,
                                 String url) {
         /**
          * Constructs a {@code Procedure} entry.
@@ -161,7 +161,7 @@ public class RagHelper<T> {
          */
         public Procedure {
         }
-        }
+    }
 
     // =========================================================================
     // Domain configuration

@@ -1,13 +1,12 @@
 package cat.complai.utilities.s3;
 
-import cat.complai.utilities.s3.S3FeedbackLister.FeedbackFileEntry;
+import static org.junit.jupiter.api.Assertions.*;
 
+import cat.complai.utilities.s3.S3FeedbackLister.FeedbackFileEntry;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
 import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for {@link S3FeedbackLister}.

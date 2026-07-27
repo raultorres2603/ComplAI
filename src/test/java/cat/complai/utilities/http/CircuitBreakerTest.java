@@ -1,8 +1,8 @@
 package cat.complai.utilities.http;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.*;
+
+import org.junit.jupiter.api.Test;
 
 /**
  * Unit tests for {@link CircuitBreaker} state machine transitions.

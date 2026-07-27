@@ -2,11 +2,11 @@ package cat.complai.config;
 
 /**
  * Provider interface for SES sender configuration.
- * 
+ *
  * This interface allows EmailService to receive sender configuration
  * without depending directly on SesConfiguration, enabling better
  * testability and loose coupling.
- * 
+ *
  * @author ComplAI Team
  * @version 1.0
  */

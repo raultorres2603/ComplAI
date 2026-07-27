@@ -6,6 +6,12 @@ plugins {
     // so `./gradlew shadowJar` produces build/libs/complai-all.jar for SAM local.
     // Not used in production (CI deploys GraalVM native images via buildNativeLambda).
     id("com.gradleup.shadow") version "9.0.0-beta4"
+    // Checkstyle — static analysis for Java code quality. Advisory in CI until
+    // existing violations (~10k) are fixed.
+    id("checkstyle")
+    // OWASP dependency-check — scans Java dependencies for known CVEs.
+    // Fails build on CVSS >= 7 (High severity). First run downloads NVD database.
+    id("org.owasp.dependencycheck") version "12.2.2"
 }
 
 // Configure the shadow JAR to match the SAM template expectation
@@ -90,6 +96,28 @@ java {
 
 tasks.withType(JavaCompile).configureEach {
     options.compilerArgs.addAll(['-Xlint:all,-path,-serial,-processing'])
+}
+
+// Checkstyle configuration — uses Google Java Style bundled with the Checkstyle JAR.
+// The configFile path references the bundled ruleset by name (no custom file needed).
+checkstyle {
+    toolVersion = '10.21.4'
+}
+checkstyleMain {
+    configFile = rootProject.file('config/checkstyle/google_checks.xml')
+}
+checkstyleTest {
+    enabled = false
+}
+
+// OWASP dependency-check configuration — scans all dependencies for known CVEs.
+// Fail build on CVSS >= 7 (High severity). NVD API key speeds up database sync.
+dependencyCheck {
+    failBuildOnCVSS = 7.0f
+    formats = ['HTML', 'JSON']
+    nvd {
+        apiKey = System.getenv("NVD_API_KEY")
+    }
 }
 
 

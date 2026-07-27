@@ -42,7 +42,9 @@ public class FeedbackWorkerHandler extends MicronautRequestHandler<SQSEvent, SQS
     private boolean initialized = false;
 
     private void ensureInitialized() {
-        if (initialized) return;
+        if (initialized) {
+            return;
+        }
         s3Uploader = getApplicationContext().getBean(S3FeedbackUploader.class);
         mapper = getApplicationContext().getBean(ObjectMapper.class);
         initialized = true;

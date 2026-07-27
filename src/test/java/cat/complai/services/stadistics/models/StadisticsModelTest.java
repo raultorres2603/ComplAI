@@ -1,19 +1,18 @@
 package cat.complai.services.stadistics.models;
-import java.net.URI;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.net.MalformedURLException;
-import java.time.YearMonth;
-import java.util.ArrayList;
-
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.time.YearMonth;
+import java.util.ArrayList;
 
 @DisplayName("StadisticsModel Tests")
 class StadisticsModelTest {

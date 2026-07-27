@@ -1,13 +1,13 @@
 package cat.complai.services.openrouter.cache;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import cat.complai.utilities.cache.CommonResponseEntry;
 import cat.complai.utilities.cache.QuestionCategory;
 import cat.complai.utilities.cache.ResponseCacheKey;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 @DisplayName("CommonResponseCacheInitializer Tests")
 class CommonResponseCacheInitializerTest {

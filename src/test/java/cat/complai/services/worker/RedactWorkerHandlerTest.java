@@ -1,10 +1,12 @@
 package cat.complai.services.worker;
 
-import cat.complai.utilities.http.HttpWrapper;
+import static org.junit.jupiter.api.Assertions.*;
+
 import cat.complai.dto.http.HttpDto;
-import cat.complai.helpers.openrouter.RedactPromptBuilder;
-import cat.complai.utilities.s3.S3PdfUploader;
 import cat.complai.dto.sqs.RedactSqsMessage;
+import cat.complai.helpers.openrouter.RedactPromptBuilder;
+import cat.complai.utilities.http.HttpWrapper;
+import cat.complai.utilities.s3.S3PdfUploader;
 import com.amazonaws.services.lambda.runtime.events.SQSBatchResponse;
 import org.junit.jupiter.api.Test;
 
@@ -14,8 +16,6 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for the async complaint letter generation pipeline.
@@ -166,7 +166,7 @@ class RedactWorkerHandlerTest {
         List<SQSBatchResponse.BatchItemFailure> failures = new ArrayList<>();
         RedactSqsMessage msg1 = new RedactSqsMessage("Bad complaint", "A", "B", "C", "complaints/fail/1-complaint.pdf", null, "elprat");
         RedactSqsMessage msg2 = new RedactSqsMessage("Good complaint", "X", "Y", "Z", "complaints/ok/2-complaint.pdf", null, "elprat");
-        
+
         for (RedactSqsMessage msg : List.of(msg1, msg2)) {
             try {
                 generator.generate(msg);

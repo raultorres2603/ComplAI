@@ -6,6 +6,7 @@ import cat.complai.helpers.openrouter.NewsRagHelperRegistry;
 import cat.complai.helpers.openrouter.ProcedureRagHelperRegistry;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -425,45 +426,45 @@ public class IntentDetector {
     private record TitleMatcher(Map<String, List<String>> titlesByToken, List<String> fallbackTitles) {
 
         private static TitleMatcher fromTitles(List<String> normalizedTitles) {
-                Map<String, LinkedHashSet<String>> byToken = new LinkedHashMap<>();
-                List<String> fallbackTitles = new ArrayList<>();
+            Map<String, LinkedHashSet<String>> byToken = new LinkedHashMap<>();
+            List<String> fallbackTitles = new ArrayList<>();
 
-                for (String normalizedTitle : normalizedTitles) {
-                    Set<String> tokens = tokenize(normalizedTitle);
-                    if (tokens.isEmpty()) {
-                        fallbackTitles.add(normalizedTitle);
-                        continue;
-                    }
-                    for (String token : tokens) {
-                        byToken.computeIfAbsent(token, ignored -> new LinkedHashSet<>()).add(normalizedTitle);
-                    }
+            for (String normalizedTitle : normalizedTitles) {
+                Set<String> tokens = tokenize(normalizedTitle);
+                if (tokens.isEmpty()) {
+                    fallbackTitles.add(normalizedTitle);
+                    continue;
                 }
-
-                Map<String, List<String>> immutableIndex = new LinkedHashMap<>();
-                byToken.forEach((token, titles) -> immutableIndex.put(token, List.copyOf(titles)));
-                return new TitleMatcher(Map.copyOf(immutableIndex), List.copyOf(fallbackTitles));
+                for (String token : tokens) {
+                    byToken.computeIfAbsent(token, ignored -> new LinkedHashSet<>()).add(normalizedTitle);
+                }
             }
 
-            private boolean matches(String normalizedQuestion) {
-                if (normalizedQuestion == null || normalizedQuestion.isBlank()) {
-                    return false;
-                }
-                LinkedHashSet<String> candidates = new LinkedHashSet<>();
-                for (String token : tokenize(normalizedQuestion)) {
-                    List<String> titles = titlesByToken.get(token);
-                    if (titles != null) {
-                        candidates.addAll(titles);
-                    }
-                }
-                if (candidates.isEmpty()) {
-                    candidates.addAll(fallbackTitles);
-                }
-                for (String candidate : candidates) {
-                    if (normalizedQuestion.contains(candidate)) {
-                        return true;
-                    }
-                }
+            Map<String, List<String>> immutableIndex = new LinkedHashMap<>();
+            byToken.forEach((token, titles) -> immutableIndex.put(token, List.copyOf(titles)));
+            return new TitleMatcher(Map.copyOf(immutableIndex), List.copyOf(fallbackTitles));
+        }
+
+        private boolean matches(String normalizedQuestion) {
+            if (normalizedQuestion == null || normalizedQuestion.isBlank()) {
                 return false;
             }
+            LinkedHashSet<String> candidates = new LinkedHashSet<>();
+            for (String token : tokenize(normalizedQuestion)) {
+                List<String> titles = titlesByToken.get(token);
+                if (titles != null) {
+                    candidates.addAll(titles);
+                }
+            }
+            if (candidates.isEmpty()) {
+                candidates.addAll(fallbackTitles);
+            }
+            for (String candidate : candidates) {
+                if (normalizedQuestion.contains(candidate)) {
+                    return true;
+                }
+            }
+            return false;
         }
+    }
 }

@@ -1,5 +1,7 @@
 package cat.complai.controllers.telegram;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import cat.complai.config.TelegramConfiguration;
 import cat.complai.controllers.telegram.dto.TelegramCallbackQuery;
 import cat.complai.controllers.telegram.dto.TelegramChat;
@@ -15,8 +17,6 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for {@link TelegramController}.

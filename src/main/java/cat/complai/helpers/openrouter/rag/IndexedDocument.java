@@ -10,7 +10,7 @@ public record IndexedDocument<T>(
         Map<String, Integer> fieldLengths,
         Map<String, Map<String, Integer>> fieldTermFrequency,
         String language) {
-    
+
     public IndexedDocument(
             int sourceOrder,
             T source,

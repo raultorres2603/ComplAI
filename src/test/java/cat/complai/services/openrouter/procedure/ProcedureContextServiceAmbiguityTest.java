@@ -1,5 +1,12 @@
 package cat.complai.services.openrouter.procedure;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
+
 import cat.complai.helpers.openrouter.CityInfoRagHelperRegistry;
 import cat.complai.helpers.openrouter.EventRagHelperRegistry;
 import cat.complai.helpers.openrouter.NewsRagHelperRegistry;
@@ -22,13 +29,6 @@ import org.mockito.MockitoAnnotations;
 
 import java.util.List;
 import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.when;
 
 class ProcedureContextServiceAmbiguityTest {
 

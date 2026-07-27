@@ -1,5 +1,9 @@
 package cat.complai.controllers.home;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import cat.complai.dto.home.HealthDto;
 import cat.complai.services.health.HealthCheckService;
 import io.micronaut.http.HttpResponse;
@@ -11,10 +15,6 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 @MicronautTest
 class HealthControllerIntegrationTest {

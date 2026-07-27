@@ -1,18 +1,22 @@
 package cat.complai.services.openrouter.procedure;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import cat.complai.dto.openrouter.Source;
 import cat.complai.helpers.openrouter.CityInfoRagHelperRegistry;
 import cat.complai.helpers.openrouter.EventRagHelperRegistry;
 import cat.complai.helpers.openrouter.NewsRagHelperRegistry;
 import cat.complai.helpers.openrouter.ProcedureRagHelperRegistry;
 import cat.complai.helpers.openrouter.RagHelper;
+import cat.complai.services.openrouter.ContextRequirements;
+import cat.complai.services.openrouter.EventContextResult;
 import cat.complai.services.openrouter.IntentDetector;
 import cat.complai.services.openrouter.NewsContextResult;
 import cat.complai.services.openrouter.ProcedureContextResult;
-import cat.complai.services.openrouter.EventContextResult;
 import cat.complai.services.openrouter.RagContextBuilder;
-import cat.complai.services.openrouter.ContextRequirements;
-
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
@@ -21,11 +25,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @MicronautTest
 class ProcedureContextServiceTest {

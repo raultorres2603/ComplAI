@@ -1,32 +1,31 @@
 package cat.complai.services.openrouter;
 
-import cat.complai.utilities.http.HttpWrapper;
+import static org.junit.jupiter.api.Assertions.*;
+
+import cat.complai.config.CivicVocabularyConfig;
 import cat.complai.dto.http.HttpDto;
 import cat.complai.dto.openrouter.ComplainantIdentity;
+import cat.complai.dto.openrouter.OpenRouterErrorCode;
 import cat.complai.dto.openrouter.OpenRouterResponseDto;
+import cat.complai.dto.openrouter.OutputFormat;
 import cat.complai.dto.openrouter.Source;
+import cat.complai.helpers.openrouter.CityInfoRagHelperRegistry;
+import cat.complai.helpers.openrouter.CivicVocabularyService;
 import cat.complai.helpers.openrouter.EventRagHelperRegistry;
+import cat.complai.helpers.openrouter.NewsRagHelperRegistry;
 import cat.complai.helpers.openrouter.ProcedureRagHelperRegistry;
 import cat.complai.helpers.openrouter.RagHelper;
+import cat.complai.helpers.openrouter.RedactPromptBuilder;
 import cat.complai.services.openrouter.ai.AiResponseProcessingService;
+import cat.complai.services.openrouter.cache.ResponseCacheService;
 import cat.complai.services.openrouter.conversation.ConversationManagementService;
 import cat.complai.services.openrouter.validation.InputValidationService;
+import cat.complai.utilities.http.HttpWrapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-
-import cat.complai.helpers.openrouter.RedactPromptBuilder;
-import cat.complai.dto.openrouter.OpenRouterErrorCode;
-import cat.complai.dto.openrouter.OutputFormat;
-import cat.complai.services.openrouter.cache.ResponseCacheService;
-import cat.complai.helpers.openrouter.CivicVocabularyService;
-import cat.complai.config.CivicVocabularyConfig;
-import cat.complai.helpers.openrouter.NewsRagHelperRegistry;
-import cat.complai.helpers.openrouter.CityInfoRagHelperRegistry;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for OpenRouterServices. Uses a small fake HttpWrapper to avoid

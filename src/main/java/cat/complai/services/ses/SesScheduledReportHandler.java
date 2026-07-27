@@ -1,9 +1,9 @@
 package cat.complai.services.ses;
 
+import io.micronaut.function.aws.MicronautRequestHandler;
+
 import java.util.Map;
 import java.util.logging.Logger;
-
-import io.micronaut.function.aws.MicronautRequestHandler;
 
 /**
  * AWS Lambda handler for scheduled statistics report emails via SES.

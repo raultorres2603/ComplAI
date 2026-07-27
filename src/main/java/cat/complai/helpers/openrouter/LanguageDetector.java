@@ -21,36 +21,36 @@ public final class LanguageDetector {
 
     // Markers that are distinctive to Catalan and absent (or very rare) in Spanish.
     private static final String[] CATALAN_SIGNALS = {
-            "l·l", "·l",
-            " vull ", " però ", " perquè ", " és ", " amb ",
-            " quan ", " aquest ", " aquell ", " nosaltres", " vosaltres",
-            " podeu ", " esteu ", " sou ", " heu ", " molt ",
-            " volem ", " tenim ", " feu ", " cal ",
+        "l·l", "·l",
+        " vull ", " però ", " perquè ", " és ", " amb ",
+        " quan ", " aquest ", " aquell ", " nosaltres", " vosaltres",
+        " podeu ", " esteu ", " sou ", " heu ", " molt ",
+        " volem ", " tenim ", " feu ", " cal ",
     };
 
     // Markers that are distinctive to Spanish.
     private static final String[] SPANISH_SIGNALS = {
-            "ñ",
-            " quiero ", " tengo ", " usted ", " señor ", " señora ",
-            " también ", " cuando ", " porque ", " estoy ",
-            " vecino ", " necesito ", " solicito ", " quejas ",
-            " queremos ", " tenemos ", " hacemos ",
-            " queja ", " permiso ", " reclamacion ", " denuncia ",
-            " solicitud ", " autorizacion ", " formulario ",
+        "ñ",
+        " quiero ", " tengo ", " usted ", " señor ", " señora ",
+        " también ", " cuando ", " porque ", " estoy ",
+        " vecino ", " necesito ", " solicito ", " quejas ",
+        " queremos ", " tenemos ", " hacemos ",
+        " queja ", " permiso ", " reclamacion ", " denuncia ",
+        " solicitud ", " autorizacion ", " formulario ",
     };
 
     // Markers that are distinctive to French: accented characters and French keywords.
     private static final String[] FRENCH_SIGNALS = {
-            "ç", "û", "ô", "é", "è", "ê", "à", "ù", "î", "ï", "ö", "ü",
-            " vous ", "-vous", "vous ",
-            " je ", " tu ", " nous ",
-            " était ", " français ", " comment ", " pourquoi ",
-            " bonjour ", " bonsoir ", " merci ", " s'il ", " plaît ",
-            " monsieur ", " madame ", " mademoiselle ",
-            " aller ", " avoir ", " être ", " faire ", " pouvoir ", " vouloir ", " devoir ",
-            " plainte ", " reclamation ", " demande ", " clamation",
-            " formulaire ", " autorisation ", " permis ", " presentation",
-            "pouvez", "peux", "pouvaient",
+        "ç", "û", "ô", "é", "è", "ê", "à", "ù", "î", "ï", "ö", "ü",
+        " vous ", "-vous", "vous ",
+        " je ", " tu ", " nous ",
+        " était ", " français ", " comment ", " pourquoi ",
+        " bonjour ", " bonsoir ", " merci ", " s'il ", " plaît ",
+        " monsieur ", " madame ", " mademoiselle ",
+        " aller ", " avoir ", " être ", " faire ", " pouvoir ", " vouloir ", " devoir ",
+        " plainte ", " reclamation ", " demande ", " clamation",
+        " formulaire ", " autorisation ", " permis ", " presentation",
+        "pouvez", "peux", "pouvaient",
     };
 
     private LanguageDetector() {}
@@ -73,9 +73,15 @@ public final class LanguageDetector {
         int spanishScore = countSignals(lower, SPANISH_SIGNALS);
         int frenchScore = countSignals(lower, FRENCH_SIGNALS);
 
-        if (catalanScore > 0 && catalanScore >= spanishScore && catalanScore >= frenchScore) return "CA";
-        if (spanishScore > 0 && spanishScore >= frenchScore) return "ES";
-        if (frenchScore > 0) return "FR";
+        if (catalanScore > 0 && catalanScore >= spanishScore && catalanScore >= frenchScore) {
+            return "CA";
+        }
+        if (spanishScore > 0 && spanishScore >= frenchScore) {
+            return "ES";
+        }
+        if (frenchScore > 0) {
+            return "FR";
+        }
         return "EN";
     }
 
