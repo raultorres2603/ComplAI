@@ -37,12 +37,14 @@ The CDK stacks require these GitHub Actions secrets to be configured in your rep
 
 **Development environment (Development repository):**
 - `OPENROUTER_API_KEY`: OpenRouter API key for AI responses (both dev and prod)
-- `API_KEY_ELPRAT`: API key for El Prat municipality (both dev and prod)
+- `JWT_SECRET`: Base64-encoded HMAC-SHA256 key (≥ 256 bits) for signing session tokens (both dev and prod)
+- `CLIENT_SECRET_HASH`: SHA-256 hex hash of the mobile client secret (both dev and prod)
 - `COMPLAI_CORS_ALLOWED_ORIGIN`: CORS allowed origin for development (defaults to GitHub Pages URL)
 
 **Production environment (Production repository/branch):**
 - `OPENROUTER_API_KEY`: Same as development or different key if needed
-- `API_KEY_ELPRAT`: Same as development or different key if needed
+- `JWT_SECRET`: Same as development or different key if needed
+- `CLIENT_SECRET_HASH`: Same as development or different key if needed
 - `COMPLAI_CORS_ALLOWED_ORIGIN`: CORS allowed origin for production
 
 **Optional overrides (both environments):**
@@ -55,6 +57,8 @@ The CDK stacks require these GitHub Actions secrets to be configured in your rep
 - `RESPONSE_CACHE_TTL_MINUTES`: Cache TTL (defaults to `10`)
 - `RESPONSE_CACHE_MAX_ENTRIES`: Cache size (defaults to `500`)
 - `RATE_LIMIT_REQUESTS_PER_MINUTE`: Rate limit per minute (defaults to `20`)
+- `TOKEN_RATE_LIMIT_REQUESTS_PER_MINUTE`: Per-IP rate limit on the token endpoint (defaults to `10`)
+- `SESSION_TOKEN_LIFETIME_SECONDS`: Session token lifetime in seconds (defaults to `900`)
 - `COMPLAI_DEFAULT_CITY_ID`: Default city (defaults to `elprat`)
 - `HTTP_CLIENT_CONNECT_TIMEOUT`: HTTP connect timeout (defaults to `10s`)
 - `HTTP_CLIENT_READ_TIMEOUT`: HTTP read timeout (defaults to `60s`)
@@ -173,7 +177,8 @@ To deploy locally with test values:
 ```bash
 export SES_FROM_EMAIL="test@example.com"
 export OPENROUTER_API_KEY="sk-..."
-export API_KEY_ELPRAT="your-key"
+export JWT_SECRET="<base64-encoded-hmac-sha256-key>"
+export CLIENT_SECRET_HASH="<sha256-hex-hash-of-client-secret>"
 
 npm run cdk deploy -- --context environment=development
 ```

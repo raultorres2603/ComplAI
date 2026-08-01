@@ -219,11 +219,13 @@ export class LambdaStack extends cdk.Stack {
         CITYINFO_BUCKET: cityInfoBucket.bucketName,
         CITYINFO_REGION: this.region,
         OPENROUTER_MODEL: process.env.OPENROUTER_MODEL || 'openrouter/free',
-        // API key authentication — one env var per city.
-        // To add a new city: add API_KEY_<CITYID_UPPER> here and set the corresponding
-        // GitHub Environment secret (API_KEY_<CITYID_UPPER>) for both development and production.
+        // Session token auth — replaces static API keys.
+        // api.key.enabled guards Micronaut beans that must only load on the API Lambda
+        // (JwtSessionAuthFilter, OidcIdentityTokenValidator, RateLimitFilter).
         API_KEY_ENABLED: 'true',
-        API_KEY_ELPRAT: process.env.API_KEY_ELPRAT || '',
+        JWT_SECRET: process.env.JWT_SECRET || '',
+        CLIENT_SECRET_HASH: process.env.CLIENT_SECRET_HASH || '',
+        TOKEN_RATE_LIMIT_REQUESTS_PER_MINUTE: process.env.TOKEN_RATE_LIMIT_REQUESTS_PER_MINUTE || '10',
         // City enable/disable — read from GitHub Environment Variables.
         // Must be explicitly set to "true" for each city. Defaults to disabled.
         ENABLE_CITY_ELPRAT: process.env.ENABLE_CITY_ELPRAT || 'false',

@@ -53,17 +53,11 @@ script:post-response {
   console.log(" parsed — message length:", parsed.message.length, "success:", parsed.success);
 }
 
-settings {
-  encodeUrl: true
-  timeout: 0
-  stream: true
-}
-
 tests {
   test("HTTP status is successful", () => {
     expect(res.getStatus()).to.be.lessThan(500);
   });
-
+  
   test("Response asks for date range", () => {
     const parsed = bru.getVar("parsedResponse");
     const msg = parsed.message.toLowerCase();
@@ -73,4 +67,9 @@ tests {
       msg.includes("interval de dates");
     expect(hasDateWindowHint).to.equal(true);
   });
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
 }

@@ -52,32 +52,26 @@ script:post-response {
   bru.setVar("parsedResponse", parsed);
 }
 
-settings {
-  encodeUrl: true
-  timeout: 0
-  stream: true
-}
-
 tests {
   test("HTTP 200 on clarification answer", () => {
     expect(res.getStatus()).to.equal(200);
   });
-
+  
   test("Response is successful", () => {
     const parsed = bru.getVar("parsedResponse");
     expect(parsed.success).to.equal(true);
   });
-
+  
   test("Turn 2 response is not a clarification (no <ol>)", () => {
     const parsed = bru.getVar("parsedResponse");
     expect(parsed.message.includes("<ol>")).to.equal(false);
   });
-
+  
   test("SSE output includes sources event", () => {
     const parsed = bru.getVar("parsedResponse");
     expect(parsed.sources.length).to.be.greaterThan(0);
   });
-
+  
   test("Sources event contains at least one entry", () => {
     const parsed = bru.getVar("parsedResponse");
     const hasHttpSource = parsed.sources.some(s =>
@@ -85,4 +79,9 @@ tests {
     );
     expect(hasHttpSource).to.equal(true);
   });
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
 }

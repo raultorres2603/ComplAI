@@ -15,7 +15,7 @@ import cat.complai.helpers.openrouter.AskStreamErrorMapper;
 import cat.complai.helpers.openrouter.AuditLogger;
 import cat.complai.helpers.openrouter.LanguageDetector;
 import cat.complai.services.openrouter.IOpenRouterService;
-import cat.complai.utilities.auth.ApiKeyAuthFilter;
+import cat.complai.utilities.auth.AuthConstants;
 import cat.complai.utilities.auth.OidcIdentityTokenValidator;
 import cat.complai.utilities.auth.VerifiedCitizenIdentity;
 import cat.complai.utilities.metrics.InteractionMetricsPublisher;
@@ -57,7 +57,7 @@ import java.util.logging.Logger;
  *
  * <p>
  * Authentication is enforced by
- * {@link cat.complai.utilities.auth.ApiKeyAuthFilter}
+ * {@link cat.complai.utilities.auth.JwtSessionAuthFilter}
  * before this
  * controller is reached. The city identifier is read from the {@code city}
  * request attribute
@@ -93,7 +93,7 @@ public class OpenRouterController {
     @Post("/ask")
     @Produces({ MediaType.TEXT_EVENT_STREAM, MediaType.APPLICATION_JSON })
     public HttpResponse<?> ask(@Body AskRequest request, HttpRequest<?> httpRequest) {
-        String cityId = httpRequest.getAttribute(ApiKeyAuthFilter.CITY_ATTRIBUTE, String.class)
+        String cityId = httpRequest.getAttribute(AuthConstants.CITY_ATTRIBUTE, String.class)
                         .orElseThrow(() -> new IllegalStateException(
                                         "city attribute missing from request — API key filter should have set it"));
         String conversationId = request != null ? request.getConversationId() : null;
@@ -159,7 +159,7 @@ public class OpenRouterController {
     @Post("/redact")
     @Produces({ MediaType.APPLICATION_JSON })
     public HttpResponse<?> redact(@Body RedactRequest request, HttpRequest<?> httpRequest) {
-        String cityId = httpRequest.getAttribute(ApiKeyAuthFilter.CITY_ATTRIBUTE, String.class)
+        String cityId = httpRequest.getAttribute(AuthConstants.CITY_ATTRIBUTE, String.class)
                         .orElseThrow(() -> new IllegalStateException(
                                         "city attribute missing from request — API key filter should have set it"));
         String conversationId = request != null ? request.getConversationId() : null;

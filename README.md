@@ -72,8 +72,8 @@ Layering present in code:
 flowchart TD
 	C[Clients\nWeb, Telegram and API consumers]
 
-	subgraph API[Micronaut API Lambda]
-		F[Filters and Middleware\nApiKeyAuthFilter\nRateLimitFilter\nCorsFilter\nCityIdLoggingFilter]
+		subgraph API[Micronaut API Lambda]
+			F[Filters and Middleware\nJwtSessionAuthFilter\nRateLimitFilter\nCorsFilter\nCityIdLoggingFilter]
 
 		subgraph CTRL[Controllers]
 			HC[HealthController]
@@ -171,13 +171,16 @@ flowchart TD
 sequenceDiagram
     participant U as User
     participant C as API Gateway
-    participant F as ApiKeyAuthFilter
+    participant F as JwtSessionAuthFilter
     participant S as OpenRouterService
     participant R as RAG (BM25)
     participant O as OpenRouter AI
 
-    U->>C: POST /complai/ask<br/>X-Api-Key: test-integration-key-elprat
-    C->>F: Validate API key
+    U->>C: POST /complai/auth/token<br/>{clientSecret, cityId}
+    C->>C: Validate secret + city enabled
+    C-->>U: 200 {token: <JWT>, expiresIn, cityId}
+    U->>C: POST /complai/ask<br/>Authorization: Bearer <JWT>
+    C->>F: Validate JWT, extract city
     F->>S: Extract city=elprat, pass request
     S->>R: Detect intent & retrieve context
     R-->>S: Procedures/Events/Gencat docs
@@ -187,7 +190,8 @@ sequenceDiagram
 ```
 
 **Key Points:**
-- City extracted from `X-Api-Key` header (e.g., `API_KEY_ELPRAT` → `elprat`)
+- Client authenticates once via `POST /complai/auth/token` with a static client secret, receiving a short-lived (15 min) HMAC-signed JWT.
+- All subsequent requests carry `Authorization: Bearer <JWT>`. City is extracted from the JWT `city` claim.
 - Intent detection: procedure, event, or gencat query
 - RAG uses in-memory BM25 index (no external database)
 - Response via Server-Sent Events (SSE)
@@ -271,6 +275,7 @@ sequenceDiagram
 - Scheduled via EventBridge (production) or CloudWatch Events (SAM local)
 - `MultiCitySesService` discovers cities from environment variables
 - Only cities with BOTH `API_KEY_<CITYID>` AND `AWS_SES_TO_EMAIL_<CITYID>` receive reports
+  (the `API_KEY_<CITYID>` variable is retained for SES city discovery only — it is no longer used for request authentication)
 - Each city gets its own customized report email
 
 ---
@@ -288,7 +293,7 @@ sequenceDiagram
 | Search / RAG | In-memory lexical RAG (`InMemoryLexicalIndex`) | BM25 scoring, no external Lucene dependency |
 | Caching | Caffeine | Conversation state (30 min TTL), response cache (10 min TTL), rate limiter, Telegram session state |
 | PDF Generation | OpenPDF 2.0.5 | Replaces Apache PDFBox — zero AWT dependency, works in GraalVM native image |
-| Auth / Identity | API key (`X-Api-Key`) + OIDC ID token (`X-Identity-Token`) | JJWT 0.12.6 for OIDC validation |
+| Auth / Identity | Session token (HMAC JWT via `Authorization: Bearer`) + OIDC ID token (`X-Identity-Token`) | JJWT 0.12.6 for JWT + OIDC validation |
 | HTML Parsing | Jsoup 1.17.2 | |
 | Email | Amazon SES | Weekly statistics reports |
 | Tests | JUnit 5, Mockito, Bruno E2E | |
@@ -339,7 +344,9 @@ Key environment variables (see `sam/env.json.example` for the full list):
 | Variable | Description | Example |
 |---|---|---|
 | `OPENROUTER_API_KEY` | OpenRouter API key | `sk-or-v1-...` |
-| `API_KEY_ELPRAT` | API key for El Prat | `sk-test-elprat-...` |
+| `JWT_SECRET` | Base64-encoded HMAC-SHA256 key (≥ 256 bits) for signing session tokens | `<base64-key>` |
+| `CLIENT_SECRET_HASH` | SHA-256 hex hash of the mobile client secret | `<sha256-hash>` |
+| `TOKEN_RATE_LIMIT_REQUESTS_PER_MINUTE` | Per-IP rate limit on the token endpoint | `10` |
 | `AWS_SES_FROM_EMAIL` | Verified SES sender email | `noreply@elprathq.cat` |
 | `AWS_SES_TO_EMAIL_ELPRAT` | Report recipient for El Prat | `elprat@example.com` |
 | `OPENROUTER_MODEL` | OpenRouter model ID | `openrouter/free` |
@@ -356,9 +363,10 @@ Key environment variables (see `sam/env.json.example` for the full list):
 |---|---|---|---|---|---|
 | `GET` | `/health` | No | Full health check (S3, SQS, SES, RAG, OpenRouter) | — | `HealthDto` |
 | `GET` | `/health/startup` | No | Lightweight startup health check | — | `HealthDto` |
-| `POST` | `/complai/ask` | `X-Api-Key` | Ask municipal questions (SSE stream) | `AskRequest` | `Publisher<Event<String>>` (SSE) or `OpenRouterPublicDto` (error) |
-| `POST` | `/complai/redact` | `X-Api-Key` (+ `X-Identity-Token` for OIDC-enabled cities) | Complaint drafting and async PDF queueing | `RedactRequest` | `RedactAcceptedDto` (202) or `OpenRouterPublicDto` |
-| `POST` | `/complai/feedback` | `X-Api-Key` | Queue user feedback for async processing | `FeedbackRequest` | `FeedbackAcceptedDto` (202) |
+| `POST` | `/complai/auth/token` | Client secret | Exchange client secret for a session JWT | `TokenRequest {clientSecret, cityId}` | `{token, expiresIn, cityId}` |
+| `POST` | `/complai/ask` | `Authorization: Bearer <JWT>` | Ask municipal questions (SSE stream) | `AskRequest` | `Publisher<Event<String>>` (SSE) or `OpenRouterPublicDto` (error) |
+| `POST` | `/complai/redact` | `Authorization: Bearer <JWT>` (+ `X-Identity-Token` for OIDC-enabled cities) | Complaint drafting and async PDF queueing | `RedactRequest` | `RedactAcceptedDto` (202) or `OpenRouterPublicDto` |
+| `POST` | `/complai/feedback` | `Authorization: Bearer <JWT>` | Queue user feedback for async processing | `FeedbackRequest` | `FeedbackAcceptedDto` (202) |
 | `POST` | `/telegram/webhook/{cityId}` | `X-Telegram-Bot-Api-Secret-Token` | Telegram bot webhook callback | `TelegramUpdate` | `200 OK` |
 
 ### Error Codes
@@ -368,7 +376,7 @@ Key environment variables (see `sam/env.json.example` for the full list):
 | 200 | OK | Successful response (or synchronous redact with partial identity) |
 | 202 | Accepted | Request queued for async processing (redact, feedback) |
 | 400 | Bad Request | Validation error (missing fields, too long) |
-| 401 | Unauthorized | Missing or invalid `X-Api-Key` (or `X-Identity-Token` for OIDC-enabled cities) |
+| 401 | Unauthorized | Missing or invalid `Authorization: Bearer` token (or `X-Identity-Token` for OIDC-enabled cities) |
 | 422 | Unprocessable Entity | AI refusal (e.g., anonymous complaint not allowed) |
 | 429 | Too Many Requests | Rate limit exceeded |
 | 502 | Bad Gateway | Upstream AI API error |
@@ -412,16 +420,22 @@ CI auto-deploys to `development` on every PR. Production deploy requires a push 
 
 ## Security
 
-### API Key Authentication
+### Session Token Authentication
 
-All API endpoints require an `X-Api-Key` header, except health and Telegram webhook routes. The `ApiKeyAuthFilter` reads `API_KEY_<CITYID>` environment variables at startup to build an apiKey-to-cityId mapping. Requests are rejected with 401 if the key is missing or unknown.
+All API endpoints (except health, the Telegram webhook, and the token endpoint itself) require an `Authorization: Bearer <JWT>` header. Authentication is a two-step flow:
 
-- **Excluded routes**: `GET /health`, `GET /health/startup`, `POST /telegram/webhook/{cityId}`.
-- **Telegram webhook auth**: Uses `X-Telegram-Bot-Api-Secret-Token` header verification instead of API key.
+1. **Token exchange** — `POST /complai/auth/token` accepts `{ clientSecret, cityId }`. The `JwtSessionAuthFilter` is **bypassed** for this route; instead `TokenController` validates the static client secret (compared against `CLIENT_SECRET_HASH`) and checks that the city is enabled (`ENABLE_CITY_<CITYID>`). On success it returns a short-lived HMAC-SHA256 JWT (default **15 minutes**, configurable via `SESSION_TOKEN_LIFETIME_SECONDS`) with the `city` claim set.
+   - `401` — invalid or missing client secret.
+   - `503` — requested city is disabled.
+2. **Bearer auth** — `JwtSessionAuthFilter` validates the JWT signature, extracts the `city` claim, and rejects requests with `401` on any failure (missing header, malformed token, expired, bad signature, missing `city` claim) or `503` if the city is disabled.
+
+- **Excluded routes**: `GET /`, `GET /health`, `GET /health/startup`, `GET /privacy`, `POST /complai/auth/token`, `POST /telegram/webhook/{cityId}`.
+- **Telegram webhook auth**: Uses `X-Telegram-Bot-Api-Secret-Token` header verification instead of Bearer token.
 
 ### Rate Limiting
 
-Per-user in-process rate limiter using Caffeine (1-minute sliding window, default **20 requests/minute**). Returns HTTP 429 when exceeded. Excluded on health endpoints.
+- **Per-user request limiter** (`RateLimitFilter`) — in-process Caffeine cache (1-minute sliding window, default **20 requests/minute** per user). Returns HTTP 429 when exceeded. Excluded on health endpoints.
+- **Token endpoint limiter** (`TokenController`) — per-IP Caffeine cache (1-minute window, default **10 requests/minute**, configurable via `TOKEN_RATE_LIMIT_REQUESTS_PER_MINUTE`). Protects the unauthenticated token exchange from brute-force attacks. Returns HTTP 429 when exceeded.
 
 ### OIDC Identity Verification
 
@@ -454,16 +468,11 @@ Always run the full test suite before pushing:
 
 ### Test authentication
 
-All `@MicronautTest` HTTP integration tests must include an `X-Api-Key` header with one of these test keys:
+HTTP integration tests rely on `TestJwtSessionFilter` (a `@Replaces` for `JwtSessionAuthFilter`) that is active for all `@MicronautTest` classes. It validates a `Authorization: Bearer <JWT>` header using a hardcoded test signing key and reads `ENABLE_CITY_<CITYID>` from system properties/env vars to determine disabled cities.
 
-| Key | City |
-|---|---|
-| `test-integration-key-elprat` | elprat |
-| `test-integration-key-testcity` | testcity |
-| `test-api-key-feedback` | elprat |
-| `test-integration-key-elprat-htmlsources` | testcity |
+Tests obtain a valid token with `TestJwtSessionFilter.createTestToken(cityId)` (expired tokens via `createExpiredTestToken(cityId)`), then send it as `Authorization: Bearer <token>`. `GET /health` and `GET /health/startup` remain excluded from auth enforcement.
 
-**Gotcha**: `GET /health`, `GET /health/startup` are excluded from auth enforcement.
+**Gotcha**: the token endpoint `POST /complai/auth/token` is also excluded from the filter and authenticated via the client secret instead.
 
 ### E2E Tests (Bruno)
 
@@ -570,7 +579,7 @@ Telegram → POST /telegram/webhook/{cityId} → TelegramController
 ```
 
 - **Webhook endpoint**: `POST /telegram/webhook/{cityId}` — receives updates from Telegram
-- **Auth**: Excluded from `X-Api-Key` filter; secured via `X-Telegram-Bot-Api-Secret-Token` header
+- **Auth**: Excluded from `JwtSessionAuthFilter`; secured via `X-Telegram-Bot-Api-Secret-Token` header
 - **Bot token**: Resolved from `TOKEN_TELEGRAM_<cityId>` environment variable at startup
 - **Session state**: Per-chat mode/language stored in Caffeine cache (30 min TTL)
 - **Async AI**: For complaint drafting and feedback, the bot publishes messages to SQS queues. The **Ask Worker Lambda** processes Telegram ask jobs asynchronously — it calls the AI and sends the answer back via the Telegram Bot API.

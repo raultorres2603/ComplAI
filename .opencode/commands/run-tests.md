@@ -84,15 +84,8 @@ Example:
 
 ## Test Authentication
 
-When running `@MicronautTest` HTTP integration tests, you must include an `X-Api-Key` header with one of these test keys:
+HTTP integration tests rely on `TestJwtSessionFilter` — a `@Replaces(JwtSessionAuthFilter.class)` bean active for all `@MicronautTest` classes. It validates an `Authorization: Bearer <JWT>` header using a hardcoded test signing key and reads `ENABLE_CITY_<CITYID>` from system properties/env vars to determine disabled cities.
 
-| Key | City |
-|---|---|
-| `test-integration-key-elprat` | elprat |
-| `test-integration-key-testcity` | testcity |
-| `test-api-key-feedback` | elprat |
-| `test-integration-key-elprat-htmlsources` | testcity |
+Tests obtain a valid token with `TestJwtSessionFilter.createTestToken(cityId)` (expired tokens via `createExpiredTestToken(cityId)`) and send it as `Authorization: Bearer <token>`.
 
-**Note:** The production `ApiKeyAuthFilter` is disabled in test mode (`api.key.enabled=false` in `src/test/resources/application.properties`). It is replaced by `TestApiKeyFilter` which accepts these test keys.
-
-**Gotcha:** Every `@MicronautTest` HTTP integration test must include an `X-Api-Key` header with one of these keys — otherwise the request returns 401. GET `/`, `/health`, `/health/startup` are excluded from auth requirements.
+**Gotcha:** Every `@MicronautTest` HTTP integration test must send a Bearer token from `createTestToken(...)` — otherwise the request returns 401. GET `/`, `/health`, `/health/startup` are excluded from auth requirements. The token endpoint `POST /complai/auth/token` is also excluded from the filter and authenticated via the client secret instead.
