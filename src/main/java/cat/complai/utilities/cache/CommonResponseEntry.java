@@ -1,15 +1,15 @@
 package cat.complai.utilities.cache;
 
-import io.micronaut.core.annotation.Introspected;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.core.annotation.Introspected;
 
 /**
  * DTO for pre-configured common AI responses loaded from
  * common-ai-requests.json.
- * 
+ *
  * Used to pre-populate ResponseCacheService with 30-50 high-frequency responses
  * at application startup (Tier 2 cache).
- * 
+ *
  * Example JSON:
  * {
  * "category": "PARKING",
@@ -17,7 +17,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * "question_template": "How do I get a parking permit?",
  * "response": "To get a parking permit at El Prat, you need to..."
  * }
- * 
+ *
  * City can be null to apply response across all cities (lower priority in
  * matches).
  * Question template is used for simple pattern matching or as documentation

@@ -1,16 +1,16 @@
 package cat.complai.utilities.scraper;
 
-import cat.complai.utilities.scraper.ProcedureScraper.ScraperMapping;
-import cat.complai.utilities.scraper.ProcedureScraper.SkipConfig;
+import static org.junit.jupiter.api.Assertions.*;
+
 import cat.complai.utilities.scraper.ProcedureScraper.CrawlConfig;
 import cat.complai.utilities.scraper.ProcedureScraper.FieldExtractionRule;
+import cat.complai.utilities.scraper.ProcedureScraper.ScraperMapping;
+import cat.complai.utilities.scraper.ProcedureScraper.SkipConfig;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for the pure-function logic in {@link ProcedureScraper}.

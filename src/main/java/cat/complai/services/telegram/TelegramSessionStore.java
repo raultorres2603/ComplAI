@@ -3,6 +3,7 @@ package cat.complai.services.telegram;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import jakarta.inject.Singleton;
+
 import java.util.concurrent.TimeUnit;
 
 @Singleton

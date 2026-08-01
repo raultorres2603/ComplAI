@@ -1,17 +1,17 @@
 package cat.complai.services.openrouter.ai;
 
-import cat.complai.utilities.http.HttpWrapper;
+import static org.junit.jupiter.api.Assertions.*;
+
 import cat.complai.dto.http.HttpDto;
-import cat.complai.dto.openrouter.OpenRouterResponseDto;
 import cat.complai.dto.openrouter.OpenRouterErrorCode;
+import cat.complai.dto.openrouter.OpenRouterResponseDto;
 import cat.complai.services.openrouter.cache.ResponseCacheService;
+import cat.complai.utilities.http.HttpWrapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 public class AiResponseProcessingServiceTest {
 

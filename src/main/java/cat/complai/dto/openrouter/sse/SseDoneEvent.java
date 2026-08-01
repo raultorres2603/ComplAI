@@ -1,8 +1,8 @@
 package cat.complai.dto.openrouter.sse;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.Nullable;
-import com.fasterxml.jackson.annotation.JsonInclude;
 
 /**
  * SSE event for stream completion.

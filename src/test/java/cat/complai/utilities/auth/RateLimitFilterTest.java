@@ -1,12 +1,12 @@
 package cat.complai.utilities.auth;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for {@link RateLimitFilter}.

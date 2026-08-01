@@ -1,5 +1,7 @@
 package cat.complai.services.feedback;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import cat.complai.controllers.feedback.dto.FeedbackAcceptedDto;
 import cat.complai.controllers.feedback.dto.FeedbackRequest;
 import cat.complai.dto.feedback.FeedbackErrorCode;
@@ -7,8 +9,6 @@ import cat.complai.dto.feedback.FeedbackResult;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.atomic.AtomicReference;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for {@link FeedbackPublisherService}.

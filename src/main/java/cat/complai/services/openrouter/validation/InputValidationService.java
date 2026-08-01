@@ -1,10 +1,11 @@
 package cat.complai.services.openrouter.validation;
 
-import cat.complai.dto.openrouter.OpenRouterResponseDto;
 import cat.complai.dto.openrouter.OpenRouterErrorCode;
-import jakarta.inject.Singleton;
-import jakarta.inject.Inject;
+import cat.complai.dto.openrouter.OpenRouterResponseDto;
 import io.micronaut.context.annotation.Value;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
+
 import java.util.Locale;
 import java.util.Optional;
 import java.util.logging.Logger;
@@ -92,31 +93,32 @@ public class InputValidationService {
      * they want anonymity, not every mention of the word "anonymous".
      */
     private boolean requestsAnonymity(String text) {
-        if (text == null)
+        if (text == null) {
             return false;
+        }
         String lower = text.toLowerCase(Locale.ROOT)
                 .replace("'", "'").replace("'", "'")
                 .replaceAll("[.,;:!?()\\[\\]{}-]", " ")
                 .replaceAll("\\s+", " ")
                 .trim();
         String[] anonymousPhrases = {
-                "want to be anonymous",
-                "remain anonymous",
-                "stay anonymous",
-                "keep it anonymous",
-                "make it anonymous",
-                "anonymously",
-                "quiero ser anónimo",
-                "quiero que sea anónimo",
-                "de forma anónima",
-                "de manera anónima",
-                "en forma anónima",
-                "quiero hacerlo anónimo",
-                "vull ser anònim",
-                "vull que sigui anònim",
-                "de forma anònima",
-                "de manera anònima",
-                "vull fer-ho anònim"
+            "want to be anonymous",
+            "remain anonymous",
+            "stay anonymous",
+            "keep it anonymous",
+            "make it anonymous",
+            "anonymously",
+            "quiero ser anónimo",
+            "quiero que sea anónimo",
+            "de forma anónima",
+            "de manera anónima",
+            "en forma anónima",
+            "quiero hacerlo anónimo",
+            "vull ser anònim",
+            "vull que sigui anònim",
+            "de forma anònima",
+            "de manera anònima",
+            "vull fer-ho anònim"
         };
         for (String phrase : anonymousPhrases) {
             if (lower.contains(phrase)) {

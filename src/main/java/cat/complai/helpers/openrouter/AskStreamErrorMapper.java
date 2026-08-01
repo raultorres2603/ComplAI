@@ -1,9 +1,9 @@
 package cat.complai.helpers.openrouter;
 
-import cat.complai.exceptions.OpenRouterStreamingException;
 import cat.complai.dto.openrouter.OpenRouterErrorCode;
 import cat.complai.dto.openrouter.OpenRouterResponseDto;
 import cat.complai.dto.openrouter.sse.SseErrorEvent;
+import cat.complai.exceptions.OpenRouterStreamingException;
 
 import java.net.http.HttpTimeoutException;
 import java.util.concurrent.TimeoutException;

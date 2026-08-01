@@ -1,12 +1,12 @@
 package cat.complai.services.ses;
 
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
 import cat.complai.config.ISesRecipientProvider;
 import cat.complai.exceptions.ses.CloudWatchLogsException;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Business logic for sending the scheduled statistics report via SES.

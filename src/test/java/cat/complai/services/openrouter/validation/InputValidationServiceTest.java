@@ -1,10 +1,10 @@
 package cat.complai.services.openrouter.validation;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import cat.complai.dto.openrouter.OpenRouterErrorCode;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 class InputValidationServiceTest {
 

@@ -1,5 +1,7 @@
 package cat.complai.utilities.scraper;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -9,7 +11,6 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-import javax.net.ssl.SSLSocketFactory;
 import java.io.InputStream;
 import java.net.CookieStore;
 import java.net.Proxy;
@@ -20,8 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-
-import static org.junit.jupiter.api.Assertions.*;
+import javax.net.ssl.SSLSocketFactory;
 
 class NewsScraperTest {
 

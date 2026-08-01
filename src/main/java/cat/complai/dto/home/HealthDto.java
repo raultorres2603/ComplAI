@@ -1,6 +1,7 @@
 package cat.complai.dto.home;
 
 import io.micronaut.core.annotation.Introspected;
+
 import java.util.Map;
 
 /**

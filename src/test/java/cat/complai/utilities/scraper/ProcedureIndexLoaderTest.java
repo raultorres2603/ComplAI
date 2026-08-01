@@ -1,5 +1,9 @@
 package cat.complai.utilities.scraper;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
@@ -15,10 +19,6 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 
 class ProcedureIndexLoaderTest {
 

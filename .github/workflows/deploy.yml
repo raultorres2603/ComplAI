@@ -77,11 +77,154 @@ jobs:
           fi
 
   # ---------------------------------------------------------------------------
+  # Validate: pre-flight checks that run before the expensive ARM64 native
+  # image build. Catches infrastructure errors, test failures, and code quality
+  # issues early — giving developers fast feedback on a standard x86 runner.
+  # ---------------------------------------------------------------------------
+  validate:
+    name: Pre-flight validation
+    needs: [guard]
+    runs-on: ubuntu-latest
+    # Same skip logic as build: allow both success (manual dispatch that passed
+    # guard) and skipped (PR trigger).
+    if: always() && (needs.guard.result == 'success' || needs.guard.result == 'skipped')
+    steps:
+      - name: Resolve deployment target
+        id: target
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "environment=${{ inputs.environment }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "environment=development" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.branch || github.sha }}
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'corretto'
+
+      - name: Set up Node.js for CDK
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: ~/.gradle/caches
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Cache OWASP dependency-check NVD data
+        uses: actions/cache@v4
+        with:
+          path: ~/.gradle/dependency-check-data
+          key: ${{ runner.os }}-depcheck-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-depcheck-
+
+      - name: Cache npm for CDK
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            ~/.cache/npm
+          key: ${{ runner.os }}-node-${{ hashFiles('cdk/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install CDK dependencies
+        run: cd cdk && npm install
+
+      - name: Build CDK TypeScript
+        run: cd cdk && npm run build
+
+      - name: "Synthesize CDK stacks (${{ steps.target.outputs.environment }})"
+        env:
+          TARGET_ENV: ${{ steps.target.outputs.environment }}
+        run: |
+          cd cdk
+          if ! npx cdk synth "ComplAI*Stack-${TARGET_ENV}"; then
+            echo ""
+            echo "=========================================="
+            echo "CDK SYNTH FAILED"
+            echo "=========================================="
+            echo "Failed to synthesize CDK stacks for environment: ${TARGET_ENV}"
+            echo ""
+            echo "Possible causes:"
+            echo "  1. TypeScript compilation errors in CDK code"
+            echo "  2. Missing or invalid environment variables"
+            echo "  3. Invalid CDK construct configuration"
+            echo ""
+            echo "To reproduce locally:"
+            echo "  cd cdk && npm install && npm run build"
+            echo "  npx cdk synth 'ComplAI*Stack-${TARGET_ENV}'"
+            echo "=========================================="
+            exit 1
+          fi
+          echo "CDK synth successful for environment: ${TARGET_ENV}"
+
+      - name: "Show infrastructure changes (${{ steps.target.outputs.environment }})"
+        # Informational only — skipped for PRs since diff against a non-existent
+        # development stack would show all resources as new (noise, not signal).
+        if: github.event_name == 'workflow_dispatch'
+        continue-on-error: true
+        env:
+          TARGET_ENV: ${{ steps.target.outputs.environment }}
+        run: |
+          cd cdk
+          DIFF_OUTPUT=$(npx cdk diff "ComplAI*Stack-${TARGET_ENV}" 2>&1) || true
+          echo "## Infrastructure Changes — ${TARGET_ENV}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "$DIFF_OUTPUT" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "> This is informational. Changes will be applied during the deploy step." >> "$GITHUB_STEP_SUMMARY"
+          echo ""
+          echo "CDK diff output written to step summary."
+
+      - name: Compile Java code
+        run: ./gradlew --no-daemon compileJava compileTestJava
+
+      - name: Run tests
+        run: ./gradlew --no-daemon ciTest
+
+      - name: "Run Checkstyle"
+        run: ./gradlew --no-daemon checkstyleMain
+
+      - name: "Run CDK unit tests"
+        run: cd cdk && npx jest --ci
+
+      - name: "Run ESLint on CDK code"
+        run: cd cdk && npx eslint .
+
+      - name: "npm audit (CDK dependencies)"
+        # Advisory: the only production dep (aws-cdk-lib) has no known CVEs.
+        # Remaining vulns are in devDependencies (jest, eslint) and build-time
+        # transitive deps (brace-expansion in minimatch) — not deployed to AWS.
+        run: cd cdk && npm audit --audit-level=critical
+
+      - name: "OWASP dependency-check (Java CVE scan)"
+        # Advisory for now: first run downloads the NVD database (~200 MB) and
+        # populates the local cache. Remove continue-on-error to make blocking
+        # once we confirm the baseline is clean.
+        run: ./gradlew --no-daemon dependencyCheckAnalyze
+        continue-on-error: true
+
+  # ---------------------------------------------------------------------------
   # Build: compile the project and build the GraalVM native image, then upload it as an artifact.
   # ---------------------------------------------------------------------------
   build:
     name: Build Native Image
-    needs: [guard]
+    needs: [guard, validate]
     # ARM64 runner required — GraalVM native-image cannot cross-compile under
     # QEMU emulation (binary syscall-heavy process fails with exit code 126).
     # The runner natively executes ARM64 Docker containers for buildNativeLambda.
@@ -122,10 +265,6 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
-
-      - name: Run CI tests
-        # Fail early if any test fails, before building the deployable artifact.
-        run: ./gradlew --no-daemon ciTest
 
       - name: Build GraalVM native image
         run: ./gradlew --no-daemon clean buildNativeLambda

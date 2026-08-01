@@ -1,23 +1,25 @@
 package cat.complai.controllers.openrouter;
 
-import cat.complai.utilities.auth.AuthConstants;
-import cat.complai.exceptions.IdentityTokenValidationException;
-import cat.complai.utilities.auth.OidcIdentityTokenValidator;
-import cat.complai.utilities.auth.VerifiedCitizenIdentity;
+import static org.junit.jupiter.api.Assertions.*;
+
+import cat.complai.controllers.openrouter.dto.AskRequest;
+import cat.complai.controllers.openrouter.dto.RedactRequest;
 import cat.complai.dto.openrouter.AskStreamResult;
 import cat.complai.dto.openrouter.ComplainantIdentity;
 import cat.complai.dto.openrouter.OpenRouterErrorCode;
 import cat.complai.dto.openrouter.OpenRouterPublicDto;
 import cat.complai.dto.openrouter.OpenRouterResponseDto;
-import cat.complai.dto.openrouter.RedactAcceptedDto;
-import cat.complai.services.openrouter.IOpenRouterService;
-import cat.complai.controllers.openrouter.dto.AskRequest;
-import cat.complai.controllers.openrouter.dto.RedactRequest;
 import cat.complai.dto.openrouter.OutputFormat;
+import cat.complai.dto.openrouter.RedactAcceptedDto;
+import cat.complai.dto.sqs.RedactSqsMessage;
+import cat.complai.exceptions.IdentityTokenValidationException;
+import cat.complai.services.openrouter.IOpenRouterService;
+import cat.complai.utilities.auth.AuthConstants;
+import cat.complai.utilities.auth.OidcIdentityTokenValidator;
+import cat.complai.utilities.auth.VerifiedCitizenIdentity;
 import cat.complai.utilities.metrics.InteractionMetricsPublisher;
 import cat.complai.utilities.s3.S3PdfUploader;
 import cat.complai.utilities.sqs.SqsComplaintPublisher;
-import cat.complai.dto.sqs.RedactSqsMessage;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
@@ -26,8 +28,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 public class OpenRouterControllerTest {
 

@@ -1,36 +1,35 @@
 package cat.complai.services.stadistics;
-import java.net.URI;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
-import java.net.MalformedURLException;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
+import cat.complai.services.openrouter.IOpenRouterService;
+import cat.complai.services.stadistics.models.ComplaintFile;
+import cat.complai.services.stadistics.models.FeedbackFile;
+import cat.complai.services.stadistics.models.StadisticsModel.ComparisonData;
+import cat.complai.services.stadistics.models.StadisticsModel.MonthlyData;
+import cat.complai.services.stadistics.models.StadisticsModel;
+import cat.complai.utilities.metrics.InteractionMetricsPublisher;
+import cat.complai.utilities.s3.S3ComplaintLister;
+import cat.complai.utilities.s3.S3FeedbackLister;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.Mock;
-
-import cat.complai.services.stadistics.models.ComplaintFile;
-import cat.complai.services.stadistics.models.FeedbackFile;
-import cat.complai.services.stadistics.models.StadisticsModel;
-import cat.complai.services.stadistics.models.StadisticsModel.MonthlyData;
-import cat.complai.services.stadistics.models.StadisticsModel.ComparisonData;
-import cat.complai.services.openrouter.IOpenRouterService;
-import cat.complai.utilities.metrics.InteractionMetricsPublisher;
-import cat.complai.utilities.s3.S3ComplaintLister;
-import cat.complai.utilities.s3.S3FeedbackLister;
+import org.mockito.junit.jupiter.MockitoExtension;
 import software.amazon.awssdk.services.cloudwatch.CloudWatchClient;
 import software.amazon.awssdk.services.cloudwatch.model.Datapoint;
 import software.amazon.awssdk.services.cloudwatch.model.GetMetricStatisticsRequest;
 import software.amazon.awssdk.services.cloudwatch.model.GetMetricStatisticsResponse;
+
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 
 /**
  * Comprehensive unit tests for {@link StadisticsService}.

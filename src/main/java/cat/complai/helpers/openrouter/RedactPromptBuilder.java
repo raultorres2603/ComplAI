@@ -161,13 +161,15 @@ public class RedactPromptBuilder {
 
     private static List<String> readStringList(JsonNode root, String fieldName) {
         JsonNode node = root.path(fieldName);
-        if (!node.isArray())
+        if (!node.isArray()) {
             return Collections.emptyList();
+        }
         List<String> result = new ArrayList<>();
         for (JsonNode item : node) {
             String value = item.asText(null);
-            if (value != null && !value.isBlank())
+            if (value != null && !value.isBlank()) {
                 result.add(value);
+            }
         }
         return Collections.unmodifiableList(result);
     }
@@ -180,7 +182,7 @@ public class RedactPromptBuilder {
      * Returns the multilingual system message scoped to the given city.
      * The AI is instructed to only answer questions about that city and to draft
      * letters addressed to its City Hall.
-     * 
+     *
      * Uses consolidated format rules to reduce token count while preserving all
      * required content.
      */
@@ -351,8 +353,9 @@ public class RedactPromptBuilder {
 
     @Nullable
     public String buildProcedureContextBlockFromMatches(List<RagHelper.Procedure> matches, String cityId) {
-        if (matches == null || matches.isEmpty())
+        if (matches == null || matches.isEmpty()) {
             return null;
+        }
 
         String cityName = resolveCityConfig(cityId).cityName();
         StringBuilder sb = new StringBuilder();
@@ -365,21 +368,24 @@ public class RedactPromptBuilder {
                 sb.append("<a href=\"").append(p.url())
                         .append("\" target=\"_blank\" rel=\"noopener noreferrer\">Més informació / Más información / More information</a>\n\n");
             }
-            if (!p.description().isBlank())
+            if (!p.description().isBlank()) {
                 sb.append(p.description()).append("\n\n");
+            }
             if (!p.requirements().isBlank()) {
                 sb.append("**Requirements:**\n");
                 for (String req : p.requirements().split("\\n")) {
-                    if (!req.isBlank())
+                    if (!req.isBlank()) {
                         sb.append("- ").append(req.trim()).append("\n");
+                    }
                 }
                 sb.append("\n");
             }
             if (!p.steps().isBlank()) {
                 sb.append("**Steps:**\n");
                 for (String step : p.steps().split("\\n")) {
-                    if (!step.isBlank())
+                    if (!step.isBlank()) {
                         sb.append("- ").append(step.trim()).append("\n");
+                    }
                 }
                 sb.append("\n");
             }
@@ -476,12 +482,15 @@ public class RedactPromptBuilder {
         boolean hasId = partialIdentity != null && partialIdentity.idNumber() != null
                 && !partialIdentity.idNumber().isBlank();
 
-        if (!hasName)
+        if (!hasName) {
             missing.append("- First name (nom)\n");
-        if (!hasSurname)
+        }
+        if (!hasSurname) {
             missing.append("- Surname (cognoms)\n");
-        if (!hasId)
+        }
+        if (!hasId) {
             missing.append("- ID/DNI/NIF number\n");
+        }
 
         String today = LocalDate.now()
                 .format(DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", Locale.forLanguageTag("ca")));
@@ -569,14 +578,17 @@ public class RedactPromptBuilder {
     // -------------------------------------------------------------------------
 
     private static String formatSources(List<String> sources, String sep, String lastSep) {
-        if (sources == null || sources.isEmpty())
+        if (sources == null || sources.isEmpty()) {
             return "";
-        if (sources.size() == 1)
+        }
+        if (sources.size() == 1) {
             return sources.getFirst();
+        }
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < sources.size(); i++) {
-            if (i > 0)
+            if (i > 0) {
                 sb.append(i == sources.size() - 1 ? lastSep : sep);
+            }
             sb.append(sources.get(i));
         }
         return sb.toString();

@@ -1,5 +1,7 @@
 package cat.complai.services.worker;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import cat.complai.dto.openrouter.AskStreamResult;
 import cat.complai.dto.openrouter.ComplainantIdentity;
 import cat.complai.dto.openrouter.OpenRouterErrorCode;
@@ -16,8 +18,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for the async Telegram ask pipeline.

@@ -1,5 +1,8 @@
 package cat.complai.services.openrouter;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.when;
+
 import cat.complai.dto.openrouter.AskStreamResult;
 import cat.complai.dto.openrouter.OpenRouterErrorCode;
 import cat.complai.dto.openrouter.OpenRouterResponseDto;
@@ -21,8 +24,6 @@ import org.mockito.MockitoAnnotations;
 import reactor.core.publisher.Flux;
 
 import java.util.List;
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.when;
 
 class OpenRouterServicesStreamTest {
 

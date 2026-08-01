@@ -1,28 +1,28 @@
 package cat.complai.services.openrouter;
 
-import cat.complai.utilities.http.HttpWrapper;
 import cat.complai.dto.http.OpenRouterStreamStartResult;
-import cat.complai.services.openrouter.conversation.ConversationManagementService;
-import cat.complai.services.openrouter.validation.InputValidationService;
 import cat.complai.dto.openrouter.AskStreamResult;
 import cat.complai.dto.openrouter.Source;
 import cat.complai.dto.openrouter.sse.SseChunkEvent;
-import cat.complai.dto.openrouter.sse.SseSources;
-import cat.complai.dto.openrouter.sse.SseSourcesEvent;
 import cat.complai.dto.openrouter.sse.SseDoneEvent;
 import cat.complai.dto.openrouter.sse.SseErrorEvent;
+import cat.complai.dto.openrouter.sse.SseSources;
+import cat.complai.dto.openrouter.sse.SseSourcesEvent;
 import cat.complai.helpers.openrouter.AskStreamErrorMapper;
 import cat.complai.helpers.openrouter.LanguageDetector;
 import cat.complai.helpers.openrouter.RedactPromptBuilder;
 import cat.complai.helpers.openrouter.SseChunkParser;
+import cat.complai.services.openrouter.conversation.ConversationManagementService;
+import cat.complai.services.openrouter.validation.InputValidationService;
+import cat.complai.utilities.http.HttpWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.core.annotation.Nullable;
-import jakarta.inject.Singleton;
 import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -149,14 +149,18 @@ public class StreamingOrchestrator {
             return buildFallbackStreamResult(fallbackMessage, conversationId, question);
         }
 
-        if (procCtx != null && procCtx.contextBlock() != null)
+        if (procCtx != null && procCtx.contextBlock() != null) {
             messages.add(Map.of("role", "system", "content", procCtx.contextBlock()));
-        if (eventCtx != null && eventCtx.contextBlock() != null)
+        }
+        if (eventCtx != null && eventCtx.contextBlock() != null) {
             messages.add(Map.of("role", "system", "content", eventCtx.contextBlock()));
-        if (newsCtx != null && newsCtx.contextBlock() != null)
+        }
+        if (newsCtx != null && newsCtx.contextBlock() != null) {
             messages.add(Map.of("role", "system", "content", newsCtx.contextBlock()));
-        if (cityInfoCtx != null && cityInfoCtx.contextBlock() != null)
+        }
+        if (cityInfoCtx != null && cityInfoCtx.contextBlock() != null) {
             messages.add(Map.of("role", "system", "content", cityInfoCtx.contextBlock()));
+        }
 
         var history = conversationService.getConversationHistory(conversationId);
         conversationService.addToMessages(messages, history);
@@ -190,7 +194,7 @@ public class StreamingOrchestrator {
         OpenRouterStreamStartResult streamStartResult = httpWrapper.streamFromOpenRouter(messages);
         if (streamStartResult instanceof OpenRouterStreamStartResult.Error(
                 cat.complai.exceptions.OpenRouterStreamingException failure
-        )) {
+            )) {
             return new AskStreamResult.Error(AskStreamErrorMapper.toResponseDto(failure));
         }
 
@@ -303,7 +307,7 @@ public class StreamingOrchestrator {
         OpenRouterStreamStartResult srStreamStart = httpWrapper.streamFromOpenRouter(streamResolvedMsgs);
         if (srStreamStart instanceof OpenRouterStreamStartResult.Error(
                 cat.complai.exceptions.OpenRouterStreamingException failure
-        )) {
+            )) {
             return new AskStreamResult.Error(AskStreamErrorMapper.toResponseDto(failure));
         }
         Publisher<String> srStream = ((OpenRouterStreamStartResult.Success) srStreamStart).stream();

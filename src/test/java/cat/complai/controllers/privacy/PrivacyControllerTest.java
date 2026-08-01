@@ -1,9 +1,9 @@
 package cat.complai.controllers.privacy;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import io.micronaut.http.HttpResponse;
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for {@link PrivacyController}.

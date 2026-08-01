@@ -1,13 +1,12 @@
 package cat.complai.exceptions;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import cat.complai.dto.openrouter.OpenRouterErrorCode;
 import cat.complai.exceptions.ses.CloudWatchLogsException;
-
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 @DisplayName("Exception Classes Tests")
 class ExceptionsTest {

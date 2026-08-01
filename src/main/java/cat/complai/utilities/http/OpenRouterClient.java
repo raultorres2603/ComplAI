@@ -20,7 +20,7 @@ public interface OpenRouterClient {
 
     /**
      * Send a chat completion request to OpenRouter API.
-     * 
+     *
      * @param payload The request body as a Map (will be serialized to JSON)
      * @param authorization The Bearer token authorization header
      * @param referer The HTTP-Referer header for OpenRouter analytics

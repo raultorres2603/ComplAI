@@ -1,5 +1,9 @@
 package cat.complai.services.telegram;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
+
 import cat.complai.config.TelegramConfiguration;
 import cat.complai.controllers.telegram.dto.*;
 import cat.complai.dto.openrouter.ComplainantIdentity;
@@ -17,10 +21,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for {@link TelegramBotService}.

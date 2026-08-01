@@ -1,12 +1,15 @@
 package cat.complai.services.worker;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
 import cat.complai.dto.http.HttpDto;
 import cat.complai.dto.openrouter.ComplainantIdentity;
 import cat.complai.dto.sqs.RedactSqsMessage;
 import cat.complai.helpers.openrouter.RedactPromptBuilder;
 import cat.complai.utilities.http.HttpWrapper;
 import cat.complai.utilities.s3.S3PdfUploader;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,10 +19,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.concurrent.CompletableFuture;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ComplaintLetterGeneratorTest {

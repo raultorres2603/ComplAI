@@ -17,16 +17,16 @@ import java.util.logging.Logger;
 /**
  * Pre-populates the ResponseCacheService with common, high-frequency questions
  * and responses (using the in-memory Caffeine cache).
- * 
+ *
  * This implements Tier 1 of the two-tier caching strategy:
  * - Tier 1 (this class): In-memory Caffeine cache, prepopulated at startup
  * - Tier 2: Runtime caching of AI responses
- * 
+ *
  * Load strategy:
  * - Loads common-ai-requests.json from classpath if available
  * - Continues gracefully if file is not found (no error, just no pre-cached
  * responses)
- * 
+ *
  * PRIVACY NOTE:
  * Common responses are pre-configured answers (not user-generated),
  * and cache keys are deterministic (no user-specific data).
@@ -50,7 +50,7 @@ public class CommonResponseCacheInitializer {
     /**
      * Loads and processes common responses at application startup.
      * Subscribes to Micronaut's StartupEvent for automatic initialization.
-     * 
+     *
      * @param event The Micronaut startup event
      */
     @EventListener
@@ -80,11 +80,11 @@ public class CommonResponseCacheInitializer {
     /**
      * Populate the cache with common responses.
      * Creates cache keys from category + city (or global if city is null).
-     * 
+     *
      * Note: Common response cache keys use context hashes of 0 (placeholder),
      * since these are generic pre-built responses not tied to specific RAG results.
      * Higher-priority hits will come from Tier 1 (actual RAG-based responses).
-     * 
+     *
      * @param entries List of common responses to cache
      */
     private void populateCache(List<CommonResponseEntry> entries) {

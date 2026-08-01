@@ -1,12 +1,12 @@
 package cat.complai.helpers.openrouter;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import cat.complai.helpers.openrouter.rag.InMemoryLexicalIndex;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 class ProcedureRagHelperTest {
 

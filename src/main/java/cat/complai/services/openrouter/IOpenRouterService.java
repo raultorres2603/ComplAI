@@ -1,7 +1,7 @@
 package cat.complai.services.openrouter;
 
-import cat.complai.dto.openrouter.ComplainantIdentity;
 import cat.complai.dto.openrouter.AskStreamResult;
+import cat.complai.dto.openrouter.ComplainantIdentity;
 import cat.complai.dto.openrouter.OpenRouterResponseDto;
 import cat.complai.dto.openrouter.OutputFormat;
 

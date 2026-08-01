@@ -1,5 +1,7 @@
 package cat.complai.utilities.scraper;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -19,10 +21,7 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
-
 import javax.net.ssl.SSLSocketFactory;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 class EventScraperTest {
 

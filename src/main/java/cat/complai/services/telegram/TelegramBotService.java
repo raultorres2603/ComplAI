@@ -2,7 +2,14 @@ package cat.complai.services.telegram;
 
 import cat.complai.config.TelegramConfiguration;
 import cat.complai.controllers.feedback.dto.FeedbackRequest;
-import cat.complai.controllers.telegram.dto.*;
+import cat.complai.controllers.telegram.dto.TelegramAnswerCallbackQueryRequest;
+import cat.complai.controllers.telegram.dto.TelegramCallbackQuery;
+import cat.complai.controllers.telegram.dto.TelegramInlineKeyboardButton;
+import cat.complai.controllers.telegram.dto.TelegramInlineKeyboardMarkup;
+import cat.complai.controllers.telegram.dto.TelegramMessage;
+import cat.complai.controllers.telegram.dto.TelegramSendChatActionRequest;
+import cat.complai.controllers.telegram.dto.TelegramSendMessageRequest;
+import cat.complai.controllers.telegram.dto.TelegramUpdate;
 import cat.complai.dto.feedback.FeedbackResult;
 import cat.complai.dto.openrouter.ComplainantIdentity;
 import cat.complai.dto.sqs.AskSqsMessage;
@@ -15,11 +22,11 @@ import cat.complai.utilities.s3.S3PdfUploader;
 import cat.complai.utilities.sqs.SqsAskPublisher;
 import cat.complai.utilities.sqs.SqsComplaintPublisher;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -130,7 +137,9 @@ public class TelegramBotService {
      * webhook timeout window.
      */
     public void processUpdate(TelegramUpdate update, String cityId) {
-        if (update == null) return;
+        if (update == null) {
+            return;
+        }
 
         // Deduplication: skip if we already processed this updateId
         long updateId = update.updateId();
@@ -255,7 +264,9 @@ public class TelegramBotService {
     private void handleCallbackQuery(TelegramCallbackQuery callback, String cityId) {
         long chatId = callback.fromUser().id();
         String data = callback.data();
-        if (data == null) return;
+        if (data == null) {
+            return;
+        }
 
         String lang = sessionStore.getLanguage(chatId);
 
@@ -769,7 +780,9 @@ public class TelegramBotService {
     }
 
     private static String extractNif(String text) {
-        if (text == null) return null;
+        if (text == null) {
+            return null;
+        }
         // Match Spanish NIF/NIE patterns: 12345678Z, X1234567Z, etc.
         var matcher = java.util.regex.Pattern.compile("[XYZ]?\\d{7,8}[A-Z]").matcher(text);
         return matcher.find() ? matcher.group() : null;
@@ -777,12 +790,33 @@ public class TelegramBotService {
 
     private String buildMissingFieldsMessage(ComplainantIdentity identity, String lang) {
         StringBuilder missing = new StringBuilder();
-        if (!isPresent(identity.name())) missing.append("- ").append(
-                switch (lang) { case "CA" -> "Nom"; case "ES" -> "Nombre"; case "FR" -> "Nom"; default -> "Name"; }).append("\n");
-        if (!isPresent(identity.surname())) missing.append("- ").append(
-                switch (lang) { case "CA" -> "Cognoms"; case "ES" -> "Apellidos"; case "FR" -> "Pr\u00E9nom"; default -> "Surname"; }).append("\n");
-        if (!isPresent(identity.idNumber())) missing.append("- ").append(
-                switch (lang) { case "CA" -> "NIF"; case "ES" -> "NIF"; case "FR" -> "NIF"; default -> "ID Number (NIF)"; }).append("\n");
+        if (!isPresent(identity.name())) {
+            missing.append("- ").append(
+                switch (lang) {
+                    case "CA" -> "Nom";
+                    case "ES" -> "Nombre";
+                    case "FR" -> "Nom";
+                    default -> "Name";
+                }).append("\n");
+        }
+        if (!isPresent(identity.surname())) {
+            missing.append("- ").append(
+                switch (lang) {
+                    case "CA" -> "Cognoms";
+                    case "ES" -> "Apellidos";
+                    case "FR" -> "Pr\u00E9nom";
+                    default -> "Surname";
+                }).append("\n");
+        }
+        if (!isPresent(identity.idNumber())) {
+            missing.append("- ").append(
+                switch (lang) {
+                    case "CA" -> "NIF";
+                    case "ES" -> "NIF";
+                    case "FR" -> "NIF";
+                    default -> "ID Number (NIF)";
+                }).append("\n");
+        }
 
         return switch (lang) {
             case "CA" -> "Falten les següents dades:\n" + missing + "\n"
@@ -801,7 +835,9 @@ public class TelegramBotService {
     // -------------------------------------------------------------------------
 
     private String resolveToken(String cityId) {
-        if (cityId == null) return "";
+        if (cityId == null) {
+            return "";
+        }
         try {
             return telegramConfig.getToken(cityId);
         } catch (IllegalArgumentException e) {
@@ -811,7 +847,9 @@ public class TelegramBotService {
     }
 
     private String resolveCityDisplayName(String cityId) {
-        if (cityId == null) return "";
+        if (cityId == null) {
+            return "";
+        }
         return switch (cityId.toLowerCase()) {
             case "elprat" -> "El Prat de Llobregat";
             case "testcity" -> "Test City";

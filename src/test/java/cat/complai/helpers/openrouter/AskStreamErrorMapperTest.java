@@ -1,16 +1,15 @@
 package cat.complai.helpers.openrouter;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import cat.complai.dto.openrouter.OpenRouterErrorCode;
 import cat.complai.dto.openrouter.OpenRouterResponseDto;
 import cat.complai.dto.openrouter.sse.SseErrorEvent;
 import cat.complai.exceptions.OpenRouterStreamingException;
-
 import org.junit.jupiter.api.Test;
 
 import java.net.http.HttpTimeoutException;
 import java.util.concurrent.TimeoutException;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 class AskStreamErrorMapperTest {
 

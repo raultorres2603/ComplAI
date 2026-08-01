@@ -1,13 +1,13 @@
 package cat.complai.services.worker;
 
-import cat.complai.utilities.http.HttpWrapper;
 import cat.complai.dto.http.HttpDto;
 import cat.complai.dto.openrouter.ComplainantIdentity;
+import cat.complai.dto.sqs.RedactSqsMessage;
 import cat.complai.helpers.openrouter.AiParsed;
 import cat.complai.helpers.openrouter.PdfGenerator;
 import cat.complai.helpers.openrouter.RedactPromptBuilder;
+import cat.complai.utilities.http.HttpWrapper;
 import cat.complai.utilities.s3.S3PdfUploader;
-import cat.complai.dto.sqs.RedactSqsMessage;
 
 import java.util.ArrayList;
 import java.util.List;

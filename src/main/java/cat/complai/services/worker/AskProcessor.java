@@ -134,7 +134,9 @@ class AskProcessor {
      * to newlines for readability.
      */
     static String sanitizeForTelegramHtml(String text) {
-        if (text == null) return null;
+        if (text == null) {
+            return null;
+        }
 
         // Replace <p> and <br> tags with newlines (use word boundary to avoid matching <pre>)
         String result = Pattern.compile("</?p(?:\\s[^>]*)?\\s*/?>", Pattern.CASE_INSENSITIVE)

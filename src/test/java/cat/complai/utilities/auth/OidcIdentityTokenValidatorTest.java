@@ -1,11 +1,12 @@
 package cat.complai.utilities.auth;
 
+import static org.junit.jupiter.api.Assertions.*;
+
+import cat.complai.exceptions.IdentityTokenValidationException;
 import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-
-import cat.complai.exceptions.IdentityTokenValidationException;
 
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -14,8 +15,6 @@ import java.security.PublicKey;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for {@link OidcIdentityTokenValidator}.

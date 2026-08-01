@@ -20,7 +20,9 @@ public enum OutputFormat {
      */
     @JsonCreator
     public static OutputFormat fromString(String value) {
-        if (value == null) return PDF;
+        if (value == null) {
+            return PDF;
+        }
         return switch (value.trim().toLowerCase()) {
             case "pdf" -> PDF;
             case "json" -> JSON;

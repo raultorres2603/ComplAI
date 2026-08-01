@@ -1,5 +1,10 @@
 package cat.complai.utilities.scraper;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.mockStatic;
+
 import cat.complai.utilities.scraper.GencatProcedureScraper.CrawlConfig;
 import cat.complai.utilities.scraper.GencatProcedureScraper.FieldExtractionRule;
 import cat.complai.utilities.scraper.GencatProcedureScraper.ScraperMapping;
@@ -13,7 +18,6 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
-import javax.net.ssl.SSLSocketFactory;
 import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -25,11 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.CALLS_REAL_METHODS;
-import static org.mockito.Mockito.mockStatic;
+import javax.net.ssl.SSLSocketFactory;
 
 class GencatProcedureScraperTest {
 

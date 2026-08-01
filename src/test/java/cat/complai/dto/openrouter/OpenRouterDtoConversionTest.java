@@ -1,5 +1,7 @@
 package cat.complai.dto.openrouter;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import org.junit.jupiter.api.DisplayName;
@@ -8,11 +10,9 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.*;
-
 /**
  * Tests for DTO conversion and JSON serialization.
- * 
+ *
  * Verifies:
  * - OpenRouterPublicDto.from() correctly copies all fields from
  * OpenRouterResponseDto

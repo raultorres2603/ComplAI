@@ -38,7 +38,9 @@ public record AiParsed(OutputFormat format, String message) {
      * the caller can apply its graceful fallback.
      */
     public static AiParsed parseAiFormatHeader(String aiMessage) {
-        if (aiMessage == null) return new AiParsed(OutputFormat.AUTO, "");
+        if (aiMessage == null) {
+            return new AiParsed(OutputFormat.AUTO, "");
+        }
 
         String trimmed = aiMessage.trim();
 
@@ -76,17 +78,27 @@ public record AiParsed(OutputFormat format, String message) {
             Object fmt = map.get("format");
             // Check common body key names the model might inline into the JSON object itself
             Object inlineBody = map.get("body");
-            if (inlineBody == null) inlineBody = map.get("message");
-            if (inlineBody == null) inlineBody = map.get("content");
-            if (inlineBody == null) inlineBody = map.get("text");
-            if (inlineBody == null) inlineBody = map.get("response");
+            if (inlineBody == null) {
+                inlineBody = map.get("message");
+            }
+            if (inlineBody == null) {
+                inlineBody = map.get("content");
+            }
+            if (inlineBody == null) {
+                inlineBody = map.get("text");
+            }
+            if (inlineBody == null) {
+                inlineBody = map.get("response");
+            }
 
             OutputFormat parsedFormat = fmt == null ? null : OutputFormat.fromString(fmt.toString());
             OutputFormat resolvedFormat = parsedFormat != null ? parsedFormat : OutputFormat.AUTO;
 
             // Prefer inline body key; fall back to text after the closing brace
             String resolvedBody = (inlineBody != null) ? inlineBody.toString().trim() : bodyAfterHeader;
-            if (resolvedBody == null) resolvedBody = "";
+            if (resolvedBody == null) {
+                resolvedBody = "";
+            }
 
             return new AiParsed(resolvedFormat, resolvedBody);
         } catch (Exception e) {
@@ -103,10 +115,13 @@ public record AiParsed(OutputFormat format, String message) {
         int depth = 0;
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
-            if (c == '{') depth++;
-            else if (c == '}') {
+            if (c == '{') {
+                depth++;
+            } else if (c == '}') {
                 depth--;
-                if (depth == 0) return i;
+                if (depth == 0) {
+                    return i;
+                }
             }
         }
         return -1;

@@ -1,12 +1,12 @@
 package cat.complai.services.worker;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import cat.complai.dto.feedback.FeedbackSqsMessage;
 import cat.complai.utilities.s3.S3FeedbackUploader;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.atomic.AtomicReference;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for {@link FeedbackProcessor}.

@@ -201,8 +201,8 @@ public class S3FeedbackLister {
     }
 
     /**
-         * Simple data class for feedback file entries returned by listFeedbackFiles.
-         */
-        public record FeedbackFileEntry(String fileName, String url) {
+     * Simple data class for feedback file entries returned by listFeedbackFiles.
+     */
+    public record FeedbackFileEntry(String fileName, String url) {
     }
 }

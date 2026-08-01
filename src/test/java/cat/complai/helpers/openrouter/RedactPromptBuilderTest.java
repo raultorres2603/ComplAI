@@ -1,9 +1,9 @@
 package cat.complai.helpers.openrouter;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import cat.complai.dto.openrouter.ComplainantIdentity;
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for {@link RedactPromptBuilder}.
@@ -113,10 +113,10 @@ class RedactPromptBuilderTest {
     void getSystemMessage_containsNoHardcodedExampleUrls() {
         String msg = builder.getSystemMessage("elprat");
         // The system message should not contain hardcoded example URLs that don't exist in procedures
-        assertFalse(msg.contains("https://tramits.pratespais.com/Ciutadania/Empadronament"), 
+        assertFalse(msg.contains("https://tramits.pratespais.com/Ciutadania/Empadronament"),
                   "System message must not contain hardcoded Empadronament URL example");
         // Should contain clarification about official sources being for general info only
-        assertTrue(msg.contains("només són per a informació general, no per enllaços específics de tràmits"), 
+        assertTrue(msg.contains("només són per a informació general, no per enllaços específics de tràmits"),
                   "System message must clarify that official sources are for general info only");
     }
 
@@ -169,7 +169,7 @@ class RedactPromptBuilderTest {
     @Test
     void getSystemMessage_frenchPrompt_adheresToHTMLOnlyRequirement() {
         String msg = builder.getSystemMessage("elprat", "FR");
-        assertTrue(msg.contains("OBLIGATOIRE") || msg.contains("HTML"), 
+        assertTrue(msg.contains("OBLIGATOIRE") || msg.contains("HTML"),
                 "FR prompt must enforce HTML-only output (French terms)");
         assertTrue(msg.contains("Jamais Markdown") || msg.contains("HTML"),
                 "FR prompt must forbid Markdown");

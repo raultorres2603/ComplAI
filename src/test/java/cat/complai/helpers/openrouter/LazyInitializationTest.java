@@ -1,5 +1,7 @@
 package cat.complai.helpers.openrouter;
 
+import static org.junit.jupiter.api.Assertions.*;
+
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.DisplayName;
@@ -11,8 +13,6 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-
-import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests verifying that RAG helpers are strictly lazy-initialized only on first

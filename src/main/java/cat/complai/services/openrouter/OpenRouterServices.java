@@ -254,8 +254,9 @@ public class OpenRouterServices implements IOpenRouterService {
         int tmpHistoryTokens = 0;
         int tmpUserTokens = 0;
         for (Map<String, Object> msg : messages) {
-            if (!(msg.get("content") instanceof String content))
+            if (!(msg.get("content") instanceof String content)) {
                 continue;
+            }
             String role = msg.get("role") instanceof String s ? s : "";
             int tokens = estimateTokenCount(content);
 
@@ -520,10 +521,12 @@ public class OpenRouterServices implements IOpenRouterService {
         for (Source source : sources) {
             String title = source.getTitle();
             String url = source.getUrl();
-            if (title != null)
+            if (title != null) {
                 sb.append(title).append("|");
-            if (url != null)
+            }
+            if (url != null) {
                 sb.append(url).append("|");
+            }
         }
         return sb.toString().hashCode();
     }

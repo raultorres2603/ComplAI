@@ -5,6 +5,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.Nullable;
 import jakarta.inject.Singleton;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -80,11 +81,13 @@ public class ConversationManagementService {
      * @param assistantMessage the assistant's reply text
      */
     public void updateConversationHistory(String conversationId, String userMessage, String assistantMessage) {
-        if (conversationId == null || conversationId.isBlank() || assistantMessage == null)
+        if (conversationId == null || conversationId.isBlank() || assistantMessage == null) {
             return;
+        }
         List<MessageEntry> history = conversationCache.getIfPresent(conversationId);
-        if (history == null)
+        if (history == null) {
             history = new ArrayList<>();
+        }
         if (userMessage != null && !userMessage.isBlank()) {
             history.add(new MessageEntry("user", userMessage.trim()));
         }
