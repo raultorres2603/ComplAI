@@ -1,9 +1,9 @@
 package cat.complai.controllers.openrouter;
 
-import cat.complai.utilities.auth.ApiKeyAuthFilter;
-import cat.complai.exceptions.IdentityTokenValidationException;
-import cat.complai.utilities.auth.OidcIdentityTokenValidator;
-import cat.complai.utilities.auth.VerifiedCitizenIdentity;
+import static org.junit.jupiter.api.Assertions.*;
+
+import cat.complai.controllers.openrouter.dto.AskRequest;
+import cat.complai.controllers.openrouter.dto.RedactRequest;
 import cat.complai.dto.openrouter.AskStreamResult;
 import cat.complai.dto.openrouter.ComplainantIdentity;
 import cat.complai.dto.openrouter.OpenRouterErrorCode;
@@ -14,7 +14,7 @@ import cat.complai.dto.openrouter.RedactAcceptedDto;
 import cat.complai.dto.sqs.RedactSqsMessage;
 import cat.complai.exceptions.IdentityTokenValidationException;
 import cat.complai.services.openrouter.IOpenRouterService;
-import cat.complai.utilities.auth.ApiKeyAuthFilter;
+import cat.complai.utilities.auth.AuthConstants;
 import cat.complai.utilities.auth.OidcIdentityTokenValidator;
 import cat.complai.utilities.auth.VerifiedCitizenIdentity;
 import cat.complai.utilities.metrics.InteractionMetricsPublisher;

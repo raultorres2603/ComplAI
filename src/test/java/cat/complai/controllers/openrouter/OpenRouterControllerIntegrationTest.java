@@ -1,7 +1,9 @@
 package cat.complai.controllers.openrouter;
 
-import cat.complai.utilities.http.HttpWrapper;
-import cat.complai.exceptions.OpenRouterStreamingException;
+import static org.junit.jupiter.api.Assertions.*;
+
+import cat.complai.controllers.openrouter.dto.AskRequest;
+import cat.complai.controllers.openrouter.dto.RedactRequest;
 import cat.complai.dto.http.HttpDto;
 import cat.complai.dto.http.OpenRouterStreamStartResult;
 import cat.complai.dto.openrouter.ComplainantIdentity;
@@ -28,6 +30,7 @@ import cat.complai.services.openrouter.ai.AiResponseProcessingService;
 import cat.complai.services.openrouter.cache.ResponseCacheService;
 import cat.complai.services.openrouter.conversation.ConversationManagementService;
 import cat.complai.services.openrouter.validation.InputValidationService;
+import cat.complai.utilities.auth.TestJwtSessionFilter;
 import cat.complai.utilities.http.HttpWrapper;
 import cat.complai.utilities.s3.S3PdfUploader;
 import cat.complai.utilities.sqs.SqsComplaintPublisher;
